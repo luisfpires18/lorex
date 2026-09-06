@@ -55,6 +55,11 @@ secrets.json
 .DS_Store
 Thumbs.db
 
+# ---------- Graphify ----------
+# Rebuildable from source with "graphify update ." (AST only, no API cost).
+graphify-out/
+*.graphify-bak
+
 # ---------- Lorex launcher runtime ----------
 .lorex/
 logs/
