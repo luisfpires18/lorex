@@ -38,7 +38,7 @@ docs/007/architecture-update
 
 | Number | Branch | Status |
 | --- | --- | --- |
-| 001 | `feat/001/repository-bootstrap` | in progress, unmerged |
+| 001 | `feat/001/repository-bootstrap` | merged into `dev` |
 
 Next free number: `002`.
 

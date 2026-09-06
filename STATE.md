@@ -13,12 +13,14 @@ Repository bootstrap complete. No product features exist.
 
 ## Current phase
 
-`feat/001/repository-bootstrap` - done, unmerged, on branch.
+Phase 001 complete and merged into `dev`. Current branch: `dev`.
+`feat/001/repository-bootstrap` still exists, not deleted.
 
 ## Immediate next step
 
-Decide phase 002. Likely `feat/002/authentication`: wire ASP.NET Core Identity onto
-`LorexDbContext`, add the Identity migration, add auth endpoints.
+Branch `feat/002/authentication` from `dev`: derive `LorexDbContext` from
+`IdentityDbContext`, add the Identity migration, add auth endpoints.
+See `docs/architecture/decisions/0003-identity-foundation.md`.
 
 ## Tooling
 
