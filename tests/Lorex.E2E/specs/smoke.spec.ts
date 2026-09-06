@@ -2,18 +2,20 @@ import { expect, test } from '@playwright/test'
 
 test.describe('bootstrap smoke', () => {
   test('frontend loads and renders the app shell', async ({ page }) => {
-    await page.goto('/')
+    await page.goto('/login')
 
     await expect(page).toHaveTitle('Lorex')
-    await expect(page.getByTestId('app-title')).toHaveText('Lorex')
+    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
   })
 
   test('frontend reaches the API through the dev proxy', async ({ page }) => {
-    await page.goto('/')
+    const sessionProbe = page.waitForResponse((response) => response.url().includes('/api/auth/me'))
 
-    const status = page.getByTestId('api-status')
-    await expect(status).toHaveAttribute('data-state', 'online')
-    await expect(status).toContainText('Lorex.Api')
+    await page.goto('/app')
+
+    // The session probe has to reach the API for the route guard to resolve at all.
+    expect((await sessionProbe).status()).toBe(401)
+    await expect(page).toHaveURL('/login')
   })
 
   test('api health endpoint answers directly', async ({ request }) => {
