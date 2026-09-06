@@ -1,0 +1,44 @@
+using Lorex.Api.Data;
+using Lorex.Api.Features.Health;
+using Microsoft.EntityFrameworkCore;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddOpenApi();
+builder.Services.AddHealthChecks();
+
+builder.Services.AddLorexDatabase(builder.Configuration, builder.Environment);
+
+var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+if (corsOrigins.Length > 0)
+{
+    builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
+        .WithOrigins(corsOrigins)
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials()));
+}
+
+var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
+
+if (corsOrigins.Length > 0)
+{
+    app.UseCors();
+}
+
+// Dev runs over plain HTTP so the local launcher does not depend on a trusted dev certificate.
+// Production hosting is expected to terminate TLS in front of the app.
+
+app.MapHealthEndpoints();
+
+await app.MigrateLorexDatabaseAsync();
+
+app.Run();
+
+/// <summary>Exposed so integration tests can boot the real host through WebApplicationFactory.</summary>
+public partial class Program;
