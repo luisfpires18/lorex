@@ -1,0 +1,9 @@
+{
+  "enabledPlugins": {
+    "security-guidance@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true,
+    "playwright@claude-plugins-official": true,
+    "caveman@caveman": true,
+    "humanizer@humanizer": true
+  }
+}
