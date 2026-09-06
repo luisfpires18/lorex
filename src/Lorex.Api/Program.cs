@@ -1,6 +1,6 @@
 using Lorex.Api.Data;
+using Lorex.Api.Features.Auth;
 using Lorex.Api.Features.Health;
-using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,6 +8,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks();
 
 builder.Services.AddLorexDatabase(builder.Configuration, builder.Environment);
+builder.Services.AddLorexAuth(builder.Environment);
 
 var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 if (corsOrigins.Length > 0)
@@ -34,7 +35,11 @@ if (corsOrigins.Length > 0)
 // Dev runs over plain HTTP so the local launcher does not depend on a trusted dev certificate.
 // Production hosting is expected to terminate TLS in front of the app.
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.MapHealthEndpoints();
+app.MapAuthEndpoints();
 
 await app.MigrateLorexDatabaseAsync();
 

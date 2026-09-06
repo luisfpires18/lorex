@@ -5,6 +5,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 
 namespace Lorex.Api.Tests;
 
@@ -28,6 +29,20 @@ public sealed class LorexApiFactory : WebApplicationFactory<Program>
             _connection.Open();
             services.AddDbContext<LorexDbContext>(options => options.UseSqlite(_connection));
         });
+    }
+
+    /// <summary>
+    /// Applies the real migrations to the throwaway database, so every test also proves the
+    /// migration set builds a usable schema.
+    /// </summary>
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        var host = base.CreateHost(builder);
+
+        using var scope = host.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<LorexDbContext>().Database.Migrate();
+
+        return host;
     }
 
     protected override void Dispose(bool disposing)
