@@ -20,8 +20,13 @@ Repository bootstrap complete. No product features exist.
 Decide phase 002. Likely `feat/002/authentication`: wire ASP.NET Core Identity onto
 `LorexDbContext`, add the Identity migration, add auth endpoints.
 
+## Tooling
+
+Project-scoped plugins in `.claude/settings.json`: caveman, humanizer, frontend-design,
+playwright, security-guidance. ASP.NET Core guidance lives in
+`.claude/skills/aspnet-core-guidance/`.
+
 ## Blockers
 
-- Graphify CLI not installed and not present in any configured plugin marketplace.
-  Repository is not configured for it. Install manually if wanted, then configure
-  project-scoped (non-blocking mode).
+- Graphify: no CLI on PATH and no plugin in any configured marketplace, so it could
+  not be configured project-scoped. Manual action needed if wanted.
