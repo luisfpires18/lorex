@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Lorex.Api.Features.Auth;
 
@@ -15,6 +16,16 @@ public static class AuthEndpoints
     private const string InvalidCredentials = "That username or email and password combination is not correct.";
 
     private static readonly EmailAddressAttribute EmailValidator = new();
+
+    /// <summary>
+    /// A throwaway user carrying a hash of a value only this process ever sees. Verifying
+    /// against it costs the same as a real password check, so an unknown identifier and a
+    /// wrong password take the same time to answer.
+    /// </summary>
+    private static readonly LorexUser TimingDecoy = new()
+    {
+        PasswordHash = new PasswordHasher<LorexUser>().HashPassword(new LorexUser(), Guid.NewGuid().ToString()),
+    };
 
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -83,7 +94,21 @@ public static class AuthEndpoints
         }
 
         var user = new LorexUser { UserName = username, Email = email };
-        var result = await userManager.CreateAsync(user, password);
+
+        IdentityResult result;
+        try
+        {
+            result = await userManager.CreateAsync(user, password);
+        }
+        catch (DbUpdateException)
+        {
+            // Two registrations for the same username or email can pass the checks above
+            // concurrently; the unique indexes settle it and one of them lands here.
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["request"] = ["Those details were just taken. Try again."],
+            });
+        }
 
         if (!result.Succeeded)
         {
@@ -121,6 +146,10 @@ public static class AuthEndpoints
 
         if (user is null)
         {
+            // Burn the same work a real verification would, so response time does not
+            // disclose whether the account exists.
+            userManager.PasswordHasher.VerifyHashedPassword(
+                TimingDecoy, TimingDecoy.PasswordHash!, password);
             return InvalidCredentialsProblem();
         }
 
