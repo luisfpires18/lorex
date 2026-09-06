@@ -8,7 +8,8 @@ Router only. No architecture detail here.
 2. Read `SYSTEMS.md` when you need to find a file.
 3. Load only context relevant to the current task. Nothing else.
 4. Prefer targeted file reads over repository-wide scanning.
-5. Use Graphify first when available and useful. Fall back to targeted reads otherwise.
+5. Use Graphify first for repository understanding. Fall back to targeted reads when
+   faster or when the graph lacks the answer. Graphify is advisory, never blocking.
 6. Keep context/state files concise. Trim instead of appending.
 7. Use caveman-style concise output.
 
@@ -23,6 +24,11 @@ Router only. No architecture detail here.
 - Update `STATE.md`: current state, phase, next step, real blockers only.
 - Update `SYSTEMS.md` when paths or responsibilities change.
 - Write an ADR in `docs/architecture/decisions/` only for durable decisions.
+
+## Tooling
+
+- Graphify usage rules: `.claude/CLAUDE.md`. Skill: `.claude/skills/graphify/SKILL.md`.
+- Backend conventions: `.claude/skills/aspnet-core-guidance/SKILL.md`.
 
 ## Hard boundaries
 

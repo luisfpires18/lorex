@@ -23,10 +23,14 @@ Decide phase 002. Likely `feat/002/authentication`: wire ASP.NET Core Identity o
 ## Tooling
 
 Project-scoped plugins in `.claude/settings.json`: caveman, humanizer, frontend-design,
-playwright, security-guidance. ASP.NET Core guidance lives in
-`.claude/skills/aspnet-core-guidance/`.
+playwright, security-guidance.
+
+Skills in `.claude/skills/`: `aspnet-core-guidance`, `graphify`.
+
+Graphify 0.9.55 installed project-scoped. Advisory PreToolUse hooks, no strict mode.
+Graph built: 362 nodes, 351 edges, 38 communities. Rebuild with `graphify update .`
+(AST only, no API cost). `graphify-out/` is gitignored.
 
 ## Blockers
 
-- Graphify: no CLI on PATH and no plugin in any configured marketplace, so it could
-  not be configured project-scoped. Manual action needed if wanted.
+None.

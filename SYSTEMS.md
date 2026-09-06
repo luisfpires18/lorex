@@ -13,6 +13,16 @@ Repository index. Paths and one-line responsibilities only.
 | `Start-Lorex.cmd` / `Stop-Lorex.cmd` | Windows entry points for the local launcher. |
 | `CLAUDE.md` | Traffic controller for Claude sessions. |
 | `STATE.md` | Current state, phase, next step, blockers. |
+| `graphify-out/` | Generated knowledge graph. Gitignored; rebuild with `graphify update .`. |
+
+## `.claude` - session tooling
+
+| Path | Responsibility |
+| --- | --- |
+| `CLAUDE.md` | Tooling rules (Graphify usage) kept out of the root router. |
+| `settings.json` | Project-scoped plugins and Graphify advisory hooks. |
+| `skills/aspnet-core-guidance/` | Backend conventions for `src/Lorex.Api`. |
+| `skills/graphify/` | Graphify skill and references. |
 
 ## `src/Lorex.Api` - ASP.NET Core host
 
