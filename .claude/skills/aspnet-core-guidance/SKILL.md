@@ -57,9 +57,14 @@ Conventions for `src/Lorex.Api`. Follow these over generic tutorial patterns.
 - Test through HTTP where a feature is reachable over HTTP.
 - Test method names use `Snake_case_sentences`; CA1707 is suppressed in that project.
 
-## Auth (when the auth phase starts)
+## Auth
 
-- ASP.NET Core Identity on top of `LorexDbContext` - see
-  `docs/architecture/decisions/0003-identity-foundation.md`.
-- Change `LorexDbContext` to derive from `IdentityDbContext<...>`, add one migration,
-  then wire endpoints. Do not hand-roll password hashing or token issuing.
+- ASP.NET Core Identity with the application cookie, wired in `Features/Auth/AuthSetup.cs`.
+  See `docs/architecture/decisions/0005-cookie-authentication.md`.
+- Endpoints are anonymous unless they call `.RequireAuthorization()`. There is no
+  fallback policy, so every authenticated endpoint must opt in explicitly.
+- Never expose an Identity entity. Map to a record in `Features/Auth/AuthContracts.cs`
+  or the feature's own contracts.
+- Sign-in failures return one uniform response. Do not add messages that distinguish an
+  unknown account from a wrong password.
+- Do not hand-roll password hashing, cookie signing or token issuing.

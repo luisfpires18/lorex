@@ -33,6 +33,11 @@ Repository index. Paths and one-line responsibilities only.
 | `Data/DatabaseSetup.cs` | SQLite registration, data-source path resolution, dev migrations. |
 | `Data/Migrations/` | EF Core migrations. |
 | `Features/Health/HealthEndpoints.cs` | `/health` and `/api/health`. |
+| `Features/Auth/AuthSetup.cs` | Identity registration and cookie session configuration. |
+| `Features/Auth/AuthEndpoints.cs` | Register, login, logout and current-user endpoints. |
+| `Features/Auth/AuthContracts.cs` | Request and response records for the auth surface. |
+| `Features/Auth/LorexUser.cs` | Application user on top of `IdentityUser`. |
+| `Features/Auth/LorexUserConfiguration.cs` | Unique index on the normalized email. |
 | `appsettings.json` | Non-secret defaults; empty connection string. |
 | `appsettings.Development.json` | Dev connection string and CORS origins. |
 
@@ -41,8 +46,12 @@ Repository index. Paths and one-line responsibilities only.
 | Path | Responsibility |
 | --- | --- |
 | `src/main.tsx` | React entry point. |
-| `src/App.tsx` | App shell; probes `/api/health`. |
-| `src/index.css` | Global styles. |
+| `src/App.tsx` | Routes and providers. |
+| `src/styles.css` | Design tokens and all component styles. |
+| `src/lib/api.ts` | Same-origin fetch wrapper and `ApiError`. |
+| `src/auth/` | Session context, `useAuth`, and the route guards. |
+| `src/components/` | `AuthLayout` and the ruled `Field` input. |
+| `src/pages/` | `LoginPage`, `RegisterPage`, `AppPage`. |
 | `vite.config.ts` | Dev server port 5173, proxy to the API, build config. |
 
 ## `tests`
@@ -51,8 +60,10 @@ Repository index. Paths and one-line responsibilities only.
 | --- | --- |
 | `Lorex.Api.Tests/LorexApiFactory.cs` | Boots the real host over in-memory SQLite. |
 | `Lorex.Api.Tests/HealthEndpointTests.cs` | Backend test-infrastructure proof. |
+| `Lorex.Api.Tests/AuthEndpointTests.cs` | Registration, sign-in, session and logout. |
 | `Lorex.E2E/playwright.config.ts` | Starts API + web, runs Chromium. |
 | `Lorex.E2E/specs/smoke.spec.ts` | Frontend-loads smoke suite. |
+| `Lorex.E2E/specs/auth.spec.ts` | Register, sign out, guard, sign back in. |
 
 ## `scripts`
 
