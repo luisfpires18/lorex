@@ -25,6 +25,15 @@ Phase 002 complete and merged into `dev`. Current branch: `dev`.
 Phase 003: Universe ownership and the core Universe system. Branch
 `feat/003/universe-core` from `dev`.
 
+## Remote
+
+`origin` = https://github.com/luisfpires18/lorex.git (private). `dev` is published and
+tracks `origin/dev`; `dev` is the GitHub default branch.
+
+Local `master` is unpushed. `origin/master` holds an unrelated GitHub-created initial
+commit (`.gitignore`, `README.md`) with no common ancestor, so the two must be
+reconciled deliberately before any `master` push.
+
 ## Tooling
 
 Project-scoped plugins in `.claude/settings.json`: caveman, humanizer, frontend-design,
@@ -37,5 +46,5 @@ Rebuild with `graphify update .` (AST only, no API cost). `graphify-out/` is git
 
 ## Blockers
 
-None. Production deployment will need a persisted Data Protection key ring so cookie
+None blocking. `master` reconciliation is pending, see Remote. Production deployment will need a persisted Data Protection key ring so cookie
 sessions survive a restart - see `docs/architecture/decisions/0005-cookie-authentication.md`.
