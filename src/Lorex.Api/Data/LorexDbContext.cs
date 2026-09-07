@@ -1,4 +1,5 @@
 using Lorex.Api.Features.Auth;
+using Lorex.Api.Features.Universes;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,6 +13,8 @@ namespace Lorex.Api.Data;
 public class LorexDbContext(DbContextOptions<LorexDbContext> options)
     : IdentityDbContext<LorexUser>(options)
 {
+    public DbSet<Universe> Universes => Set<Universe>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);

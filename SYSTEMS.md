@@ -38,6 +38,10 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Auth/AuthContracts.cs` | Request and response records for the auth surface. |
 | `Features/Auth/LorexUser.cs` | Application user on top of `IdentityUser`. |
 | `Features/Auth/LorexUserConfiguration.cs` | Unique index on the normalized email. |
+| `Features/Universes/Universe.cs` | Universe entity, owned by one user. |
+| `Features/Universes/UniverseConfiguration.cs` | Owner FK, indexes, per-owner unique name. |
+| `Features/Universes/UniverseEndpoints.cs` | Owner-scoped CRUD, search, paging, archive. |
+| `Features/Universes/UniverseContracts.cs` | Request and response records for universes. |
 | `appsettings.json` | Non-secret defaults; empty connection string. |
 | `appsettings.Development.json` | Dev connection string and CORS origins. |
 
@@ -50,8 +54,10 @@ Repository index. Paths and one-line responsibilities only.
 | `src/styles.css` | Design tokens and all component styles. |
 | `src/lib/api.ts` | Same-origin fetch wrapper and `ApiError`. |
 | `src/auth/` | Session context, `useAuth`, and the route guards. |
-| `src/components/` | `AuthLayout` and the ruled `Field` input. |
-| `src/pages/` | `LoginPage`, `RegisterPage`, `AppPage`. |
+| `src/universes/` | Universe API client and types. |
+| `src/lib/dates.ts` | Timestamp formatting. |
+| `src/components/` | `AuthLayout`, the ruled `Field`, `UniverseCard`, `UniverseForm`. |
+| `src/pages/` | Login, Register, Universes browser, and the workspace with Overview and Settings. |
 | `vite.config.ts` | Dev server port 5173, proxy to the API, build config. |
 
 ## `tests`
@@ -61,9 +67,11 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.Api.Tests/LorexApiFactory.cs` | Boots the real host over in-memory SQLite. |
 | `Lorex.Api.Tests/HealthEndpointTests.cs` | Backend test-infrastructure proof. |
 | `Lorex.Api.Tests/AuthEndpointTests.cs` | Registration, sign-in, session and logout. |
+| `Lorex.Api.Tests/UniverseEndpointTests.cs` | Universe CRUD and the ownership invariant. |
 | `Lorex.E2E/playwright.config.ts` | Starts API + web, runs Chromium. |
 | `Lorex.E2E/specs/smoke.spec.ts` | Frontend-loads smoke suite. |
 | `Lorex.E2E/specs/auth.spec.ts` | Register, sign out, guard, sign back in. |
+| `Lorex.E2E/specs/universes.spec.ts` | Create, edit, search, archive, paginate, ownership. |
 
 ## `scripts`
 

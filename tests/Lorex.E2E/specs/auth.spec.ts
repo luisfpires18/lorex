@@ -40,7 +40,7 @@ test.describe('authentication', () => {
 
     await expect(page).toHaveURL('/app')
     await expect(page.getByTestId('signed-in-user')).toHaveText(account.username)
-    await expect(page.getByText('Your universes will appear here.')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Universes' })).toBeVisible()
 
     await page.getByRole('button', { name: 'Sign out' }).click()
     await expect(page).toHaveURL('/login')
