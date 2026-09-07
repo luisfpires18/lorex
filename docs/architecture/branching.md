@@ -8,6 +8,9 @@
 
 Never work directly on `master`. Avoid direct feature work on `dev`.
 
+`master` carries two roots: the Lorex root commit and GitHub's repository-creation
+commit, joined once with `--allow-unrelated-histories`. Nothing else needs that flag.
+
 ## Working branches
 
 Format:
