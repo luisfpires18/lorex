@@ -9,3 +9,25 @@ export function formatDate(iso: string) {
   const parsed = new Date(iso)
   return Number.isNaN(parsed.getTime()) ? '' : formatter.format(parsed)
 }
+
+/**
+ * Reads an API timestamp into the value a `<input type="date">` wants. The leading date
+ * part is taken verbatim rather than through `Date`, so a stored UTC day is never shifted
+ * into the previous one by the reader's own time zone.
+ */
+export function toDateInput(iso: string | null) {
+  return iso ? iso.slice(0, 10) : ''
+}
+
+/** Turns a date input back into the UTC instant the API stores. */
+export function fromDateInput(value: string) {
+  return value ? `${value}T00:00:00Z` : null
+}
+
+/** "1 May 3019 to 1 Mar 3120", or one open end, or nothing at all. */
+export function formatSpan(start: string | null, end: string | null) {
+  if (start && end) return `${formatDate(start)} to ${formatDate(end)}`
+  if (start) return `from ${formatDate(start)}`
+  if (end) return `until ${formatDate(end)}`
+  return ''
+}

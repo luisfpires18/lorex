@@ -1,0 +1,421 @@
+import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { EntityPicker } from './EntityPicker'
+import { ApiError } from '../lib/api'
+import { formatSpan, fromDateInput, toDateInput } from '../lib/dates'
+import {
+  createRelationship,
+  deleteRelationship,
+  listEntityRelationships,
+  listRelationshipTypes,
+  updateRelationship,
+} from '../relationships/api'
+import {
+  Perspective,
+  labelChoices,
+  type RelationshipType,
+  type RelationshipView,
+} from '../relationships/types'
+import { CANON_LABELS, CANON_ORDER, CanonStatus, type CanonStatusValue } from '../lore/types'
+
+interface RelationDraft {
+  typeId: string
+  /** True when the entry being edited is on the receiving side of the wording. */
+  useInverse: boolean
+  related: { id: string; name: string } | null
+  canonStatus: CanonStatusValue
+  start: string
+  end: string
+  notes: string
+}
+
+interface RelationshipSectionProps {
+  universeId: string
+  entityId: string
+  entityName: string
+}
+
+function choiceKey(typeId: string, useInverse: boolean) {
+  return `${typeId}:${useInverse ? 'inverse' : 'forward'}`
+}
+
+/** How a link reads from the side of the entry being edited. */
+function labelFor(types: RelationshipType[], typeId: string, useInverse: boolean) {
+  const type = types.find((candidate) => candidate.id === typeId)
+  if (!type) return ''
+  return useInverse && !type.isSymmetric ? (type.inverseName ?? type.name) : type.name
+}
+
+function draftFromView(view: RelationshipView): RelationDraft {
+  return {
+    typeId: view.relationshipTypeId,
+    useInverse: view.perspective === Perspective.Inverse,
+    related: { id: view.relatedEntityId, name: view.relatedEntityName },
+    canonStatus: view.canonStatus,
+    start: toDateInput(view.startDate),
+    end: toDateInput(view.endDate),
+    notes: view.notes ?? '',
+  }
+}
+
+export function RelationshipSection({
+  universeId,
+  entityId,
+  entityName,
+}: RelationshipSectionProps) {
+  const [views, setViews] = useState<RelationshipView[] | null>(null)
+  const [types, setTypes] = useState<RelationshipType[]>([])
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [isAdding, setIsAdding] = useState(false)
+  const [draft, setDraft] = useState<RelationDraft | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [message, setMessage] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+
+  const load = useCallback(
+    (signal?: AbortSignal) =>
+      Promise.all([
+        listEntityRelationships(universeId, entityId, signal),
+        listRelationshipTypes(universeId, signal),
+      ])
+        .then(([loadedViews, loadedTypes]) => {
+          setViews(loadedViews)
+          setTypes(loadedTypes)
+        })
+        .catch(() => {
+          if (signal?.aborted) return
+          setViews([])
+          setMessage('The relations could not be read.')
+        }),
+    [universeId, entityId],
+  )
+
+  useEffect(() => {
+    const controller = new AbortController()
+    void load(controller.signal)
+    return () => {
+      controller.abort()
+    }
+  }, [load])
+
+  function close() {
+    setIsAdding(false)
+    setEditingId(null)
+    setDraft(null)
+    setFieldErrors({})
+  }
+
+  function openAdd() {
+    if (types.length === 0) return
+    setMessage(null)
+    setFieldErrors({})
+    setEditingId(null)
+    setIsAdding(true)
+    setDraft({
+      typeId: types[0].id,
+      useInverse: false,
+      related: null,
+      canonStatus: CanonStatus.Idea,
+      start: '',
+      end: '',
+      notes: '',
+    })
+  }
+
+  function openEdit(view: RelationshipView) {
+    setMessage(null)
+    setFieldErrors({})
+    setIsAdding(false)
+    setEditingId(view.id)
+    setDraft(draftFromView(view))
+  }
+
+  async function save() {
+    if (!draft) return
+
+    if (!draft.related) {
+      setFieldErrors({ targetentityid: 'Choose the entry this connects to.' })
+      return
+    }
+
+    setMessage(null)
+    setFieldErrors({})
+    setIsSaving(true)
+
+    // The stored row always runs source to target. Which end this entry sits on comes
+    // from the wording the author picked, so no source/target vocabulary reaches them.
+    const input = {
+      relationshipTypeId: draft.typeId,
+      sourceEntityId: draft.useInverse ? draft.related.id : entityId,
+      targetEntityId: draft.useInverse ? entityId : draft.related.id,
+      canonStatus: draft.canonStatus,
+      startDate: fromDateInput(draft.start),
+      endDate: fromDateInput(draft.end),
+      notes: draft.notes.trim() ? draft.notes.trim() : null,
+    }
+
+    try {
+      if (editingId) {
+        await updateRelationship(universeId, editingId, input)
+      } else {
+        await createRelationship(universeId, input)
+      }
+      close()
+      await load()
+    } catch (error: unknown) {
+      if (error instanceof ApiError) {
+        setFieldErrors(error.fieldErrors)
+        setMessage(
+          Object.keys(error.fieldErrors).length === 0
+            ? error.message
+            : 'Some details need a change before this can be saved.',
+        )
+      } else {
+        setMessage('That relation could not be saved.')
+      }
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  async function remove(view: RelationshipView) {
+    if (!window.confirm(`Remove "${view.label} ${view.relatedEntityName}"?`)) return
+
+    setMessage(null)
+    try {
+      await deleteRelationship(universeId, view.id)
+      if (editingId === view.id) close()
+      await load()
+    } catch (error: unknown) {
+      setMessage(error instanceof ApiError ? error.message : 'That relation could not be removed.')
+    }
+  }
+
+  const choices = labelChoices(types)
+
+  const form = draft ? (
+    <div className="relform" data-testid="relationship-form">
+      <p className="relform__reads" data-testid="relationship-preview">
+        <span className="relform__subject">{entityName || 'This entry'}</span>{' '}
+        <span className="relform__verb">{labelFor(types, draft.typeId, draft.useInverse)}</span>{' '}
+        <span className="relform__object">{draft.related?.name ?? '…'}</span>
+      </p>
+
+      <div className="relform__grid">
+        <div className="field">
+          <label className="field__label" htmlFor="relation-reading">
+            Reading
+          </label>
+          <select
+            id="relation-reading"
+            className="field__input field__input--select"
+            value={choiceKey(draft.typeId, draft.useInverse)}
+            onChange={(event) => {
+              const chosen = choices.find((choice) => choice.key === event.target.value)
+              if (chosen) {
+                setDraft({ ...draft, typeId: chosen.typeId, useInverse: chosen.useInverse })
+              }
+            }}
+            data-testid="relationship-reading"
+          >
+            {choices.map((choice) => (
+              <option key={choice.key} value={choice.key}>
+                {choice.label}
+              </option>
+            ))}
+          </select>
+          {fieldErrors.relationshiptypeid ? (
+            <p className="field__error">{fieldErrors.relationshiptypeid}</p>
+          ) : null}
+        </div>
+
+        <EntityPicker
+          label="Connected to"
+          universeId={universeId}
+          value={draft.related}
+          onChange={(related) => setDraft({ ...draft, related })}
+          excludeId={entityId}
+          error={fieldErrors.targetentityid ?? fieldErrors.sourceentityid}
+        />
+
+        <div className="field">
+          <span className="field__label">Status</span>
+          <div className="canon" role="group" aria-label="Relation status">
+            {CANON_ORDER.map((option) => (
+              <button
+                key={option}
+                type="button"
+                className="canon__step"
+                aria-pressed={draft.canonStatus === option}
+                onClick={() => setDraft({ ...draft, canonStatus: option })}
+                data-testid={`relation-canon-${CANON_LABELS[option].toLowerCase()}`}
+              >
+                {CANON_LABELS[option]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="field">
+          <label className="field__label" htmlFor="relation-start">
+            Began
+          </label>
+          <input
+            id="relation-start"
+            className="field__input"
+            type="date"
+            value={draft.start}
+            onChange={(event) => setDraft({ ...draft, start: event.target.value })}
+            data-testid="relation-start"
+          />
+        </div>
+
+        <div className="field">
+          <label className="field__label" htmlFor="relation-end">
+            Ended
+          </label>
+          <input
+            id="relation-end"
+            className="field__input"
+            type="date"
+            value={draft.end}
+            onChange={(event) => setDraft({ ...draft, end: event.target.value })}
+            aria-invalid={fieldErrors.enddate ? true : undefined}
+            data-testid="relation-end"
+          />
+          {fieldErrors.enddate ? <p className="field__error">{fieldErrors.enddate}</p> : null}
+        </div>
+      </div>
+
+      <div className="field">
+        <label className="field__label" htmlFor="relation-notes">
+          Notes
+        </label>
+        <textarea
+          id="relation-notes"
+          className="entry__summaryinput"
+          rows={2}
+          placeholder="What is worth remembering about this connection."
+          value={draft.notes}
+          onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
+          data-testid="relation-notes"
+        />
+        {fieldErrors.notes ? <p className="field__error">{fieldErrors.notes}</p> : null}
+      </div>
+
+      <div className="relform__actions">
+        <button
+          className="button"
+          type="button"
+          onClick={save}
+          disabled={isSaving}
+          data-testid="save-relationship"
+        >
+          {isSaving ? 'Saving' : editingId ? 'Save relation' : 'Add relation'}
+        </button>
+        <button className="button button--quiet" type="button" onClick={close}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  ) : null
+
+  return (
+    <section className="relations" aria-labelledby="relations-heading">
+      <div className="relations__head">
+        <h3 className="relations__title" id="relations-heading">
+          Relations
+        </h3>
+        {types.length > 0 && !isAdding && !editingId ? (
+          <button
+            className="button button--quiet"
+            type="button"
+            onClick={openAdd}
+            data-testid="add-relationship"
+          >
+            Add relation
+          </button>
+        ) : null}
+      </div>
+
+      {message ? (
+        <p className="form__message" role="alert" data-testid="relationship-error">
+          {message}
+        </p>
+      ) : null}
+
+      {isAdding ? form : null}
+
+      {views === null ? (
+        <p className="relations__quiet" role="status">
+          Reading the relations…
+        </p>
+      ) : views.length === 0 && !isAdding ? (
+        <p className="relations__quiet" data-testid="relations-empty">
+          {types.length === 0 ? (
+            <>
+              Relations need a kind first — who rules what, who is married to whom. Name one under{' '}
+              <Link to={`/app/universes/${universeId}/types`}>Types</Link>.
+            </>
+          ) : (
+            'Nothing connects to this yet. Add the first relation.'
+          )}
+        </p>
+      ) : (
+        <ul className="relations__list" data-testid="relationship-list">
+          {views.map((view) =>
+            editingId === view.id ? (
+              <li className="relations__editing" key={view.id}>
+                {form}
+              </li>
+            ) : (
+              <li className="relation" key={view.id} data-relation-label={view.label}>
+                <p className="relation__label">{view.label}</p>
+
+                <div className="relation__body">
+                  <Link
+                    className="relation__name"
+                    to={`/app/universes/${universeId}/lore/${view.relatedEntityId}`}
+                  >
+                    {view.relatedEntityName}
+                  </Link>
+                  <p className="relation__meta">
+                    <span className="relation__kind">{view.relatedEntityTypeName}</span>
+                    {formatSpan(view.startDate, view.endDate) ? (
+                      <span className="relation__span">
+                        {formatSpan(view.startDate, view.endDate)}
+                      </span>
+                    ) : null}
+                  </p>
+                  {view.notes ? <p className="relation__notes">{view.notes}</p> : null}
+                </div>
+
+                <div className="relation__tools">
+                  <span className="chip" data-canon={view.canonStatus}>
+                    {CANON_LABELS[view.canonStatus]}
+                  </span>
+                  <button
+                    className="button button--quiet"
+                    type="button"
+                    onClick={() => openEdit(view)}
+                    data-testid={`edit-relationship-${view.relatedEntityName}`}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="button button--quiet"
+                    type="button"
+                    onClick={() => remove(view)}
+                    data-testid={`delete-relationship-${view.relatedEntityName}`}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </li>
+            ),
+          )}
+        </ul>
+      )}
+    </section>
+  )
+}
