@@ -50,6 +50,12 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Lore/EntityTypeDefaults.cs` | Idempotent seeding of the starter types. |
 | `Features/Lore/LoreContent.cs` | Structural validation of the Tiptap article. |
 | `Features/Lore/LoreValidation.cs` | Shared lore input checks and LIKE escaping. |
+| `Features/Relationships/RelationshipModel.cs` | `RelationshipType` and `LoreRelationship`. |
+| `Features/Relationships/RelationshipConfiguration.cs` | Relationship schema: keys, indexes, delete behaviour. |
+| `Features/Relationships/RelationshipTypeEndpoints.cs` | Relationship-type CRUD; delete refused while in use. |
+| `Features/Relationships/RelationshipEndpoints.cs` | Relationship CRUD and the per-entity, perspective-resolved list. |
+| `Features/Relationships/RelationshipContracts.cs` | Request and response records for relationships. |
+| `Features/Relationships/RelationshipValidation.cs` | Relationship input checks, UTC coercion, perspective labels. |
 | `appsettings.json` | Non-secret defaults; empty connection string. |
 | `appsettings.Development.json` | Dev connection string and CORS origins. |
 
@@ -78,6 +84,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.Api.Tests/AuthEndpointTests.cs` | Registration, sign-in, session and logout. |
 | `Lorex.Api.Tests/UniverseEndpointTests.cs` | Universe CRUD and the ownership invariant. |
 | `Lorex.Api.Tests/LoreEndpointTests.cs` | Lore CRUD, field kinds, and cross-universe isolation. |
+| `Lorex.Api.Tests/RelationshipEndpointTests.cs` | Relationship CRUD, both perspectives, and cross-owner isolation. |
 | `Lorex.E2E/playwright.config.ts` | Starts API + web, runs Chromium. |
 | `Lorex.E2E/specs/smoke.spec.ts` | Frontend-loads smoke suite. |
 | `Lorex.E2E/specs/auth.spec.ts` | Register, sign out, guard, sign back in. |
