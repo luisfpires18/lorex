@@ -46,7 +46,7 @@ public static partial class LoreValidation
         }
 
         if (request.Options is not null
-            && request.Options.Any(option => option.Length > LoreLimits.OptionMaxLength))
+            && request.Options.Any(option => (option?.Length ?? 0) > LoreLimits.OptionMaxLength))
         {
             errors["options"] = ["One of those options is too long."];
         }
@@ -75,14 +75,15 @@ public static partial class LoreValidation
             errors["content"] = [contentError!];
         }
 
+        // A JSON array can carry nulls, so entries are length-checked defensively.
         if (request.Aliases is not null
-            && request.Aliases.Any(alias => alias.Trim().Length > LoreLimits.NameMaxLength))
+            && request.Aliases.Any(alias => (alias?.Trim().Length ?? 0) > LoreLimits.NameMaxLength))
         {
             errors["aliases"] = ["One of those aliases is too long."];
         }
 
         if (request.Tags is not null
-            && request.Tags.Any(tag => tag.Trim().Length > LoreLimits.TagMaxLength))
+            && request.Tags.Any(tag => (tag?.Trim().Length ?? 0) > LoreLimits.TagMaxLength))
         {
             errors["tags"] = ["One of those tags is too long."];
         }

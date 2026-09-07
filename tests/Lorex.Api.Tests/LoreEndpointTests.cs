@@ -334,6 +334,52 @@ public sealed class LoreEndpointTests(LorexApiFactory factory) : IClassFixture<L
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Theory]
+    // Every shape here is legal JSON but not a legal document. Each must be answered with
+    // a validation problem, never an unhandled exception.
+    [InlineData("""{"type":123}""")]
+    [InlineData("""{"type":"doc","content":[{"type":"paragraph","marks":[{"type":42}]}]}""")]
+    [InlineData("""{"type":"doc","content":[{"type":"text","marks":[{"type":"link","attrs":"nope"}]}]}""")]
+    [InlineData("""{"type":"doc","content":[{"type":"text","marks":[{"type":"link","attrs":{"href":7}}]}]}""")]
+    [InlineData("""{"type":"doc","content":[{"type":"text","marks":[{"type":"link","attrs":{}}]}]}""")]
+    [InlineData("[]")]
+    public async Task Malformed_article_content_is_answered_without_a_server_error(string content)
+    {
+        var (client, universe) = await SignedInWithUniverse($"malformed-{content.Length}-{content.GetHashCode()}");
+        var type = await FirstDefaultType(client, universe.Id);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/universes/{universe.Id}/entities",
+            new EntityRequest(type.Id, "Odd Content", null, content, CanonStatus.Idea, null, null, null));
+
+        Assert.True(
+            response.StatusCode is HttpStatusCode.Created or HttpStatusCode.BadRequest,
+            $"Expected Created or BadRequest but got {(int)response.StatusCode}.");
+    }
+
+    [Fact]
+    public async Task Null_entries_in_aliases_and_tags_do_not_break_the_request()
+    {
+        var (client, universe) = await SignedInWithUniverse("nulllists");
+        var type = await FirstDefaultType(client, universe.Id);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/universes/{universe.Id}/entities",
+            new
+            {
+                entityTypeId = type.Id,
+                name = "Sparse Lists",
+                canonStatus = CanonStatus.Idea,
+                aliases = new string?[] { "Real Alias", null },
+                tags = new string?[] { null, "Real Tag" },
+            });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var created = await response.Content.ReadFromJsonAsync<EntityDetail>();
+        Assert.Equal(["Real Alias"], created!.Aliases);
+        Assert.Equal(["Real Tag"], created.Tags);
+    }
+
     [Fact]
     public async Task Search_matches_name_alias_and_summary()
     {

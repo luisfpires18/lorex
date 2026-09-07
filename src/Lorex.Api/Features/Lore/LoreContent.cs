@@ -96,20 +96,20 @@ public static class LoreContent
 
     private static bool IsMarkAllowed(JsonElement mark)
     {
+        // Every shape below is attacker-controlled, so each access checks its kind first:
+        // a non-string "type" or a non-object "attrs" must be inert, not an exception.
         if (mark.ValueKind != JsonValueKind.Object
             || !mark.TryGetProperty("type", out var type)
+            || type.ValueKind != JsonValueKind.String
             || type.GetString() != "link")
         {
             return true;
         }
 
         if (!mark.TryGetProperty("attrs", out var attrs)
-            || !attrs.TryGetProperty("href", out var hrefElement))
-        {
-            return true;
-        }
-
-        if (hrefElement.ValueKind == JsonValueKind.Null)
+            || attrs.ValueKind != JsonValueKind.Object
+            || !attrs.TryGetProperty("href", out var hrefElement)
+            || hrefElement.ValueKind != JsonValueKind.String)
         {
             return true;
         }
