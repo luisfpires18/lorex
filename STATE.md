@@ -23,12 +23,13 @@ Phase 003 (core Universe system) implemented. No lore entities yet.
 
 ## Current phase
 
-Phase 003 on `feat/003/universe-core`, unmerged.
+Phase 003 complete and merged into `dev`. Current branch: `dev`.
+`feat/003/universe-core` still exists, not deleted.
 
 ## Immediate next step
 
 Phase 004: the core Entity system inside a universe (the first lore records).
-Branch `feat/004/entity-core` from `dev` once 003 is merged.
+Branch `feat/004/entity-core` from `dev`.
 
 ## Remote
 

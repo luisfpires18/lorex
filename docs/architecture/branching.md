@@ -43,8 +43,9 @@ docs/007/architecture-update
 | --- | --- | --- |
 | 001 | `feat/001/repository-bootstrap` | merged into `dev` |
 | 002 | `feat/002/authentication` | merged into `dev` |
+| 003 | `feat/003/universe-core` | merged into `dev` |
 
-Next free number: `003`.
+Next free number: `004`.
 
 ## Rules for automation
 
