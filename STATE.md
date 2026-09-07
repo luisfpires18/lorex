@@ -26,12 +26,11 @@ Phase 004 (core entity system) implemented. No relationships, timeline or storie
 
 ## Current phase
 
-Phase 004 on `feat/004/entity-core`, unmerged.
+Phase 004 complete on `dev`. Feature branch `feat/004/entity-core` still exists.
 
 ## Immediate next step
 
-Phase 005: relationships between entities. Branch `feat/005/relationships` from `dev`
-once 004 is merged.
+Phase 005: relationships between entities. Branch `feat/005/relationships` from `dev`.
 
 ## Remote
 
