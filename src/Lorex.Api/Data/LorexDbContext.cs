@@ -1,4 +1,5 @@
 using Lorex.Api.Features.Auth;
+using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Universes;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +15,22 @@ public class LorexDbContext(DbContextOptions<LorexDbContext> options)
     : IdentityDbContext<LorexUser>(options)
 {
     public DbSet<Universe> Universes => Set<Universe>();
+
+    public DbSet<EntityType> EntityTypes => Set<EntityType>();
+
+    public DbSet<EntityFieldDefinition> EntityFieldDefinitions => Set<EntityFieldDefinition>();
+
+    public DbSet<EntityFieldOption> EntityFieldOptions => Set<EntityFieldOption>();
+
+    public DbSet<LoreEntity> Entities => Set<LoreEntity>();
+
+    public DbSet<EntityAlias> EntityAliases => Set<EntityAlias>();
+
+    public DbSet<EntityFieldValue> EntityFieldValues => Set<EntityFieldValue>();
+
+    public DbSet<Tag> Tags => Set<Tag>();
+
+    public DbSet<EntityTag> EntityTags => Set<EntityTag>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
