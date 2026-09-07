@@ -2,28 +2,33 @@
 
 ## Current state
 
-Phase 002 (authentication) implemented. No product domain features yet.
+Phase 003 (core Universe system) implemented. No lore entities yet.
 
+- Universes: private, owned by exactly one user. Create, read, update, archive,
+  unarchive, and delete once archived. Name search, archived filter, deterministic
+  sort, server-side paging. Every query and mutation filters on `OwnerId`; a
+  cross-owner request answers 404.
+- Web: `/app` universe browser (plate grid, search, filter, paging, empty and error
+  states); `/app/universes/:id` workspace shell with Overview and Settings working
+  and the later sections greyed out.
 - Auth: ASP.NET Core Identity with a cookie session. Register, login by username or
-  email, logout, `/api/auth/me`. `LorexUser` adds nothing to `IdentityUser`.
-- Web: `/login`, `/register` and a protected `/app` shell behind route guards.
-  Session held in a React context fed by `/api/auth/me`.
+  email, logout, `/api/auth/me`.
 - API: `Lorex.Api` on `http://localhost:5180`, SQLite via EF Core, `/health` + `/api/health`.
 - Web: `Lorex.Web` (React 19 + TS + Vite) on `http://localhost:5173`, proxies `/api`.
-- Tests: 13 API integration tests, 8 Playwright tests. All green.
-- Migrations: `InitialCreate`, `AddIdentity`, `UniqueUserEmail`. Apply to a fresh database.
-- Launcher: `Start-Lorex.cmd` / `Stop-Lorex.cmd` verified with auth in place.
+- Tests: 39 API integration tests, 13 Playwright tests. All green.
+- Migrations: `InitialCreate`, `AddIdentity`, `UniqueUserEmail`, `AddUniverses`.
+  Verified against a fresh SQLite database.
+- Launcher: `Start-Lorex.cmd` / `Stop-Lorex.cmd` verified.
 - Tiptap installed as a dependency only. Editor not built.
 
 ## Current phase
 
-Phase 002 complete and merged into `dev`. Current branch: `dev`.
-`feat/002/authentication` still exists, not deleted.
+Phase 003 on `feat/003/universe-core`, unmerged.
 
 ## Immediate next step
 
-Phase 003: Universe ownership and the core Universe system. Branch
-`feat/003/universe-core` from `dev`.
+Phase 004: the core Entity system inside a universe (the first lore records).
+Branch `feat/004/entity-core` from `dev` once 003 is merged.
 
 ## Remote
 
