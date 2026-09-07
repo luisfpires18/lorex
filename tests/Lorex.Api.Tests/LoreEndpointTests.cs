@@ -217,6 +217,55 @@ public sealed class LoreEndpointTests(LorexApiFactory factory) : IClassFixture<L
     }
 
     [Fact]
+    public async Task An_entity_keeping_its_aliases_and_tags_can_be_updated()
+    {
+        var (client, universe) = await SignedInWithUniverse("resave");
+        var type = await FirstDefaultType(client, universe.Id);
+
+        var created = await CreateEntity(
+            client, universe.Id, type.Id, "Alenna Vance",
+            aliases: ["The Warden"],
+            tags: ["Coast"]);
+
+        // Saving the same aliases and tags again must not collide with the rows already
+        // stored for this entity.
+        var response = await client.PutAsJsonAsync(
+            $"/api/universes/{universe.Id}/entities/{created.Id}",
+            new EntityRequest(type.Id, "Alenna Vance", "Now with a summary.", null,
+                CanonStatus.Draft, ["The Warden"], ["Coast"], null));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var fetched = await GetEntity(client, universe.Id, created.Id);
+        Assert.Equal(["The Warden"], fetched.Aliases);
+        Assert.Equal(["Coast"], fetched.Tags);
+        Assert.Equal(CanonStatus.Draft, fetched.CanonStatus);
+    }
+
+    [Fact]
+    public async Task Updating_replaces_aliases_and_tags_with_the_supplied_set()
+    {
+        var (client, universe) = await SignedInWithUniverse("replace");
+        var type = await FirstDefaultType(client, universe.Id);
+
+        var created = await CreateEntity(
+            client, universe.Id, type.Id, "Shifting Name",
+            aliases: ["Old Alias"],
+            tags: ["Old Tag"]);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/universes/{universe.Id}/entities/{created.Id}",
+            new EntityRequest(type.Id, "Shifting Name", null, null,
+                CanonStatus.Idea, ["New Alias"], ["New Tag"], null));
+
+        response.EnsureSuccessStatusCode();
+
+        var fetched = await GetEntity(client, universe.Id, created.Id);
+        Assert.Equal(["New Alias"], fetched.Aliases);
+        Assert.Equal(["New Tag"], fetched.Tags);
+    }
+
+    [Fact]
     public async Task Canon_status_moves_from_idea_through_draft_to_canon()
     {
         var (client, universe) = await SignedInWithUniverse("canonwalk");

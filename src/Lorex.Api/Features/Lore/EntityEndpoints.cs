@@ -208,13 +208,9 @@ public static class EntityEndpoints
             return Results.NotFound();
         }
 
-        var entity = await db.Entities
-            .Include(candidate => candidate.Aliases)
-            .Include(candidate => candidate.EntityTags)
-            .Include(candidate => candidate.FieldValues)
-            .FirstOrDefaultAsync(
-                candidate => candidate.Id == entityId && candidate.UniverseId == universeId,
-                cancellationToken);
+        var entity = await db.Entities.FirstOrDefaultAsync(
+            candidate => candidate.Id == entityId && candidate.UniverseId == universeId,
+            cancellationToken);
 
         if (entity is null)
         {
@@ -245,14 +241,19 @@ public static class EntityEndpoints
         entity.CanonStatus = request.CanonStatus;
         entity.UpdatedAt = DateTime.UtcNow;
 
-        // Replace wholesale: simpler and deterministic, and the client always sends the
-        // complete set it wants stored.
-        db.EntityAliases.RemoveRange(entity.Aliases);
-        db.EntityTags.RemoveRange(entity.EntityTags);
-        db.EntityFieldValues.RemoveRange(entity.FieldValues);
-        entity.Aliases.Clear();
-        entity.EntityTags.Clear();
-        entity.FieldValues.Clear();
+        // The client always sends the complete set it wants stored, so the children are
+        // replaced wholesale. The old rows are deleted straight against the database
+        // first: EF Core does not promise to order deletes ahead of inserts within one
+        // SaveChanges, and re-saving an unchanged alias or tag would then collide with the
+        // row still in the table. The transaction keeps the two steps atomic.
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        await db.EntityAliases.Where(alias => alias.EntityId == entityId)
+            .ExecuteDeleteAsync(cancellationToken);
+        await db.EntityTags.Where(link => link.EntityId == entityId)
+            .ExecuteDeleteAsync(cancellationToken);
+        await db.EntityFieldValues.Where(value => value.EntityId == entityId)
+            .ExecuteDeleteAsync(cancellationToken);
 
         if (await ApplyAliasesTagsAndFieldsAsync(db, universeId, entity, request, cancellationToken)
             is { } problem)
@@ -261,6 +262,7 @@ public static class EntityEndpoints
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         var detail = await LoadDetailAsync(db, universeId, entity.Id, cancellationToken);
         return Results.Ok(detail);
@@ -323,7 +325,7 @@ public static class EntityEndpoints
         EntityRequest request,
         CancellationToken cancellationToken)
     {
-        AddAliases(entity, request.Aliases);
+        AddAliases(db, entity, request.Aliases);
 
         if (await AddTagsAsync(db, universeId, entity, request.Tags, cancellationToken) is { } tagProblem)
         {
@@ -333,7 +335,7 @@ public static class EntityEndpoints
         return await AddFieldValuesAsync(db, universeId, entity, request, cancellationToken);
     }
 
-    private static void AddAliases(LoreEntity entity, IReadOnlyList<string>? aliases)
+    private static void AddAliases(LorexDbContext db, LoreEntity entity, IReadOnlyList<string>? aliases)
     {
         if (aliases is null)
         {
@@ -350,7 +352,7 @@ public static class EntityEndpoints
                 continue;
             }
 
-            entity.Aliases.Add(new EntityAlias
+            db.EntityAliases.Add(new EntityAlias
             {
                 Id = Guid.NewGuid(),
                 EntityId = entity.Id,
@@ -414,7 +416,7 @@ public static class EntityEndpoints
                 bySlug[slug] = tag;
             }
 
-            entity.EntityTags.Add(new EntityTag { EntityId = entity.Id, TagId = tag.Id });
+            db.EntityTags.Add(new EntityTag { EntityId = entity.Id, TagId = tag.Id });
         }
 
         return null;
@@ -460,10 +462,7 @@ public static class EntityEndpoints
                 errors[definition.Id.ToString()] = [$"{definition.Name} is required."];
             }
 
-            foreach (var row in rows)
-            {
-                entity.FieldValues.Add(row);
-            }
+            db.EntityFieldValues.AddRange(rows);
         }
 
         return errors.Count == 0 ? null : Results.ValidationProblem(errors);

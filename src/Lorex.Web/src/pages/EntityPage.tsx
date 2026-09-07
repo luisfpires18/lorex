@@ -277,7 +277,7 @@ export default function EntityPage() {
           {isEditing ? (
             <select
               className="field__input field__input--select entry__typepick"
-              aria-label="Type"
+              aria-label="Entry type"
               value={draft.entityTypeId}
               onChange={(event) =>
                 setDraft({ ...draft, entityTypeId: event.target.value, fields: {} })
@@ -480,11 +480,17 @@ export default function EntityPage() {
               className="button"
               type="button"
               onClick={() => setIsEditing(true)}
+              disabled={isSaving}
               data-testid="edit-entity"
             >
               Edit
             </button>
-            <button className="button button--quiet" type="button" onClick={remove}>
+            <button
+              className="button button--quiet"
+              type="button"
+              onClick={remove}
+              disabled={isSaving}
+            >
               Delete
             </button>
           </>
