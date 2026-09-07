@@ -62,11 +62,15 @@ public static partial class UniverseEndpoints
 
         var totalCount = await query.CountAsync(cancellationToken);
 
+        // Widened before multiplying: an absurd page number would otherwise overflow to a
+        // negative offset.
+        var skip = (int)Math.Min((long)(page - 1) * pageSize, int.MaxValue);
+
         // Id breaks ties so paging stays stable when two universes share a timestamp.
         var items = await query
             .OrderByDescending(universe => universe.UpdatedAt)
             .ThenBy(universe => universe.Id)
-            .Skip((page - 1) * pageSize)
+            .Skip(skip)
             .Take(pageSize)
             .Select(universe => new UniverseSummary(
                 universe.Id,
@@ -305,7 +309,8 @@ public static partial class UniverseEndpoints
             errors["name"] = [$"Keep the name under {UniverseConfiguration.NameMaxLength} characters."];
         }
 
-        if (description is { Length: > UniverseConfiguration.DescriptionMaxLength })
+        // Measured after trimming, because that is what actually gets stored.
+        if (description?.Trim() is { Length: > UniverseConfiguration.DescriptionMaxLength })
         {
             errors["description"] =
                 [$"Keep the description under {UniverseConfiguration.DescriptionMaxLength} characters."];
