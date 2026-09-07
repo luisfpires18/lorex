@@ -1,5 +1,6 @@
 using Lorex.Api.Features.Auth;
 using Lorex.Api.Features.Lore;
+using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.Universes;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -31,6 +32,10 @@ public class LorexDbContext(DbContextOptions<LorexDbContext> options)
     public DbSet<Tag> Tags => Set<Tag>();
 
     public DbSet<EntityTag> EntityTags => Set<EntityTag>();
+
+    public DbSet<RelationshipType> RelationshipTypes => Set<RelationshipType>();
+
+    public DbSet<LoreRelationship> Relationships => Set<LoreRelationship>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
