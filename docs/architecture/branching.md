@@ -39,8 +39,9 @@ docs/007/architecture-update
 | Number | Branch | Status |
 | --- | --- | --- |
 | 001 | `feat/001/repository-bootstrap` | merged into `dev` |
+| 002 | `feat/002/authentication` | merged into `dev` |
 
-Next free number: `002`.
+Next free number: `003`.
 
 ## Rules for automation
 

@@ -17,12 +17,13 @@ Phase 002 (authentication) implemented. No product domain features yet.
 
 ## Current phase
 
-Phase 002 on `feat/002/authentication`, unmerged.
+Phase 002 complete and merged into `dev`. Current branch: `dev`.
+`feat/002/authentication` still exists, not deleted.
 
 ## Immediate next step
 
 Phase 003: Universe ownership and the core Universe system. Branch
-`feat/003/universe-core` from `dev` once 002 is merged.
+`feat/003/universe-core` from `dev`.
 
 ## Tooling
 
