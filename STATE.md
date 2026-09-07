@@ -34,14 +34,13 @@ Phase 005 (relationship domain) implemented. Backend only: no relationship UI ye
 
 ## Current phase
 
-Phase 005 on `feat/005/relationship-domain`, branched from `dev`. Three local commits,
-not merged and not pushed. Phase 004 is complete on `dev`.
+Phase 005 complete on `dev`. Merged from `feat/005/relationship-domain`, 3 commits.
+Feature branch retained.
 
 ## Immediate next step
 
-Phase 006: relationship UI. Branch `feat/006/relationship-ui` from this branch or from
-`dev` once it is merged. Entity-page relationship display, a relationship-type editor,
-and Playwright coverage.
+Phase 006: relationship UI. Branch `feat/006/relationship-ui` from `dev`.
+Entity-page relationship display, a relationship-type editor, and Playwright coverage.
 
 ## Remote
 
