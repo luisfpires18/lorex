@@ -1,0 +1,333 @@
+/*
+  Lorex visual foundation.
+
+  Two surfaces: a graphite plate that carries the wordmark, and warm paper that carries
+  the work. Inputs are ruled rather than boxed, which keeps the screens closer to a
+  bound reference volume than to a settings panel. One accent only, an ink blue, used
+  for links, focus and the primary action.
+*/
+
+:root {
+  --paper: #f6f2ea;
+  --surface: #fdfbf7;
+  --plate: #201f1d;
+  --plate-ink: #f0ece3;
+  --plate-muted: #a09a90;
+  --ink: #191713;
+  --muted: #6b6459;
+  --rule: #d8d0c2;
+  --rule-strong: #b3a996;
+  --accent: #2e4795;
+  --danger: #96271f;
+
+  --display: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  --ui:
+    Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', system-ui,
+    sans-serif;
+
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #151617;
+    --surface: #1b1d1f;
+    --plate: #0f1011;
+    --plate-ink: #e9e6e0;
+    --plate-muted: #8b8781;
+    --ink: #e9e6e0;
+    --muted: #97938c;
+    --rule: #2f3235;
+    --rule-strong: #4a4e52;
+    --accent: #93a6e6;
+    --danger: #e39a93;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.wordmark {
+  font-family: var(--display);
+  font-size: 1.25rem;
+  letter-spacing: 0.14em;
+  font-weight: 400;
+}
+
+.wordmark--large {
+  font-size: clamp(2.75rem, 6vw, 4.25rem);
+  line-height: 1;
+  letter-spacing: 0.16em;
+  display: block;
+}
+
+/* ---------- Session hold ---------- */
+
+.session-pending {
+  min-height: 100dvh;
+  background: var(--paper);
+}
+
+/* ---------- Auth canvas ---------- */
+
+.auth {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+}
+
+.auth__plate {
+  background: var(--plate);
+  color: var(--plate-ink);
+  padding: clamp(2rem, 5vw, 4.5rem);
+  display: flex;
+  align-items: flex-end;
+}
+
+.auth__mark {
+  max-width: 26ch;
+}
+
+.auth__rule {
+  display: block;
+  width: 4.5rem;
+  height: 1px;
+  background: var(--plate-muted);
+  margin: 2rem 0 1.5rem;
+}
+
+.auth__pitch {
+  margin: 0;
+  color: var(--plate-muted);
+  font-size: 0.95rem;
+  line-height: 1.7;
+  max-width: 34ch;
+}
+
+.auth__panel {
+  background: var(--surface);
+  padding: clamp(2rem, 5vw, 4.5rem);
+  display: flex;
+  align-items: center;
+}
+
+.auth__form {
+  width: 100%;
+  max-width: 26rem;
+}
+
+.auth__heading {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(1.9rem, 3vw, 2.4rem);
+  line-height: 1.15;
+  margin: 0;
+}
+
+.auth__intro {
+  margin: 0.5rem 0 2.75rem;
+  color: var(--muted);
+}
+
+.auth__footer {
+  margin: 2rem 0 0;
+  color: var(--muted);
+  font-size: 0.925rem;
+}
+
+/* ---------- Forms ---------- */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.form__message {
+  margin: 0;
+  padding: 0 0 0 0.9rem;
+  border-left: 2px solid var(--danger);
+  color: var(--danger);
+  font-size: 0.925rem;
+}
+
+.field__label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+}
+
+.field__input {
+  width: 100%;
+  padding: 0.35rem 0 0.55rem;
+  border: 0;
+  border-bottom: 1px solid var(--rule-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1.0625rem;
+  transition: border-color 120ms ease;
+}
+
+.field__input:hover {
+  border-bottom-color: var(--ink);
+}
+
+.field__input:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+  box-shadow: 0 1px 0 0 var(--accent);
+}
+
+.field__input[aria-invalid='true'] {
+  border-bottom-color: var(--danger);
+}
+
+.field__error {
+  margin: 0.45rem 0 0;
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+/* Ink, not accent: the accent is kept for links, focus and rules so one solid block of
+   colour never becomes the loudest thing on the screen. */
+.button {
+  align-self: flex-start;
+  padding: 0.7rem 1.75rem;
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  background: var(--ink);
+  color: var(--surface);
+  font: inherit;
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.button:hover:not(:disabled) {
+  background: transparent;
+  color: var(--ink);
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.button--quiet {
+  padding: 0.35rem 0.9rem;
+  background: transparent;
+  border-color: var(--rule-strong);
+  color: var(--ink);
+  font-size: 0.875rem;
+}
+
+.button--quiet:hover:not(:disabled) {
+  background: transparent;
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+/* ---------- Signed-in shell ---------- */
+
+.workspace {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+}
+
+.workspace__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.15rem clamp(1.25rem, 4vw, 3rem);
+  border-bottom: 1px solid var(--rule);
+}
+
+.workspace__session {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.workspace__user {
+  font-size: 0.925rem;
+  color: var(--muted);
+}
+
+.workspace__body {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 3rem 1.5rem;
+}
+
+.workspace__empty {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(1.15rem, 2.4vw, 1.5rem);
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ---------- Narrow screens ---------- */
+
+@media (max-width: 900px) {
+  .auth {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .auth__plate {
+    align-items: flex-start;
+    padding: 2.25rem 1.5rem;
+  }
+
+  .auth__mark {
+    max-width: none;
+  }
+
+  .auth__rule {
+    margin: 1.25rem 0 1rem;
+  }
+
+  .auth__panel {
+    padding: 2.5rem 1.5rem 3.5rem;
+    align-items: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}
