@@ -7,7 +7,7 @@ import type { UniverseDetail } from '../universes/types'
  * Sections that exist in the plan but not yet in the product. They are shown so the shape
  * of a universe is legible, and disabled so nothing pretends to work.
  */
-const PLANNED = ['Lore', 'Timeline', 'Stories', 'Plot', 'Ideas', 'Search']
+const PLANNED = ['Timeline', 'Stories', 'Plot', 'Ideas', 'Search']
 
 type LoadState =
   | { kind: 'loading' }
@@ -126,6 +126,16 @@ export default function UniverseWorkspace() {
           <li>
             <NavLink to="." end className="sidebar__link">
               Overview
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="lore" className="sidebar__link" data-testid="workspace-lore">
+              Lore
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="types" className="sidebar__link" data-testid="workspace-types">
+              Types
             </NavLink>
           </li>
           {PLANNED.map((label) => (

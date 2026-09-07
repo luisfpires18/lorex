@@ -2,34 +2,36 @@
 
 ## Current state
 
-Phase 003 (core Universe system) implemented. No lore entities yet.
+Phase 004 (core entity system) implemented. No relationships, timeline or stories yet.
 
-- Universes: private, owned by exactly one user. Create, read, update, archive,
-  unarchive, and delete once archived. Name search, archived filter, deterministic
-  sort, server-side paging. Every query and mutation filters on `OwnerId`; a
-  cross-owner request answers 404.
-- Web: `/app` universe browser (plate grid, search, filter, paging, empty and error
-  states); `/app/universes/:id` workspace shell with Overview and Settings working
-  and the later sections greyed out.
-- Auth: ASP.NET Core Identity with a cookie session. Register, login by username or
-  email, logout, `/api/auth/me`.
-- API: `Lorex.Api` on `http://localhost:5180`, SQLite via EF Core, `/health` + `/api/health`.
-- Web: `Lorex.Web` (React 19 + TS + Vite) on `http://localhost:5173`, proxies `/api`.
-- Tests: 39 API integration tests, 13 Playwright tests. All green.
-- Migrations: `InitialCreate`, `AddIdentity`, `UniqueUserEmail`, `AddUniverses`.
-  Verified against a fresh SQLite database.
+- Lore: one generic `LoreEntity` per universe. Its kind comes from an `EntityType` the
+  author owns, its fields from `EntityFieldDefinition` rows on that type. Values are
+  stored in typed columns, never JSON. Eight field kinds, including select,
+  multi-select and an intra-universe entity reference.
+- Idea, Draft and Canon status; aliases; universe-scoped tags. Search covers name,
+  aliases and summary. Type, status and paging filters.
+- Article content is a Tiptap document, validated structurally; link schemes are
+  limited to http, https and mailto on both sides.
+- Every lore route proves universe ownership first, then re-resolves every client id
+  inside that universe. Cross-universe access answers 404.
+- Deleting a type, field or option is refused while it still holds authored data.
+- Web: `/app/universes/:id/lore` browser, `/lore/:entityId` dossier page with in-page
+  editing, `/types` for custom types and fields.
+- Universes: create, read, update, archive, unarchive, delete once archived.
+- Auth: ASP.NET Core Identity with a cookie session.
+- Tests: 76 API integration tests, 17 Playwright tests. All green.
+- Migrations: `InitialCreate`, `AddIdentity`, `UniqueUserEmail`, `AddUniverses`,
+  `AddLoreEntities`. Verified against a fresh SQLite database.
 - Launcher: `Start-Lorex.cmd` / `Stop-Lorex.cmd` verified.
-- Tiptap installed as a dependency only. Editor not built.
 
 ## Current phase
 
-Phase 003 complete and merged into `dev`. Current branch: `dev`.
-`feat/003/universe-core` still exists, not deleted.
+Phase 004 on `feat/004/entity-core`, unmerged.
 
 ## Immediate next step
 
-Phase 004: the core Entity system inside a universe (the first lore records).
-Branch `feat/004/entity-core` from `dev`.
+Phase 005: relationships between entities. Branch `feat/005/relationships` from `dev`
+once 004 is merged.
 
 ## Remote
 
@@ -52,5 +54,7 @@ Rebuild with `graphify update .` (AST only, no API cost). `graphify-out/` is git
 
 ## Blockers
 
-None. Production deployment will need a persisted Data Protection key ring so cookie
+None. Follow-up, not blocking: the lore article is not searched. Name, aliases and
+summary are. Full-text search over the Tiptap document needs SQLite FTS rather than a
+LIKE over editor JSON. Production deployment will need a persisted Data Protection key ring so cookie
 sessions survive a restart - see `docs/architecture/decisions/0005-cookie-authentication.md`.

@@ -1,10 +1,13 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthProvider'
 import { RequireAuth, RequireGuest } from './auth/routes'
+import EntityPage from './pages/EntityPage'
 import LoginPage from './pages/LoginPage'
+import LorePage from './pages/LorePage'
 import RegisterPage from './pages/RegisterPage'
 import UniverseOverview from './pages/UniverseOverview'
 import UniverseSettings from './pages/UniverseSettings'
+import UniverseTypes from './pages/UniverseTypes'
 import UniverseWorkspace from './pages/UniverseWorkspace'
 import UniversesPage from './pages/UniversesPage'
 
@@ -22,6 +25,10 @@ export default function App() {
             <Route path="/app" element={<UniversesPage />} />
             <Route path="/app/universes/:id" element={<UniverseWorkspace />}>
               <Route index element={<UniverseOverview />} />
+              <Route path="lore" element={<LorePage />} />
+              <Route path="lore/new" element={<EntityPage />} />
+              <Route path="lore/:entityId" element={<EntityPage />} />
+              <Route path="types" element={<UniverseTypes />} />
               <Route path="settings" element={<UniverseSettings />} />
             </Route>
           </Route>

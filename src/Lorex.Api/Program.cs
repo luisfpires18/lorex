@@ -1,6 +1,7 @@
 using Lorex.Api.Data;
 using Lorex.Api.Features.Auth;
 using Lorex.Api.Features.Health;
+using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Universes;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -42,6 +43,8 @@ app.UseAuthorization();
 app.MapHealthEndpoints();
 app.MapAuthEndpoints();
 app.MapUniverseEndpoints();
+app.MapEntityTypeEndpoints();
+app.MapEntityEndpoints();
 
 await app.MigrateLorexDatabaseAsync();
 

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.RegularExpressions;
 using Lorex.Api.Data;
+using Lorex.Api.Features.Lore;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -156,6 +157,10 @@ public static partial class UniverseEndpoints
             // The unique index settles a concurrent create of the same name.
             return NameTakenProblem();
         }
+
+        // A universe is useless without somewhere to put things, so it starts with the
+        // default entity types. Seeding is idempotent and only fills in missing names.
+        await EntityTypeDefaults.EnsureAsync(db, universe.Id, cancellationToken);
 
         return Results.Created($"/api/universes/{universe.Id}", ToDetail(universe));
     }

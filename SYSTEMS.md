@@ -42,6 +42,14 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Universes/UniverseConfiguration.cs` | Owner FK, indexes, per-owner unique name. |
 | `Features/Universes/UniverseEndpoints.cs` | Owner-scoped CRUD, search, paging, archive. |
 | `Features/Universes/UniverseContracts.cs` | Request and response records for universes. |
+| `Features/Lore/LoreModel.cs` | Entity, type, field, option, alias, value and tag entities. |
+| `Features/Lore/LoreConfiguration.cs` | Lore schema: keys, indexes and delete behaviour. |
+| `Features/Lore/LoreAccess.cs` | The universe-ownership gate every lore route passes. |
+| `Features/Lore/EntityEndpoints.cs` | Entity CRUD, search, filters, paging, tags. |
+| `Features/Lore/EntityTypeEndpoints.cs` | Entity types and their field definitions. |
+| `Features/Lore/EntityTypeDefaults.cs` | Idempotent seeding of the starter types. |
+| `Features/Lore/LoreContent.cs` | Structural validation of the Tiptap article. |
+| `Features/Lore/LoreValidation.cs` | Shared lore input checks and LIKE escaping. |
 | `appsettings.json` | Non-secret defaults; empty connection string. |
 | `appsettings.Development.json` | Dev connection string and CORS origins. |
 
@@ -55,9 +63,10 @@ Repository index. Paths and one-line responsibilities only.
 | `src/lib/api.ts` | Same-origin fetch wrapper and `ApiError`. |
 | `src/auth/` | Session context, `useAuth`, and the route guards. |
 | `src/universes/` | Universe API client and types. |
+| `src/lore/` | Lore API client, shared types, document and field helpers. |
 | `src/lib/dates.ts` | Timestamp formatting. |
-| `src/components/` | `AuthLayout`, the ruled `Field`, `UniverseCard`, `UniverseForm`. |
-| `src/pages/` | Login, Register, Universes browser, and the workspace with Overview and Settings. |
+| `src/components/` | `AuthLayout`, `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `FieldInputs`, `TokenInput`, `LoreEditor`. |
+| `src/pages/` | Login, Register, Universes browser, and the workspace: Overview, Lore, entry page, Types and Settings. |
 | `vite.config.ts` | Dev server port 5173, proxy to the API, build config. |
 
 ## `tests`
@@ -68,10 +77,12 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.Api.Tests/HealthEndpointTests.cs` | Backend test-infrastructure proof. |
 | `Lorex.Api.Tests/AuthEndpointTests.cs` | Registration, sign-in, session and logout. |
 | `Lorex.Api.Tests/UniverseEndpointTests.cs` | Universe CRUD and the ownership invariant. |
+| `Lorex.Api.Tests/LoreEndpointTests.cs` | Lore CRUD, field kinds, and cross-universe isolation. |
 | `Lorex.E2E/playwright.config.ts` | Starts API + web, runs Chromium. |
 | `Lorex.E2E/specs/smoke.spec.ts` | Frontend-loads smoke suite. |
 | `Lorex.E2E/specs/auth.spec.ts` | Register, sign out, guard, sign back in. |
 | `Lorex.E2E/specs/universes.spec.ts` | Create, edit, search, archive, paginate, ownership. |
+| `Lorex.E2E/specs/lore.spec.ts` | Author an entry, edit it, filter, and cross-owner isolation. |
 
 ## `scripts`
 
