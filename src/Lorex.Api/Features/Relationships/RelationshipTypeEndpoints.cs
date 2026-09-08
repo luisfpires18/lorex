@@ -177,7 +177,9 @@ public static class RelationshipTypeEndpoints
         {
             return Results.Problem(
                 title: "Relationship type is in use",
-                detail: $"{inUse} relationships still use this type. Delete them first.",
+                detail: inUse == 1
+                    ? "1 relationship still uses this type. Delete it first."
+                    : $"{inUse} relationships still use this type. Delete them first.",
                 statusCode: StatusCodes.Status409Conflict);
         }
 

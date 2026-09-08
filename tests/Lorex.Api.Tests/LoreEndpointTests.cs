@@ -78,6 +78,29 @@ public sealed class LoreEndpointTests(LorexApiFactory factory) : IClassFixture<L
         var response = await client.DeleteAsync($"/api/universes/{universe.Id}/entity-types/{type.Id}");
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        // The refusal counts entries in English, not in row counts.
+        Assert.Contains(
+            "1 entity still uses this type. Move or delete it first.",
+            await response.Content.ReadAsStringAsync(),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_refusal_to_delete_a_used_type_counts_more_than_one_in_the_plural()
+    {
+        var (client, universe) = await SignedInWithUniverse("typeinuseplural");
+        var type = await CreateType(client, universe.Id, "Starship");
+        await CreateEntity(client, universe.Id, type.Id, "The Kestrel");
+        await CreateEntity(client, universe.Id, type.Id, "The Harrier");
+
+        var response = await client.DeleteAsync($"/api/universes/{universe.Id}/entity-types/{type.Id}");
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Contains(
+            "2 entities still use this type. Move or delete them first.",
+            await response.Content.ReadAsStringAsync(),
+            StringComparison.Ordinal);
     }
 
     // ---------- Custom fields ----------
@@ -146,6 +169,10 @@ public sealed class LoreEndpointTests(LorexApiFactory factory) : IClassFixture<L
             $"/api/universes/{universe.Id}/entity-types/{type.Id}/fields/{field.Id}");
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Contains(
+            "1 entity has a value for this field. Clear that value before deleting it.",
+            await response.Content.ReadAsStringAsync(),
+            StringComparison.Ordinal);
     }
 
     [Fact]
