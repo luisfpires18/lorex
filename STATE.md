@@ -2,7 +2,8 @@
 
 ## Current state
 
-Phase 006 (relationship UI) implemented. Relationships are authored from the app.
+Phase 007 (relationship end-to-end coverage and hardening) complete. The relationship
+feature is finished: authored from the app, and proven from the app.
 
 - Relationships: one `LoreRelationship` row per link, with a universe-scoped
   `RelationshipType` that carries the forward name, the inverse name, and a symmetric
@@ -30,26 +31,38 @@ Phase 006 (relationship UI) implemented. Relationships are authored from the app
   searches one universe through the API and is kept reusable.
 - Universes: create, read, update, archive, unarchive, delete once archived.
 - Auth: ASP.NET Core Identity with a cookie session.
-- Tests: 100 API integration tests, 17 Playwright tests. No new automated tests in
-  phase 006; relationship E2E is the next phase. Frontend verified by hand through the
-  running app: both perspectives, symmetric wording, edit, delete from both sides,
-  end-before-start refusal, and the 409 on a relation kind still in use.
+- Tests: 103 API integration tests, 23 Playwright tests. Relationships are covered end
+  to end in Chromium: a directional link authored from its source and read back inverted
+  from its target, edited from that inverse side and confirmed against the API to still
+  be stored one way round; a symmetric kind read identically from both ends; relation
+  kind create, reword, and the refusal to delete one in use; the end-before-start refusal
+  and the draft that survives it; notes rendered as text; and the universe and owner
+  boundaries around the picker, the three id slots and the per-entity list.
 - Migrations: `InitialCreate`, `AddIdentity`, `UniqueUserEmail`, `AddUniverses`,
   `AddLoreEntities`, `AddRelationships`. Verified against a fresh SQLite database.
 - Launcher: `Start-Lorex.cmd` / `Stop-Lorex.cmd` verified.
 
 ## Current phase
 
-Phase 006 complete on `dev`. Merged from `feat/006/relationship-ui`, 3 commits.
-Feature branch retained.
+Phase 007 complete on `test/007/relationship-e2e-hardening`, branched from `dev`, 3
+commits. Not merged and not pushed.
 
-Validation at merge: typecheck, lint, format check and production build all clean. No
-backend change was needed. Playwright not run, by design.
+Two defects were found and fixed. A delete refused because something still uses the
+target interpolated a count into a sentence written only for the plural, so one blocker
+read "1 relationships still use this type"; the relationship-type, entity-type and
+field-in-use refusals now each carry a singular sentence, pinned by regression tests on
+both sides of one. Running the whole Playwright suite for the first time since phase 006
+also caught a regression that phase left behind: the Relation kinds section added to the
+Types page made the lore spec's `getByLabel('Kind')` ambiguous, and that locator is now
+exact.
+
+Validation: frontend typecheck, lint, format check and production build clean; Release
+build and all 103 backend tests green; the full Playwright suite green at 23 of 23;
+launcher start, health probe and stop all clean; no tracked secrets.
 
 ## Immediate next step
 
-Phase 007: relationship end-to-end coverage and hardening. Branch
-`test/007/relationship-e2e-hardening` from `dev`.
+Phase 008: timeline domain. Branch `feat/008/timeline-domain` from `dev`.
 
 ## Remote
 
@@ -72,12 +85,14 @@ as `python -m graphify update .` (AST only, no API cost). `graphify-out/` is git
 
 ## Deferred
 
-- Full relationship security audit deferred to integration/hardening phase. Phase 005
-  did a focused manual check only: IDOR, cross-universe ids, overposting, ownership
-  filters. Not a blocker.
-- The 409 on a relation kind in use reads "1 relationships still use this type". The
-  count is not pluralised, in this message and in the entity-type one it copies. Copy
-  only; fold into the next backend pass.
+- Full relationship security audit still deferred; it is not a blocker. Phase 007 did a
+  focused check in the main session only, now backed by tests: a cross-owner read of a
+  relationship, its type list and the per-entity list all answer 404 with nothing about
+  the universe in the body; the entity picker searches one universe and cannot surface
+  another; and a relationship type id, a source id or a target id from another universe
+  is refused as an unusable choice rather than as someone else's row. The wider audit -
+  rate limiting, header and cookie hardening, dependency review, a deliberate look at
+  the auth surface - is what remains.
 
 ## Blockers
 

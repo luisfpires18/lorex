@@ -91,6 +91,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.E2E/specs/auth.spec.ts` | Register, sign out, guard, sign back in. |
 | `Lorex.E2E/specs/universes.spec.ts` | Create, edit, search, archive, paginate, ownership. |
 | `Lorex.E2E/specs/lore.spec.ts` | Author an entry, edit it, filter, and cross-owner isolation. |
+| `Lorex.E2E/specs/relationships.spec.ts` | Both readings, relation kinds, refusals, and the universe and owner boundaries. |
 
 ## `scripts`
 
