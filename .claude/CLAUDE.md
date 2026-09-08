@@ -21,3 +21,31 @@ only when a question is genuinely broad.
 - Rebuild from scratch on a fresh clone: `graphify update .`.
 
 Installed as a module rather than on `PATH`: run it as `python -m graphify <command>`.
+
+## rtk
+
+Binary: `rtk` (Rust Token Killer), user-scoped at `%USERPROFILE%\.local\bin\rtk.exe`.
+Hook: `PreToolUse` / matcher `Bash` -> `rtk hook claude`, in `.claude/settings.json`
+(project-scoped on purpose, so the trial is tracked by git and does not leak into
+unrelated repositories). Nothing is installed in the global `~/.claude`.
+
+RTK compresses **shell output**. It is not a code-exploration tool.
+
+- The hook rewrites supported commands transparently: `git status` -> `rtk git status`.
+  Nothing needs to be typed differently.
+- Do **not** use `rtk read`, `rtk grep` or `rtk find` for ordinary repository work.
+  Targeted `Read`, `Grep` and `Glob` stay the default - they are what the file-reading
+  rules above are written against.
+- Full output escape hatch: `rtk proxy <command>` runs unfiltered. Use it when a filtered
+  failure is ambiguous, diagnostics look missing, or debugging needs the whole log.
+  **Record every such rerun** in `docs/tooling/agent-tooling-trial.md`.
+- Savings so far: `rtk gain`.
+
+Filtering is by design asymmetric: a passing `dotnet build` collapses to one line, a
+failing one is passed through whole so diagnostics survive.
+
+`rtk gain` prints `No hook installed` because it only inspects the global config. The
+project-scoped hook is real; the warning is cosmetic.
+
+RTK and Graphify are unrelated and both stay: Graphify explores the codebase, RTK
+compresses command output. Neither replaces the other.

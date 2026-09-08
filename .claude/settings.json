@@ -1,9 +1,30 @@
 {
+  "permissions": {
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(rtk git push:*)",
+      "Bash(git merge:*)",
+      "Bash(rtk git merge:*)"
+    ]
+  },
   "enabledPlugins": {
     "security-guidance@claude-plugins-official": true,
     "frontend-design@claude-plugins-official": true,
     "playwright@claude-plugins-official": true,
     "caveman@caveman": true,
     "humanizer@humanizer": true
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "rtk hook claude"
+          }
+        ]
+      }
+    ]
   }
 }

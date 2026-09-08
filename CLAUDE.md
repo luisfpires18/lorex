@@ -27,7 +27,7 @@ Router only. No architecture detail here.
 
 ## Tooling
 
-- Graphify usage rules: `.claude/CLAUDE.md`. Skill: `.claude/skills/graphify/SKILL.md`.
+- Graphify and RTK usage rules: `.claude/CLAUDE.md`. Graphify skill: `.claude/skills/graphify/SKILL.md`.
 - Backend conventions: `.claude/skills/aspnet-core-guidance/SKILL.md`.
 
 ## Hard boundaries
