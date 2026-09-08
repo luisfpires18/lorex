@@ -56,6 +56,11 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Relationships/RelationshipEndpoints.cs` | Relationship CRUD and the per-entity, perspective-resolved list. |
 | `Features/Relationships/RelationshipContracts.cs` | Request and response records for relationships. |
 | `Features/Relationships/RelationshipValidation.cs` | Relationship input checks, UTC coercion, perspective labels. |
+| `Features/Timeline/TimelineModel.cs` | `TimelineEntry`, its participation link, date kind and precision. |
+| `Features/Timeline/TimelineConfiguration.cs` | Timeline schema: keys, the chronological index, delete behaviour. |
+| `Features/Timeline/TimelineEndpoints.cs` | Timeline CRUD and the chronological, filtered, paged listing. |
+| `Features/Timeline/TimelineContracts.cs` | Request and response records for the timeline. |
+| `Features/Timeline/TimelineValidation.cs` | Date-kind rules and component checks. No calendar engine. |
 | `appsettings.json` | Non-secret defaults; empty connection string. |
 | `appsettings.Development.json` | Dev connection string and CORS origins. |
 
@@ -86,6 +91,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.Api.Tests/UniverseEndpointTests.cs` | Universe CRUD and the ownership invariant. |
 | `Lorex.Api.Tests/LoreEndpointTests.cs` | Lore CRUD, field kinds, and cross-universe isolation. |
 | `Lorex.Api.Tests/RelationshipEndpointTests.cs` | Relationship CRUD, both perspectives, and cross-owner isolation. |
+| `Lorex.Api.Tests/TimelineEndpointTests.cs` | Date kinds, participation, ordering, paging, and ownership. |
 | `Lorex.E2E/playwright.config.ts` | Starts API + web, runs Chromium. |
 | `Lorex.E2E/specs/smoke.spec.ts` | Frontend-loads smoke suite. |
 | `Lorex.E2E/specs/auth.spec.ts` | Register, sign out, guard, sign back in. |
