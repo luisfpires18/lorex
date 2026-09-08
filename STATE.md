@@ -2,8 +2,8 @@
 
 ## Current state
 
-Phase 011 (Canon Integrity foundation) complete and merged into `dev`. The backend half
-of Canon Integrity exists: persistence, a rule engine, and a review API. No UI.
+Phase 013 (Canon Integrity chronology rules) complete on its branch. The backend half of
+Canon Integrity exists: persistence, a rule engine, six rules, and a review API. No UI.
 
 - Canon Integrity: a conflict is a derived finding, never lore. Lorex records that
   something looks wrong and changes nothing about the records it describes. `CanonConflict`
@@ -22,13 +22,28 @@ of Canon Integrity exists: persistence, a rule engine, and a review API. No UI.
   is actually fixed, and raises the same fingerprint as Pending again if it later returns.
   Dismiss and reopen are the author's, and both refuse a Resolved conflict. See
   `docs/architecture/decisions/0010-canon-conflict-lifecycle.md`.
-- Rules are ordinary C# behind `ICanonIntegrityRule`, registered in one list, no DSL. All
-  three are structural: they read canon status on records the model already links and never
-  a field's meaning, so no semantic field name is hardcoded anywhere. `CANON-REL-001`
-  (Canon relationship resting on a non-Canon endpoint), `CANON-TIME-001` (Canon moment with
-  a non-Canon participant), `CANON-FIELD-001` (Canon entity whose entity-reference field
-  points at a non-Canon entry). All Medium. Severity is recorded and wired to nothing:
-  no promotion gate yet, and no rule emits High.
+- Rules are ordinary C# behind `ICanonIntegrityRule`, registered in one list, no DSL. Three
+  are structural and Medium: they read canon status on records the model already links.
+  `CANON-REL-001` (Canon relationship resting on a non-Canon endpoint), `CANON-TIME-001`
+  (Canon moment with a non-Canon participant), `CANON-FIELD-001` (Canon entity whose
+  entity-reference field points at a non-Canon entry).
+- Three are chronological and High. `CANON-LIFE-001` (declared birth year after declared
+  death year), `CANON-LIFE-002` (Canon moment wholly before a Canon participant's birth),
+  `CANON-LIFE-003` (wholly after its death). Severity is still wired to nothing - no
+  promotion gate yet.
+- Semantic field codes: `EntityFieldDefinition.Semantic`, a nullable `EntityFieldSemantic`
+  scalar column - `BirthYear`, `DeathYear`, `Age`. Optional, null by default, and the only
+  way a rule learns what a field is about. No display name is ever matched and no meaning is
+  inferred. Every member is valid on `Number` only, because fictional time is signed integer
+  years and `DateValue` is a Gregorian `DateTime` that does not compare with it. At most one
+  field per type per meaning, enforced at the edge and by a filtered unique index. `Age` is
+  declarable but read by nothing: an age is a claim about a moment and the model cannot say
+  which. See `docs/architecture/decisions/0011-semantic-field-codes.md`.
+- The chronology rules only report what is provable. Approximate and undated moments are
+  skipped; a range counts only when it ends before a birth or starts after a death; birth
+  equal to death, and a moment in the year of a birth or death, are all legal. A universe
+  whose timeline uses more than one named era gets no chronology findings at all, because a
+  declared birth year names no era.
 - Canon Integrity API: `/api/universes/{universeId}/canon-conflicts` - list with severity,
   status and paging under a deterministic order (pending first, then worst severity, then
   oldest, then id), get one, `POST /evaluate`, `POST /{id}/dismiss`, `POST /{id}/reopen`.
@@ -71,80 +86,56 @@ of Canon Integrity exists: persistence, a rule engine, and a review API. No UI.
   **No Canon Integrity UI exists yet.**
 - Universes: create, read, update, archive, unarchive, delete once archived.
 - Auth: ASP.NET Core Identity with a cookie session.
-- Tests: 180 API integration tests (34 for Canon Integrity), 38 Playwright tests. The
-  Canon Integrity tests cover detection, each of the three rules, idempotence across
-  repeated evaluation, a rename refreshing rather than duplicating, a fingerprint change
-  on materially different facts, the whole lifecycle - dismissal surviving an unchanged
-  re-evaluation, resolving once the issue is fixed, and returning as Pending when the same
-  issue comes back - a repointed field and a half-fixed relationship not inheriting a
-  dismissal, both filters, deterministic paging, and the owner and universe boundaries from
-  both directions.
+- Tests: 217 API integration tests (71 for Canon Integrity), 38 Playwright tests. The
+  structural half covers detection, each rule, idempotence, a rename refreshing rather than
+  duplicating, a fingerprint change on materially different facts, the whole lifecycle, both
+  filters, deterministic paging and the ownership boundaries. The chronology half adds
+  semantic field assignment and its validation, each chronology rule, both boundaries, every
+  case Lorex must stay quiet on - approximate dates, straddling ranges, two eras, drafts,
+  and a field named "Birth Year" that declares nothing - a rename not affecting detection,
+  moving a meaning to another field opening a new conflict, and fix-then-break returning to
+  Pending.
 - Migrations: `InitialCreate`, `AddIdentity`, `UniqueUserEmail`, `AddUniverses`,
-  `AddLoreEntities`, `AddRelationships`, `AddTimeline`, `AddCanonIntegrity`. Verified
-  against a fresh SQLite database.
+  `AddLoreEntities`, `AddRelationships`, `AddTimeline`, `AddCanonIntegrity`,
+  `AddEntityFieldSemantics`. Verified against a fresh SQLite database.
 - Launcher: `Start-Lorex.cmd` / `Stop-Lorex.cmd`.
 
 ## Current phase
 
-Phase 012 setup complete and merged into `dev`. Tooling only - no Canon Integrity work.
-Current branch is `dev`. Merged from `chore/012/rtk-token-trial`, 6 commits, `--no-ff`, no
-conflicts. Feature branch retained. `dev` published to `origin/dev`.
+Phase 013 on `feat/013/canon-integrity-rules`, branched from `dev`. Three commits, backend
+only, not merged and not pushed. Release build clean, 217/217 API tests green, all nine
+migrations verified against a fresh SQLite file, working tree clean.
 
-The trial itself has not started. Phase 012 built and proved the setup; **the measurement
-begins with Phase 013**, and RTK and Graphify are judged independently after 3-4 real
-implementation tasks.
+Detection only. Promotion is **not** gated: a High conflict blocks nothing yet, which is
+Phase 014's job.
 
-RTK 0.48.0 installed user-scoped from the official release zip, checksum verified against
-the release `checksums.txt`, no admin. The project `PreToolUse` / `Bash` hook calls
-`.claude/hooks/rtk-safe-hook.ps1`, not `rtk hook claude` directly: RTK answers
-`permissionDecision: "allow"` for everything it rewrites, so the wrapper keeps its
-`updatedInput` and strips every permission decision. RTK compresses; it never authorizes.
-Failure is silent - RTK missing, crashing or emitting bad JSON produces no decision and no
-rewrite, and the command follows Claude's normal flow. Nothing lives in the global config;
-`rtk init -g` was run once to inspect it, then reverted with `--uninstall`.
+Rules deliberately left out. **Exclusive relationship overlap**: `RelationshipType` has a
+forward name, an inverse name and a symmetric flag, and `LoreRelationship` carries no
+interval, so there is nothing to overlap and no way to mark a type exclusive - it would mean
+inventing schema to justify a rule. **Age consistency**: an age is a claim about a moment and
+nothing records which moment; inferring a current year would be inventing a fact. The `Age`
+semantic exists so the meaning can be declared, and waits for a structured reference year.
+**Invalid ranges** are refused at write time already and are not re-reported as conflicts.
 
-The wrapper also refuses semantic substitution. RTK does not merely prefix commands: it
-turns `npm run lint` into `rtk lint` (ESLint, while this repo uses oxlint), drops `npx` from
-`npx tsc` and `npx playwright test`, turns `cat` into `rtk read`, and rewrites each element
-of a chain separately. Two rules, no shell parsing: a command containing `&&`, `||`, `;`,
-`|`, a newline, a backtick or `$(` bypasses RTK entirely; otherwise the rewrite is accepted
-only when it is exactly the original with a literal `rtk ` prefix and nothing else in
-`tool_input` changed. No per-tool special cases. Correctness beats filtering coverage, and a
-rejected rewrite just runs normally. Manual `rtk <cmd>` and `rtk proxy <cmd>` still work.
-
-Probes are static: 29 payloads across safe, repo-script, substitution, compound and
-dangerous groups. Every accepted rewrite is a pure `rtk ` prefix; `npm run lint`, `npx ...`,
-`cat`, `dotnet test`, `git merge`, `git remote` and all compound forms bypass; no permission
-decision anywhere; six failure modes silent. **A Claude Code restart or a new conversation is
-needed before the wrapper is live**, so real behaviour in a running session is not yet
-observed.
-
-Graphify is untouched: package, skill, `graphify-out/` and manual invocation all stay, and
-the noisy automatic hooks from Phase 011 were not restored. The two tools solve different
-problems - Graphify explores the codebase, RTK compresses shell output.
-
-File reads stay on Claude's built-in `Read`/`Grep`/`Glob`. `rtk read`/`grep`/`find` are
-deliberately not adopted. `rtk proxy <command>` is the verified unfiltered escape hatch and
-every use of it is logged.
-
-Baseline (raw -> RTK): `git status` 302 -> 53 B, successful `dotnet build` 488 -> 64 B,
-`npm run typecheck` 48 -> 18 B, `npm run lint` 34 -> 9 B. `git log --oneline` and a
-**failing** build are passed through untouched - diagnostics are preserved by design.
-`rtk gain` after the baseline: 7 commands, 185 tokens, 5.0%. Shell bytes only, not a
-measure of Claude's overall token use.
-
-Method and per-task reporting: `docs/tooling/agent-tooling-trial.md`. Evaluate RTK and
-Graphify independently after **3-4 real implementation tasks**, then Keep / Conditional /
-Remove. No verdict in Phase 012.
+Phase 012 (tooling trial setup) is merged into `dev`. RTK 0.48.0 and Graphify are on trial
+independently, judged after 3-4 real implementation tasks; method, probes and per-task
+results live in `docs/tooling/agent-tooling-trial.md`. **Task 1 is Phase 013 and is
+recorded there.** In short: the wrapper went live and behaved exactly as designed - pure
+prefix rewrite, no permission decision - but every rewritten command failed with
+`rtk: command not found`, because the desktop app's PATH snapshot predates RTK's install.
+`rtk gain` is unchanged from the Phase 012 baseline, so nothing was filtered and nothing was
+saved. **Restarting the Claude desktop app should fix it; task 2 must re-measure.** Graphify
+was not used - targeted reads covered a narrow vertical slice.
 
 ## Immediate next step
 
-Phase 013: `feat/013/canon-integrity-rules`, branched from `dev`. Canon Integrity rules
-resume there, and it is the **first** of the 3-4 tasks the tooling trial measures: report
-RTK and Graphify per `docs/tooling/agent-tooling-trial.md` at the end of it.
+Phase 014: `feat/014/canon-promotion-gates`, branched from `dev` once 013 is merged. High
+severity now has a meaning to enforce: refuse the promotion that would introduce a
+provable contradiction, and decide what the author is told when it is refused. Nothing in
+013 needs another backend slice first.
 
-The RTK hook needs a Claude Code restart or a new conversation before it is live, so Phase
-013 should start in a fresh session.
+Task 2 of the tooling trial. Restart the desktop app before starting it, or RTK will be
+measured at zero again.
 
 ## Remote
 
@@ -159,13 +150,21 @@ playwright, security-guidance. Skills in `.claude/skills/`: `aspnet-core-guidanc
 `graphify`. Usage rules for both tools live in `.claude/CLAUDE.md`; the root `CLAUDE.md`
 stays a router.
 
-**RTK** (`%USERPROFILE%\.local\bin\rtk.exe`, on the user PATH) filters shell output through
-a project-scoped `PreToolUse` hook that runs `.claude/hooks/rtk-safe-hook.ps1`. The wrapper
-is permission-neutral: it forwards the payload to `rtk hook claude`, preserves the rewrite
-and removes `permissionDecision` / `permissionDecisionReason` (and the legacy
-`decision`/`reason` pair), so authorization stays with Claude Code. `permissions.ask` covers
-push, force-push, merge, branch deletion, remote changes and PR create/merge, bare and
+**RTK** (`%USERPROFILE%\.local\bin\rtk.exe`, on the Windows user PATH) filters shell output
+through a project-scoped `PreToolUse` / `Bash` hook that runs `.claude/hooks/rtk-safe-hook.ps1`.
+The wrapper is permission-neutral: it forwards the payload to `rtk hook claude`, preserves
+the rewrite and removes `permissionDecision` / `permissionDecisionReason` (and the legacy
+`decision`/`reason` pair), so authorization stays with Claude Code. It accepts a rewrite only
+when it is exactly the original with an `rtk ` prefix, and bypasses anything containing
+`&&`, `||`, `;`, `|`, a newline, a backtick or `$(`. `permissions.ask` covers push,
+force-push, merge, branch deletion, remote changes and PR create/merge, bare and
 `rtk`-prefixed, as an independent second layer. There is no blanket `Bash(rtk *)` allow.
+
+**RTK is currently non-functional in the `Bash` tool** and rewritten commands fail with
+exit 127. `rtk.exe` is on the user PATH in the registry but not in the running desktop app's
+environment, which was snapshotted before RTK was installed. `~/.bashrc` does not help - the
+tool runs `bash -c`, which sources no profile. Restart the desktop app. The `PowerShell`
+tool is unaffected, because the hook matches `Bash` only.
 
 **Graphify** stays manual-only, installed under the WindowsApps Python rather than on
 `PATH`: `python -m graphify update .` (AST only, no API cost). Nothing invokes it unless
@@ -181,7 +180,11 @@ asked.
   sort, so a Second Age 3441 sorts after a Third Age 3018 even though it is earlier in the
   story. The fallback is deterministic, not correct. Making it correct needs eras to be
   first-class rows with an order and an offset. The page says so when more than one
-  reckoning is present, and Playwright pins that behaviour.
+  reckoning is present, and Playwright pins that behaviour. It now bounds a rule as well:
+  the chronology rules stand down entirely for a universe using more than one named era.
+- An age rule needs a structured way to say **when** an age was true - a reference year on
+  the fact, or an age recorded against a timeline entry. Until one exists, `Age` is a
+  meaning Lorex records and reasons about nothing.
 - Evaluation only runs when asked. Nothing triggers it on write, so a conflict list is as
   fresh as the last evaluation and no more.
 

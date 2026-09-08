@@ -44,7 +44,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Universes/UniverseConfiguration.cs` | Owner FK, indexes, per-owner unique name. |
 | `Features/Universes/UniverseEndpoints.cs` | Owner-scoped CRUD, search, paging, archive. |
 | `Features/Universes/UniverseContracts.cs` | Request and response records for universes. |
-| `Features/Lore/LoreModel.cs` | Entity, type, field, option, alias, value and tag entities. |
+| `Features/Lore/LoreModel.cs` | Entity, type, field, option, alias, value and tag entities, and `EntityFieldSemantic`. |
 | `Features/Lore/LoreConfiguration.cs` | Lore schema: keys, indexes and delete behaviour. |
 | `Features/Lore/LoreAccess.cs` | The universe-ownership gate every lore route passes. |
 | `Features/Lore/EntityEndpoints.cs` | Entity CRUD, search, filters, paging, tags. |
@@ -71,7 +71,8 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/CanonIntegrity/CanonIntegrityEndpoints.cs` | List, get, evaluate, dismiss, reopen; subject-name resolution. |
 | `Features/CanonIntegrity/CanonIntegrityContracts.cs` | Response records for conflicts and evaluation. |
 | `Features/CanonIntegrity/CanonRuleText.cs` | Shared wording and length fitting for rule titles and explanations. |
-| `Features/CanonIntegrity/Rules/` | The three production rules: relationship, timeline and entity-reference. |
+| `Features/CanonIntegrity/Rules/` | The six production rules: three structural, three chronological. |
+| `Features/CanonIntegrity/Rules/CanonLifespan.cs` | Reads declared birth/death years and the moments comparable to them. |
 | `appsettings.json` | Non-secret defaults; empty connection string. |
 | `appsettings.Development.json` | Dev connection string and CORS origins. |
 
@@ -104,7 +105,8 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.Api.Tests/LoreEndpointTests.cs` | Lore CRUD, field kinds, and cross-universe isolation. |
 | `Lorex.Api.Tests/RelationshipEndpointTests.cs` | Relationship CRUD, both perspectives, and cross-owner isolation. |
 | `Lorex.Api.Tests/TimelineEndpointTests.cs` | Date kinds, participation, ordering, paging, and ownership. |
-| `Lorex.Api.Tests/CanonIntegrityEndpointTests.cs` | Conflict lifecycle, fingerprinting, the three rules, filters and ownership. |
+| `Lorex.Api.Tests/CanonIntegrityEndpointTests.cs` | Conflict lifecycle, fingerprinting, the structural rules, filters and ownership. |
+| `Lorex.Api.Tests/CanonChronologyRuleTests.cs` | Semantic field assignment, the three chronology rules and every case they must stay quiet on. |
 | `Lorex.E2E/playwright.config.ts` | Starts API + web, runs Chromium. |
 | `Lorex.E2E/specs/smoke.spec.ts` | Frontend-loads smoke suite. |
 | `Lorex.E2E/specs/auth.spec.ts` | Register, sign out, guard, sign back in. |
