@@ -23,24 +23,41 @@ git, reverts with the branch, and does not change behaviour in unrelated reposit
 `rtk hook claude` directly. It calls a Lorex wrapper that keeps the rewrite and throws the
 permission decision away.
 
-## The permission-neutral wrapper
+## The wrapper
 
-`.claude/hooks/rtk-safe-hook.ps1` reads the `PreToolUse` payload, passes it unchanged to the
-official `rtk hook claude`, preserves `updatedInput` exactly, and removes
-`permissionDecision` and `permissionDecisionReason` (and the legacy `decision`/`reason`
-pair) wherever they appear before emitting the rest.
+`.claude/hooks/rtk-safe-hook.ps1` sits between Claude Code and `rtk hook claude`. RTK may
+compress a command's output. It may not change which command runs, and it may not decide
+whether a command is allowed.
 
-It never emits `allow`, `deny` or `ask`. Its only job is rewriting; Claude Code's own
-permission system stays responsible for authorizing every command.
+**Permissions.** The wrapper removes `permissionDecision` and `permissionDecisionReason`
+(and the legacy `decision`/`reason` pair) wherever they appear. It never emits `allow`,
+`deny` or `ask`; Claude Code's permission system authorizes every command. A wrapper was
+needed rather than `permissions.ask` alone because RTK answers `allow` for everything it
+rewrites and whether an `ask` rule outranks a hook-level `allow` was never proven. Removing
+the decision at source does not depend on that precedence; the `ask` rules stay as an
+independent second layer.
 
-Failure is silent by design. If RTK is missing, crashes, writes invalid JSON, or declines to
-rewrite, the wrapper writes nothing and exits 0, and the command follows Claude's normal
-flow. RTK breaking must never block development.
+**Semantics.** RTK's rewrite is not always a transparent prefix, so the automatic path is
+deliberately conservative. Two rules, no shell parsing:
 
-Why a wrapper rather than `permissions.ask` alone: RTK answers `permissionDecision: "allow"`
-for everything it rewrites, and whether an `ask` rule outranks a hook-level `allow` was never
-proven. Removing the decision at source does not depend on that precedence. The `ask` rules
-are kept as a second, independent layer.
+1. **Compound commands bypass RTK.** If the original contains `&&`, `||`, `;`, `|`, a
+   newline, a backtick or `$(`, the wrapper emits nothing and the original runs. RTK rewrites
+   each element of a chain separately, which is where it did the most damage.
+2. **Only a pure `rtk ` prefix is accepted.** The rewrite must be exactly the original
+   command with `rtk ` in front. `git status` -> `rtk git status` is accepted;
+   `npm run lint` -> `rtk lint` is not. Nothing else in `tool_input` may change either.
+
+This needs no knowledge of any particular tool and rejects every substitution, including
+ones not yet seen. **Correctness beats filtering coverage.** A rejected rewrite is not a
+failure - the command simply runs normally through Claude Code.
+
+**Failing open.** The wrapper fails open to the *original* command, never to an altered one.
+RTK missing, crashing, emitting invalid JSON, declining to rewrite, or producing anything
+that is not a pure prefix all result in no output, exit 0, and the normal flow. RTK breaking
+must never block development.
+
+Manual `rtk <command>` and `rtk proxy <command>` stay available when deliberately chosen.
+This file governs only the automatic path.
 
 ## Method
 
@@ -52,8 +69,10 @@ costing diagnostics?
 Evaluate over the next **3-4 real implementation tasks**, not synthetic runs. After each,
 report:
 
-**RTK** - filter categories actually used; `rtk gain`; filter failures; commands rerun
-unfiltered and why; whether any useful diagnostic was lost.
+**RTK** - commands actually filtered; rewrites the wrapper **bypassed or rejected**, and
+whether that hurt; commands rerun unfiltered and why; filter failures; `rtk gain`; whether
+context longevity improved. A tool that is right but rarely applies is a different verdict
+from one that is wrong; the bypass count is what separates them.
 
 **Graphify** - used or not, and why; whether it materially avoided repository reads;
 anything it surfaced that a targeted read would have missed.
@@ -105,13 +124,22 @@ rerun is a data point** and belongs in the log below.
   approve anything. `permissions.ask` entries (push, force-push, merge, branch deletion,
   remote changes, PR create/merge - bare and `rtk`-prefixed) remain as a second layer. There
   is deliberately no blanket `Bash(rtk *)` allow rule.
-- **RTK rewrites compound commands unfaithfully.** `git status && npm run lint && dotnet
-  build` becomes `rtk git status && rtk lint && rtk dotnet build` - `npm run lint` is
-  replaced by RTK's own `lint`, which assumes ESLint and fails on this repository's oxlint
-  ("JSON parse failed"). Standalone `npm run lint` is rewritten correctly. So RTK can change
-  **which command runs**, not just how its output is displayed. Not fixed here - the wrapper
-  preserves `updatedInput` verbatim by design. Prefer separate calls over `&&` chains while
-  the trial runs, and weigh this in the keep/remove decision.
+- **RTK substitutes commands, not just wraps them.** Surveyed against the real hook:
+
+  | Original | RTK rewrite | Semantics |
+  | --- | --- | --- |
+  | `git status`, `git diff`, `git log --oneline -5` | `rtk <same>` | preserved |
+  | `dotnet build Lorex.slnx` | `rtk dotnet build Lorex.slnx` | preserved |
+  | `npm run typecheck`, `npm run build`, `npm run format:check` | `rtk npm run <script>` | preserved |
+  | `npm run lint` | `rtk lint` | **changed** - `rtk lint` assumes ESLint, this repo uses oxlint, and it fails with "JSON parse failed" |
+  | `npx tsc --noEmit` | `rtk tsc --noEmit` | **changed** - drops `npx` |
+  | `npx playwright test` | `rtk playwright test` | **changed** - drops `npx` |
+  | `cat README.md` | `rtk read README.md` | **changed** - and `rtk read` is the file-reading path this trial excludes |
+  | `git status && npm run lint` | `rtk git status && rtk lint` | **changed** - each element rewritten separately |
+
+  It affects standalone commands, not only compound chains. So RTK can change **which
+  command runs**, not just how its output reads. Handled by the wrapper's pure-prefix rule
+  rather than by any per-tool special case.
 - Commands RTK does not handle (`rm -rf`, `curl ... | sh`) get no decision at all, so the
   normal permission flow still applies to them.
 - `rtk init` without `-g` installs **no hook** and writes its instructions into the root
@@ -128,28 +156,34 @@ rerun is a data point** and belongs in the log below.
 Payloads fed straight into `.claude/hooks/rtk-safe-hook.ps1`. Nothing was pushed, merged,
 deleted or created; only hook JSON was exercised.
 
-| Input command | Rewrite emitted | Permission decision |
+29 probes, no permission decision in any of them. "bypass" means the wrapper emitted nothing
+and Claude Code runs the original command.
+
+| Group | Input | Result |
 | --- | --- | --- |
-| `git status` | `rtk git status` | none |
-| `dotnet build Lorex.slnx` | `rtk dotnet build Lorex.slnx` | none |
-| `git push` | `rtk git push` | none |
-| `git push --force-with-lease` | `rtk git push --force-with-lease` | none |
-| `git push --force origin dev` | `rtk git push --force origin dev` | none |
-| `git merge dev` | not rewritten, empty output | none |
-| `git branch -D dev` | `rtk git branch -D dev` | none |
-| `git remote set-url origin ...` | not rewritten, empty output | none |
-| `gh pr create --fill` | `rtk gh pr create --fill` | none |
-| `git status && npm run lint && dotnet build` | `rtk git status && rtk lint && rtk dotnet build` | none |
-| `git log --oneline -5; git status` | `rtk git log --oneline -5; rtk git status` | none |
-| `rm -rf /tmp/x` | not rewritten, empty output | none |
+| safe simple | `git status`, `git diff`, `git diff --stat HEAD~1` | accepted as `rtk <same>` |
+| safe simple | `dotnet build`, `dotnet build Lorex.slnx`, `git log --oneline -5` | accepted as `rtk <same>` |
+| safe simple | `dotnet test` | bypass - RTK does not rewrite it |
+| repo script | `npm run typecheck`, `npm run build`, `npm run format:check` | accepted as `rtk npm run <script>` |
+| repo script | `npm run lint` | **bypass** - RTK wanted `rtk lint` |
+| repo script | `npm test`, `npx tsc --noEmit`, `npx playwright test` | bypass |
+| substitution | `cat README.md` | **bypass** - RTK wanted `rtk read README.md` |
+| compound | `git status && npm run lint`, `dotnet build && dotnet test` | bypass |
+| compound | `git status; git diff`, `git status \| head -5`, `dotnet build \|\| echo failed` | bypass |
+| compound | embedded newline, `echo $(git status)` | bypass |
+| dangerous | `git push`, `git push --force-with-lease`, `git branch -D example`, `gh pr create --fill` | accepted as `rtk <same>`, **no decision** - Claude Code and the `ask` rules authorize |
+| dangerous | `git merge dev`, `git remote set-url ...`, `rm -rf /tmp/x` | bypass |
+
+Every accepted rewrite was checked to be exactly `rtk ` plus the original, with `description`
+unchanged. Nothing was pushed, merged, deleted or created; only hook JSON was exercised.
 
 Failure modes, all silent and exit 0: RTK absent from PATH and from the fallback path;
 empty stdin; non-JSON stdin; RTK emitting invalid JSON; RTK emitting `allow` with no
 rewrite. The decisive case - RTK emitting `allow` **with** a rewrite - keeps the rewrite and
 drops the decision.
 
-Compression after the wrapper change: `git status` 401 -> 71 B, `dotnet build` (success)
-488 -> 64 B. `rtk gain`: 13 commands, 423 tokens, 10.6%.
+Compression after the wrapper change: `git status` 312 -> 63 B, `dotnet build` (success)
+488 -> 64 B. `rtk gain`: 15 commands, 592 tokens, 14.1%.
 
 **These are static probes.** They prove what the wrapper emits. They do not prove how Claude
 Code behaves at a real permission boundary, because a running session caches its hook

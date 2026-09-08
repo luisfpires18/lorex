@@ -37,8 +37,11 @@ authority on permissions.
 - **RTK never approves a command.** It answers `permissionDecision: "allow"` for everything
   it rewrites; the wrapper strips that so Claude Code's permission system decides. Never
   wire `rtk hook claude` in directly, and never add a blanket `Bash(rtk *)` allow rule.
-- RTK mangles compound chains: `npm run lint` inside an `&&` chain becomes `rtk lint`, a
-  different linter. Run validation commands separately rather than chained.
+- **RTK never changes what runs.** It substitutes rather than wraps - `npm run lint` ->
+  `rtk lint`, `npx tsc` -> `rtk tsc`, `cat` -> `rtk read` - so the wrapper accepts a rewrite
+  only when it is exactly the original with an `rtk ` prefix, and bypasses anything
+  containing `&&`, `||`, `;`, `|`, a newline, a backtick or `$(`. A bypassed command simply
+  runs unfiltered; that is normal, not a fault, and nothing needs working around.
 - Do **not** use `rtk read`, `rtk grep` or `rtk find` for ordinary repository work.
   Targeted `Read`, `Grep` and `Glob` stay the default - they are what the file-reading
   rules above are written against.

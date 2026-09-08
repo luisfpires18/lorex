@@ -98,14 +98,21 @@ Failure is silent - RTK missing, crashing or emitting bad JSON produces no decis
 rewrite, and the command follows Claude's normal flow. Nothing lives in the global config;
 `rtk init -g` was run once to inspect it, then reverted with `--uninstall`.
 
-Probes are static: 12 payloads, including push, force-push, merge, branch deletion, PR
-creation and a compound chain, all emit a correct rewrite and no permission decision. **A
-Claude Code restart or a new conversation is needed before the wrapper is live**, so real
-permission behaviour in a running session is not yet observed.
+The wrapper also refuses semantic substitution. RTK does not merely prefix commands: it
+turns `npm run lint` into `rtk lint` (ESLint, while this repo uses oxlint), drops `npx` from
+`npx tsc` and `npx playwright test`, turns `cat` into `rtk read`, and rewrites each element
+of a chain separately. Two rules, no shell parsing: a command containing `&&`, `||`, `;`,
+`|`, a newline, a backtick or `$(` bypasses RTK entirely; otherwise the rewrite is accepted
+only when it is exactly the original with a literal `rtk ` prefix and nothing else in
+`tool_input` changed. No per-tool special cases. Correctness beats filtering coverage, and a
+rejected rewrite just runs normally. Manual `rtk <cmd>` and `rtk proxy <cmd>` still work.
 
-Open RTK defect, not fixed here: in a compound chain `npm run lint` is rewritten to `rtk
-lint`, which assumes ESLint and fails against this repository's oxlint. RTK can change which
-command runs, not only how its output reads. Prefer separate calls over `&&` chains.
+Probes are static: 29 payloads across safe, repo-script, substitution, compound and
+dangerous groups. Every accepted rewrite is a pure `rtk ` prefix; `npm run lint`, `npx ...`,
+`cat`, `dotnet test`, `git merge`, `git remote` and all compound forms bypass; no permission
+decision anywhere; six failure modes silent. **A Claude Code restart or a new conversation is
+needed before the wrapper is live**, so real behaviour in a running session is not yet
+observed.
 
 Graphify is untouched: package, skill, `graphify-out/` and manual invocation all stay, and
 the noisy automatic hooks from Phase 011 were not restored. The two tools solve different
