@@ -53,8 +53,9 @@ docs/007/architecture-update
 | 010 | `test/010/timeline-e2e-hardening` | merged into `dev` |
 | 011 | `feat/011/canon-integrity-domain` | merged into `dev` |
 | 012 | `chore/012/rtk-token-trial` | merged into `dev` |
+| 013 | `feat/013/canon-integrity-rules` | merged into `dev` |
 
-Next free number: `013`.
+Next free number: `014`.
 
 ## Rules for automation
 

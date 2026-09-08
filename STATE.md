@@ -102,9 +102,11 @@ Canon Integrity exists: persistence, a rule engine, six rules, and a review API.
 
 ## Current phase
 
-Phase 013 on `feat/013/canon-integrity-rules`, branched from `dev`. Three commits, backend
-only, not merged and not pushed. Release build clean, 217/217 API tests green, all nine
-migrations verified against a fresh SQLite file, working tree clean.
+Phase 013 complete and merged into `dev`. Semantic field codes and `CANON-LIFE-001`,
+`CANON-LIFE-002` and `CANON-LIFE-003` are done. Current branch is `dev`. Merged from
+`feat/013/canon-integrity-rules`, 3 commits, `--no-ff`, no conflicts. Feature branch
+retained. `dev` published to `origin/dev`. Backend only. Release build clean, 217/217 API
+tests green, all nine migrations verified against a fresh SQLite file.
 
 Detection only. Promotion is **not** gated: a High conflict blocks nothing yet, which is
 Phase 014's job.
@@ -117,25 +119,28 @@ nothing records which moment; inferring a current year would be inventing a fact
 semantic exists so the meaning can be declared, and waits for a structured reference year.
 **Invalid ranges** are refused at write time already and are not re-reported as conflicts.
 
-Phase 012 (tooling trial setup) is merged into `dev`. RTK 0.48.0 and Graphify are on trial
-independently, judged after 3-4 real implementation tasks; method, probes and per-task
-results live in `docs/tooling/agent-tooling-trial.md`. **Task 1 is Phase 013 and is
-recorded there.** In short: the wrapper went live and behaved exactly as designed - pure
-prefix rewrite, no permission decision - but every rewritten command failed with
-`rtk: command not found`, because the desktop app's PATH snapshot predates RTK's install.
-`rtk gain` is unchanged from the Phase 012 baseline, so nothing was filtered and nothing was
-saved. **Restarting the Claude desktop app should fix it; task 2 must re-measure.** Graphify
-was not used - targeted reads covered a narrow vertical slice.
+Tooling trial, task 1 of 3-4. RTK 0.48.0 and Graphify are judged independently; method,
+probes and per-task results live in `docs/tooling/agent-tooling-trial.md`.
+
+- **Graphify: unused.** Targeted reads were sufficient for a narrow vertical slice through
+  files `SYSTEMS.md` already names.
+- **RTK: inconclusive.** The hook itself worked - it went live in a fresh conversation and
+  behaved exactly as designed, a pure-prefix rewrite with no permission decision. The
+  executable was then unavailable to the host's stale PATH, so every rewritten command
+  failed with `rtk: command not found` and nothing was filtered. `rtk gain` is unchanged
+  from the Phase 012 baseline, confirming it ran nothing. No command executed with altered
+  meaning.
+- **A fresh host or session must re-measure RTK** before any verdict. Measuring it again on
+  this host without a restart would record another zero.
 
 ## Immediate next step
 
-Phase 014: `feat/014/canon-promotion-gates`, branched from `dev` once 013 is merged. High
-severity now has a meaning to enforce: refuse the promotion that would introduce a
-provable contradiction, and decide what the author is told when it is refused. Nothing in
-013 needs another backend slice first.
+Phase 014: `feat/014/canon-promotion-gates`, branched from `dev`. High severity now has a
+meaning to enforce: refuse the promotion that would introduce a provable contradiction, and
+decide what the author is told when it is refused. Nothing in 013 needs another backend
+slice first.
 
-Task 2 of the tooling trial. Restart the desktop app before starting it, or RTK will be
-measured at zero again.
+Task 2 of the tooling trial runs with it.
 
 ## Remote
 
