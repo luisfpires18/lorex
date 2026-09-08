@@ -181,7 +181,9 @@ public static class EntityTypeEndpoints
         {
             return Results.Problem(
                 title: "Type is in use",
-                detail: $"{inUse} entities still use this type. Move or delete them first.",
+                detail: inUse == 1
+                    ? "1 entity still uses this type. Move or delete it first."
+                    : $"{inUse} entities still use this type. Move or delete them first.",
                 statusCode: StatusCodes.Status409Conflict);
         }
 
@@ -411,8 +413,10 @@ public static class EntityTypeEndpoints
         {
             return Results.Problem(
                 title: "Field is in use",
-                detail: $"{valueCount} entities have a value for this field. "
-                    + "Clear those values before deleting it.",
+                detail: valueCount == 1
+                    ? "1 entity has a value for this field. Clear that value before deleting it."
+                    : $"{valueCount} entities have a value for this field. "
+                        + "Clear those values before deleting it.",
                 statusCode: StatusCodes.Status409Conflict);
         }
 

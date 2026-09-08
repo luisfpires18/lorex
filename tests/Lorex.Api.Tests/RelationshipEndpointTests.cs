@@ -104,6 +104,34 @@ public sealed class RelationshipEndpointTests(LorexApiFactory factory) : IClassF
             $"/api/universes/{universe.Id}/relationship-types/{type.Id}");
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        // The refusal names how many links stand in the way, so it has to count in
+        // English rather than in row counts.
+        Assert.Contains(
+            "1 relationship still uses this type. Delete it first.",
+            await response.Content.ReadAsStringAsync(),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_refusal_to_delete_a_used_type_counts_more_than_one_in_the_plural()
+    {
+        var (client, universe) = await SignedInWithUniverse("reltypeplural");
+        var world = await Cast(client, universe.Id, "Aragorn", "Gondor");
+        var third = await CreateEntity(
+            client, universe.Id, (await FirstDefaultType(client, universe.Id)).Id, "Arnor");
+        var type = await CreateType(client, universe.Id, "rules", "ruled by");
+        await CreateRelationship(client, universe.Id, type.Id, world.First.Id, world.Second.Id);
+        await CreateRelationship(client, universe.Id, type.Id, world.First.Id, third.Id);
+
+        var response = await client.DeleteAsync(
+            $"/api/universes/{universe.Id}/relationship-types/{type.Id}");
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Contains(
+            "2 relationships still use this type. Delete them first.",
+            await response.Content.ReadAsStringAsync(),
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -345,6 +373,21 @@ public sealed class RelationshipEndpointTests(LorexApiFactory factory) : IClassF
                 awayType.Id, world.First.Id, world.Second.Id, CanonStatus.Idea, null, null, null));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task An_entity_from_another_universe_has_no_relationships_here()
+    {
+        var (client, universe, world, type) = await Populated("rellistcross");
+        await CreateRelationship(client, universe.Id, type.Id, world.First.Id, world.Second.Id);
+
+        // Same owner, different universe: the entity is real, but not real *here*.
+        var other = await CreateUniverse(client, "World rellistcross-other");
+
+        var response = await client.GetAsync(
+            $"/api/universes/{other.Id}/entities/{world.First.Id}/relationships");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]

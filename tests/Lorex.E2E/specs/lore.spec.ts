@@ -60,7 +60,9 @@ test.describe('lore', () => {
     await expect(page.getByText('Registry')).toBeVisible()
 
     await page.getByLabel('Field name').fill('Class')
-    await page.getByLabel('Kind').selectOption({ label: 'Choose one' })
+    // Exact: the Relation kinds section on this page is labelled "Relation kinds", which
+    // a loose match would also pick up.
+    await page.getByLabel('Kind', { exact: true }).selectOption({ label: 'Choose one' })
     await page.getByLabel('Options, separated by commas').fill('Courier, Hauler')
     await page.getByTestId('add-field-Starship').click()
     await expect(page.getByText('Class')).toBeVisible()
