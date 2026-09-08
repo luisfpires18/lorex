@@ -47,8 +47,9 @@ docs/007/architecture-update
 | 004 | `feat/004/entity-core` | merged into `dev` |
 | 005 | `feat/005/relationship-domain` | merged into `dev` |
 | 006 | `feat/006/relationship-ui` | merged into `dev` |
+| 007 | `test/007/relationship-e2e-hardening` | merged into `dev` |
 
-Next free number: `007`.
+Next free number: `008`.
 
 ## Rules for automation
 

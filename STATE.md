@@ -44,8 +44,8 @@ feature is finished: authored from the app, and proven from the app.
 
 ## Current phase
 
-Phase 007 complete on `test/007/relationship-e2e-hardening`, branched from `dev`, 3
-commits. Not merged and not pushed.
+Phase 007 complete on `dev`. Merged from `test/007/relationship-e2e-hardening`, 3
+commits, `--no-ff`. Feature branch retained. `dev` published to `origin/dev`.
 
 Two defects were found and fixed. A delete refused because something still uses the
 target interpolated a count into a sentence written only for the plural, so one blocker
