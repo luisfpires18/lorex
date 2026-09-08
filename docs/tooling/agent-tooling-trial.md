@@ -189,12 +189,37 @@ Compression after the wrapper change: `git status` 312 -> 63 B, `dotnet build` (
 Code behaves at a real permission boundary, because a running session caches its hook
 configuration - see below.
 
-## Restart requirement
+## Restart requirement - settled (2026-09-08)
 
-The hook command changed, so **a Claude Code restart or a new conversation is required
-before the wrapper is active in a real session**. Until then the session keeps whatever hook
-configuration it started with. Live permission behaviour has not been observed in a running
-session and must not be reported as verified.
+The hook command changed in Phase 012, so a Claude Code restart or a new conversation was
+required before the wrapper went live. Phase 013 started in a fresh conversation and the
+hook fired on the first `Bash` call: `git status` ran as `rtk git status`. The wrapper is
+active, its rewrite is a pure prefix, and no permission decision reaches Claude Code.
+
+## The PATH break (2026-09-08, Phase 013)
+
+**The live hook rewrites commands the `Bash` tool cannot then run.** Every rewritten command
+in the first real session failed with `/usr/bin/bash: line 1: rtk: command not found`,
+exit 127.
+
+`rtk.exe` is on the Windows *user* PATH (registry), but not in the running app process's
+`PATH`, which was snapshotted before RTK was installed on 2026-09-04. `$env:PATH` in a
+`PowerShell` tool call does not contain `%USERPROFILE%\.local\bin` either, and the `Bash`
+tool's Git Bash inherits the same stale environment. Adding the directory in `~/.bashrc`
+does not help: the tool runs `bash -c`, which sources no profile.
+
+**Fix: restart the Claude desktop app**, which picks up the current user PATH. Nothing in
+the repository is wrong, and no hook or wrapper change is warranted - the wrapper behaved
+exactly as designed and the failure was loud rather than silent.
+
+Two things this does *not* mean. RTK did not cause a wrong command to run: the rewritten
+commands failed to start, and no command executed with different meaning. And the wrapper's
+fail-open guarantee is intact - it fails open to the original command when *RTK* fails,
+which is not the case here, because RTK's hook process ran fine under PowerShell and only
+the rewritten command could not resolve the binary.
+
+Practical effect for the rest of the phase: shell work moved to the `PowerShell` tool, which
+the `Bash`-matched hook does not touch, so it runs unfiltered and correct.
 
 ## Unfiltered rerun log
 
@@ -204,7 +229,44 @@ session and must not be reported as verified.
 
 ## Per-task results
 
-### Task 1 - pending
+### Task 1 - Phase 013, Canon Integrity chronology rules (2026-09-08)
+
+Backend only: semantic field codes, one migration, three deterministic rules, 37 tests.
+
+**RTK**
+
+| Question | Answer |
+| --- | --- |
+| Live hook active | **Yes.** First real session since the wrapper landed. `git status` -> `rtk git status`, pure prefix, `description` untouched. |
+| Permission decision injected | **No.** Hook output re-probed directly: `hookSpecificOutput` carried `updatedInput` only, no `permissionDecision`, no legacy `decision`. |
+| Command categories filtered | **None.** Every rewrite failed to start - see "The PATH break". `rtk gain` is unchanged from the Phase 012 baseline (15 commands, 592 tokens, 14.1%), which independently confirms RTK ran nothing this session. |
+| Rewrites accepted, then failed | 5 observed: `git status` x2, `wc -l`, `ls`, a pipe-less `grep`. All exit 127. |
+| Rewrites bypassed by the wrapper | Not individually reported by the hook, so counted by behaviour: every command containing a pipe ran unfiltered (compound-bypass rule), and `cat <file>` ran unfiltered (substitution rejected - RTK wanted `rtk read`). Consistent with the Phase 012 probe table, now confirmed live. |
+| Filter failures | None. Nothing was filtered. |
+| Unfiltered reruns needed for diagnostics | None. `rtk proxy` was not used. |
+| Incorrect command execution caused by RTK | **No.** No command ran with altered meaning. Five commands failed to start, which is a different and much cheaper failure. |
+
+Verdict material: the wrapper's two safety rules held in a live session, which is the thing
+Phase 012 could only prove statically. The savings question is still unanswered, because the
+environment prevented RTK from running at all. Task 2 should re-measure after an app restart.
+
+Cost of the break: five wasted tool calls plus the diagnosis, against zero tokens saved.
+
+**Graphify**
+
+Not used. The task was a narrow vertical slice through known files - the Canon Integrity
+rule engine, the lore field model, the timeline model - and `SYSTEMS.md` plus targeted
+`Read`/`Grep`/`Glob` located every one of them. No question came up that was broad enough to
+need the graph, and no repository-wide scan was run that the graph would have replaced.
+Building or refreshing the graph purely to have something to report was deliberately not done.
+
+**aspnet-core-guidance**
+
+Used. Materially helped with: the migration command shape and the instruction to inspect the
+generated migration before committing (it is a plain additive column plus a filtered index,
+no SQLite table rebuild); keeping validation at the edge returning `ValidationProblem` rather
+than letting bad input reach EF Core; projecting to DTOs inside the query; `AsNoTracking` on
+every rule read; and no service or repository layer around the rules.
 ### Task 2 - pending
 ### Task 3 - pending
 ### Task 4 - pending

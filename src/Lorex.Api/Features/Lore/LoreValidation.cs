@@ -51,8 +51,44 @@ public static partial class LoreValidation
             errors["options"] = ["One of those options is too long."];
         }
 
+        if (request.Semantic is { } semantic)
+        {
+            if (!Enum.IsDefined(semantic))
+            {
+                errors["semantic"] = ["That is not a field meaning Lorex knows."];
+            }
+            else if (!IsSemanticCompatible(semantic, request.Kind))
+            {
+                errors["semantic"] = [
+                    $"A field that means {SemanticWord(semantic)} has to be a Number field, "
+                        + "because Lorex counts fictional time in plain years."];
+            }
+        }
+
         return errors.Count == 0 ? null : errors;
     }
+
+    /// <summary>
+    /// Whether a meaning may be declared on a field of this shape. Every meaning Lorex has
+    /// is a number on the universe's own reckoning, so the answer is uniform today; it is
+    /// written as a switch because the next meaning added will not be.
+    /// </summary>
+    public static bool IsSemanticCompatible(EntityFieldSemantic semantic, EntityFieldKind kind) =>
+        semantic switch
+        {
+            EntityFieldSemantic.BirthYear => kind is EntityFieldKind.Number,
+            EntityFieldSemantic.DeathYear => kind is EntityFieldKind.Number,
+            EntityFieldSemantic.Age => kind is EntityFieldKind.Number,
+            _ => false,
+        };
+
+    /// <summary>How a meaning is named to the author, so an error reads as a sentence.</summary>
+    public static string SemanticWord(EntityFieldSemantic semantic) => semantic switch
+    {
+        EntityFieldSemantic.BirthYear => "a birth year",
+        EntityFieldSemantic.DeathYear => "a death year",
+        _ => "an age",
+    };
 
     public static Dictionary<string, string[]>? ValidateEntity(EntityRequest request)
     {

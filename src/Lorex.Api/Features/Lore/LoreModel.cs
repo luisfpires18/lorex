@@ -24,6 +24,39 @@ public enum EntityFieldKind
 }
 
 /// <summary>
+/// What a field *means*, for the handful of meanings Lorex can reason about deterministically.
+///
+/// Fields are otherwise semantic-free: a type's fields are whatever the author invents, and
+/// nothing infers meaning from a display name. "Birth Year", "Born", "Geburtsjahr" and
+/// "b." are all the same thing to an author and nothing to a matcher, so a rule that keyed
+/// off names would be wrong the moment someone renamed a field or wrote in another language.
+/// Meaning is therefore declared, once, on the definition - never guessed, and never by AI.
+///
+/// Deliberately tiny and closed. This is not an ontology: it is the vocabulary the
+/// chronology rules need, and it grows one entry at a time when a rule needs one.
+///
+/// Only *year* meanings exist, because the rest of Lorex counts fictional time in signed
+/// integer years (see <c>docs/architecture/decisions/0009-fictional-chronology.md</c>).
+/// <see cref="EntityFieldValue.DateValue"/> is a Gregorian <see cref="DateTime"/> and does
+/// not compare with a universe's own calendar, so no BirthDate/DeathDate member is offered.
+/// </summary>
+public enum EntityFieldSemantic
+{
+    /// <summary>The year the subject was born, on the universe's own reckoning.</summary>
+    BirthYear = 1,
+
+    /// <summary>The year the subject died, on the universe's own reckoning.</summary>
+    DeathYear = 2,
+
+    /// <summary>
+    /// How old the subject is. Recorded so the meaning can be declared, but no rule reads
+    /// it yet: an age is only a claim about a moment, and nothing in the model says which
+    /// moment. See <c>docs/architecture/decisions/0011-semantic-field-codes.md</c>.
+    /// </summary>
+    Age = 3,
+}
+
+/// <summary>
 /// A kind of thing a universe contains: Character, Location, whatever the author invents.
 /// Types carry no domain behaviour, only presentation hints and their field definitions.
 /// </summary>
@@ -65,6 +98,14 @@ public sealed class EntityFieldDefinition
     public required string Name { get; set; }
 
     public EntityFieldKind Kind { get; set; }
+
+    /// <summary>
+    /// What this field means to the integrity rules, or null - which is the normal case.
+    /// A scalar column rather than JSON, so it is queryable and a rule can join on it.
+    /// At most one field per type may carry any given meaning, or a rule reading "the
+    /// birth year" would have to choose between two answers.
+    /// </summary>
+    public EntityFieldSemantic? Semantic { get; set; }
 
     public bool IsRequired { get; set; }
 

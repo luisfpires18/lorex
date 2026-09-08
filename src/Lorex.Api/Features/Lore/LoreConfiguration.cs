@@ -49,6 +49,7 @@ public sealed class EntityFieldDefinitionConfiguration : IEntityTypeConfiguratio
         builder.Property(field => field.Name).IsRequired().HasMaxLength(LoreLimits.NameMaxLength);
         builder.Property(field => field.DefaultValue).HasMaxLength(LoreLimits.TextValueMaxLength);
         builder.Property(field => field.Kind).HasConversion<int>();
+        builder.Property(field => field.Semantic).HasConversion<int?>();
 
         builder.HasOne(field => field.EntityType)
             .WithMany(type => type.Fields)
@@ -56,6 +57,12 @@ public sealed class EntityFieldDefinitionConfiguration : IEntityTypeConfiguratio
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasIndex(field => new { field.EntityTypeId, field.Name }).IsUnique();
+
+        // One meaning per type at most. Filtered, because the ordinary case is a type with
+        // several semantic-free fields and a unique index over nulls would forbid that.
+        builder.HasIndex(field => new { field.EntityTypeId, field.Semantic })
+            .IsUnique()
+            .HasFilter("\"Semantic\" IS NOT NULL");
     }
 }
 

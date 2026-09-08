@@ -221,6 +221,11 @@ public static class EntityTypeEndpoints
             return FieldNameTaken();
         }
 
+        if (await SemanticTakenAsync(db, typeId, null, request.Semantic, cancellationToken))
+        {
+            return SemanticTaken(request.Semantic!.Value);
+        }
+
         var order = request.DisplayOrder
             ?? await db.EntityFieldDefinitions.Where(field => field.EntityTypeId == typeId)
                 .Select(field => (int?)field.DisplayOrder).MaxAsync(cancellationToken) + 1
@@ -232,6 +237,7 @@ public static class EntityTypeEndpoints
             EntityTypeId = typeId,
             Name = name,
             Kind = request.Kind,
+            Semantic = request.Semantic,
             IsRequired = request.IsRequired,
             DisplayOrder = order,
             DefaultValue = LoreValidation.Normalize(request.DefaultValue),
@@ -308,8 +314,17 @@ public static class EntityTypeEndpoints
             return FieldNameTaken();
         }
 
+        if (await SemanticTakenAsync(db, typeId, fieldId, request.Semantic, cancellationToken))
+        {
+            return SemanticTaken(request.Semantic!.Value);
+        }
+
         definition.Name = name;
         definition.Kind = request.Kind;
+
+        // Meaning is metadata about the field, not about what is stored in it, so it may be
+        // declared or withdrawn at any time - unlike the kind, which is frozen once values exist.
+        definition.Semantic = request.Semantic;
         definition.IsRequired = request.IsRequired;
         definition.DisplayOrder = request.DisplayOrder ?? definition.DisplayOrder;
         definition.DefaultValue = LoreValidation.Normalize(request.DefaultValue);
@@ -502,7 +517,8 @@ public static class EntityTypeEndpoints
                         field.Options
                             .OrderBy(option => option.DisplayOrder)
                             .Select(option => new FieldOptionResponse(option.Id, option.Value, option.DisplayOrder))
-                            .ToList()))
+                            .ToList(),
+                        field.Semantic))
                     .ToList()))
             .ToListAsync(cancellationToken);
 
@@ -510,6 +526,32 @@ public static class EntityTypeEndpoints
         Results.ValidationProblem(new Dictionary<string, string[]>
         {
             ["name"] = ["This universe already has a type with that name."],
+        });
+
+    /// <summary>
+    /// Whether some other field on this type already claims that meaning. Checked here so
+    /// the author gets a readable error rather than a unique-index violation, and enforced
+    /// again by the index so a race cannot leave a rule with two birth years to choose from.
+    /// </summary>
+    private static async Task<bool> SemanticTakenAsync(
+        LorexDbContext db,
+        Guid typeId,
+        Guid? excludingFieldId,
+        EntityFieldSemantic? semantic,
+        CancellationToken cancellationToken) =>
+        semantic is { } value
+        && await db.EntityFieldDefinitions.AnyAsync(
+            field => field.EntityTypeId == typeId
+                && field.Semantic == value
+                && field.Id != excludingFieldId,
+            cancellationToken);
+
+    private static IResult SemanticTaken(EntityFieldSemantic semantic) =>
+        Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["semantic"] = [
+                $"Another field on this type is already {LoreValidation.SemanticWord(semantic)}. "
+                    + "Only one field may mean it."],
         });
 
     private static IResult FieldNameTaken() =>
