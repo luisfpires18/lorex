@@ -116,6 +116,11 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
     }
   }
 
+  /** Merges into the latest draft, so two changes in one tick cannot drop one. */
+  function edit(change: Partial<TypeDraft>) {
+    setDraft((current) => ({ ...current, ...change }))
+  }
+
   const form = (
     <div className="reltype__form" data-testid="relationship-type-form">
       <Field
@@ -123,7 +128,7 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
         name="reltype-name"
         placeholder="rules, parent of, married to"
         value={draft.name}
-        onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+        onChange={(event) => edit({ name: event.target.value })}
         error={fieldErrors.name}
       />
 
@@ -137,7 +142,7 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
           name="reltype-inverse"
           placeholder="ruled by, child of"
           value={draft.inverseName}
-          onChange={(event) => setDraft({ ...draft, inverseName: event.target.value })}
+          onChange={(event) => edit({ inverseName: event.target.value })}
           error={fieldErrors.inversename}
         />
       )}
@@ -146,7 +151,7 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
         <input
           type="checkbox"
           checked={draft.isSymmetric}
-          onChange={(event) => setDraft({ ...draft, isSymmetric: event.target.checked })}
+          onChange={(event) => edit({ isSymmetric: event.target.checked })}
           data-testid="reltype-symmetric"
         />
         <span>Reads the same from both sides</span>
@@ -157,7 +162,7 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
         name="reltype-description"
         placeholder="Optional"
         value={draft.description}
-        onChange={(event) => setDraft({ ...draft, description: event.target.value })}
+        onChange={(event) => edit({ description: event.target.value })}
         error={fieldErrors.description}
       />
 

@@ -193,6 +193,21 @@ export function RelationshipSection({
 
   const choices = labelChoices(types)
 
+  /** Every edit merges into the latest draft, so two changes in one tick cannot drop one. */
+  function edit(change: Partial<RelationDraft>) {
+    setDraft((current) => (current ? { ...current, ...change } : current))
+  }
+
+  // A symmetric kind offers one reading only, so a link stored with this entry as the
+  // target still points at that single option rather than falling back to the first kind
+  // in the list.
+  const readingValue = draft
+    ? choiceKey(
+        draft.typeId,
+        draft.useInverse && !types.find((type) => type.id === draft.typeId)?.isSymmetric,
+      )
+    : ''
+
   const form = draft ? (
     <div className="relform" data-testid="relationship-form">
       <p className="relform__reads" data-testid="relationship-preview">
@@ -209,11 +224,11 @@ export function RelationshipSection({
           <select
             id="relation-reading"
             className="field__input field__input--select"
-            value={choiceKey(draft.typeId, draft.useInverse)}
+            value={readingValue}
             onChange={(event) => {
               const chosen = choices.find((choice) => choice.key === event.target.value)
               if (chosen) {
-                setDraft({ ...draft, typeId: chosen.typeId, useInverse: chosen.useInverse })
+                edit({ typeId: chosen.typeId, useInverse: chosen.useInverse })
               }
             }}
             data-testid="relationship-reading"
@@ -233,7 +248,7 @@ export function RelationshipSection({
           label="Connected to"
           universeId={universeId}
           value={draft.related}
-          onChange={(related) => setDraft({ ...draft, related })}
+          onChange={(related) => edit({ related })}
           excludeId={entityId}
           error={fieldErrors.targetentityid ?? fieldErrors.sourceentityid}
         />
@@ -247,7 +262,7 @@ export function RelationshipSection({
                 type="button"
                 className="canon__step"
                 aria-pressed={draft.canonStatus === option}
-                onClick={() => setDraft({ ...draft, canonStatus: option })}
+                onClick={() => edit({ canonStatus: option })}
                 data-testid={`relation-canon-${CANON_LABELS[option].toLowerCase()}`}
               >
                 {CANON_LABELS[option]}
@@ -265,7 +280,7 @@ export function RelationshipSection({
             className="field__input"
             type="date"
             value={draft.start}
-            onChange={(event) => setDraft({ ...draft, start: event.target.value })}
+            onChange={(event) => edit({ start: event.target.value })}
             data-testid="relation-start"
           />
         </div>
@@ -279,7 +294,7 @@ export function RelationshipSection({
             className="field__input"
             type="date"
             value={draft.end}
-            onChange={(event) => setDraft({ ...draft, end: event.target.value })}
+            onChange={(event) => edit({ end: event.target.value })}
             aria-invalid={fieldErrors.enddate ? true : undefined}
             data-testid="relation-end"
           />
@@ -297,7 +312,7 @@ export function RelationshipSection({
           rows={2}
           placeholder="What is worth remembering about this connection."
           value={draft.notes}
-          onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
+          onChange={(event) => edit({ notes: event.target.value })}
           data-testid="relation-notes"
         />
         {fieldErrors.notes ? <p className="field__error">{fieldErrors.notes}</p> : null}
