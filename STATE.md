@@ -2,7 +2,7 @@
 
 ## Current state
 
-Phase 005 (relationship domain) implemented. Backend only: no relationship UI yet.
+Phase 006 (relationship UI) implemented. Relationships are authored from the app.
 
 - Relationships: one `LoreRelationship` row per link, with a universe-scoped
   `RelationshipType` that carries the forward name, the inverse name, and a symmetric
@@ -23,24 +23,33 @@ Phase 005 (relationship domain) implemented. Backend only: no relationship UI ye
   every client id inside that universe. Cross-universe access answers 404.
 - Deleting a type, field or option is refused while it still holds authored data.
 - Web: `/app/universes/:id/lore` browser, `/lore/:entityId` dossier page with in-page
-  editing, `/types` for custom types and fields. No relationship screens yet.
+  editing, `/types` for custom types, fields and relation kinds.
+- The entry page carries a Relations section, worded from the entry you are on. Adding
+  and editing happen in a contextual panel; the kind picker offers both readings of a
+  directional kind, so source and target are never named to the author. `EntityPicker`
+  searches one universe through the API and is kept reusable.
 - Universes: create, read, update, archive, unarchive, delete once archived.
 - Auth: ASP.NET Core Identity with a cookie session.
-- Tests: 100 API integration tests (24 new for relationships), 17 Playwright tests.
-  Backend all green in Release; Playwright not re-run, no frontend code changed.
+- Tests: 100 API integration tests, 17 Playwright tests. No new automated tests in
+  phase 006; relationship E2E is the next phase. Frontend verified by hand through the
+  running app: both perspectives, symmetric wording, edit, delete from both sides,
+  end-before-start refusal, and the 409 on a relation kind still in use.
 - Migrations: `InitialCreate`, `AddIdentity`, `UniqueUserEmail`, `AddUniverses`,
   `AddLoreEntities`, `AddRelationships`. Verified against a fresh SQLite database.
 - Launcher: `Start-Lorex.cmd` / `Stop-Lorex.cmd` verified.
 
 ## Current phase
 
-Phase 005 complete on `dev`. Merged from `feat/005/relationship-domain`, 3 commits.
-Feature branch retained.
+Phase 006 on `feat/006/relationship-ui`, branched from `dev`. Two local commits, not
+merged and not pushed. Phase 005 is complete on `dev`.
+
+Validation: typecheck, lint, format check and production build all clean. No backend
+change was needed. Playwright not run, by design.
 
 ## Immediate next step
 
-Phase 006: relationship UI. Branch `feat/006/relationship-ui` from `dev`.
-Entity-page relationship display, a relationship-type editor, and Playwright coverage.
+Phase 007: relationship end-to-end coverage and hardening. Branch
+`test/007/relationship-e2e-hardening` from `dev` once phase 006 is merged.
 
 ## Remote
 
@@ -66,6 +75,9 @@ as `python -m graphify update .` (AST only, no API cost). `graphify-out/` is git
 - Full relationship security audit deferred to integration/hardening phase. Phase 005
   did a focused manual check only: IDOR, cross-universe ids, overposting, ownership
   filters. Not a blocker.
+- The 409 on a relation kind in use reads "1 relationships still use this type". The
+  count is not pluralised, in this message and in the entity-type one it copies. Copy
+  only; fold into the next backend pass.
 
 ## Blockers
 

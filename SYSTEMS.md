@@ -70,8 +70,9 @@ Repository index. Paths and one-line responsibilities only.
 | `src/auth/` | Session context, `useAuth`, and the route guards. |
 | `src/universes/` | Universe API client and types. |
 | `src/lore/` | Lore API client, shared types, document and field helpers. |
-| `src/lib/dates.ts` | Timestamp formatting. |
-| `src/components/` | `AuthLayout`, `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `FieldInputs`, `TokenInput`, `LoreEditor`. |
+| `src/relationships/` | Relationship API client, DTO types, and both-readings helper. |
+| `src/lib/dates.ts` | Timestamp formatting, date-input round trips, and spans. |
+| `src/components/` | `AuthLayout`, `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker`, `RelationshipSection`, `RelationshipTypeManager`. |
 | `src/pages/` | Login, Register, Universes browser, and the workspace: Overview, Lore, entry page, Types and Settings. |
 | `vite.config.ts` | Dev server port 5173, proxy to the API, build config. |
 
