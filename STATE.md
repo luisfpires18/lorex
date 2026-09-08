@@ -90,11 +90,22 @@ Phase 012, `chore/012/rtk-token-trial`, branched from `dev`. Tooling only - no C
 Integrity work in this branch.
 
 RTK 0.48.0 installed user-scoped from the official release zip, checksum verified against
-the release `checksums.txt`, no admin. Its Claude Code hook (`PreToolUse` / `Bash` ->
-`rtk hook claude`) sits in the project `.claude/settings.json`, not the global config, so
-the trial is tracked by git and does not change unrelated repositories. `rtk init -g` was
-run once to inspect what it writes, then reverted with `--uninstall`; the global config was
-verified unchanged apart from the removed hook.
+the release `checksums.txt`, no admin. The project `PreToolUse` / `Bash` hook calls
+`.claude/hooks/rtk-safe-hook.ps1`, not `rtk hook claude` directly: RTK answers
+`permissionDecision: "allow"` for everything it rewrites, so the wrapper keeps its
+`updatedInput` and strips every permission decision. RTK compresses; it never authorizes.
+Failure is silent - RTK missing, crashing or emitting bad JSON produces no decision and no
+rewrite, and the command follows Claude's normal flow. Nothing lives in the global config;
+`rtk init -g` was run once to inspect it, then reverted with `--uninstall`.
+
+Probes are static: 12 payloads, including push, force-push, merge, branch deletion, PR
+creation and a compound chain, all emit a correct rewrite and no permission decision. **A
+Claude Code restart or a new conversation is needed before the wrapper is live**, so real
+permission behaviour in a running session is not yet observed.
+
+Open RTK defect, not fixed here: in a compound chain `npm run lint` is rewritten to `rtk
+lint`, which assumes ESLint and fails against this repository's oxlint. RTK can change which
+command runs, not only how its output reads. Prefer separate calls over `&&` chains.
 
 Graphify is untouched: package, skill, `graphify-out/` and manual invocation all stay, and
 the noisy automatic hooks from Phase 011 were not restored. The two tools solve different
@@ -132,12 +143,13 @@ playwright, security-guidance. Skills in `.claude/skills/`: `aspnet-core-guidanc
 `graphify`. Usage rules for both tools live in `.claude/CLAUDE.md`; the root `CLAUDE.md`
 stays a router.
 
-**RTK** (`%USERPROFILE%\.local\bin\rtk.exe`, on the user PATH) filters shell output
-through a project-scoped `PreToolUse` hook. One caveat found during setup: the hook returns
-`permissionDecision: "allow"` for everything it rewrites, `git push` included, which
-removes the prompt guarding the never-push rule. `permissions.ask` entries for
-`git push`/`git merge` were added to compensate; whether an `ask` rule outranks a hook
-`allow` is not yet verified.
+**RTK** (`%USERPROFILE%\.local\bin\rtk.exe`, on the user PATH) filters shell output through
+a project-scoped `PreToolUse` hook that runs `.claude/hooks/rtk-safe-hook.ps1`. The wrapper
+is permission-neutral: it forwards the payload to `rtk hook claude`, preserves the rewrite
+and removes `permissionDecision` / `permissionDecisionReason` (and the legacy
+`decision`/`reason` pair), so authorization stays with Claude Code. `permissions.ask` covers
+push, force-push, merge, branch deletion, remote changes and PR create/merge, bare and
+`rtk`-prefixed, as an independent second layer. There is no blanket `Bash(rtk *)` allow.
 
 **Graphify** stays manual-only, installed under the WindowsApps Python rather than on
 `PATH`: `python -m graphify update .` (AST only, no API cost). Nothing invokes it unless

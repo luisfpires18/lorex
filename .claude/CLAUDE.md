@@ -25,14 +25,20 @@ Installed as a module rather than on `PATH`: run it as `python -m graphify <comm
 ## rtk
 
 Binary: `rtk` (Rust Token Killer), user-scoped at `%USERPROFILE%\.local\bin\rtk.exe`.
-Hook: `PreToolUse` / matcher `Bash` -> `rtk hook claude`, in `.claude/settings.json`
-(project-scoped on purpose, so the trial is tracked by git and does not leak into
-unrelated repositories). Nothing is installed in the global `~/.claude`.
+Hook: `PreToolUse` / matcher `Bash` -> `.claude/hooks/rtk-safe-hook.ps1`, in
+`.claude/settings.json` (project-scoped on purpose, so the trial is tracked by git and does
+not leak into unrelated repositories). Nothing is installed in the global `~/.claude`.
 
-RTK compresses **shell output**. It is not a code-exploration tool.
+RTK compresses **shell output**. It is not a code-exploration tool, and it is not an
+authority on permissions.
 
 - The hook rewrites supported commands transparently: `git status` -> `rtk git status`.
   Nothing needs to be typed differently.
+- **RTK never approves a command.** It answers `permissionDecision: "allow"` for everything
+  it rewrites; the wrapper strips that so Claude Code's permission system decides. Never
+  wire `rtk hook claude` in directly, and never add a blanket `Bash(rtk *)` allow rule.
+- RTK mangles compound chains: `npm run lint` inside an `&&` chain becomes `rtk lint`, a
+  different linter. Run validation commands separately rather than chained.
 - Do **not** use `rtk read`, `rtk grep` or `rtk find` for ordinary repository work.
   Targeted `Read`, `Grep` and `Glob` stay the default - they are what the file-reading
   rules above are written against.
