@@ -86,8 +86,13 @@ of Canon Integrity exists: persistence, a rule engine, and a review API. No UI.
 
 ## Current phase
 
-Phase 012, `chore/012/rtk-token-trial`, branched from `dev`. Tooling only - no Canon
-Integrity work in this branch.
+Phase 012 setup complete and merged into `dev`. Tooling only - no Canon Integrity work.
+Current branch is `dev`. Merged from `chore/012/rtk-token-trial`, 6 commits, `--no-ff`, no
+conflicts. Feature branch retained. `dev` published to `origin/dev`.
+
+The trial itself has not started. Phase 012 built and proved the setup; **the measurement
+begins with Phase 013**, and RTK and Graphify are judged independently after 3-4 real
+implementation tasks.
 
 RTK 0.48.0 installed user-scoped from the official release zip, checksum verified against
 the release `checksums.txt`, no admin. The project `PreToolUse` / `Bash` hook calls
@@ -135,7 +140,11 @@ Remove. No verdict in Phase 012.
 ## Immediate next step
 
 Phase 013: `feat/013/canon-integrity-rules`, branched from `dev`. Canon Integrity rules
-resume there, with RTK and Graphify reported on per the trial method.
+resume there, and it is the **first** of the 3-4 tasks the tooling trial measures: report
+RTK and Graphify per `docs/tooling/agent-tooling-trial.md` at the end of it.
+
+The RTK hook needs a Claude Code restart or a new conversation before it is live, so Phase
+013 should start in a fresh session.
 
 ## Remote
 
