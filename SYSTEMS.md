@@ -20,7 +20,7 @@ Repository index. Paths and one-line responsibilities only.
 | Path | Responsibility |
 | --- | --- |
 | `CLAUDE.md` | Tooling rules (Graphify usage) kept out of the root router. |
-| `settings.json` | Project-scoped plugins and Graphify advisory hooks. |
+| `settings.json` | Project-scoped plugins. No hooks; Graphify is manual-only. |
 | `skills/aspnet-core-guidance/` | Backend conventions for `src/Lorex.Api`. |
 | `skills/graphify/` | Graphify skill and references. |
 
