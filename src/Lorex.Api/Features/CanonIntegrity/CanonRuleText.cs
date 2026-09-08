@@ -1,0 +1,57 @@
+using Lorex.Api.Features.Lore;
+
+namespace Lorex.Api.Features.CanonIntegrity;
+
+/// <summary>
+/// The wording rules share. Titles and explanations are written for the author, so they
+/// name the records rather than their ids, and they always end with what can be done
+/// about it - a conflict that only says something is wrong is not worth showing.
+/// </summary>
+internal static class CanonRuleText
+{
+    /// <summary>
+    /// Truncates on a word boundary where it can, so a long title ends readably rather
+    /// than mid-word. The column limits are the hard constraint; this keeps under them.
+    /// </summary>
+    public static string Fit(string text, int maxLength)
+    {
+        if (text.Length <= maxLength)
+        {
+            return text;
+        }
+
+        var cut = text[..(maxLength - 1)];
+        var lastSpace = cut.LastIndexOf(' ');
+
+        if (lastSpace > maxLength / 2)
+        {
+            cut = cut[..lastSpace];
+        }
+
+        return cut.TrimEnd() + "…";
+    }
+
+    public static string Title(string text) => Fit(text, CanonIntegrityLimits.TitleMaxLength);
+
+    public static string Explanation(string text) =>
+        Fit(text, CanonIntegrityLimits.ExplanationMaxLength);
+
+    /// <summary>Quotes a name so a title reads as a sentence about a record.</summary>
+    public static string Quoted(string name) => $"“{name}”";
+
+    public static string StatusWord(CanonStatus status) => status switch
+    {
+        CanonStatus.Idea => "an Idea",
+        CanonStatus.Draft => "a Draft",
+        _ => "Canon",
+    };
+
+    /// <summary>"A", "A and B", "A, B and C". Oxford-free, because it reads better inline.</summary>
+    public static string List(IReadOnlyList<string> names) => names.Count switch
+    {
+        0 => string.Empty,
+        1 => names[0],
+        2 => $"{names[0]} and {names[1]}",
+        _ => $"{string.Join(", ", names.Take(names.Count - 1))} and {names[^1]}",
+    };
+}
