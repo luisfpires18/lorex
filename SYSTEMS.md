@@ -14,13 +14,14 @@ Repository index. Paths and one-line responsibilities only.
 | `CLAUDE.md` | Traffic controller for Claude sessions. |
 | `STATE.md` | Current state, phase, next step, blockers. |
 | `graphify-out/` | Generated knowledge graph. Gitignored, manual-only; rebuild with `python -m graphify update .`. |
+| `docs/tooling/` | Agent tooling trial notes (RTK and Graphify evaluation). |
 
 ## `.claude` - session tooling
 
 | Path | Responsibility |
 | --- | --- |
-| `CLAUDE.md` | Tooling rules (Graphify usage) kept out of the root router. |
-| `settings.json` | Project-scoped plugins. No hooks; Graphify is manual-only. |
+| `CLAUDE.md` | Tooling rules (Graphify and RTK usage) kept out of the root router. |
+| `settings.json` | Project-scoped plugins, the RTK `PreToolUse` hook, and `ask` rules for push/merge. Graphify stays manual-only. |
 | `skills/aspnet-core-guidance/` | Backend conventions for `src/Lorex.Api`. |
 | `skills/graphify/` | Graphify skill and references. |
 

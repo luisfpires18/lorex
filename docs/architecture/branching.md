@@ -52,8 +52,9 @@ docs/007/architecture-update
 | 009 | `feat/009/timeline-ui` | merged into `dev` |
 | 010 | `test/010/timeline-e2e-hardening` | merged into `dev` |
 | 011 | `feat/011/canon-integrity-domain` | merged into `dev` |
+| 012 | `chore/012/rtk-token-trial` | in progress |
 
-Next free number: `012`.
+Next free number: `013`.
 
 ## Rules for automation
 

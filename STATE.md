@@ -86,36 +86,38 @@ of Canon Integrity exists: persistence, a rule engine, and a review API. No UI.
 
 ## Current phase
 
-Phase 011 complete on `dev`. Merged from `feat/011/canon-integrity-domain`, 5 commits,
-`--no-ff`, no conflicts. Feature branch retained. `dev` published to `origin/dev`.
+Phase 012, `chore/012/rtk-token-trial`, branched from `dev`. Tooling only - no Canon
+Integrity work in this branch.
 
-Lifecycle and fingerprint semantics are finalized. Two bugs were found and fixed before
-acceptance: a dismissal was permanent, surviving even after the author fixed the lore, and
-the relationship and timeline rules bundled every offending record into one fingerprint, so
-fixing one endpoint discarded the decision made about another. Both are now one finding per
-offending fact, and a dismissal suppresses an issue only while it is still there.
+RTK 0.48.0 installed user-scoped from the official release zip, checksum verified against
+the release `checksums.txt`, no admin. Its Claude Code hook (`PreToolUse` / `Bash` ->
+`rtk hook claude`) sits in the project `.claude/settings.json`, not the global config, so
+the trial is tracked by git and does not change unrelated repositories. `rtk init -g` was
+run once to inspect what it writes, then reverted with `--uninstall`; the global config was
+verified unchanged apart from the removed hook.
 
-Backend only: no frontend, no Playwright, no AI.
+Graphify is untouched: package, skill, `graphify-out/` and manual invocation all stay, and
+the noisy automatic hooks from Phase 011 were not restored. The two tools solve different
+problems - Graphify explores the codebase, RTK compresses shell output.
 
-Validation: Release build clean (0 warnings), full backend suite 180/180, all eight
-migrations applied to a fresh SQLite file, no tracked secrets, working tree clean.
+File reads stay on Claude's built-in `Read`/`Grep`/`Glob`. `rtk read`/`grep`/`find` are
+deliberately not adopted. `rtk proxy <command>` is the verified unfiltered escape hatch and
+every use of it is logged.
 
-Focused security check, main session only, backed by tests: a second account gets 404 with
-an empty body from list, get, evaluate, dismiss and reopen; a conflict id from another
-owner is refused inside the intruder's own universe, so ids cannot be enumerated across the
-boundary; a conflict of one universe is not reachable through another of the same owner;
-no conflict route accepts a request body, so there is nothing to overpost; subject-name
-lookups are universe-scoped, so a subject that somehow pointed elsewhere comes back
-nameless rather than disclosing a record.
+Baseline (raw -> RTK): `git status` 302 -> 53 B, successful `dotnet build` 488 -> 64 B,
+`npm run typecheck` 48 -> 18 B, `npm run lint` 34 -> 9 B. `git log --oneline` and a
+**failing** build are passed through untouched - diagnostics are preserved by design.
+`rtk gain` after the baseline: 7 commands, 185 tokens, 5.0%. Shell bytes only, not a
+measure of Claude's overall token use.
 
-Deliberately not built in this phase: soft or interpretive contradictions, plot logic,
-age and birth semantics, relationship exclusivity, automatic promotion blocking, and any
-UI.
+Method and per-task reporting: `docs/tooling/agent-tooling-trial.md`. Evaluate RTK and
+Graphify independently after **3-4 real implementation tasks**, then Keep / Conditional /
+Remove. No verdict in Phase 012.
 
 ## Immediate next step
 
-Phase 012: `chore/012/rtk-token-trial`, branched from `dev`. A tooling evaluation, not a
-feature: Canon Integrity rules are deferred behind it.
+Phase 013: `feat/013/canon-integrity-rules`, branched from `dev`. Canon Integrity rules
+resume there, with RTK and Graphify reported on per the trial method.
 
 ## Remote
 
@@ -126,20 +128,20 @@ merges are ordinary.
 ## Tooling
 
 Project-scoped plugins in `.claude/settings.json`: caveman, humanizer, frontend-design,
-playwright, security-guidance.
+playwright, security-guidance. Skills in `.claude/skills/`: `aspnet-core-guidance`,
+`graphify`. Usage rules for both tools live in `.claude/CLAUDE.md`; the root `CLAUDE.md`
+stays a router.
 
-Skills in `.claude/skills/`: `aspnet-core-guidance`, `graphify`.
+**RTK** (`%USERPROFILE%\.local\bin\rtk.exe`, on the user PATH) filters shell output
+through a project-scoped `PreToolUse` hook. One caveat found during setup: the hook returns
+`permissionDecision: "allow"` for everything it rewrites, `git push` included, which
+removes the prompt guarding the never-push rule. `permissions.ask` entries for
+`git push`/`git merge` were added to compensate; whether an `ask` rule outranks a hook
+`allow` is not yet verified.
 
-**Graphify automatic hooks removed in Phase 011.** The two advisory `PreToolUse` hooks
-fired on every read and search and pushed the same reminder into context whether or not the
-graph held the answer; recent phases got no measurable benefit from it. The package, the
-skill and `graphify-out/` all stay. Graphify is manual-only now: nothing invokes it unless
-asked. It is installed under the WindowsApps Python, not on `PATH`, so run it as
-`python -m graphify update .` (AST only, no API cost).
-
-A tooling evaluation is planned as Phase 012, `chore/012/rtk-token-trial`, before any
-further Canon Integrity rules. Graphify's removal from the hook path is the first result of
-that line of work, not the end of it.
+**Graphify** stays manual-only, installed under the WindowsApps Python rather than on
+`PATH`: `python -m graphify update .` (AST only, no API cost). Nothing invokes it unless
+asked.
 
 ## Deferred
 
