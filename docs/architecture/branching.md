@@ -51,8 +51,9 @@ docs/007/architecture-update
 | 008 | `feat/008/timeline-domain` | merged into `dev` |
 | 009 | `feat/009/timeline-ui` | merged into `dev` |
 | 010 | `test/010/timeline-e2e-hardening` | merged into `dev` |
+| 011 | `feat/011/canon-integrity-domain` | merged into `dev` |
 
-Next free number: `011`.
+Next free number: `012`.
 
 ## Rules for automation
 

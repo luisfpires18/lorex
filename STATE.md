@@ -2,8 +2,8 @@
 
 ## Current state
 
-Phase 011 (Canon Integrity foundation) implemented on `feat/011/canon-integrity-domain`,
-branched from `dev`. Not merged, not pushed.
+Phase 011 (Canon Integrity foundation) complete and merged into `dev`. The backend half
+of Canon Integrity exists: persistence, a rule engine, and a review API. No UI.
 
 - Canon Integrity: a conflict is a derived finding, never lore. Lorex records that
   something looks wrong and changes nothing about the records it describes. `CanonConflict`
@@ -86,8 +86,16 @@ branched from `dev`. Not merged, not pushed.
 
 ## Current phase
 
-Phase 011 implemented, 5 local commits on `feat/011/canon-integrity-domain`. Backend only:
-no frontend, no Playwright, no AI.
+Phase 011 complete on `dev`. Merged from `feat/011/canon-integrity-domain`, 5 commits,
+`--no-ff`, no conflicts. Feature branch retained. `dev` published to `origin/dev`.
+
+Lifecycle and fingerprint semantics are finalized. Two bugs were found and fixed before
+acceptance: a dismissal was permanent, surviving even after the author fixed the lore, and
+the relationship and timeline rules bundled every offending record into one fingerprint, so
+fixing one endpoint discarded the decision made about another. Both are now one finding per
+offending fact, and a dismissal suppresses an issue only while it is still there.
+
+Backend only: no frontend, no Playwright, no AI.
 
 Validation: Release build clean (0 warnings), full backend suite 180/180, all eight
 migrations applied to a fresh SQLite file, no tracked secrets, working tree clean.
@@ -106,7 +114,8 @@ UI.
 
 ## Immediate next step
 
-Phase 012: `feat/012/canon-integrity-rules`, branched from `dev` after 011 merges.
+Phase 012: `chore/012/rtk-token-trial`, branched from `dev`. A tooling evaluation, not a
+feature: Canon Integrity rules are deferred behind it.
 
 ## Remote
 
@@ -127,6 +136,10 @@ graph held the answer; recent phases got no measurable benefit from it. The pack
 skill and `graphify-out/` all stay. Graphify is manual-only now: nothing invokes it unless
 asked. It is installed under the WindowsApps Python, not on `PATH`, so run it as
 `python -m graphify update .` (AST only, no API cost).
+
+A tooling evaluation is planned as Phase 012, `chore/012/rtk-token-trial`, before any
+further Canon Integrity rules. Graphify's removal from the hook path is the first result of
+that line of work, not the end of it.
 
 ## Deferred
 
