@@ -5,6 +5,7 @@ import EntityPage from './pages/EntityPage'
 import LoginPage from './pages/LoginPage'
 import LorePage from './pages/LorePage'
 import RegisterPage from './pages/RegisterPage'
+import TimelinePage from './pages/TimelinePage'
 import UniverseOverview from './pages/UniverseOverview'
 import UniverseSettings from './pages/UniverseSettings'
 import UniverseTypes from './pages/UniverseTypes'
@@ -28,6 +29,7 @@ export default function App() {
               <Route path="lore" element={<LorePage />} />
               <Route path="lore/new" element={<EntityPage />} />
               <Route path="lore/:entityId" element={<EntityPage />} />
+              <Route path="timeline" element={<TimelinePage />} />
               <Route path="types" element={<UniverseTypes />} />
               <Route path="settings" element={<UniverseSettings />} />
             </Route>
