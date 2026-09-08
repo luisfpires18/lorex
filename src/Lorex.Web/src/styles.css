@@ -1789,3 +1789,437 @@ a {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------- Chronology ----------
+
+   A timeline is read down a spine, not across a table. The year sits out in the margin
+   like a running head, the moments hang off a single continuous rule, and the marker on
+   that rule says how the date is known: filled for a point the author is sure of, hollow
+   for one they are not, a bar for a span.
+
+   Moments with no date are cut loose below a broken rule. They belong to the world but
+   not to the order, and putting them on the spine would claim a place for them. */
+
+.chron__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.chron__title {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(1.7rem, 2.6vw, 2.1rem);
+  margin: 0;
+}
+
+.chron__lede {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  max-width: 42ch;
+}
+
+.chron__caution {
+  margin: 0 0 1.5rem;
+  padding-left: 0.9rem;
+  border-left: 2px solid var(--rule-strong);
+  color: var(--muted);
+  font-size: 0.85rem;
+  max-width: 62ch;
+}
+
+.chron__stream {
+  margin-top: 2rem;
+}
+
+.chron__group {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  column-gap: 2rem;
+}
+
+/* The year follows the moments it covers while they scroll, the way a running head
+   stays with its chapter. */
+.chron__year {
+  grid-column: 1;
+  align-self: start;
+  position: sticky;
+  top: 1.25rem;
+  margin: 0;
+  text-align: right;
+  font-weight: 400;
+}
+
+.chron__yearnum {
+  display: block;
+  font-family: var(--display);
+  font-size: clamp(1.4rem, 2.2vw, 1.85rem);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.chron__yearnum--none {
+  color: var(--rule-strong);
+}
+
+.chron__era {
+  display: block;
+  margin-top: 0.2rem;
+  font-family: var(--ui);
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.chron__moments {
+  grid-column: 2;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-left: 1px solid var(--rule);
+}
+
+.chron__group--unplaced {
+  margin-top: 2.5rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--rule);
+}
+
+.chron__aside {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  max-width: 52ch;
+}
+
+/* Broken, because the order these sit in is not a claim about when they happened. */
+.chron__moments--unplaced {
+  border-left-style: dashed;
+}
+
+.moment {
+  position: relative;
+  padding: 0 0 2.25rem 1.75rem;
+}
+
+/* Only the very last moment stops short. Trimming the last one of every run would break
+   the spine into a stack of separate rules between one year and the next. */
+.chron__group:last-child .moment:last-child {
+  padding-bottom: 0.5rem;
+}
+
+.moment__mark {
+  position: absolute;
+  left: -0.3125rem;
+  top: 0.5rem;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  border: 1px solid var(--rule-strong);
+  background: var(--paper);
+}
+
+/* Exact: a point, filled in. */
+.moment[data-kind='0'] .moment__mark {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+/* Range: a bar, because the moment occupies time rather than sitting at a point. */
+.moment[data-kind='2'] .moment__mark {
+  left: -0.1875rem;
+  top: 0.45rem;
+  width: 0.375rem;
+  height: 1.5rem;
+  border-radius: 0.1875rem;
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.chron__moments--unplaced .moment__mark {
+  display: none;
+}
+
+.moment__stamp {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.7rem;
+  margin: 0;
+}
+
+.moment__when {
+  font-family: var(--display);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.moment__kind {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.moment__title {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(1.05rem, 1.6vw, 1.25rem);
+  margin: 0.15rem 0 0.35rem;
+  overflow-wrap: anywhere;
+}
+
+.moment__account {
+  margin: 0 0 0.6rem;
+  max-width: 62ch;
+  font-size: 0.95rem;
+}
+
+.moment__cast {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0;
+  padding: 0;
+}
+
+.moment__player {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.moment__player:hover,
+.moment__player:focus-visible {
+  color: var(--ink);
+  border-bottom-color: var(--rule-strong);
+}
+
+.moment__dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--rule-strong);
+  flex: none;
+}
+
+/* The tools belong to the moment under the cursor, not to every moment at once. They
+   stay in the tab order, and focus brings them back into view. */
+.moment__tools {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-top: 0.7rem;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.moment:hover .moment__tools,
+.moment:focus-within .moment__tools {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .moment__tools {
+    opacity: 1;
+  }
+}
+
+.moment__tools .button--quiet {
+  padding: 0;
+  border: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.moment__tools .button--quiet:hover:not(:disabled) {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+/* The participant filter needs room for a name, not for a two-word status. */
+.controls__filters .picker {
+  min-width: 15rem;
+}
+
+/* ---------- Moment drawer ---------- */
+
+.drawer {
+  margin: 0 0 0 auto;
+  width: min(34rem, 100%);
+  max-width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--rule-strong);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.drawer::backdrop {
+  background: rgb(0 0 0 / 0.45);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .drawer[open] {
+    animation: drawer-in 200ms cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+
+  .drawer[open]::backdrop {
+    animation: drawer-veil 200ms ease;
+  }
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(2rem);
+    opacity: 0;
+  }
+}
+
+@keyframes drawer-veil {
+  from {
+    opacity: 0;
+  }
+}
+
+.drawer__panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.drawer__head {
+  padding: 1.75rem 1.75rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.drawer__eyebrow {
+  margin: 0 0 0.3rem;
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+
+.drawer__title {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 1.5rem;
+  overflow-wrap: anywhere;
+}
+
+.drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+
+.drawer__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.75rem;
+  border-top: 1px solid var(--rule);
+}
+
+.field__hint {
+  margin: 0 0 0.4rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.kinds {
+  display: flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--rule-strong);
+}
+
+.kinds__step {
+  flex: 1 1 auto;
+  border: 0;
+  border-right: 1px solid var(--rule-strong);
+  background: transparent;
+  padding: 0.35rem 0.5rem;
+  font: inherit;
+  font-size: 0.78rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.kinds__step:last-child {
+  border-right: 0;
+}
+
+.kinds__step[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.kinds + .field__hint {
+  margin: 0.45rem 0 0;
+}
+
+.momentform__point {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+/* ---------- Chronology on a narrow screen ---------- */
+
+@media (max-width: 700px) {
+  .chron__group {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .chron__year {
+    grid-column: 1;
+    position: static;
+    text-align: left;
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .chron__era {
+    margin-top: 0;
+  }
+
+  .chron__moments {
+    grid-column: 1;
+  }
+
+  .momentform__point {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .drawer__head,
+  .drawer__actions {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+
+  .drawer__body {
+    padding: 1.25rem;
+  }
+}
