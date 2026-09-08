@@ -21,3 +21,40 @@ only when a question is genuinely broad.
 - Rebuild from scratch on a fresh clone: `graphify update .`.
 
 Installed as a module rather than on `PATH`: run it as `python -m graphify <command>`.
+
+## rtk
+
+Binary: `rtk` (Rust Token Killer), user-scoped at `%USERPROFILE%\.local\bin\rtk.exe`.
+Hook: `PreToolUse` / matcher `Bash` -> `.claude/hooks/rtk-safe-hook.ps1`, in
+`.claude/settings.json` (project-scoped on purpose, so the trial is tracked by git and does
+not leak into unrelated repositories). Nothing is installed in the global `~/.claude`.
+
+RTK compresses **shell output**. It is not a code-exploration tool, and it is not an
+authority on permissions.
+
+- The hook rewrites supported commands transparently: `git status` -> `rtk git status`.
+  Nothing needs to be typed differently.
+- **RTK never approves a command.** It answers `permissionDecision: "allow"` for everything
+  it rewrites; the wrapper strips that so Claude Code's permission system decides. Never
+  wire `rtk hook claude` in directly, and never add a blanket `Bash(rtk *)` allow rule.
+- **RTK never changes what runs.** It substitutes rather than wraps - `npm run lint` ->
+  `rtk lint`, `npx tsc` -> `rtk tsc`, `cat` -> `rtk read` - so the wrapper accepts a rewrite
+  only when it is exactly the original with an `rtk ` prefix, and bypasses anything
+  containing `&&`, `||`, `;`, `|`, a newline, a backtick or `$(`. A bypassed command simply
+  runs unfiltered; that is normal, not a fault, and nothing needs working around.
+- Do **not** use `rtk read`, `rtk grep` or `rtk find` for ordinary repository work.
+  Targeted `Read`, `Grep` and `Glob` stay the default - they are what the file-reading
+  rules above are written against.
+- Full output escape hatch: `rtk proxy <command>` runs unfiltered. Use it when a filtered
+  failure is ambiguous, diagnostics look missing, or debugging needs the whole log.
+  **Record every such rerun** in `docs/tooling/agent-tooling-trial.md`.
+- Savings so far: `rtk gain`.
+
+Filtering is by design asymmetric: a passing `dotnet build` collapses to one line, a
+failing one is passed through whole so diagnostics survive.
+
+`rtk gain` prints `No hook installed` because it only inspects the global config. The
+project-scoped hook is real; the warning is cosmetic.
+
+RTK and Graphify are unrelated and both stay: Graphify explores the codebase, RTK
+compresses command output. Neither replaces the other.
