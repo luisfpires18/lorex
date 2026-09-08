@@ -2,8 +2,8 @@
 
 ## Current state
 
-Phase 009 (timeline UI) complete and merged into `dev`. The timeline now has a domain, an
-API and a page.
+Phase 010 (timeline end-to-end coverage) complete and merged into `dev`. The timeline now
+has a domain, an API, a page and end-to-end tests.
 
 - Timeline: a `TimelineEntry` is a chronology record, not a lore entity. It is a moment
   in one universe that may name any number of entities, and participation never requires
@@ -75,9 +75,9 @@ API and a page.
 
 ## Current phase
 
-Phase 010 complete on `test/010/timeline-e2e-hardening`, branched from `dev`. Two
-commits. Not merged, not pushed. The timeline is now complete through end-to-end
-coverage.
+Phase 010 complete on `dev`. Merged from `test/010/timeline-e2e-hardening`, 3 commits,
+`--no-ff`, no conflicts. Feature branch retained. `dev` published to `origin/dev`. The
+timeline is now complete through end-to-end coverage.
 
 One file added, `tests/Lorex.E2E/specs/timeline.spec.ts`. No production code changed:
 the tests found no reproducible defect to fix, so none was invented. The three real ones

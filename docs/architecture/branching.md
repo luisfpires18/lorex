@@ -50,8 +50,9 @@ docs/007/architecture-update
 | 007 | `test/007/relationship-e2e-hardening` | merged into `dev` |
 | 008 | `feat/008/timeline-domain` | merged into `dev` |
 | 009 | `feat/009/timeline-ui` | merged into `dev` |
+| 010 | `test/010/timeline-e2e-hardening` | merged into `dev` |
 
-Next free number: `010`.
+Next free number: `011`.
 
 ## Rules for automation
 
