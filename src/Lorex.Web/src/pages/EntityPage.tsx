@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { FieldInput } from '../components/FieldInputs'
 import { LoreArticle, LoreEditor } from '../components/LoreEditor'
+import { RelationshipSection } from '../components/RelationshipSection'
 import { emptyValue, isEmptyDocument } from '../lore/document'
 import { TokenInput } from '../components/TokenInput'
 import { ApiError } from '../lib/api'
@@ -446,6 +447,14 @@ export default function EntityPage() {
           )}
         </aside>
       </div>
+
+      {!isNew && !isEditing ? (
+        <RelationshipSection
+          universeId={universe.id}
+          entityId={entityId}
+          entityName={detail?.name ?? ''}
+        />
+      ) : null}
 
       <footer className="entry__actions">
         {isEditing ? (

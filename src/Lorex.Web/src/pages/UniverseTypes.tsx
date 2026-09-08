@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { Field } from '../components/Field'
+import { RelationshipTypeManager } from '../components/RelationshipTypeManager'
 import { ApiError } from '../lib/api'
 import {
   addField,
@@ -269,6 +270,8 @@ export default function UniverseTypes() {
           Add type
         </button>
       </div>
+
+      <RelationshipTypeManager universeId={universe.id} />
     </article>
   )
 }
