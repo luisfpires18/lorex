@@ -2,8 +2,8 @@
 
 ## Current state
 
-Phase 008 (timeline domain) complete and merged into `dev`. Backend and domain only:
-there is no timeline UI yet.
+Phase 009 (timeline UI) implemented on `feat/009/timeline-ui`, not merged. The timeline
+now has a domain, an API and a page.
 
 - Timeline: a `TimelineEntry` is a chronology record, not a lore entity. It is a moment
   in one universe that may name any number of entities, and participation never requires
@@ -40,8 +40,19 @@ there is no timeline UI yet.
   re-resolves every client id inside that universe. Cross-universe access answers 404.
 - Deleting a type, field or option is refused while it still holds authored data.
 - Web: `/app/universes/:id/lore` browser, `/lore/:entityId` dossier page with in-page
-  editing, `/types` for custom types, fields and relation kinds. Nothing for the
-  timeline yet.
+  editing, `/types` for custom types, fields and relation kinds, `/timeline` for the
+  chronology. The sidebar Timeline item is a real link now.
+- Timeline UI: a vertical spine, not a table. The year stands in the margin and sticks to
+  its run; the marker on the rule encodes the kind (filled point, hollow point, bar for a
+  span); undated moments hang below a broken rule instead of claiming a year. Runs are
+  consecutive, never gathered, so the API's order is never rewritten by the grouping. The
+  client formats from the numeric components and the precision the API sends, never from
+  a string: `3018`, `3018.09`, `3018.09.22`, `c. 3018`, `3018.03 – 3021.05`,
+  `Date unknown`. Month and day stay numeric because the calendar belongs to the author's
+  world. A moment known only to its run's year drops the restated stamp. Create, edit and
+  delete run through one drawer (`<dialog>` `showModal`) that reveals only the components
+  the chosen kind allows and clears the ones it forbids. Status and participant filters,
+  paging at 12.
 - Universes: create, read, update, archive, unarchive, delete once archived.
 - Auth: ASP.NET Core Identity with a cookie session.
 - Tests: 146 API integration tests (43 new for the timeline), 23 Playwright tests. The
@@ -57,28 +68,45 @@ there is no timeline UI yet.
 
 ## Current phase
 
-Phase 008 complete on `dev`. Merged from `feat/008/timeline-domain`, 4 commits,
-`--no-ff`. Feature branch retained. `dev` published to `origin/dev`.
+Phase 009 on `feat/009/timeline-ui`, branched from `dev`, 2 commits, not merged and not
+pushed. Frontend only: no backend file changed, so no backend build or test run was
+needed and no API defect appeared.
 
-Backend only by design: no timeline UI, no visual timeline, no custom calendar engine,
-no Canon Integrity conflict detection, no relationship chronology integration.
+Out of scope by design and still absent: Playwright coverage for the timeline, Canon
+Integrity, custom calendars, era mathematics, a visual graph, stories and plot, AI, and
+relationship chronology integration. Entity pages still carry no timeline section.
 
-Validation: Release build clean, all 146 backend tests green, a fresh SQLite database
-applies all seven migrations, no tracked secrets, working tree clean. Playwright was not
-run: nothing in the frontend changed.
+The entity picker was widened rather than copied: `EntityPicker.tsx` holds one search
+hook, one outside-click hook and one key handler, and exports both the single picker
+relations use and the multi picker a moment's participants use.
 
-A focused security check was done in the main session, not a full audit. Every timeline
-route gates on `LoreAccess.OwnsUniverseAsync` before touching a row and re-filters the
-entry by `UniverseId`, so there is no IDOR. Participants are re-resolved inside the
-universe on create and on update, and a foreign id is refused as an unusable choice with
-no name in the body. The request record is explicit, so `Id`, `UniverseId`, `CreatedAt`
-and `UpdatedAt` cannot be overposted. The `entityId` list filter sits inside the
-universe-scoped query, so a foreign id matches nothing rather than reporting that it is
-foreign.
+Validation: typecheck, oxlint, `prettier --check` and the production Vite build all
+clean; the manual flow below was driven in a browser; no tracked secrets; working tree
+clean.
+
+Manual flow, all confirmed against the running app: sidebar Timeline opens the page; a
+moment of each of the four date kinds was created through the drawer; several entities
+were linked to one moment; an edit changed title, month and status and the entry moved
+to its new place; the status filter and the participant filter both narrowed the list;
+paging showed 12 of 14 with a working second page; a delete removed one moment and
+refilled the page; a reload kept everything. Adding one Second Age moment beside the
+Third Age ones raised the cross-era caution, and it sorted after 3019 exactly as the
+known limitation says it would.
+
+Three defects were found by driving it and fixed in the second commit: a year's moments
+split into one group each (the run key was compared against the React key built from
+it), the spine broke between runs, and the drawer handed focus to its scrolling body,
+which then wore a focus ring across the panel.
+
+Visual review in dark, light and at 375px: layout holds, no horizontal overflow, the
+drawer fills a narrow screen, and per-moment tools stay visible where there is no hover.
+
+The security posture is unchanged from Phase 008: no route, contract or validation rule
+was touched.
 
 ## Immediate next step
 
-Phase 009: timeline UI. Branch `feat/009/timeline-ui` from `dev`.
+Phase 010: `test/010/timeline-e2e-hardening`. Playwright coverage for the timeline page.
 
 ## Remote
 
@@ -117,11 +145,13 @@ otherwise. Reassess as the repository grows.
   is refused as an unusable choice rather than as someone else's row. The wider audit -
   rate limiting, header and cookie hardening, dependency review, a deliberate look at
   the auth surface - is what remains.
-- Cross-era ordering is not solved. `EraLabel` is display metadata in Phase 008 and takes
-  no part in the sort, so entries under different eras order by their raw year numbers: a
-  Second Age 3441 sorts after a Third Age 3018 even though it is earlier in the story.
-  The fallback is deterministic, not correct. Making it correct needs eras to be
-  first-class rows with an order and an offset.
+- Cross-era ordering is not solved. `EraLabel` is display metadata and takes no part in
+  the sort, so entries under different eras order by their raw year numbers: a Second Age
+  3441 sorts after a Third Age 3018 even though it is earlier in the story. The fallback
+  is deterministic, not correct. Making it correct needs eras to be first-class rows with
+  an order and an offset. Phase 009 does not hide this: a page carrying more than one
+  reckoning says so above the stream, and the era label is shown beside the year rather
+  than folded into it.
 - Full timeline security audit deferred, as for relationships. Phase 008 did a focused
   check in the main session only, backed by tests.
 
