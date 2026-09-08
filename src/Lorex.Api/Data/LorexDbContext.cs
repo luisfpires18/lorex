@@ -1,4 +1,5 @@
 using Lorex.Api.Features.Auth;
+using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.Timeline;
@@ -41,6 +42,10 @@ public class LorexDbContext(DbContextOptions<LorexDbContext> options)
     public DbSet<TimelineEntry> TimelineEntries => Set<TimelineEntry>();
 
     public DbSet<TimelineEntryLink> TimelineEntryLinks => Set<TimelineEntryLink>();
+
+    public DbSet<CanonConflict> CanonConflicts => Set<CanonConflict>();
+
+    public DbSet<CanonConflictSubject> CanonConflictSubjects => Set<CanonConflictSubject>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

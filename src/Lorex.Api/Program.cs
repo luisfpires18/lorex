@@ -1,5 +1,6 @@
 using Lorex.Api.Data;
 using Lorex.Api.Features.Auth;
+using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Health;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Relationships;
@@ -13,6 +14,7 @@ builder.Services.AddHealthChecks();
 
 builder.Services.AddLorexDatabase(builder.Configuration, builder.Environment);
 builder.Services.AddLorexAuth(builder.Environment);
+builder.Services.AddCanonIntegrity();
 
 var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 if (corsOrigins.Length > 0)
@@ -50,6 +52,7 @@ app.MapEntityEndpoints();
 app.MapRelationshipTypeEndpoints();
 app.MapRelationshipEndpoints();
 app.MapTimelineEndpoints();
+app.MapCanonIntegrityEndpoints();
 
 await app.MigrateLorexDatabaseAsync();
 

@@ -13,14 +13,14 @@ Repository index. Paths and one-line responsibilities only.
 | `Start-Lorex.cmd` / `Stop-Lorex.cmd` | Windows entry points for the local launcher. |
 | `CLAUDE.md` | Traffic controller for Claude sessions. |
 | `STATE.md` | Current state, phase, next step, blockers. |
-| `graphify-out/` | Generated knowledge graph. Gitignored; rebuild with `graphify update .`. |
+| `graphify-out/` | Generated knowledge graph. Gitignored, manual-only; rebuild with `python -m graphify update .`. |
 
 ## `.claude` - session tooling
 
 | Path | Responsibility |
 | --- | --- |
 | `CLAUDE.md` | Tooling rules (Graphify usage) kept out of the root router. |
-| `settings.json` | Project-scoped plugins and Graphify advisory hooks. |
+| `settings.json` | Project-scoped plugins. No hooks; Graphify is manual-only. |
 | `skills/aspnet-core-guidance/` | Backend conventions for `src/Lorex.Api`. |
 | `skills/graphify/` | Graphify skill and references. |
 
@@ -61,6 +61,15 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Timeline/TimelineEndpoints.cs` | Timeline CRUD and the chronological, filtered, paged listing. |
 | `Features/Timeline/TimelineContracts.cs` | Request and response records for the timeline. |
 | `Features/Timeline/TimelineValidation.cs` | Date-kind rules and component checks. No calendar engine. |
+| `Features/CanonIntegrity/CanonIntegrityModel.cs` | `CanonConflict`, its subject rows, severity, status and subject kind. |
+| `Features/CanonIntegrity/CanonIntegrityConfiguration.cs` | Conflict schema: the unique fingerprint index and the review index. |
+| `Features/CanonIntegrity/CanonIntegrityRule.cs` | `ICanonIntegrityRule`, the finding record and the fingerprint hash. |
+| `Features/CanonIntegrity/CanonIntegrityEvaluator.cs` | Runs the rules over one universe and reconciles by fingerprint. |
+| `Features/CanonIntegrity/CanonIntegritySetup.cs` | The registered rule set and evaluator. |
+| `Features/CanonIntegrity/CanonIntegrityEndpoints.cs` | List, get, evaluate, dismiss, reopen; subject-name resolution. |
+| `Features/CanonIntegrity/CanonIntegrityContracts.cs` | Response records for conflicts and evaluation. |
+| `Features/CanonIntegrity/CanonRuleText.cs` | Shared wording and length fitting for rule titles and explanations. |
+| `Features/CanonIntegrity/Rules/` | The three production rules: relationship, timeline and entity-reference. |
 | `appsettings.json` | Non-secret defaults; empty connection string. |
 | `appsettings.Development.json` | Dev connection string and CORS origins. |
 
@@ -93,6 +102,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.Api.Tests/LoreEndpointTests.cs` | Lore CRUD, field kinds, and cross-universe isolation. |
 | `Lorex.Api.Tests/RelationshipEndpointTests.cs` | Relationship CRUD, both perspectives, and cross-owner isolation. |
 | `Lorex.Api.Tests/TimelineEndpointTests.cs` | Date kinds, participation, ordering, paging, and ownership. |
+| `Lorex.Api.Tests/CanonIntegrityEndpointTests.cs` | Conflict lifecycle, fingerprinting, the three rules, filters and ownership. |
 | `Lorex.E2E/playwright.config.ts` | Starts API + web, runs Chromium. |
 | `Lorex.E2E/specs/smoke.spec.ts` | Frontend-loads smoke suite. |
 | `Lorex.E2E/specs/auth.spec.ts` | Register, sign out, guard, sign back in. |

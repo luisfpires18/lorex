@@ -9,7 +9,7 @@ Router only. No architecture detail here.
 3. Load only context relevant to the current task. Nothing else.
 4. Prefer targeted file reads over repository-wide scanning.
 5. Prefer a targeted read. Reach for Graphify when a question is genuinely broad.
-   Graphify is advisory, never blocking, and never the mandatory first step.
+   Graphify is optional and manual-only: no hook invokes it, and it never blocks work.
 6. Keep context/state files concise. Trim instead of appending.
 7. Use caveman-style concise output.
 

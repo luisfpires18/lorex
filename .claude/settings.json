@@ -5,27 +5,5 @@
     "playwright@claude-plugins-official": true,
     "caveman@caveman": true,
     "humanizer@humanizer": true
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash|Grep",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python -m graphify hook-guard search"
-          }
-        ]
-      },
-      {
-        "matcher": "Read|Glob",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python -m graphify hook-guard read"
-          }
-        ]
-      }
-    ]
   }
 }
