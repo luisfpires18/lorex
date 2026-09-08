@@ -44,8 +44,11 @@ docs/007/architecture-update
 | 001 | `feat/001/repository-bootstrap` | merged into `dev` |
 | 002 | `feat/002/authentication` | merged into `dev` |
 | 003 | `feat/003/universe-core` | merged into `dev` |
+| 004 | `feat/004/entity-core` | merged into `dev` |
+| 005 | `feat/005/relationship-domain` | merged into `dev` |
+| 006 | `feat/006/relationship-ui` | merged into `dev` |
 
-Next free number: `004`.
+Next free number: `007`.
 
 ## Rules for automation
 

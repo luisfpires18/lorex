@@ -40,16 +40,16 @@ Phase 006 (relationship UI) implemented. Relationships are authored from the app
 
 ## Current phase
 
-Phase 006 on `feat/006/relationship-ui`, branched from `dev`. Two local commits, not
-merged and not pushed. Phase 005 is complete on `dev`.
+Phase 006 complete on `dev`. Merged from `feat/006/relationship-ui`, 3 commits.
+Feature branch retained.
 
-Validation: typecheck, lint, format check and production build all clean. No backend
-change was needed. Playwright not run, by design.
+Validation at merge: typecheck, lint, format check and production build all clean. No
+backend change was needed. Playwright not run, by design.
 
 ## Immediate next step
 
 Phase 007: relationship end-to-end coverage and hardening. Branch
-`test/007/relationship-e2e-hardening` from `dev` once phase 006 is merged.
+`test/007/relationship-e2e-hardening` from `dev`.
 
 ## Remote
 
