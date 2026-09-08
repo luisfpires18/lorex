@@ -55,12 +55,19 @@ API and a page.
   paging at 12.
 - Universes: create, read, update, archive, unarchive, delete once archived.
 - Auth: ASP.NET Core Identity with a cookie session.
-- Tests: 146 API integration tests (43 new for the timeline), 23 Playwright tests. The
-  timeline tests cover the four date kinds, optional month and day, negative years, every
-  refused date combination, canon status round-tripping, participation from none to
-  several, chronological order with unknown dates last, a bare year before a dated moment
-  inside it, stable paging, both filters, and the ownership boundary from both
+- Tests: 146 API integration tests (43 for the timeline), 38 Playwright tests (15 for the
+  timeline). The API tests cover the four date kinds, optional month and day, negative
+  years, every refused date combination, canon status round-tripping, participation from
+  none to several, chronological order with unknown dates last, a bare year before a dated
+  moment inside it, stable paging, both filters, and the ownership boundary from both
   directions including a foreign entity slipped in through an update.
+  `tests/Lorex.E2E/specs/timeline.spec.ts` drives the same ground through the page: each
+  kind written in the drawer and read back, year zero and signed years, unknown moments
+  apart from the placed ones, participation from none to several, an edit that moves a
+  moment, canon status across a reload, both filters, paging across two pages with a
+  delete from each, the drawer's refusals and its three ways out, mixed eras raising the
+  caution, run grouping, an entity's deletion dropping its participation, hostile text
+  rendered as text, a narrow viewport, and the universe and owner boundaries.
 - Migrations: `InitialCreate`, `AddIdentity`, `UniqueUserEmail`, `AddUniverses`,
   `AddLoreEntities`, `AddRelationships`, `AddTimeline`. Verified against a fresh SQLite
   database.
@@ -68,52 +75,52 @@ API and a page.
 
 ## Current phase
 
-Phase 009 complete on `dev`. Merged from `feat/009/timeline-ui`, 3 commits, `--no-ff`,
-no conflicts. Feature branch retained. `dev` published to `origin/dev`.
+Phase 010 complete on `test/010/timeline-e2e-hardening`, branched from `dev`. Two
+commits. Not merged, not pushed. The timeline is now complete through end-to-end
+coverage.
 
-Frontend only: no backend file changed, so no backend build or test run was needed and
-no API defect appeared.
+One file added, `tests/Lorex.E2E/specs/timeline.spec.ts`. No production code changed:
+the tests found no reproducible defect to fix, so none was invented. The three real ones
+were caught in Phase 009 by driving the page, and the tests now hold them: a year's
+moments stay one run, two runs of the same year under different reckonings stay apart,
+and the drawer opens on its title.
 
-Out of scope by design and still absent: Playwright coverage for the timeline, Canon
-Integrity, custom calendars, era mathematics, a visual graph, stories and plot, AI, and
-relationship chronology integration. Entity pages still carry no timeline section.
+Each test registers its own account and builds its own universe, so the suite runs
+fully parallel. The drawer is driven as an author would; the API is used directly only
+to seed the thirteen moments a paging test needs and to probe refusals the UI cannot
+build.
 
-The entity picker was widened rather than copied: `EntityPicker.tsx` holds one search
-hook, one outside-click hook and one key handler, and exports both the single picker
-relations use and the multi picker a moment's participants use.
+One expectation was corrected rather than the code: a month with no year breaks two
+rules, and the kind rule is checked last, so the API answers "Give the year this
+happened in." rather than the component-level message. That is the better message and
+the test now records why.
 
-Validation: typecheck, oxlint, `prettier --check` and the production Vite build all
-clean; the manual flow below was driven in a browser; no tracked secrets; working tree
-clean.
+Validation: frontend typecheck, oxlint, `prettier --check` and the production Vite build
+all clean; the E2E project typechecks against its own tsconfig and is Prettier-clean;
+the full Playwright suite passes 38 of 38; `Start-Lorex.cmd -NoBrowser -Force` brought
+both servers up and `Stop-Lorex.cmd` took them down; no tracked secrets; working tree
+clean. No backend file changed, so no backend build or test run was needed.
 
-Manual flow, all confirmed against the running app: sidebar Timeline opens the page; a
-moment of each of the four date kinds was created through the drawer; several entities
-were linked to one moment; an edit changed title, month and status and the entry moved
-to its new place; the status filter and the participant filter both narrowed the list;
-paging showed 12 of 14 with a working second page; a delete removed one moment and
-refilled the page; a reload kept everything. Adding one Second Age moment beside the
-Third Age ones raised the cross-era caution, and it sorted after 3019 exactly as the
-known limitation says it would.
+Focused security check, main session only, now backed by the E2E suite: a second account
+gets 404 with an empty body from list, get, update and delete of the first account's
+moment, and the page shows the missing-universe empty state; a participant id from
+another universe is refused on create and on update; a filter carrying a foreign entity
+id matches nothing rather than reaching across; the drawer's picker searches one universe
+only; extra fields on the request body (`id`, `universeId`, `createdAt`) are ignored, so
+the row keeps the universe of its route and the id the server minted; and title and
+description are rendered as text by React, with a hostile string surviving a reload
+without executing.
 
-Three defects were found by driving it and fixed in the second commit: a year's moments
-split into one group each (the run key was compared against the React key built from
-it), the spine broke between runs, and the drawer handed focus to its scrolling body,
-which then wore a focus ring across the panel.
+Out of scope by design and still absent: Canon Integrity, custom calendars, era
+mathematics, a visual graph, stories and plot, AI, and relationship chronology
+integration. Entity pages still carry no timeline section.
 
-Visual review in dark, light and at 375px: layout holds, no horizontal overflow, the
-drawer fills a narrow screen, and per-moment tools stay visible where there is no hover.
-
-The security posture is unchanged from Phase 008: no route, contract or validation rule
-was touched.
-
-Graphify was not used in Phase 009. Targeted reads of the timeline contracts and of the
-neighbouring relationship UI were sufficient, and faster than a broad query would have
-been.
+Graphify was not used in Phase 010. Targeted reads of the timeline page, its drawer, the
+picker and the endpoints were sufficient.
 
 ## Immediate next step
 
-Phase 010: `test/010/timeline-e2e-hardening`, branched from `dev`. Playwright coverage
-for the timeline page.
+Phase 011: `feat/011/canon-integrity-domain`, branched from `dev`.
 
 ## Remote
 
@@ -158,9 +165,11 @@ otherwise. Reassess as the repository grows.
   is deterministic, not correct. Making it correct needs eras to be first-class rows with
   an order and an offset. Phase 009 does not hide this: a page carrying more than one
   reckoning says so above the stream, and the era label is shown beside the year rather
-  than folded into it.
+  than folded into it. Phase 010 pins that behaviour in Playwright, so a change to the
+  ordering cannot pass unnoticed.
 - Full timeline security audit deferred, as for relationships. Phase 008 did a focused
-  check in the main session only, backed by tests.
+  check in the main session only and Phase 010 repeated it end to end; both are backed by
+  tests. What remains is the wider audit listed above, not anything timeline-specific.
 
 ## Blockers
 
