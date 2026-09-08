@@ -35,43 +35,48 @@ public sealed class CanonTimelineEntityStatusRule : ICanonIntegrityRule
                     .ToList()))
             .ToListAsync(cancellationToken);
 
-        return [.. rows.Select(Finding)];
+        return [.. rows.SelectMany(Findings)];
     }
 
-    private CanonFinding Finding(Row row)
-    {
-        // Ordered here rather than in SQL: the order decides the wording, and sorting the
-        // ids into the fingerprint separately would let the two disagree.
-        var offenders = row.Offenders
+    /// <summary>
+    /// One finding per offending participant. A moment can name any number of entities,
+    /// and each is separately fixable, so promoting one participant must not disturb what
+    /// the author already decided about another.
+    /// </summary>
+    private IEnumerable<CanonFinding> Findings(Row row) =>
+        row.Offenders
             .OrderBy(offender => offender.Name, StringComparer.Ordinal)
             .ThenBy(offender => offender.Id)
-            .ToList();
+            .Select(offender => Finding(row, offender));
 
-        var named = CanonRuleText.List(
-            [.. offenders.Select(offender => $"{CanonRuleText.Quoted(offender.Name)} is {CanonRuleText.StatusWord(offender.Status)}")]);
-
-        var title = offenders.Count == 1
-            ? $"Canon moment {CanonRuleText.Quoted(row.Title)} involves {CanonRuleText.Quoted(offenders[0].Name)}, which is not Canon"
-            : $"Canon moment {CanonRuleText.Quoted(row.Title)} involves {offenders.Count} entries that are not Canon";
+    private CanonFinding Finding(Row row, Offender offender)
+    {
+        var title =
+            $"Canon moment {CanonRuleText.Quoted(row.Title)} involves " +
+            $"{CanonRuleText.Quoted(offender.Name)}, which is not Canon";
 
         var explanation =
-            $"The timeline entry {CanonRuleText.Quoted(row.Title)} is marked Canon, but {named}. " +
-            "A settled moment should not depend on lore that is not settled. Either promote " +
-            "the participants, drop them from the moment, or lower the moment's own status.";
+            $"The timeline entry {CanonRuleText.Quoted(row.Title)} is marked Canon, but its " +
+            $"participant {CanonRuleText.Quoted(offender.Name)} is " +
+            $"{CanonRuleText.StatusWord(offender.Status)}. A settled moment should not depend on " +
+            "lore that is not settled. Either promote the participant, drop it from the moment, " +
+            "or lower the moment's own status.";
 
         return new CanonFinding(
             RuleCode,
             Severity,
+
+            // The moment and the one participant at fault. Swapping in a different
+            // participant is a different problem and gets its own conflict.
             CanonFingerprint.From(
                 RuleCode,
                 CanonFingerprint.Id(row.EntryId),
-                CanonFingerprint.Ids(offenders.Select(offender => offender.Id))),
+                CanonFingerprint.Id(offender.Id)),
             CanonRuleText.Title(title),
             CanonRuleText.Explanation(explanation),
             [
                 new CanonFindingSubject(CanonSubjectKind.TimelineEntry, row.EntryId, "entry"),
-                .. offenders.Select(offender =>
-                    new CanonFindingSubject(CanonSubjectKind.Entity, offender.Id, "participant")),
+                new CanonFindingSubject(CanonSubjectKind.Entity, offender.Id, "participant"),
             ]);
     }
 

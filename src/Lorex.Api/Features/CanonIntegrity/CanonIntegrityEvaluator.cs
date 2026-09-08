@@ -3,7 +3,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Lorex.Api.Features.CanonIntegrity;
 
-/// <summary>What one evaluation did. Counts only; the conflicts themselves are read back.</summary>
+/// <summary>
+/// What one evaluation did. Counts only; the conflicts themselves are read back.
+/// <c>Resolved</c> covers every conflict that stopped being detected, dismissed ones
+/// included.
+/// </summary>
 public sealed record CanonEvaluationSummary(
     int Detected,
     int Created,
@@ -54,10 +58,10 @@ public sealed class CanonIntegrityEvaluator(LorexDbContext db, IEnumerable<ICano
 
             if (conflict.Status == CanonConflictStatus.Resolved)
             {
-                // The same issue, by fingerprint, has come back. A conflict the author
-                // dismissed is left alone here: dismissing is a decision about the issue,
-                // not about one sighting of it, and reopening it would undo that decision
-                // every time evaluation ran.
+                // The same issue, by fingerprint, is being detected again. A conflict the
+                // author dismissed is left alone instead: a dismissal suppresses an issue
+                // that is still there, and reopening it every time evaluation ran would
+                // undo that decision immediately.
                 conflict.Status = CanonConflictStatus.Pending;
                 conflict.ResolvedAt = null;
                 changed = true;
@@ -75,11 +79,14 @@ public sealed class CanonIntegrityEvaluator(LorexDbContext db, IEnumerable<ICano
         }
 
         foreach (var conflict in existing.Where(conflict =>
-            conflict.Status == CanonConflictStatus.Pending
+            conflict.Status != CanonConflictStatus.Resolved
             && !findings.ContainsKey(conflict.Fingerprint)))
         {
-            // The underlying issue is gone. The row stays, so the author can see that
-            // something they were told about has since been dealt with.
+            // The underlying issue is gone. A dismissed conflict is resolved here too: a
+            // dismissal suppresses an issue that is still there, not the fingerprint
+            // forever. Once the issue is actually fixed there is nothing left to suppress,
+            // and if the very same issue is reintroduced later it deserves to be raised
+            // again rather than swallowed by a decision made about the old occurrence.
             conflict.Status = CanonConflictStatus.Resolved;
             conflict.ResolvedAt = now;
             conflict.UpdatedAt = now;

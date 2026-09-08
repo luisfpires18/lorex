@@ -39,55 +39,58 @@ public sealed class CanonRelationshipEntityStatusRule : ICanonIntegrityRule
                 relationship.TargetEntity.CanonStatus))
             .ToListAsync(cancellationToken);
 
-        return [.. rows.Select(Finding)];
+        return [.. rows.SelectMany(Findings)];
     }
 
-    private CanonFinding Finding(Row row)
+    /// <summary>
+    /// One finding per offending endpoint, not one per relationship.
+    ///
+    /// Both ends can be at fault, and each is separately fixable. Bundling them would put
+    /// both ids in one fingerprint, so promoting one endpoint would change the key and
+    /// throw away whatever the author had decided about the other.
+    /// </summary>
+    private IEnumerable<CanonFinding> Findings(Row row)
     {
-        // Both endpoints may be at fault. They are reported as one conflict rather than
-        // two, because the problem is the relationship, not each entity separately - and
-        // fixing only one of them is a materially different situation, which the
-        // fingerprint picks up because the offender ids are part of it.
-        List<Offender> offenders = [];
-
         if (row.SourceStatus != CanonStatus.Canon)
         {
-            offenders.Add(new Offender(row.SourceId, row.SourceName, row.SourceStatus, "source"));
+            yield return Finding(row, row.SourceId, row.SourceName, row.SourceStatus, "source");
         }
 
         if (row.TargetStatus != CanonStatus.Canon)
         {
-            offenders.Add(new Offender(row.TargetId, row.TargetName, row.TargetStatus, "target"));
+            yield return Finding(row, row.TargetId, row.TargetName, row.TargetStatus, "target");
         }
+    }
 
+    private CanonFinding Finding(Row row, Guid entityId, string name, CanonStatus status, string role)
+    {
         var reading = $"{row.SourceName} {row.TypeName} {row.TargetName}";
 
-        var named = CanonRuleText.List(
-            [.. offenders.Select(offender => $"{CanonRuleText.Quoted(offender.Name)} is {CanonRuleText.StatusWord(offender.Status)}")]);
-
-        var title = offenders.Count == 1
-            ? $"Canon relationship {CanonRuleText.Quoted(reading)} rests on {CanonRuleText.Quoted(offenders[0].Name)}, which is not Canon"
-            : $"Canon relationship {CanonRuleText.Quoted(reading)} rests on two entries that are not Canon";
+        var title =
+            $"Canon relationship {CanonRuleText.Quoted(reading)} rests on " +
+            $"{CanonRuleText.Quoted(name)}, which is not Canon";
 
         var explanation =
-            $"The relationship {CanonRuleText.Quoted(reading)} is marked Canon, but {named}. " +
-            "Canon should not depend on lore that is not settled yet. Either promote the " +
-            "entries this relationship links, or lower the relationship's own status until " +
-            "they are ready.";
+            $"The relationship {CanonRuleText.Quoted(reading)} is marked Canon, but its {role}, " +
+            $"{CanonRuleText.Quoted(name)}, is {CanonRuleText.StatusWord(status)}. Canon should not " +
+            "depend on lore that is not settled yet. Either promote the entry this relationship " +
+            "links, or lower the relationship's own status until it is ready.";
 
         return new CanonFinding(
             RuleCode,
             Severity,
+
+            // The relationship and the one endpoint at fault. Retargeting the relationship
+            // at a different entry is a different problem and gets its own conflict.
             CanonFingerprint.From(
                 RuleCode,
                 CanonFingerprint.Id(row.RelationshipId),
-                CanonFingerprint.Ids(offenders.Select(offender => offender.Id))),
+                CanonFingerprint.Id(entityId)),
             CanonRuleText.Title(title),
             CanonRuleText.Explanation(explanation),
             [
                 new CanonFindingSubject(CanonSubjectKind.Relationship, row.RelationshipId, "relationship"),
-                .. offenders.Select(offender =>
-                    new CanonFindingSubject(CanonSubjectKind.Entity, offender.Id, offender.Role)),
+                new CanonFindingSubject(CanonSubjectKind.Entity, entityId, role),
             ]);
     }
 
@@ -100,6 +103,4 @@ public sealed class CanonRelationshipEntityStatusRule : ICanonIntegrityRule
         Guid TargetId,
         string TargetName,
         CanonStatus TargetStatus);
-
-    private sealed record Offender(Guid Id, string Name, CanonStatus Status, string Role);
 }

@@ -216,6 +216,85 @@ public sealed class CanonIntegrityEndpointTests(LorexApiFactory factory) : IClas
         var after = Assert.Single((await List(client, universe.Id)).Items);
         Assert.Equal(conflict.Id, after.Id);
         Assert.Equal(CanonConflictStatus.Dismissed, after.Status);
+        Assert.Null(after.ResolvedAt);
+
+        // And nothing moved on the second look either.
+        Assert.Equal(dismissed.UpdatedAt, after.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task A_dismissed_conflict_is_resolved_once_the_issue_is_actually_fixed()
+    {
+        var (client, universe) = await SignedInWithUniverse("cidismissfixed");
+        var (_, _, target) = await CanonRelationshipOntoDraft(client, universe.Id);
+        await Evaluate(client, universe.Id);
+
+        var conflict = Assert.Single((await List(client, universe.Id)).Items);
+        await Dismiss(client, universe.Id, conflict.Id);
+
+        // A dismissal suppresses an issue that is still there. Once it is gone there is
+        // nothing left to suppress, so the conflict resolves like any other.
+        await SetStatus(client, universe.Id, target, CanonStatus.Canon);
+        var summary = await Evaluate(client, universe.Id);
+
+        Assert.Equal(0, summary.Detected);
+        Assert.Equal(1, summary.Resolved);
+
+        var resolved = Assert.Single((await List(client, universe.Id)).Items);
+        Assert.Equal(conflict.Id, resolved.Id);
+        Assert.Equal(CanonConflictStatus.Resolved, resolved.Status);
+        Assert.NotNull(resolved.ResolvedAt);
+    }
+
+    [Fact]
+    public async Task An_issue_reintroduced_after_a_dismissal_and_a_fix_is_pending_again()
+    {
+        var (client, universe) = await SignedInWithUniverse("cidismissreturn");
+        var (_, _, target) = await CanonRelationshipOntoDraft(client, universe.Id);
+        await Evaluate(client, universe.Id);
+
+        var conflict = Assert.Single((await List(client, universe.Id)).Items);
+        await Dismiss(client, universe.Id, conflict.Id);
+
+        var promoted = await SetStatus(client, universe.Id, target, CanonStatus.Canon);
+        await Evaluate(client, universe.Id);
+
+        // The old dismissal was about the old occurrence. It must not swallow this one.
+        await SetStatus(client, universe.Id, promoted, CanonStatus.Draft);
+        var summary = await Evaluate(client, universe.Id);
+
+        Assert.Equal(1, summary.Reopened);
+        Assert.Equal(0, summary.Created);
+
+        var reopened = Assert.Single((await List(client, universe.Id)).Items);
+        Assert.Equal(conflict.Id, reopened.Id);
+        Assert.Equal(CanonConflictStatus.Pending, reopened.Status);
+        Assert.Null(reopened.ResolvedAt);
+    }
+
+    [Fact]
+    public async Task Evaluation_stays_idempotent_once_a_dismissed_conflict_has_resolved()
+    {
+        var (client, universe) = await SignedInWithUniverse("cidismissidempotent");
+        var (_, _, target) = await CanonRelationshipOntoDraft(client, universe.Id);
+        await Evaluate(client, universe.Id);
+
+        var conflict = Assert.Single((await List(client, universe.Id)).Items);
+        await Dismiss(client, universe.Id, conflict.Id);
+        await SetStatus(client, universe.Id, target, CanonStatus.Canon);
+        await Evaluate(client, universe.Id);
+
+        var first = Assert.Single((await List(client, universe.Id)).Items);
+        var summary = await Evaluate(client, universe.Id);
+
+        Assert.Equal(0, summary.Detected);
+        Assert.Equal(0, summary.Created);
+        Assert.Equal(0, summary.Resolved);
+
+        var second = Assert.Single((await List(client, universe.Id)).Items);
+        Assert.Equal(CanonConflictStatus.Resolved, second.Status);
+        Assert.Equal(first.UpdatedAt, second.UpdatedAt);
+        Assert.Equal(first.ResolvedAt, second.ResolvedAt);
     }
 
     [Fact]
@@ -261,8 +340,8 @@ public sealed class CanonIntegrityEndpointTests(LorexApiFactory factory) : IClas
         await SetStatus(client, universe.Id, target, CanonStatus.Canon);
         await Evaluate(client, universe.Id);
 
-        // Dismissing a resolved conflict would suppress the issue for good, and reopening
-        // one would claim it is live when the last evaluation found it gone.
+        // Both transitions are about a live issue. This one is gone, so dismissing would
+        // suppress nothing and reopening would claim it is back when it is not.
         var dismiss = await client.PostAsync(
             $"/api/universes/{universe.Id}/canon-conflicts/{conflict.Id}/dismiss", null);
         var reopen = await client.PostAsync(
@@ -425,6 +504,108 @@ public sealed class CanonIntegrityEndpointTests(LorexApiFactory factory) : IClas
         // The field's name is data, never a rule input: nothing here knows what a
         // "Homeland" is, only that the field holds an entity reference.
         Assert.Contains("Gondor", conflict.Explanation, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Repointing_a_field_at_a_different_entry_does_not_inherit_the_old_dismissal()
+    {
+        var (client, universe) = await SignedInWithUniverse("cifieldrepoint");
+
+        var type = await CharacterType(client, universe.Id);
+        var field = await AddReferenceField(client, universe.Id, type.Id, "Mentor");
+
+        var elrond = await CreateEntity(client, universe.Id, "Elrond", CanonStatus.Draft);
+        var galadriel = await CreateEntity(client, universe.Id, "Galadriel", CanonStatus.Draft);
+        var owner = await CreateEntity(
+            client,
+            universe.Id,
+            "Aragorn",
+            CanonStatus.Canon,
+            [new FieldValueInput(field.Id, null, null, null, null, null, elrond.Id)]);
+
+        await Evaluate(client, universe.Id);
+        var first = Assert.Single((await List(client, universe.Id)).Items);
+        await Dismiss(client, universe.Id, first.Id);
+
+        // Same owner, same field, different target. A dismissal covers one fact, not the
+        // field, so this must be raised rather than swallowed.
+        await SetReference(client, universe.Id, owner, field.Id, galadriel.Id);
+        await Evaluate(client, universe.Id);
+
+        var page = await List(client, universe.Id);
+        Assert.Equal(2, page.Items.Count);
+
+        var stale = page.Items.Single(item => item.Id == first.Id);
+        Assert.Equal(CanonConflictStatus.Resolved, stale.Status);
+        Assert.NotNull(stale.ResolvedAt);
+
+        var raised = page.Items.Single(item => item.Id != first.Id);
+        Assert.Equal(CanonConflictStatus.Pending, raised.Status);
+        Assert.Equal(
+            galadriel.Id,
+            Assert.Single(raised.Subjects, subject => subject.Role == "reference").SubjectId);
+    }
+
+    [Fact]
+    public async Task Renaming_a_referenced_entry_keeps_the_field_conflict_it_already_had()
+    {
+        var (client, universe) = await SignedInWithUniverse("cifieldrename");
+
+        var type = await CharacterType(client, universe.Id);
+        var field = await AddReferenceField(client, universe.Id, type.Id, "Mentor");
+
+        var mentor = await CreateEntity(client, universe.Id, "Elrond", CanonStatus.Draft);
+        await CreateEntity(
+            client,
+            universe.Id,
+            "Aragorn",
+            CanonStatus.Canon,
+            [new FieldValueInput(field.Id, null, null, null, null, null, mentor.Id)]);
+
+        await Evaluate(client, universe.Id);
+        var before = Assert.Single((await List(client, universe.Id)).Items);
+
+        await Rename(client, universe.Id, mentor, "Elrond Half-elven");
+        await Evaluate(client, universe.Id);
+
+        var after = Assert.Single((await List(client, universe.Id)).Items);
+        Assert.Equal(before.Id, after.Id);
+        Assert.Equal(CanonConflictStatus.Pending, after.Status);
+        Assert.Contains("Elrond Half-elven", after.Explanation, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Each_offending_endpoint_of_one_relationship_is_its_own_conflict()
+    {
+        var (client, universe) = await SignedInWithUniverse("cibothends");
+
+        var source = await CreateEntity(client, universe.Id, "Aragorn", CanonStatus.Draft);
+        var target = await CreateEntity(client, universe.Id, "Gondor", CanonStatus.Draft);
+        var type = await CreateRelationshipType(client, universe.Id, "rules", "ruled by");
+        await CreateRelationship(client, universe.Id, type.Id, source.Id, target.Id, CanonStatus.Canon);
+
+        await Evaluate(client, universe.Id);
+        var opened = (await List(client, universe.Id)).Items;
+        Assert.Equal(2, opened.Count);
+
+        var targetConflict = Assert.Single(
+            opened,
+            item => item.Subjects.Any(subject => subject.SubjectId == target.Id));
+        await Dismiss(client, universe.Id, targetConflict.Id);
+
+        // Promoting the source fixes only the source's conflict. The other endpoint's
+        // conflict, and the decision made about it, must survive untouched.
+        await SetStatus(client, universe.Id, source, CanonStatus.Canon);
+        await Evaluate(client, universe.Id);
+
+        var after = await List(client, universe.Id);
+        Assert.Equal(2, after.Items.Count);
+
+        var stillDismissed = after.Items.Single(item => item.Id == targetConflict.Id);
+        Assert.Equal(CanonConflictStatus.Dismissed, stillDismissed.Status);
+        Assert.Equal(
+            CanonConflictStatus.Resolved,
+            after.Items.Single(item => item.Id != targetConflict.Id).Status);
     }
 
     // ---------- Listing ----------
@@ -747,6 +928,29 @@ public sealed class CanonIntegrityEndpointTests(LorexApiFactory factory) : IClas
         EntityDetail entity,
         CanonStatus status) =>
         Save(client, universeId, entity, entity.Name, status);
+
+    /// <summary>Points one entity-reference field somewhere else, leaving the rest alone.</summary>
+    private static async Task<EntityDetail> SetReference(
+        HttpClient client,
+        Guid universeId,
+        EntityDetail entity,
+        Guid fieldId,
+        Guid referencedEntityId)
+    {
+        var response = await client.PutAsJsonAsync(
+            $"/api/universes/{universeId}/entities/{entity.Id}",
+            new EntityRequest(
+                entity.EntityTypeId,
+                entity.Name,
+                entity.Summary,
+                entity.Content,
+                entity.CanonStatus,
+                entity.Aliases,
+                entity.Tags,
+                [new FieldValueInput(fieldId, null, null, null, null, null, referencedEntityId)]));
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
+    }
 
     private static Task<EntityDetail> Rename(
         HttpClient client,

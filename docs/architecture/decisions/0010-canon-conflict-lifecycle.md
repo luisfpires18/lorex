@@ -30,29 +30,42 @@ by the evaluator looking first. A cryptographic hash, not `GetHashCode`, which i
 randomized per process and would give the same problem a different key after a restart.
 
 Only ids go in - never a name, never a wording. So renaming a character rewords its
-conflict in place, while a materially different set of records opens a new conflict and
-resolves the old one. `CANON-FIELD-001` fingerprints the *field definition* rather than
-the stored value row, whose id is rewritten every time the entity is saved.
+conflict in place, while a materially different fact opens a new conflict and resolves the
+old one.
 
-**Three statuses, and evaluation owns two of them.**
+**One finding per offending fact.** Every rule fingerprints the thing at fault plus the one
+record it is at fault over: `(relationship, offending endpoint)`, `(timeline entry,
+offending participant)`, `(owning entity, field definition, referenced entity)`. A
+relationship with two non-Canon endpoints is two conflicts, because each is separately
+fixable and bundling them would put both ids in one key - promoting one endpoint would then
+change the fingerprint and throw away whatever the author had decided about the other.
+`CANON-FIELD-001` uses the *field definition* rather than the stored value row, whose id is
+rewritten every time the entity is saved, and the referenced entity, so repointing a field
+from B to C is a new conflict rather than the old one reworded.
+
+**Three statuses, and evaluation owns the transitions that follow the lore.**
 
 | Transition | Who | When |
 | --- | --- | --- |
 | → `Pending` | evaluation | a finding with no stored conflict |
-| → `Resolved` | evaluation | a `Pending` conflict no longer found |
-| `Resolved` → `Pending` | evaluation | the same fingerprint detected again |
-| → `Dismissed` | the author | explicitly, on a live conflict |
+| `Pending` → `Resolved` | evaluation | no longer found |
+| `Dismissed` → `Resolved` | evaluation | no longer found |
+| `Resolved` → `Pending` | evaluation | the same fingerprint found again |
+| `Pending` → `Dismissed` | the author | explicitly, on a live conflict |
 | `Dismissed` → `Pending` | the author | explicitly |
 
-A `Dismissed` conflict is never reopened by evaluation, and evaluation never resolves one
-either. Dismissing is a decision about the issue, not about one sighting of it; reopening
-it on the next run would undo that decision every few seconds, and resolving it would
-quietly discard the record of a judgement the author made. A dismissal covers exactly one
-fingerprint, so materially different facts still raise a new `Pending` conflict.
+A dismissal suppresses an issue that is *currently there*, and only while it is there. It
+is not a permanent mute on the fingerprint. While the issue persists, evaluation leaves a
+`Dismissed` conflict alone - reopening it on the next run would undo the decision within
+seconds. Once the issue is actually fixed there is nothing left to suppress, so the
+conflict resolves like any other; and if the very same issue is reintroduced later it
+returns as `Pending` rather than being swallowed by a judgement made about the earlier
+occurrence.
 
-The author cannot dismiss or reopen a `Resolved` conflict. Dismissing one would suppress
-the issue for good, since a dismissal is never reopened automatically; reopening one would
-claim the issue is live when the last evaluation found it gone. Both answer 400.
+The author cannot dismiss or reopen a `Resolved` conflict. Both transitions are about a
+live issue, and this one is not: dismissing would suppress nothing and be undone by the
+next evaluation anyway, and reopening would claim the issue is live when the last
+evaluation found it gone. Both answer 400.
 
 **Subjects are a relational reference table, not JSON and not many nullable keys.**
 `CanonConflictSubjects` carries `(ConflictId, SubjectKind, SubjectId, Role)`. The role is
@@ -67,6 +80,8 @@ the target lives in one of several tables. Only kinds the current rules produce 
   the first left it, `UpdatedAt` included, which is what the tests assert.
 - A conflict id is stable across evaluations, so a client can link to one and a later run
   will not have replaced it.
+- A dismissal is scoped to one fact. Fixing one endpoint of a relationship, or repointing a
+  field somewhere else, leaves any other dismissal on that record standing.
 - A subject can dangle: deleting lore leaves its subject rows until the next evaluation,
   and the API returns a null name for one rather than resolving outside the universe. Both
   lookups and rules are universe-scoped, so nothing crosses that boundary either way.

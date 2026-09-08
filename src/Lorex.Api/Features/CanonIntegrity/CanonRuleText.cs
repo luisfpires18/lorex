@@ -45,13 +45,4 @@ internal static class CanonRuleText
         CanonStatus.Draft => "a Draft",
         _ => "Canon",
     };
-
-    /// <summary>"A", "A and B", "A, B and C". Oxford-free, because it reads better inline.</summary>
-    public static string List(IReadOnlyList<string> names) => names.Count switch
-    {
-        0 => string.Empty,
-        1 => names[0],
-        2 => $"{names[0]} and {names[1]}",
-        _ => $"{string.Join(", ", names.Take(names.Count - 1))} and {names[^1]}",
-    };
 }

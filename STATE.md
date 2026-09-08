@@ -12,11 +12,15 @@ branched from `dev`. Not merged, not pushed.
   relational `CanonConflictSubjects` table keyed by `(ConflictId, SubjectKind, SubjectId,
   Role)` - no JSON, and deliberately no foreign key, because the target is one of several
   tables. Kinds: Entity, Relationship, TimelineEntry, EntityField.
-- Fingerprint: SHA-256 over the rule code and the ids only. A rename rewords a conflict
-  in place; materially different records open a new one and resolve the old. Evaluation is
-  idempotent down to `UpdatedAt`. Evaluation owns Pending and Resolved; only the author
-  dismisses, and evaluation never reopens or resolves a dismissal. Dismiss and reopen both
-  refuse a Resolved conflict. See
+- Fingerprint: SHA-256 over the rule code and the ids only, one finding per offending
+  fact - `(relationship, endpoint)`, `(entry, participant)`, `(entity, field definition,
+  referenced entity)`. A rename rewords a conflict in place; a materially different fact
+  opens a new one and resolves the old, so a dismissal is never inherited by a different
+  fact. Evaluation is idempotent down to `UpdatedAt`.
+- Lifecycle: a dismissal suppresses an issue only while it is still there. Evaluation
+  leaves a Dismissed conflict alone while the finding persists, resolves it once the issue
+  is actually fixed, and raises the same fingerprint as Pending again if it later returns.
+  Dismiss and reopen are the author's, and both refuse a Resolved conflict. See
   `docs/architecture/decisions/0010-canon-conflict-lifecycle.md`.
 - Rules are ordinary C# behind `ICanonIntegrityRule`, registered in one list, no DSL. All
   three are structural: they read canon status on records the model already links and never
@@ -67,12 +71,14 @@ branched from `dev`. Not merged, not pushed.
   **No Canon Integrity UI exists yet.**
 - Universes: create, read, update, archive, unarchive, delete once archived.
 - Auth: ASP.NET Core Identity with a cookie session.
-- Tests: 174 API integration tests (28 for Canon Integrity), 38 Playwright tests. The
+- Tests: 180 API integration tests (34 for Canon Integrity), 38 Playwright tests. The
   Canon Integrity tests cover detection, each of the three rules, idempotence across
   repeated evaluation, a rename refreshing rather than duplicating, a fingerprint change
-  on materially different facts, the whole lifecycle including dismissal surviving
-  re-evaluation and an issue's return reopening its own conflict, both filters,
-  deterministic paging, and the owner and universe boundaries from both directions.
+  on materially different facts, the whole lifecycle - dismissal surviving an unchanged
+  re-evaluation, resolving once the issue is fixed, and returning as Pending when the same
+  issue comes back - a repointed field and a half-fixed relationship not inheriting a
+  dismissal, both filters, deterministic paging, and the owner and universe boundaries from
+  both directions.
 - Migrations: `InitialCreate`, `AddIdentity`, `UniqueUserEmail`, `AddUniverses`,
   `AddLoreEntities`, `AddRelationships`, `AddTimeline`, `AddCanonIntegrity`. Verified
   against a fresh SQLite database.
@@ -80,10 +86,10 @@ branched from `dev`. Not merged, not pushed.
 
 ## Current phase
 
-Phase 011 implemented, 4 local commits on `feat/011/canon-integrity-domain`. Backend only:
+Phase 011 implemented, 5 local commits on `feat/011/canon-integrity-domain`. Backend only:
 no frontend, no Playwright, no AI.
 
-Validation: Release build clean (0 warnings), full backend suite 174/174, all eight
+Validation: Release build clean (0 warnings), full backend suite 180/180, all eight
 migrations applied to a fresh SQLite file, no tracked secrets, working tree clean.
 
 Focused security check, main session only, backed by tests: a second account gets 404 with

@@ -81,11 +81,4 @@ public static class CanonFingerprint
 
     /// <summary>Guids in one invariant form, so the hash never depends on formatting.</summary>
     public static string Id(Guid id) => id.ToString("N", CultureInfo.InvariantCulture);
-
-    /// <summary>
-    /// A set of ids in a fixed order. The caller may hand these over in whatever order the
-    /// database returned them; sorting here keeps the fingerprint stable regardless.
-    /// </summary>
-    public static string Ids(IEnumerable<Guid> ids) =>
-        string.Join(',', ids.Select(Id).Order(StringComparer.Ordinal));
 }

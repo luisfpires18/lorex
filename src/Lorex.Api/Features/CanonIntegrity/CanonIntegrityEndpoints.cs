@@ -134,9 +134,8 @@ public static class CanonIntegrityEndpoints
             db,
             CanonConflictStatus.Dismissed,
 
-            // Dismissing an issue that is no longer detected would suppress it for good:
-            // a dismissed conflict is never reopened by evaluation, so the same problem
-            // returning later would go unreported. Only a live conflict can be dismissed.
+            // A dismissal suppresses a live issue. This one is gone, so there would be
+            // nothing to suppress, and the next evaluation would resolve it straight back.
             "This conflict is already resolved, so there is nothing to dismiss.",
             cancellationToken);
 
