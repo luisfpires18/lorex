@@ -1907,7 +1907,9 @@ a {
   padding: 0 0 2.25rem 1.75rem;
 }
 
-.moment:last-child {
+/* Only the very last moment stops short. Trimming the last one of every run would break
+   the spine into a stack of separate rules between one year and the next. */
+.chron__group:last-child .moment:last-child {
   padding-bottom: 0.5rem;
 }
 

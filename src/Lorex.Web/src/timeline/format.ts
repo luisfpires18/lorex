@@ -56,7 +56,10 @@ export function formatTimelineDate(date: TimelineDate) {
 
 /** A run of moments that share a year, and an era label when one was given. */
 export interface YearGroup {
+  /** Unique across the page, so React keeps two runs of the same year apart. */
   key: string
+  /** The year and era the run stands for. What the next moment is measured against. */
+  run: string
   year: number
   eraLabel: string | null
   entries: TimelineEntry[]
@@ -93,14 +96,15 @@ export function groupTimeline(entries: TimelineEntry[]): GroupedTimeline {
 
     eras.add(entry.date.eraLabel)
 
-    const key = groupKey(entry)
+    const run = groupKey(entry)
     const open = groups.at(-1)
 
-    if (open && open.key === key) {
+    if (open && open.run === run) {
       open.entries.push(entry)
     } else {
       groups.push({
-        key: `${key}|${groups.length}`,
+        key: `${run}|${groups.length}`,
+        run,
         year: entry.date.startYear,
         eraLabel: entry.date.eraLabel,
         entries: [entry],

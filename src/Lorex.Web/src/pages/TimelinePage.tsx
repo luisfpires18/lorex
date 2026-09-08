@@ -5,7 +5,7 @@ import { TimelineEntryForm } from '../components/TimelineEntryForm'
 import { ApiError } from '../lib/api'
 import { CANON_LABELS, CANON_ORDER, type CanonStatusValue } from '../lore/types'
 import { deleteTimelineEntry, listTimelineEntries } from '../timeline/api'
-import { formatTimelineDate, groupTimeline } from '../timeline/format'
+import { formatTimelineDate, formatYear, groupTimeline } from '../timeline/format'
 import { DATE_KIND_LABELS, type TimelineEntry, type TimelineEntryPage } from '../timeline/types'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
@@ -76,15 +76,21 @@ export default function TimelinePage() {
 
   const { groups, unplaced, mixedEras } = groupTimeline(result?.items ?? [])
 
-  function moment(entry: TimelineEntry) {
+  /**
+   * `heading` is the year already standing in the margin. A moment known only to that
+   * year would repeat it word for word, so its own stamp is dropped and the kind carries
+   * the line; anything finer, approximate or spanning still says what it claims.
+   */
+  function moment(entry: TimelineEntry, heading?: string) {
     const stamp = formatTimelineDate(entry.date)
+    const restates = stamp === heading
 
     return (
       <li className="moment" key={entry.id} data-kind={entry.date.kind} data-title={entry.title}>
         <span className="moment__mark" aria-hidden="true" />
 
         <p className="moment__stamp">
-          {stamp ? <span className="moment__when">{stamp}</span> : null}
+          {stamp && !restates ? <span className="moment__when">{stamp}</span> : null}
           <span className="moment__kind">{DATE_KIND_LABELS[entry.date.kind]}</span>
           <span className="chip" data-canon={entry.canonStatus}>
             {CANON_LABELS[entry.canonStatus]}
@@ -233,10 +239,12 @@ export default function TimelinePage() {
           {groups.map((group) => (
             <section className="chron__group" key={group.key}>
               <h3 className="chron__year">
-                <span className="chron__yearnum">{group.year}</span>
+                <span className="chron__yearnum">{formatYear(group.year)}</span>
                 {group.eraLabel ? <span className="chron__era">{group.eraLabel}</span> : null}
               </h3>
-              <ul className="chron__moments">{group.entries.map(moment)}</ul>
+              <ul className="chron__moments">
+                {group.entries.map((entry) => moment(entry, formatYear(group.year)))}
+              </ul>
             </section>
           ))}
 
@@ -250,7 +258,9 @@ export default function TimelinePage() {
                 <p className="chron__aside">
                   In the story, not yet in time. These sit apart rather than pretending to a year.
                 </p>
-                <ul className="chron__moments chron__moments--unplaced">{unplaced.map(moment)}</ul>
+                <ul className="chron__moments chron__moments--unplaced">
+                  {unplaced.map((entry) => moment(entry))}
+                </ul>
               </div>
             </section>
           ) : null}

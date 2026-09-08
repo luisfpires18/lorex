@@ -100,6 +100,7 @@ interface TimelineEntryFormProps {
  */
 export function TimelineEntryForm({ universeId, entry, onClose, onSaved }: TimelineEntryFormProps) {
   const dialog = useRef<HTMLDialogElement>(null)
+  const title = useRef<HTMLInputElement>(null)
   const [draft, setDraft] = useState<MomentDraft>(() => (entry ? draftFrom(entry) : EMPTY))
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
@@ -109,6 +110,10 @@ export function TimelineEntryForm({ universeId, entry, onClose, onSaved }: Timel
     // showModal, not the open attribute: it brings the focus trap, the backdrop and
     // Escape with it rather than leaving them to be rebuilt here.
     dialog.current?.showModal()
+
+    // Left alone, the browser hands the focus to the scrolling body, which then wears a
+    // focus ring across the whole panel. The title is where the writing starts anyway.
+    title.current?.focus()
   }, [])
 
   function edit(change: Partial<MomentDraft>) {
@@ -304,6 +309,7 @@ export function TimelineEntryForm({ universeId, entry, onClose, onSaved }: Timel
             <input
               id="moment-title"
               className="field__input"
+              ref={title}
               type="text"
               placeholder="Frodo leaves the Shire"
               value={draft.title}
