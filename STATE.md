@@ -2,8 +2,8 @@
 
 ## Current state
 
-Phase 009 (timeline UI) implemented on `feat/009/timeline-ui`, not merged. The timeline
-now has a domain, an API and a page.
+Phase 009 (timeline UI) complete and merged into `dev`. The timeline now has a domain, an
+API and a page.
 
 - Timeline: a `TimelineEntry` is a chronology record, not a lore entity. It is a moment
   in one universe that may name any number of entities, and participation never requires
@@ -68,9 +68,11 @@ now has a domain, an API and a page.
 
 ## Current phase
 
-Phase 009 on `feat/009/timeline-ui`, branched from `dev`, 2 commits, not merged and not
-pushed. Frontend only: no backend file changed, so no backend build or test run was
-needed and no API defect appeared.
+Phase 009 complete on `dev`. Merged from `feat/009/timeline-ui`, 3 commits, `--no-ff`,
+no conflicts. Feature branch retained. `dev` published to `origin/dev`.
+
+Frontend only: no backend file changed, so no backend build or test run was needed and
+no API defect appeared.
 
 Out of scope by design and still absent: Playwright coverage for the timeline, Canon
 Integrity, custom calendars, era mathematics, a visual graph, stories and plot, AI, and
@@ -104,9 +106,14 @@ drawer fills a narrow screen, and per-moment tools stay visible where there is n
 The security posture is unchanged from Phase 008: no route, contract or validation rule
 was touched.
 
+Graphify was not used in Phase 009. Targeted reads of the timeline contracts and of the
+neighbouring relationship UI were sufficient, and faster than a broad query would have
+been.
+
 ## Immediate next step
 
-Phase 010: `test/010/timeline-e2e-hardening`. Playwright coverage for the timeline page.
+Phase 010: `test/010/timeline-e2e-hardening`, branched from `dev`. Playwright coverage
+for the timeline page.
 
 ## Remote
 
