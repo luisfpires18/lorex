@@ -2,8 +2,8 @@
 
 ## Current state
 
-Phase 008 (timeline domain) implemented on `feat/008/timeline-domain`. Backend and
-domain only: there is no timeline UI yet.
+Phase 008 (timeline domain) complete and merged into `dev`. Backend and domain only:
+there is no timeline UI yet.
 
 - Timeline: a `TimelineEntry` is a chronology record, not a lore entity. It is a moment
   in one universe that may name any number of entities, and participation never requires
@@ -57,10 +57,11 @@ domain only: there is no timeline UI yet.
 
 ## Current phase
 
-Phase 008 on `feat/008/timeline-domain`, branched from `dev`. Four local commits, not
-merged and not pushed. Backend only by design: no timeline UI, no visual timeline, no
-custom calendar engine, no Canon Integrity conflict detection, no relationship
-chronology integration.
+Phase 008 complete on `dev`. Merged from `feat/008/timeline-domain`, 4 commits,
+`--no-ff`. Feature branch retained. `dev` published to `origin/dev`.
+
+Backend only by design: no timeline UI, no visual timeline, no custom calendar engine,
+no Canon Integrity conflict detection, no relationship chronology integration.
 
 Validation: Release build clean, all 146 backend tests green, a fresh SQLite database
 applies all seven migrations, no tracked secrets, working tree clean. Playwright was not
@@ -77,8 +78,7 @@ foreign.
 
 ## Immediate next step
 
-Phase 009: timeline UI. Branch `feat/009/timeline-ui` from `dev` once phase 008 is
-merged.
+Phase 009: timeline UI. Branch `feat/009/timeline-ui` from `dev`.
 
 ## Remote
 
@@ -100,6 +100,12 @@ Graphify is installed under the WindowsApps Python, not on `PATH` as `graphify`.
 as `python -m graphify update .` (AST only, no API cost). `graphify-out/` is gitignored.
 The two advisory `PreToolUse` hooks in `.claude/settings.json` call `python -m graphify`
 for the same reason; as bare `graphify` they failed silently and never ran.
+
+Graphify stays installed, but it is no longer the mandatory or default first step for
+repository exploration. Phase 008 used it once and got no measurable benefit: the answer
+came back truncated and mostly noise, and targeted reads of the neighbouring feature did
+the real work. Reach for it when a question is genuinely broad; prefer a targeted read
+otherwise. Reassess as the repository grows.
 
 ## Deferred
 

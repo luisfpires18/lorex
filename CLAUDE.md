@@ -8,8 +8,8 @@ Router only. No architecture detail here.
 2. Read `SYSTEMS.md` when you need to find a file.
 3. Load only context relevant to the current task. Nothing else.
 4. Prefer targeted file reads over repository-wide scanning.
-5. Use Graphify first for repository understanding. Fall back to targeted reads when
-   faster or when the graph lacks the answer. Graphify is advisory, never blocking.
+5. Prefer a targeted read. Reach for Graphify when a question is genuinely broad.
+   Graphify is advisory, never blocking, and never the mandatory first step.
 6. Keep context/state files concise. Trim instead of appending.
 7. Use caveman-style concise output.
 

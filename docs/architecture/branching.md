@@ -48,8 +48,9 @@ docs/007/architecture-update
 | 005 | `feat/005/relationship-domain` | merged into `dev` |
 | 006 | `feat/006/relationship-ui` | merged into `dev` |
 | 007 | `test/007/relationship-e2e-hardening` | merged into `dev` |
+| 008 | `feat/008/timeline-domain` | merged into `dev` |
 
-Next free number: `008`.
+Next free number: `009`.
 
 ## Rules for automation
 
