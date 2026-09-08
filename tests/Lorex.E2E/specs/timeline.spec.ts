@@ -352,6 +352,47 @@ test.describe('timeline', () => {
     )
   })
 
+  test('an entry leaving the world takes its participation with it and leaves the moment standing', async ({
+    page,
+  }) => {
+    await signUp(page)
+    const universeId = await newUniverse(page, unique('Departures '))
+
+    await newEntry(page, universeId, 'Boromir')
+    const gone = await newEntry(page, universeId, 'Denethor')
+
+    await openTimeline(page, universeId)
+    await addMoment(page, {
+      title: 'The last council of Minas Tirith',
+      kind: 'exact',
+      startYear: '3019',
+      participants: ['Boromir', 'Denethor'],
+    })
+    await expect(
+      moment(page, 'The last council of Minas Tirith').locator('.moment__player'),
+    ).toHaveCount(2)
+
+    // A timeline entry is a chronology record, not a lore entity: deleting one of the
+    // entries it names drops the participation and leaves the moment itself standing.
+    const removed = await page.request.delete(`/api/universes/${universeId}/entities/${gone}`)
+    expect(removed.status()).toBe(204)
+
+    await page.reload()
+    const council = moment(page, 'The last council of Minas Tirith')
+    await expect(council).toBeVisible()
+    await expect(council.locator('.moment__player')).toHaveCount(1)
+    await expect(council.locator('.moment__cast')).toContainText('Boromir')
+    await expect(council.locator('.moment__cast')).not.toContainText('Denethor')
+
+    // And the moment can still be edited afterwards, with only the survivor on it.
+    await page.getByTestId('edit-moment-The last council of Minas Tirith').click()
+    await expect(page.getByTestId('participants')).toContainText('Boromir')
+    await expect(page.getByTestId('participants')).not.toContainText('Denethor')
+    await page.getByTestId('save-moment').click()
+    await expect(page.getByTestId('moment-form')).toHaveCount(0)
+    await expect(council.locator('.moment__player')).toHaveCount(1)
+  })
+
   test('an edit moves a moment to its new place, and everything it was given survives a reload', async ({
     page,
   }) => {
@@ -753,6 +794,50 @@ test.describe('timeline', () => {
     await expect
       .poll(() => momentOrder(page))
       .toEqual(['The One Ring is made', 'The Ring is unmade'])
+  })
+
+  test('a run of moments sharing a year stays one run, and two runs of the same year stay apart', async ({
+    page,
+  }) => {
+    await signUp(page)
+    const universeId = await newUniverse(page, unique('Same Year '))
+
+    // Three moments in year 3018, the middle one under a different reckoning. Eras take
+    // no part in the sort, so this is the order the API returns.
+    for (const [title, eraLabel] of [
+      ['A first', 'Third Age'],
+      ['B second', 'Second Age'],
+      ['C third', 'Third Age'],
+    ]) {
+      await seedMoment(page, universeId, { title, kind: 'exact', startYear: '3018', eraLabel })
+    }
+
+    await openTimeline(page, universeId)
+
+    // Runs are consecutive, never gathered: pulling the two Third Age moments together
+    // would quietly rewrite the order the API decided.
+    await expect.poll(() => momentOrder(page)).toEqual(['A first', 'B second', 'C third'])
+    await expect.poll(() => yearHeadings(page)).toEqual(['3018', '3018', '3018'])
+    await expect(page.locator('.chron__group')).toHaveCount(3)
+
+    // Moments that do share a run share one heading rather than one heading each.
+    await seedMoment(page, universeId, {
+      title: 'D fourth',
+      kind: 'exact',
+      startYear: '3019',
+      eraLabel: 'Third Age',
+    })
+    await seedMoment(page, universeId, {
+      title: 'E fifth',
+      kind: 'exact',
+      startYear: '3019',
+      eraLabel: 'Third Age',
+    })
+    await page.reload()
+
+    await expect.poll(() => yearHeadings(page)).toEqual(['3018', '3018', '3018', '3019'])
+    await expect(page.locator('.chron__group')).toHaveCount(4)
+    await expect(page.locator('.chron__group').last().locator('.moment')).toHaveCount(2)
   })
 
   test('a title and an account are shown as text, never as markup', async ({ page }) => {
