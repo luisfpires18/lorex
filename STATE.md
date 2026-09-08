@@ -2,9 +2,25 @@
 
 ## Current state
 
-Phase 007 (relationship end-to-end coverage and hardening) complete. The relationship
-feature is finished: authored from the app, and proven from the app.
+Phase 008 (timeline domain) implemented on `feat/008/timeline-domain`. Backend and
+domain only: there is no timeline UI yet.
 
+- Timeline: a `TimelineEntry` is a chronology record, not a lore entity. It is a moment
+  in one universe that may name any number of entities, and participation never requires
+  an Event entity to exist. Links live in a `TimelineEntryLinks` join table, one row per
+  entity, never a JSON list of ids. Deleting an entity drops its participation and
+  leaves the moment standing.
+- Chronology is signed integer components, not `DateTime` and not JSON: `StartYear`,
+  `StartMonth`, `StartDay`, `EndYear`, `EndMonth`, `EndDay`, a `DateKind` and an optional
+  `EraLabel`. Exact and Approximate take a start only, Range takes both ends and may not
+  end before it starts, Unknown takes nothing. Month and day stay optional, a day needs a
+  month and a month needs a year, and years may be negative. UTC `DateTime` is still used
+  for `CreatedAt` and `UpdatedAt` only. See
+  `docs/architecture/decisions/0009-fictional-chronology.md`.
+- Timeline API: list, get, create, update, delete under
+  `/api/universes/{universeId}/timeline`. The listing orders chronologically in SQL so
+  paging is stable, filters by canon status and by a participating entity, and returns
+  the chronology as numbers plus a derived precision so no client parses date strings.
 - Relationships: one `LoreRelationship` row per link, with a universe-scoped
   `RelationshipType` that carries the forward name, the inverse name, and a symmetric
   flag. The reverse reading is derived at read time, never stored twice. Listing an
@@ -20,49 +36,49 @@ feature is finished: authored from the app, and proven from the app.
   aliases and summary. Type, status and paging filters.
 - Article content is a Tiptap document, validated structurally; link schemes are
   limited to http, https and mailto on both sides.
-- Every lore and relationship route proves universe ownership first, then re-resolves
-  every client id inside that universe. Cross-universe access answers 404.
+- Every lore, relationship and timeline route proves universe ownership first, then
+  re-resolves every client id inside that universe. Cross-universe access answers 404.
 - Deleting a type, field or option is refused while it still holds authored data.
 - Web: `/app/universes/:id/lore` browser, `/lore/:entityId` dossier page with in-page
-  editing, `/types` for custom types, fields and relation kinds.
-- The entry page carries a Relations section, worded from the entry you are on. Adding
-  and editing happen in a contextual panel; the kind picker offers both readings of a
-  directional kind, so source and target are never named to the author. `EntityPicker`
-  searches one universe through the API and is kept reusable.
+  editing, `/types` for custom types, fields and relation kinds. Nothing for the
+  timeline yet.
 - Universes: create, read, update, archive, unarchive, delete once archived.
 - Auth: ASP.NET Core Identity with a cookie session.
-- Tests: 103 API integration tests, 23 Playwright tests. Relationships are covered end
-  to end in Chromium: a directional link authored from its source and read back inverted
-  from its target, edited from that inverse side and confirmed against the API to still
-  be stored one way round; a symmetric kind read identically from both ends; relation
-  kind create, reword, and the refusal to delete one in use; the end-before-start refusal
-  and the draft that survives it; notes rendered as text; and the universe and owner
-  boundaries around the picker, the three id slots and the per-entity list.
+- Tests: 146 API integration tests (43 new for the timeline), 23 Playwright tests. The
+  timeline tests cover the four date kinds, optional month and day, negative years, every
+  refused date combination, canon status round-tripping, participation from none to
+  several, chronological order with unknown dates last, a bare year before a dated moment
+  inside it, stable paging, both filters, and the ownership boundary from both
+  directions including a foreign entity slipped in through an update.
 - Migrations: `InitialCreate`, `AddIdentity`, `UniqueUserEmail`, `AddUniverses`,
-  `AddLoreEntities`, `AddRelationships`. Verified against a fresh SQLite database.
+  `AddLoreEntities`, `AddRelationships`, `AddTimeline`. Verified against a fresh SQLite
+  database.
 - Launcher: `Start-Lorex.cmd` / `Stop-Lorex.cmd` verified.
 
 ## Current phase
 
-Phase 007 complete on `dev`. Merged from `test/007/relationship-e2e-hardening`, 3
-commits, `--no-ff`. Feature branch retained. `dev` published to `origin/dev`.
+Phase 008 on `feat/008/timeline-domain`, branched from `dev`. Four local commits, not
+merged and not pushed. Backend only by design: no timeline UI, no visual timeline, no
+custom calendar engine, no Canon Integrity conflict detection, no relationship
+chronology integration.
 
-Two defects were found and fixed. A delete refused because something still uses the
-target interpolated a count into a sentence written only for the plural, so one blocker
-read "1 relationships still use this type"; the relationship-type, entity-type and
-field-in-use refusals now each carry a singular sentence, pinned by regression tests on
-both sides of one. Running the whole Playwright suite for the first time since phase 006
-also caught a regression that phase left behind: the Relation kinds section added to the
-Types page made the lore spec's `getByLabel('Kind')` ambiguous, and that locator is now
-exact.
+Validation: Release build clean, all 146 backend tests green, a fresh SQLite database
+applies all seven migrations, no tracked secrets, working tree clean. Playwright was not
+run: nothing in the frontend changed.
 
-Validation: frontend typecheck, lint, format check and production build clean; Release
-build and all 103 backend tests green; the full Playwright suite green at 23 of 23;
-launcher start, health probe and stop all clean; no tracked secrets.
+A focused security check was done in the main session, not a full audit. Every timeline
+route gates on `LoreAccess.OwnsUniverseAsync` before touching a row and re-filters the
+entry by `UniverseId`, so there is no IDOR. Participants are re-resolved inside the
+universe on create and on update, and a foreign id is refused as an unusable choice with
+no name in the body. The request record is explicit, so `Id`, `UniverseId`, `CreatedAt`
+and `UpdatedAt` cannot be overposted. The `entityId` list filter sits inside the
+universe-scoped query, so a foreign id matches nothing rather than reporting that it is
+foreign.
 
 ## Immediate next step
 
-Phase 008: timeline domain. Branch `feat/008/timeline-domain` from `dev`.
+Phase 009: timeline UI. Branch `feat/009/timeline-ui` from `dev` once phase 008 is
+merged.
 
 ## Remote
 
@@ -82,6 +98,8 @@ Skills in `.claude/skills/`: `aspnet-core-guidance`, `graphify`.
 
 Graphify is installed under the WindowsApps Python, not on `PATH` as `graphify`. Run it
 as `python -m graphify update .` (AST only, no API cost). `graphify-out/` is gitignored.
+The two advisory `PreToolUse` hooks in `.claude/settings.json` call `python -m graphify`
+for the same reason; as bare `graphify` they failed silently and never ran.
 
 ## Deferred
 
@@ -93,6 +111,13 @@ as `python -m graphify update .` (AST only, no API cost). `graphify-out/` is git
   is refused as an unusable choice rather than as someone else's row. The wider audit -
   rate limiting, header and cookie hardening, dependency review, a deliberate look at
   the auth surface - is what remains.
+- Cross-era ordering is not solved. `EraLabel` is display metadata in Phase 008 and takes
+  no part in the sort, so entries under different eras order by their raw year numbers: a
+  Second Age 3441 sorts after a Third Age 3018 even though it is earlier in the story.
+  The fallback is deterministic, not correct. Making it correct needs eras to be
+  first-class rows with an order and an offset.
+- Full timeline security audit deferred, as for relationships. Phase 008 did a focused
+  check in the main session only, backed by tests.
 
 ## Blockers
 

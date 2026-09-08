@@ -1,0 +1,105 @@
+using Lorex.Api.Features.Lore;
+using Lorex.Api.Features.Universes;
+
+namespace Lorex.Api.Features.Timeline;
+
+/// <summary>
+/// How much a timeline entry actually claims about when something happened. The kind
+/// decides which date components may be filled in, not how they are formatted.
+/// </summary>
+public enum TimelineDateKind
+{
+    /// <summary>A single point the author is sure of. Start only.</summary>
+    Exact = 0,
+
+    /// <summary>A single point the author is only roughly sure of. Start only.</summary>
+    Approximate = 1,
+
+    /// <summary>A span. Start and end are both required.</summary>
+    Range = 2,
+
+    /// <summary>The entry is placed in the story but not in time. No components at all.</summary>
+    Unknown = 3,
+}
+
+/// <summary>How far down a date is specified. Derived, never stored.</summary>
+public enum TimelineDatePrecision
+{
+    /// <summary>No year, so nothing to show.</summary>
+    None = 0,
+
+    Year = 1,
+    Month = 2,
+    Day = 3,
+}
+
+/// <summary>
+/// One chronology record inside a universe: "Year 3018 - Frodo leaves the Shire".
+///
+/// A timeline entry is deliberately not a <see cref="LoreEntity"/>. It is a moment, not a
+/// thing in the world, and it may reference any number of entities without any of them
+/// having to exist. An Event entity may point at an entry, but participation never
+/// requires one.
+///
+/// The date is held as plain signed integers rather than <see cref="DateTime"/>, because
+/// fictional calendars are not Gregorian and years may run negative or past any real
+/// range. See <c>docs/architecture/decisions/0009-fictional-chronology.md</c>.
+/// </summary>
+public sealed class TimelineEntry
+{
+    public Guid Id { get; set; }
+
+    public Guid UniverseId { get; set; }
+
+    public Universe? Universe { get; set; }
+
+    public required string Title { get; set; }
+
+    public string? Description { get; set; }
+
+    public CanonStatus CanonStatus { get; set; }
+
+    public TimelineDateKind DateKind { get; set; }
+
+    /// <summary>Signed: a fictional calendar may count down to its own year zero.</summary>
+    public int? StartYear { get; set; }
+
+    /// <summary>1-12 when given. Optional: a year on its own is a valid claim.</summary>
+    public int? StartMonth { get; set; }
+
+    /// <summary>1-31 when given. Requires a month.</summary>
+    public int? StartDay { get; set; }
+
+    public int? EndYear { get; set; }
+
+    public int? EndMonth { get; set; }
+
+    public int? EndDay { get; set; }
+
+    /// <summary>
+    /// Display metadata only: "Third Age", "AC". Phase 008 does no cross-era arithmetic,
+    /// so two entries labelled differently still order by their raw year numbers.
+    /// </summary>
+    public string? EraLabel { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime UpdatedAt { get; set; }
+
+    public ICollection<TimelineEntryLink> EntityLinks { get; } = [];
+}
+
+/// <summary>
+/// One entity taking part in one timeline entry. A relational row per link, never a JSON
+/// list of ids, so the join is queryable and the foreign keys are real.
+/// </summary>
+public sealed class TimelineEntryLink
+{
+    public Guid TimelineEntryId { get; set; }
+
+    public TimelineEntry? TimelineEntry { get; set; }
+
+    public Guid EntityId { get; set; }
+
+    public LoreEntity? Entity { get; set; }
+}
