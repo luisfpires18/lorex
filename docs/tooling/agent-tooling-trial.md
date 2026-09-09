@@ -361,12 +361,65 @@ though not before it was written wrongly once - and the wrap-up list is what kep
 and `SYSTEMS.md` from drifting. The "argue against the plan once" step is what removed the
 entity-type field editor from scope, on the evidence that no client for that route exists.
 
-### Task 4 - pending
+### Task 4 - Phase 016, Canon Integrity E2E and hardening (2026-09-09)
+
+Test-first: five Playwright scenarios over the whole Canon Integrity slice, one frontend
+defect found and fixed, no backend change. Second run of the repository-native context
+workflow.
+
+**RTK**
+
+| Question | Answer |
+| --- | --- |
+| Live hook working | **Yes.** A bare `git status` still rewrites to `rtk git status` and runs. |
+| Command categories filtered | **Almost none.** A Playwright phase is `cd <project> && <runner>` for nearly every command - the tests, the typechecks, the lint, the build all live in three different project directories - and every one of those is a compound command the wrapper bypasses by design. `rtk gain` moved from 23.5% to 23.2%, which is dilution rather than saving. |
+| `rtk gain` | Meter 23.2%; by-command table ~33 commands / ~3.6K tokens, unchanged in substance from Task 3. |
+| Safety-wrapper bypasses | The whole session, effectively: every `cd … && …`, every `;`-joined pair, every `python - <<'PY'` heredoc. Nothing cost anything; each ran normally. |
+| Unfiltered reruns caused by missing diagnostics | **Zero.** `rtk proxy` was not used. |
+| Incorrect command execution | **Zero.** |
+| Do dev/test commands hide useful output? | **Not observed here, and the question was watched deliberately.** `npx playwright test` is a substitution (`rtk playwright test`, dropping `npx`), so the wrapper rejects it and the full reporter output survived every run - including the failure logs, error-context files and screenshot paths that drove the debugging. The one recorded loss remains Task 3's `rtk npm run dev`. The pattern is consistent: RTK is safe on short status-shaped commands and unhelpful-to-harmful on long-running or diagnostic-carrying ones, and the wrapper already refuses most of the latter for unrelated reasons. |
+
+Verdict material: the clearest demonstration yet that RTK's value is a function of command
+mix and nothing else. A backend task filters builds; a frontend task filters greps; a test
+task filters nothing, because its commands are all compound. Four tasks in, the safety record
+is unblemished and the savings are real but small and erratic.
+
+**Graphify**
+
+Not used, a fourth time. The one question with any breadth - *can an existing High conflict
+be reached through the product at all?* - is a question about which write paths are wrapped
+by the gate, and one `grep` for `gate` across the five endpoint files answered it exactly,
+with ADR 0012 confirming the answer in prose. A graph query would have inferred what two
+authoritative sources already stated. Four tasks with no use is now the finding itself.
+
+**phase-workflow**
+
+Used. Its value this time was the validation list rather than the ordering: "full suite for
+every area touched" is what caught that the E2E project has no `format:check` of its own, and
+"read the diff before committing" is a step this phase needed because the working tree spanned
+three projects. The "argue against the plan once" step is what stopped an attempt to
+manufacture a pre-existing High conflict for a scenario the product cannot reach - see below.
+
+**Durable finding, recorded in `STATE.md` rather than here**
+
+The brief asked for a scenario proving that an *existing, unrelated* High conflict does not
+freeze valid edits. It cannot be built through the product: ADR 0012 already concludes that
+"a High conflict can no longer be authored through the API at all", and re-deriving that from
+the routes confirmed it - entity create/update, timeline create/update and the field-semantic
+update are all gated, and every other path either only removes facts or writes a field that
+holds no values yet. The property was proved in the direction that is reachable: a refusal
+leaves the rest of the universe editable, and Medium never blocks. Separately, the three
+chronological rules turn out to be unreachable from the UI at all, because
+`EntityFieldSemantic` has no control on the Types screen.
+
+### Task 5 - not planned
 
 ## Decision
 
 Taken **after** 3-4 tasks, each tool judged on its own: **Keep**, **Conditional**, or
-**Remove**.
+**Remove**. Four tasks are now measured, so the decision is due; it is the owner's, and it
+is listed in `STATE.md` under deferred decisions. No verdict was taken in Phase 016 either -
+changing the tooling is not test-and-hardening work.
 
 RTK - real shell-output reduction; stability; diagnostic quality; how often output had to
 be rerun unfiltered; any observable improvement in context/session longevity.

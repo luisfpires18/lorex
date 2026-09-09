@@ -56,8 +56,9 @@ docs/007/architecture-update
 | 013 | `feat/013/canon-integrity-rules` | merged into `dev` |
 | 014 | `feat/014/canon-promotion-gates` | merged into `dev` |
 | 015 | `feat/015/canon-integrity-ui` | merged into `dev` |
+| 016 | `test/016/canon-integrity-hardening` | in progress |
 
-Next free number: `016`.
+Next free number: `017`.
 
 ## Rules for automation
 

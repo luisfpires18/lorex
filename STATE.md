@@ -5,17 +5,19 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 
 ## Roadmap position
 
-- Phases 001-015 done. Sequence log: `docs/architecture/branching.md`.
-- **Phase 015** (Canon Integrity UI) merged into `dev`. Frontend only. Canon Integrity has
-  a review screen at `/app/universes/:id/canon`, and the gate's 409 is presented as a
-  refusal rather than a save failure on entity and timeline saves.
-- **Now: Phase 016 - hardening.** Owns the E2E coverage Phase 015 deliberately did not add,
-  and whatever the security follow-ups below turn into.
+- Phases 001-016 done. Sequence log: `docs/architecture/branching.md`.
+- **Phase 016** (Canon Integrity E2E / hardening) on `test/016/canon-integrity-hardening`,
+  **not merged, not pushed**. Five Playwright scenarios in `tests/Lorex.E2E/specs/canon.spec.ts`
+  cover the review screen, conflict identity across runs, the promotion gate, reconciliation
+  on write, and the universe/owner boundary. One defect found and fixed: the entry page's
+  one-click Canon step swallowed the gate's 409.
+- **Next: no phase chosen.** The security follow-ups below are the largest open item.
 
 ## Baseline
 
-- 246 API integration tests, 38 Playwright tests, green on Release. No frontend unit runner
-  exists; the web checks are `typecheck`, `lint`, `format:check` and `build`.
+- 246 API integration tests, 43 Playwright tests, green. No frontend unit runner exists; the
+  web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
+  format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings.
 - 9 migrations, latest `AddEntityFieldSemantics`; `has-pending-model-changes` reports none.
 - Six rules in `src/Lorex.Api/Features/CanonIntegrity/Rules/`: three structural (Medium),
   three chronological (High). Behaviour: ADR 0010, 0011, 0012.
@@ -28,12 +30,14 @@ happen only when the owner asks.
 
 ## Tooling trial
 
-Task 3 of 3-4 done, **no verdict yet**. RTK and Graphify judged independently.
+Task 4 of 3-4 done. The agreed number of tasks is complete and **the verdict is owed** -
+see Deferred. RTK and Graphify judged independently.
 
-- RTK works in the `Bash` tool. Last measure `rtk gain` ~33 commands / ~3.6K tokens / 23.5%;
-  the jump came from a frontend command mix (`grep`, `git status`), not from the tool. First
-  diagnostic loss recorded: `rtk npm run dev` swallowed Vite's whole startup banner.
-- Graphify unused in all three tasks. Targeted `Grep` over `SYSTEMS.md`-named files has
+- RTK works in the `Bash` tool. `rtk gain` ~23.2% and essentially flat across Task 4: a
+  Playwright phase runs almost everything as `cd … && …`, which the wrapper bypasses by
+  design, so RTK had close to nothing to filter. Correctness record still clean; the one
+  recorded diagnostic loss remains `rtk npm run dev` swallowing Vite's startup banner.
+- Graphify unused in all four tasks. Targeted `Grep` over `SYSTEMS.md`-named files has
   answered every question so far.
 
 ## Deferred / owner decisions
@@ -42,6 +46,13 @@ Task 3 of 3-4 done, **no verdict yet**. RTK and Graphify judged independently.
   backed by tests. Outstanding: rate limiting, header/cookie hardening, dependency review, auth.
 - **Cross-era ordering** unsolved, and it bounds the chronology rules. ADR 0009, ADR 0011.
 - **`Age`** is declarable but read by nothing until a structured reference year exists. ADR 0011.
+- **`EntityFieldSemantic` has no control on the Types screen.** It is bound on the
+  field-definition contract but nothing in `src/Lorex.Web` writes it, so the three
+  chronological rules - every High rule there is - are unreachable through the UI alone.
+  ADR 0011 assumes a field editor that declares meaning; the E2E suite seeds semantics
+  through the API for exactly this reason. Either build the control or amend the ADR.
+- **Tooling trial verdict.** Four tasks measured, `docs/tooling/agent-tooling-trial.md`
+  holds the evidence. Keep / conditional / remove is the owner's call, per tool.
 
 ## Blockers
 
