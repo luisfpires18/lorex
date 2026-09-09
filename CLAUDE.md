@@ -1,34 +1,41 @@
 # CLAUDE.md - traffic controller
 
-Router only. No architecture detail here.
+Router only. No architecture detail and no operational state here.
+
+## Where things live
+
+| Need | Go to |
+| --- | --- |
+| Current state, roadmap position, blockers | `STATE.md` - read first, always |
+| A file or a responsibility | `SYSTEMS.md` |
+| An architecture decision | `docs/architecture/decisions/README.md` |
+| Git workflow and branch naming | `docs/architecture/branching.md` |
+| Graphify and RTK usage | `.claude/CLAUDE.md` |
+| How to run a phase | `.claude/skills/phase-workflow/SKILL.md` |
+| Backend conventions | `.claude/skills/aspnet-core-guidance/SKILL.md` |
 
 ## Every session
 
 1. Read `STATE.md` first. Always.
-2. Read `SYSTEMS.md` when you need to find a file.
-3. Load only context relevant to the current task. Nothing else.
-4. Prefer targeted file reads over repository-wide scanning.
-5. Prefer a targeted read. Reach for Graphify when a question is genuinely broad.
-   Graphify is optional and manual-only: no hook invokes it, and it never blocks work.
-6. Keep context/state files concise. Trim instead of appending.
-7. Use caveman-style concise output.
+2. Load only context relevant to the current task. Nothing else.
+3. Prefer targeted reads over repository-wide scanning.
+4. Keep context and state files concise. Trim instead of appending.
+5. Use caveman-style concise output.
 
-## Git rules
+## Git safety
 
-- Never push, merge, force-push, create PRs, or modify remote branches unless explicitly requested.
-- Work on numbered branches: `<type>/<NNN>/<short-kebab-description>`.
-- Full convention: `docs/architecture/branching.md`.
+Never, without an explicit request:
 
-## After each implementation phase
+- push
+- merge
+- create a pull request
+- force-push
+- delete a branch
+- change a remote
 
-- Update `STATE.md`: current state, phase, next step, real blockers only.
-- Update `SYSTEMS.md` when paths or responsibilities change.
-- Write an ADR in `docs/architecture/decisions/` only for durable decisions.
-
-## Tooling
-
-- Graphify and RTK usage rules: `.claude/CLAUDE.md`. Graphify skill: `.claude/skills/graphify/SKILL.md`.
-- Backend conventions: `.claude/skills/aspnet-core-guidance/SKILL.md`.
+Never work directly on `master` or `main`. Work on numbered branches,
+`<type>/<NNN>/<short-kebab-description>`. `docs/architecture/branching.md` is authoritative
+for the full convention.
 
 ## Hard boundaries
 

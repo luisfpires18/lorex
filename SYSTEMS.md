@@ -12,7 +12,7 @@ Repository index. Paths and one-line responsibilities only.
 | `dotnet-tools.json` | Local .NET tool manifest (`dotnet-ef`). |
 | `Start-Lorex.cmd` / `Stop-Lorex.cmd` | Windows entry points for the local launcher. |
 | `CLAUDE.md` | Traffic controller for Claude sessions. |
-| `STATE.md` | Current state, phase, next step, blockers. |
+| `STATE.md` | Operational state only: roadmap position, blockers, deferred decisions. |
 | `graphify-out/` | Generated knowledge graph. Gitignored, manual-only; rebuild with `python -m graphify update .`. |
 | `docs/tooling/` | Agent tooling trial notes (RTK and Graphify evaluation). |
 
@@ -25,6 +25,7 @@ Repository index. Paths and one-line responsibilities only.
 | `hooks/rtk-safe-hook.ps1` | Permission-neutral wrapper around `rtk hook claude`: keeps the rewrite, strips every permission decision. |
 | `skills/aspnet-core-guidance/` | Backend conventions for `src/Lorex.Api`. |
 | `skills/graphify/` | Graphify skill and references. |
+| `skills/phase-workflow/` | How a meaningful change is run: plan, validate, wrap up. |
 
 ## `src/Lorex.Api` - ASP.NET Core host
 
@@ -130,4 +131,5 @@ Repository index. Paths and one-line responsibilities only.
 | Path | Responsibility |
 | --- | --- |
 | `architecture/branching.md` | Branch naming and merge rules. |
+| `architecture/decisions/README.md` | One-line index of every ADR. |
 | `architecture/decisions/` | ADRs; one small file per durable decision. |
