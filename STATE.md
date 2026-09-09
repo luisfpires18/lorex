@@ -5,17 +5,13 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 
 ## Roadmap position
 
-- Phases 001-017 done and merged. Sequence log: `docs/architecture/branching.md`.
-- **Phase 017** (Revision / History) merged into `dev`. Every accepted entity write records a
-  full snapshot (ADR 0013), captured inside the promotion gate's transaction; a version is put
-  back by replaying it through the ordinary gated update. The dossier carries the history
-  section under the relations.
-- **Phase 018 - Export / Backup.** Complete on `feat/018/export-backup`, **not merged and not
-  pushed**. `GET /api/universes/{id}/export` hands the owner one versioned JSON file holding
-  the universe's authored data, read in a single transaction with every collection ordered in
-  memory so unchanged lore exports byte-identical payloads. What is in a backup and what is
-  deliberately rebuilt instead: ADR 0014. Export only - nothing reads a backup back in, and
-  the Settings screen says so.
+- Phases 001-018 done and merged. Sequence log: `docs/architecture/branching.md`.
+- **Phase 018** (Export / Backup) merged into `dev`. `GET /api/universes/{id}/export` hands the
+  owner one versioned JSON file holding the universe's authored data, read in a single
+  transaction with every collection ordered in memory so unchanged lore exports byte-identical
+  payloads. What is in a backup and what is deliberately rebuilt instead: ADR 0014. Export
+  only - nothing reads a backup back in, and the Settings screen says so.
+- **Now: Phase 019 - Trash / Recovery.** Not started; no branch yet.
 
 ## Baseline
 
