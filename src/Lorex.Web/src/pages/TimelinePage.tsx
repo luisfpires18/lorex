@@ -103,26 +103,42 @@ export default function TimelinePage() {
 
         {entry.entities.length > 0 ? (
           <ul className="moment__cast">
-            {entry.entities.map((link) => (
-              <li key={link.entityId}>
-                <Link
-                  className="moment__player"
-                  to={`/app/universes/${universe.id}/lore/${link.entityId}`}
-                  title={link.entityTypeName}
-                >
-                  <span
-                    className="moment__dot"
-                    aria-hidden="true"
-                    style={
-                      link.entityTypeAccentColor
-                        ? { background: link.entityTypeAccentColor }
-                        : undefined
-                    }
-                  />
-                  {link.name}
-                </Link>
-              </li>
-            ))}
+            {entry.entities.map((link) => {
+              const dot = (
+                <span
+                  className="moment__dot"
+                  aria-hidden="true"
+                  style={
+                    link.entityTypeAccentColor
+                      ? { background: link.entityTypeAccentColor }
+                      : undefined
+                  }
+                />
+              )
+
+              // A participant in the Trash is still stored on this moment and comes back
+              // with it, so it is named rather than dropped - but it has no page to open
+              // while it is in the Trash, so it is not a link.
+              return (
+                <li key={link.entityId}>
+                  {link.isTrashed ? (
+                    <span className="moment__player moment__player--trashed">
+                      {dot}
+                      {link.name} (in Trash)
+                    </span>
+                  ) : (
+                    <Link
+                      className="moment__player"
+                      to={`/app/universes/${universe.id}/lore/${link.entityId}`}
+                      title={link.entityTypeName}
+                    >
+                      {dot}
+                      {link.name}
+                    </Link>
+                  )}
+                </li>
+              )
+            })}
           </ul>
         ) : null}
 

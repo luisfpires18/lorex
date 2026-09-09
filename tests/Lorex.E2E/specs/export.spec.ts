@@ -63,7 +63,7 @@ test.describe('export', () => {
     }
 
     expect(backup.format).toBe('lorex.universe.backup')
-    expect(backup.formatVersion).toBe(1)
+    expect(backup.formatVersion).toBe(2)
     expect(backup.payload.entities.map((entity) => entity.name)).toContain(name)
 
     // And the page says which file to go and look for.

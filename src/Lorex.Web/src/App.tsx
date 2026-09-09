@@ -9,6 +9,7 @@ import RegisterPage from './pages/RegisterPage'
 import TimelinePage from './pages/TimelinePage'
 import UniverseOverview from './pages/UniverseOverview'
 import UniverseSettings from './pages/UniverseSettings'
+import UniverseTrash from './pages/UniverseTrash'
 import UniverseTypes from './pages/UniverseTypes'
 import UniverseWorkspace from './pages/UniverseWorkspace'
 import UniversesPage from './pages/UniversesPage'
@@ -33,6 +34,7 @@ export default function App() {
               <Route path="timeline" element={<TimelinePage />} />
               <Route path="canon" element={<CanonPage />} />
               <Route path="types" element={<UniverseTypes />} />
+              <Route path="trash" element={<UniverseTrash />} />
               <Route path="settings" element={<UniverseSettings />} />
             </Route>
           </Route>

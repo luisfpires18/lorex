@@ -69,7 +69,13 @@ function draftFrom(entry: TimelineEntry): MomentDraft {
     endMonth: numberText(entry.date.endMonth),
     endDay: numberText(entry.date.endDay),
     eraLabel: entry.date.eraLabel ?? '',
-    entities: entry.entities.map((link) => ({ id: link.entityId, name: link.name })),
+    // A participant in the Trash keeps its place in the set - the form posts every id back,
+    // so dropping it here would delete the participation on the next save. It is labelled
+    // instead, so the author can see why it is not clickable anywhere else.
+    entities: entry.entities.map((link) => ({
+      id: link.entityId,
+      name: link.isTrashed ? `${link.name} (in Trash)` : link.name,
+    })),
   }
 }
 

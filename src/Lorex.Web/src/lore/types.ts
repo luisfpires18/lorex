@@ -126,6 +126,14 @@ export interface FieldValue {
   optionValues: string[]
   referencedEntityId: string | null
   referencedEntityName: string | null
+
+  /**
+   * The reference points at an entry that is currently in the Trash. The id and the name are
+   * still sent, on purpose: this value belongs to the live entry holding it, and the client
+   * posts its whole field set on every save, so hiding the reference would delete it the next
+   * time an unrelated field was touched. Render it as unavailable and do not link it.
+   */
+  referencedEntityIsTrashed: boolean
 }
 
 export interface EntitySummary {

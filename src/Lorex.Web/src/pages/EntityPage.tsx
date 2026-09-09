@@ -274,10 +274,35 @@ export default function EntityPage() {
     setHistoryKey((key) => key + 1)
   }
 
-  async function remove() {
-    if (isNew || !window.confirm('Delete this entry permanently?')) return
+  /**
+   * Moves the entry to the Trash. Nothing is destroyed, and the wording says so: the article,
+   * the fields, the history and every connection stay stored, and Trash restores them whole.
+   */
+  async function moveToTrash() {
+    const confirmed = window.confirm(
+      'Move this entry to the Trash?\n\n' +
+        'It leaves your lore, your search and your pickers, but nothing is erased. ' +
+        'Its article, fields, history and connections are kept, and you can restore it ' +
+        'from Trash at any time.',
+    )
+    if (isNew || !confirmed) return
     await deleteEntity(universe.id, entityId)
-    await navigate(`/app/universes/${universe.id}/lore`, { replace: true })
+    await navigate(`/app/universes/${universe.id}/trash`, { replace: true })
+  }
+
+  // Order matters here. A load that failed leaves the draft null, so a loading guard placed
+  // first would answer "Opening…" forever instead of saying what happened - which is now an
+  // ordinary thing to hit, because a link to an entry since moved to the Trash answers 404.
+  if (status === 'missing') {
+    return (
+      <div className="empty" data-testid="entity-missing">
+        <p className="empty__line">That entry is not here.</p>
+        <p className="empty__hint">
+          It may be in the <Link to={`/app/universes/${universe.id}/trash`}>Trash</Link>, where it
+          can be restored. <Link to={`/app/universes/${universe.id}/lore`}>Back to the lore</Link>
+        </p>
+      </div>
+    )
   }
 
   if (status === 'loading' || !draft) {
@@ -285,17 +310,6 @@ export default function EntityPage() {
       <p className="notice" role="status">
         Opening…
       </p>
-    )
-  }
-
-  if (status === 'missing') {
-    return (
-      <div className="empty" data-testid="entity-missing">
-        <p className="empty__line">That entry is not here.</p>
-        <p className="empty__hint">
-          <Link to={`/app/universes/${universe.id}/lore`}>Back to the lore</Link>
-        </p>
-      </div>
     )
   }
 
@@ -448,6 +462,7 @@ export default function EntityPage() {
                     definition={definition}
                     value={draft.fields[definition.id] ?? emptyValue(definition)}
                     candidates={candidates}
+                    retainedReference={retainedReference(detail, candidates, definition.id)}
                     onChange={(next) =>
                       setDraft((current) =>
                         current
@@ -557,16 +572,43 @@ export default function EntityPage() {
             <button
               className="button button--quiet"
               type="button"
-              onClick={remove}
+              onClick={moveToTrash}
               disabled={isSaving}
+              data-testid="trash-entity"
             >
-              Delete
+              Move to Trash
             </button>
           </>
         )}
       </footer>
     </article>
   )
+}
+
+/**
+ * The reference a field already holds, when the picker's own list does not contain it.
+ *
+ * That happens for an entry in the Trash - the listing never offers one - and for an entry
+ * past the first page the picker loaded. Either way the stored id has to stay in the select,
+ * or saving any other field on this form would silently clear the reference.
+ */
+function retainedReference(
+  detail: EntityDetail | null,
+  candidates: EntitySummary[],
+  fieldDefinitionId: string,
+) {
+  const held = detail?.fields.find((value) => value.fieldDefinitionId === fieldDefinitionId)
+
+  if (!held?.referencedEntityId || candidates.some((one) => one.id === held.referencedEntityId)) {
+    return null
+  }
+
+  const name = held.referencedEntityName ?? 'Unavailable'
+
+  return {
+    id: held.referencedEntityId,
+    label: held.referencedEntityIsTrashed ? `${name} (in Trash)` : name,
+  }
 }
 
 function renderFact(value: {
@@ -577,6 +619,7 @@ function renderFact(value: {
   date: string | null
   optionValues: string[]
   referencedEntityName: string | null
+  referencedEntityIsTrashed: boolean
 }) {
   switch (value.kind) {
     case FieldKind.ShortText:
@@ -592,7 +635,12 @@ function renderFact(value: {
     case FieldKind.MultiSelect:
       return value.optionValues.length > 0 ? value.optionValues.join(', ') : '—'
     case FieldKind.EntityReference:
-      return value.referencedEntityName ?? '—'
+      if (value.referencedEntityName === null) return '—'
+      // Named, not hidden: the entry is still there and still connected, it is simply in the
+      // Trash. Saying so is what stops the author reading it as lore that has gone missing.
+      return value.referencedEntityIsTrashed
+        ? `${value.referencedEntityName} (in Trash)`
+        : value.referencedEntityName
     default:
       return '—'
   }

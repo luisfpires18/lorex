@@ -9,11 +9,27 @@ interface FieldInputProps {
   definition: FieldDefinition
   value: FieldValueInput
   candidates: EntitySummary[]
+
+  /**
+   * The reference this field already holds, when it is not among `candidates` - because the
+   * entry it names is in the Trash, or simply beyond the first page the picker loaded.
+   *
+   * It is offered as a disabled option carrying the stored id, so the select shows what is
+   * really there and a save round-trips it. Without this the control would read "Not set" and
+   * saving an unrelated field would quietly destroy the reference.
+   */
+  retainedReference?: { id: string; label: string } | null
   onChange: (next: FieldValueInput) => void
 }
 
 /** Renders the one control the field's kind calls for. */
-export function FieldInput({ definition, value, candidates, onChange }: FieldInputProps) {
+export function FieldInput({
+  definition,
+  value,
+  candidates,
+  retainedReference,
+  onChange,
+}: FieldInputProps) {
   const id = `field-${definition.id}`
   const label = definition.isRequired ? `${definition.name} (required)` : definition.name
 
@@ -131,6 +147,11 @@ export function FieldInput({ definition, value, candidates, onChange }: FieldInp
           onChange={(event) => patch({ referencedEntityId: event.target.value || null })}
         >
           <option value="">Not set</option>
+          {retainedReference ? (
+            <option value={retainedReference.id} disabled>
+              {retainedReference.label}
+            </option>
+          ) : null}
           {candidates.map((candidate) => (
             <option key={candidate.id} value={candidate.id}>
               {candidate.name}

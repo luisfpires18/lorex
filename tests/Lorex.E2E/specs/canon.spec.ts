@@ -684,11 +684,11 @@ test.describe('canon integrity', () => {
     await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
     await expect(page.getByTestId('entry-name')).toHaveText('Sela')
 
-    // Delete the entry the finding rests on. The conflict closes, and the subject it can
-    // no longer resolve is said plainly rather than linked into nothing.
+    // Remove the entry the finding rests on. The conflict closes, and the subject is said
+    // plainly rather than linked into nothing: it is in the Trash, so it has no page to open.
     page.once('dialog', (dialog) => void dialog.accept())
-    await page.getByRole('button', { name: 'Delete' }).click()
-    await page.waitForURL(/\/lore$/)
+    await page.getByTestId('trash-entity').click()
+    await page.waitForURL(/\/trash$/)
 
     await openCanon(page, universeId)
     await showStatus(page, Status.resolved)

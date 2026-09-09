@@ -20,7 +20,7 @@ const stampFormatter = new Intl.DateTimeFormat(undefined, {
 
 /**
  * Formats an API timestamp down to the minute, for the places where two entries on the
- * same day have to be told apart - a document history, and nothing else so far.
+ * same day have to be told apart - a document history, and the Trash.
  */
 export function formatDateTime(iso: string) {
   const parsed = new Date(iso)

@@ -65,6 +65,13 @@ export interface TimelineEntityLink {
   entityTypeIcon: string | null
   entityTypeAccentColor: string | null
   canonStatus: CanonStatusValue
+
+  /**
+   * The participant is in the Trash. Still reported, because the form posts a moment's whole
+   * participant set back on every save and dropping it here would delete the participation.
+   * Shown as unavailable and not linked; it becomes ordinary again when the entry is restored.
+   */
+  isTrashed: boolean
 }
 
 export interface TimelineEntry {

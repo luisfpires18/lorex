@@ -148,6 +148,11 @@ export default function UniverseWorkspace() {
               Types
             </NavLink>
           </li>
+          <li>
+            <NavLink to="trash" className="sidebar__link" data-testid="workspace-trash">
+              Trash
+            </NavLink>
+          </li>
           {PLANNED.map((label) => (
             <li key={label}>
               <span className="sidebar__link sidebar__link--planned" aria-disabled="true">
