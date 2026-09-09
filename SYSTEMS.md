@@ -80,6 +80,9 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/CanonIntegrity/CanonRuleText.cs` | Shared wording and length fitting for rule titles and explanations. |
 | `Features/CanonIntegrity/Rules/` | The six production rules: three structural, three chronological. |
 | `Features/CanonIntegrity/Rules/CanonLifespan.cs` | Reads declared birth/death years and the moments comparable to them. |
+| `Features/Export/UniverseBackup.cs` | The backup format, as records. The contract a future import reads. |
+| `Features/Export/UniverseBackupBuilder.cs` | Reads one universe in a single transaction and orders every collection. |
+| `Features/Export/UniverseExportEndpoints.cs` | The export route, the download filename, and how a backup is written. |
 | `appsettings.json` | Non-secret defaults; empty connection string. |
 | `appsettings.Development.json` | Dev connection string and CORS origins. |
 
@@ -94,6 +97,7 @@ Repository index. Paths and one-line responsibilities only.
 | `src/auth/` | Session context, `useAuth`, and the route guards. |
 | `src/universes/` | Universe API client and types. |
 | `src/lore/` | Lore API client, shared types, document and field helpers, and the revision client. |
+| `src/export/` | Backup download: the request, the server's filename, and handing the blob to the browser. |
 | `src/relationships/` | Relationship API client, DTO types, and both-readings helper. |
 | `src/timeline/` | Timeline API client, DTO types, date formatting and year grouping. |
 | `src/canon/` | Canon Integrity API client, DTO types, and the reader for the promotion gate's 409. |
@@ -117,6 +121,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.Api.Tests/CanonIntegrityEndpointTests.cs` | Conflict lifecycle, fingerprinting, the structural rules, filters and ownership. |
 | `Lorex.Api.Tests/CanonChronologyRuleTests.cs` | Semantic field assignment, the three chronology rules and every case they must stay quiet on. |
 | `Lorex.Api.Tests/CanonPromotionGateTests.cs` | What the gate refuses, what a refusal leaves behind, and what it must never block. |
+| `Lorex.Api.Tests/UniverseExportTests.cs` | What a backup holds, what it must never hold, its coherence and its determinism. |
 | `Lorex.E2E/playwright.config.ts` | Starts API + web, runs Chromium. |
 | `Lorex.E2E/specs/smoke.spec.ts` | Frontend-loads smoke suite. |
 | `Lorex.E2E/specs/auth.spec.ts` | Register, sign out, guard, sign back in. |
@@ -125,6 +130,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.E2E/specs/relationships.spec.ts` | Both readings, relation kinds, refusals, and the universe and owner boundaries. |
 | `Lorex.E2E/specs/timeline.spec.ts` | Date kinds through the drawer, order, filters, paging, refusals, and the owner boundary. |
 | `Lorex.E2E/specs/history.spec.ts` | One journey: versions accumulate, an old one is read in place and put back. |
+| `Lorex.E2E/specs/export.spec.ts` | One journey: the click produces a real file on disk, named and readable. |
 | `Lorex.E2E/specs/canon.spec.ts` | The review screen, conflict identity across runs, the promotion gate's refusals, reconciliation on write, and the universe and owner boundaries. |
 
 ## `scripts`
