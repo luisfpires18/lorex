@@ -208,13 +208,24 @@ export default function EntityPage() {
     }
   }, [draft, selectedType, isNew, universe.id, entityId, navigate])
 
+  /**
+   * The one-click promotion, which saves on the spot rather than through the editor.
+   *
+   * It is a gated write like any other, so a refusal has to read as one: the same notice
+   * the edit form shows, and the step the author had before, because nothing moved. The
+   * optimistic step is rolled back on any failure - leaving it pressed would claim a
+   * status the server refused.
+   */
   async function changeCanon(next: CanonStatusValue) {
     if (!draft) return
+    const previous = draft.canonStatus
     const updated = { ...draft, canonStatus: next }
     setDraft(updated)
 
     if (isNew || isEditing) return
 
+    setMessage(null)
+    setBlocked(null)
     setIsSaving(true)
     try {
       const definitions = selectedType?.fields ?? []
@@ -232,8 +243,15 @@ export default function EntityPage() {
       })
       setDetail(saved)
       setDraft(draftFromDetail(saved))
-    } catch {
-      setMessage('The status could not be changed.')
+    } catch (error: unknown) {
+      setDraft({ ...updated, canonStatus: previous })
+
+      const blocking = blockingFindingsOf(error)
+      if (blocking) {
+        setBlocked(blocking)
+      } else {
+        setMessage('The status could not be changed.')
+      }
     } finally {
       setIsSaving(false)
     }
