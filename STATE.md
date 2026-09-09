@@ -5,18 +5,19 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 
 ## Roadmap position
 
-- Phases 001-018 done and merged. Sequence log: `docs/architecture/branching.md`.
+- Phases 001-019 done and merged. Sequence log: `docs/architecture/branching.md`.
 - **Phase 018** (Export / Backup) merged into `dev`. `GET /api/universes/{id}/export` hands the
   owner one versioned JSON file holding the universe's authored data, read in a single
   transaction with every collection ordered in memory so unchanged lore exports byte-identical
   payloads. What is in a backup and what is deliberately rebuilt instead: ADR 0014. Export
   only - nothing reads a backup back in, and the Settings screen says so.
-- **Phase 019** (Trash / Recovery) built on `feat/019/trash-recovery`. **Not merged, not
-  pushed.** `DELETE` on an entry now sets `DeletedAt` instead of removing the row, so nothing
-  that pointed at it is destroyed; `GET /api/universes/{id}/trash` lists what was thrown away
-  and `POST .../trash/{entityId}/restore` puts one back under the promotion gate. Entries are
-  the only trashable thing. Semantics: ADR 0015. The backup format is at version 2 because a
-  backup now carries the Trash - ADR 0014 argues the bump.
+- **Phase 019** (Trash / Recovery) merged into `dev`. `DELETE` on an entry sets `DeletedAt`
+  instead of removing the row, so nothing that pointed at it is destroyed;
+  `GET /api/universes/{id}/trash` lists what was thrown away and
+  `POST .../trash/{entityId}/restore` puts one back under the promotion gate. Entries are the
+  only trashable thing. Semantics: ADR 0015. The backup format is at version 2 because a backup
+  now carries the Trash - ADR 0014 argues the bump.
+- **Now: Phase 020 - Full-Text Search.** Not started; no branch yet.
 
 ## Baseline
 

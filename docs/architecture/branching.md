@@ -59,8 +59,9 @@ docs/007/architecture-update
 | 016 | `test/016/canon-integrity-hardening` | merged into `dev` |
 | 017 | `feat/017/revision-history` | merged into `dev` |
 | 018 | `feat/018/export-backup` | merged into `dev` |
+| 019 | `feat/019/trash-recovery` | merged into `dev` |
 
-Next free number: `019`.
+Next free number: `020`.
 
 ## Rules for automation
 
