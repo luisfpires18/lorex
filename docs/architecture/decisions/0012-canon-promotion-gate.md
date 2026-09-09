@@ -35,10 +35,21 @@ identity of a problem across runs. Around each gated write:
 A count would not do. Comparing counts lets a write swap one contradiction for another
 without either being noticed, and a fingerprint set does not.
 
-**Only detection runs, never reconciliation.** The gate calls the rules and stops there.
-Nothing is opened, resolved, reopened or refreshed on the way to a refusal, so the recorded
-conflicts - the author's dismissals included - are exactly as they were. Evaluation stays
-the only thing that writes to the conflict table, and it stays explicitly triggered.
+**Nothing is reconciled until the candidate is accepted.** On the way to a refusal the gate
+only detects: nothing is opened, resolved, reopened or refreshed, so the recorded conflicts -
+the author's dismissals included - are exactly as they were. A rejection cannot leak a
+statement about lore that no longer exists.
+
+**An accepted candidate is reconciled, inside the same transaction.** It is the lore now, so
+the conflict table has to describe it. The findings collected to make the decision are the
+accepted state, so they are reconciled directly rather than gathered a third time - which
+also removes any chance of the table describing lore re-read a moment later. The evaluator's
+reconciliation is split into `ReconcileAsync(universeId, findings)`, and `EvaluateAsync` is
+now detect-then-reconcile over the same method, so `POST /evaluate` and a gated write share
+one implementation and every lifecycle rule in ADR 0010 holds unchanged in both.
+
+Reconciliation happens before the commit, not after it. Lore and conflicts are one
+transaction: they land together or neither lands.
 
 **The candidate is applied for real and rolled back.** The rules read the database, not the
 change tracker, so there is no way to ask them about lore that exists only in memory. A
@@ -79,9 +90,13 @@ Everything in the payload is inside the universe the caller has already proved t
   could reach one refuses. The only way one exists is lore settled before this phase, which
   is precisely the case the gate is built to tolerate - and it is how the rule tests now
   seed their fixtures, since they are about detection rather than about the gate.
-- A gated write costs two rule sweeps. They are the same queries evaluation already runs
-  over one universe, and the ungated paths above are ungated partly to keep that off the
-  cheap routes.
+- A gated write costs two rule sweeps and, when accepted, a reconciliation. They are the
+  same queries and writes `POST /evaluate` already performs over one universe, and the
+  ungated paths above are ungated partly to keep that off the cheap routes.
+- The conflict list is now current for everything that goes through a gated route, rather
+  than as stale as the last explicit evaluation. `POST /evaluate` remains, and is still the
+  only way to refresh after a change made through an ungated route - a delete, a
+  relationship write - or to lore altered outside the API.
 - Entity update's own delete-then-insert transaction joins the gate's rather than nesting,
   which SQLite does not support. Run ungated it still opens its own.
 - Nothing is gated by *asking* for it. A route is gated because its handler is wrapped, so

@@ -233,8 +233,13 @@ public sealed class CanonPromotionGateTests(LorexApiFactory factory) : IClassFix
         Assert.Equal("Still being worked out.", (await Entity(client, universe.Id, broken.Id)).Summary);
     }
 
+    /// <summary>
+    /// A Medium finding does not block, and the accepted write records it there and then. No
+    /// <c>POST /evaluate</c> is called anywhere in this test: an accepted write reconciles, so
+    /// the conflict table describes the lore that was just committed.
+    /// </summary>
     [Fact]
-    public async Task A_medium_finding_never_blocks_a_write()
+    public async Task A_medium_finding_never_blocks_a_write_and_is_recorded_by_it()
     {
         var (client, universe) = await SignedInWithUniverse("gatemedium");
         var draft = await CreateEntity(client, universe.Id, "A Rumoured Figure", CanonStatus.Draft);
@@ -245,10 +250,141 @@ public sealed class CanonPromotionGateTests(LorexApiFactory factory) : IClassFix
             client, universe.Id, "The Council", startYear: 3018, participants: [draft.Id]);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        await Evaluate(client, universe.Id);
         var conflict = Assert.Single((await List(client, universe.Id)).Items);
         Assert.Equal("CANON-TIME-001", conflict.RuleCode);
         Assert.Equal(CanonConflictSeverity.Medium, conflict.Severity);
+        Assert.Equal(CanonConflictStatus.Pending, conflict.Status);
+
+        // The write did the whole job, so an explicit evaluation has nothing left to do.
+        var summary = await Evaluate(client, universe.Id);
+        Assert.Equal(1, summary.Detected);
+        Assert.Equal(0, summary.Created);
+        Assert.Equal(1, summary.Persisted);
+        Assert.Equal(conflict.UpdatedAt, Assert.Single((await List(client, universe.Id)).Items).UpdatedAt);
+    }
+
+    /// <summary>
+    /// The other direction, and the same rule: a write that removes the offending fact resolves
+    /// the conflict about it on the spot, following the lifecycle ADR 0010 already fixed.
+    /// </summary>
+    [Fact]
+    public async Task A_write_that_fixes_an_issue_resolves_its_conflict_on_the_spot()
+    {
+        var (client, universe) = await SignedInWithUniverse("gatefix");
+        var draft = await CreateEntity(client, universe.Id, "A Rumoured Figure", CanonStatus.Draft);
+        await Moment(
+            client, universe.Id, "The Council", 3018, [draft.Id], CanonStatus.Canon);
+
+        var opened = Assert.Single((await List(client, universe.Id)).Items);
+        Assert.Equal(CanonConflictStatus.Pending, opened.Status);
+
+        var promote = await Put(client, universe.Id, draft with { CanonStatus = CanonStatus.Canon }, []);
+        Assert.Equal(HttpStatusCode.OK, promote.StatusCode);
+
+        var resolved = Assert.Single((await List(client, universe.Id)).Items);
+        Assert.Equal(opened.Id, resolved.Id);
+        Assert.Equal(CanonConflictStatus.Resolved, resolved.Status);
+        Assert.NotNull(resolved.ResolvedAt);
+    }
+
+    /// <summary>
+    /// A dismissal is the one piece of state on a conflict the author owns, and reconciling on
+    /// every write must not spend it. The issue is still there, so the conflict is left exactly
+    /// alone - not reopened, and not even touched.
+    /// </summary>
+    [Fact]
+    public async Task A_dismissed_finding_that_is_still_there_survives_a_successful_write()
+    {
+        var (client, universe) = await SignedInWithUniverse("gatedismissed");
+        var draft = await CreateEntity(client, universe.Id, "A Rumoured Figure", CanonStatus.Draft);
+        await Moment(client, universe.Id, "The Council", 3018, [draft.Id], CanonStatus.Canon);
+
+        var conflict = Assert.Single((await List(client, universe.Id)).Items);
+        await Dismiss(client, universe.Id, conflict.Id);
+        var dismissed = Assert.Single((await List(client, universe.Id)).Items);
+
+        // A successful, unrelated, gated write. It reconciles, and the finding it reconciles
+        // over is unchanged.
+        var response = await client.PostAsJsonAsync(
+            $"/api/universes/{universe.Id}/entities",
+            new EntityRequest(
+                draft.EntityTypeId, "Someone Else", null, null, CanonStatus.Canon, null, null, null));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var after = Assert.Single((await List(client, universe.Id)).Items);
+        Assert.Equal(dismissed.Id, after.Id);
+        Assert.Equal(CanonConflictStatus.Dismissed, after.Status);
+        Assert.Null(after.ResolvedAt);
+        Assert.Equal(dismissed.UpdatedAt, after.UpdatedAt);
+    }
+
+    /// <summary>
+    /// Lore and conflicts move in one step. This write does two lifecycle things at once -
+    /// the old participant's finding disappears and a new one takes its place - and both are
+    /// true the moment the response comes back, with the lore that caused them. There is no
+    /// window in which the entry has been redirected and the conflicts still describe the
+    /// participant it used to have.
+    /// </summary>
+    [Fact]
+    public async Task One_write_moves_the_lore_and_its_conflicts_together()
+    {
+        var (client, universe) = await SignedInWithUniverse("gateatomicaccept");
+        var first = await CreateEntity(client, universe.Id, "A Rumoured Figure", CanonStatus.Draft);
+        var second = await CreateEntity(client, universe.Id, "Another Rumour", CanonStatus.Draft);
+
+        var moment = await Moment(client, universe.Id, "The Council", 3018, [first.Id], CanonStatus.Canon);
+        var opened = Assert.Single((await List(client, universe.Id)).Items);
+
+        var response = await PutMoment(
+            client, universe.Id, moment.Id, "The Council", 3018, [second.Id], CanonStatus.Canon);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var conflicts = (await List(client, universe.Id)).Items;
+        Assert.Equal(2, conflicts.Count);
+
+        var gone = Assert.Single(conflicts, conflict => conflict.Id == opened.Id);
+        Assert.Equal(CanonConflictStatus.Resolved, gone.Status);
+        Assert.NotNull(gone.ResolvedAt);
+
+        var raised = Assert.Single(conflicts, conflict => conflict.Id != opened.Id);
+        Assert.Equal(CanonConflictStatus.Pending, raised.Status);
+        Assert.Equal("CANON-TIME-001", raised.RuleCode);
+        Assert.Contains(
+            raised.Subjects,
+            subject => subject.Kind == CanonSubjectKind.Entity && subject.SubjectId == second.Id);
+
+        // And the lore that both statements are about is the committed lore.
+        var stored = (await client.GetFromJsonAsync<TimelineEntryResponse>(
+            $"/api/universes/{universe.Id}/timeline/{moment.Id}"))!;
+        Assert.Equal(second.Id, Assert.Single(stored.Entities).EntityId);
+    }
+
+    /// <summary>
+    /// The mirror of the above. A rejected write reconciles nothing at all, so a conflict that
+    /// has nothing to do with the refusal is not refreshed, resolved or reopened by it, and the
+    /// finding that caused the refusal is never recorded.
+    /// </summary>
+    [Fact]
+    public async Task A_rejected_write_records_nothing_and_touches_nothing()
+    {
+        var (client, universe) = await SignedInWithUniverse("gatenoleak");
+        var fields = await LifespanFields(client, universe.Id);
+        var draft = await CreateEntity(client, universe.Id, "A Rumoured Figure", CanonStatus.Draft);
+        await Moment(client, universe.Id, "The Council", 3018, [draft.Id], CanonStatus.Canon);
+
+        var medium = Assert.Single((await List(client, universe.Id)).Items);
+        Assert.Equal("CANON-TIME-001", medium.RuleCode);
+
+        var settled = await Character(client, universe.Id, "Gil-galad", fields, birth: 3300, death: null);
+        var response = await Put(client, universe.Id, settled, Years(fields, 3300, 3200));
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        // Still exactly one conflict, still the Medium one, still untouched: no row was opened
+        // for the High finding that caused the refusal.
+        var after = Assert.Single((await List(client, universe.Id)).Items);
+        Assert.Equal(medium.Id, after.Id);
+        Assert.Equal(medium.Status, after.Status);
+        Assert.Equal(medium.UpdatedAt, after.UpdatedAt);
     }
 
     [Fact]

@@ -27,9 +27,16 @@ namespace Lorex.Api.Features.CanonIntegrity;
 /// database, not the change tracker, so there is no way to ask them about lore that has only
 /// been staged in memory. The write is therefore applied for real inside a transaction that is
 /// rolled back when the answer comes back bad, which is what makes a refusal atomic from the
-/// caller's side: the lore is exactly as it was, and - because this class only ever calls
-/// detection - the recorded conflicts are untouched too. A rejected candidate reconciles
-/// nothing, so nothing is opened, resolved or reopened on its way out.
+/// caller's side: the lore is exactly as it was, and the recorded conflicts are untouched too,
+/// because detection is all that runs before the decision. A rejected candidate opens,
+/// resolves and reopens nothing on its way out.
+///
+/// An accepted candidate is the opposite case and needs the opposite treatment. It is the lore
+/// now, so the conflict table has to describe it: the candidate findings - already in hand, and
+/// not gathered again - are reconciled through the ordinary evaluator, inside the same
+/// transaction, before the commit. Lore and conflicts therefore move together or not at all,
+/// and every lifecycle rule stays exactly where it was written, because this is the same
+/// reconciliation <c>POST /evaluate</c> runs.
 /// </summary>
 public sealed class CanonPromotionGate(LorexDbContext db, CanonIntegrityEvaluator evaluator)
 {
@@ -65,13 +72,21 @@ public sealed class CanonPromotionGate(LorexDbContext db, CanonIntegrityEvaluato
             return result;
         }
 
-        var introduced = await IntroducedAsync(universeId, baseline, cancellationToken);
+        var candidate = await evaluator.DetectAsync(universeId, cancellationToken);
+        var introduced = Introduced(candidate, baseline);
 
         if (introduced.Count > 0)
         {
             await AbandonAsync(transaction, cancellationToken);
             return Blocked(introduced);
         }
+
+        // Accepted, so the candidate is simply the lore now, and these findings describe it.
+        // Reconciling here rather than after the commit is what makes the conflict table and
+        // the lore move together: they are one transaction, and a failure in either takes both
+        // back. Reconciling any earlier would record conflicts about a candidate that might
+        // still be rolled back.
+        await evaluator.ReconcileAsync(universeId, candidate, cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
         return result;
@@ -99,16 +114,13 @@ public sealed class CanonPromotionGate(LorexDbContext db, CanonIntegrityEvaluato
     /// Every High finding the candidate added, in a fixed order so the same rejection reads the
     /// same way on every run.
     /// </summary>
-    private async Task<IReadOnlyList<CanonFinding>> IntroducedAsync(
-        Guid universeId,
-        HashSet<string> baseline,
-        CancellationToken cancellationToken)
+    private static IReadOnlyList<CanonFinding> Introduced(
+        Dictionary<string, CanonFinding> candidate,
+        HashSet<string> baseline)
     {
-        var findings = await evaluator.DetectAsync(universeId, cancellationToken);
-
         return
         [
-            .. findings.Values
+            .. candidate.Values
                 .Where(finding => finding.Severity == CanonConflictSeverity.High
                     && !baseline.Contains(finding.Fingerprint))
                 .OrderBy(finding => finding.RuleCode, StringComparer.Ordinal)

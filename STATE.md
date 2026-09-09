@@ -34,8 +34,13 @@ that gives High severity teeth. No UI.
 - Promotion gate: a write is refused when it introduces a High **fingerprint** that was not
   already there - never because the universe contains one. `CanonPromotionGate` opens a
   transaction, collects the baseline High fingerprints, applies the candidate, collects them
-  again, and rolls back on any addition. Only detection runs, so a rejected candidate leaves
-  the lore and the recorded conflicts - dismissals included - untouched. The refusal is 409
+  again, and rolls back on any addition. Nothing is reconciled before that decision, so a
+  rejected candidate leaves the lore and the recorded conflicts - dismissals included -
+  untouched. An accepted candidate **is** reconciled, from the findings already in hand and
+  inside the same transaction, so lore and conflicts commit together and the table describes
+  the lore that was actually stored. `CanonIntegrityEvaluator.ReconcileAsync` is the shared
+  half: `POST /evaluate` is detect-then-reconcile over the same method, so every lifecycle
+  rule holds identically on both paths. The refusal is 409
   ProblemDetails plus `code: "canon_promotion_blocked"` and a `blockingFindings` array (rule
   code, severity, fingerprint, title, explanation, subject ids). Low and Medium never block.
   Gated: entity create/update, timeline create/update, field-definition update (where meaning
@@ -101,11 +106,13 @@ that gives High severity teeth. No UI.
   **No Canon Integrity UI exists yet.**
 - Universes: create, read, update, archive, unarchive, delete once archived.
 - Auth: ASP.NET Core Identity with a cookie session.
-- Tests: 234 API integration tests (88 for Canon Integrity), 38 Playwright tests. The gate
+- Tests: 238 API integration tests (92 for Canon Integrity), 38 Playwright tests. The gate
   half proves an existing High blocks nothing, each of the three High rules blocks the write
-  that introduces it, a refusal leaves lore and conflict lifecycle untouched, Medium never
-  blocks, the entity/timeline/semantic paths are gated, relationships stay usable, and the
-  ownership boundary is unchanged. The
+  that introduces it, a refusal leaves lore and conflict lifecycle untouched and records
+  nothing, Medium never blocks and is recorded by the write that causes it, a fixing write
+  resolves on the spot, a dismissal survives an unrelated write, one write moves lore and
+  both conflict transitions together, the entity/timeline/semantic paths are gated,
+  relationships stay usable, and the ownership boundary is unchanged. The
   structural half covers detection, each rule, idempotence, a rename refreshing rather than
   duplicating, a fingerprint change on materially different facts, the whole lifecycle, both
   filters, deterministic paging and the ownership boundaries. The chronology half adds
@@ -125,8 +132,9 @@ Phase 014 complete on `feat/014/canon-promotion-gates`, branched from `dev`. **N
 not pushed.** Backend only. Release build clean, 234/234 API tests green, no schema change -
 `has-pending-model-changes` reports none, so no tenth migration.
 
-Detection is still explicit: nothing evaluates on write. The gate detects without recording,
-so a conflict list is still as fresh as the last `POST /evaluate` and no more.
+Gated writes now reconcile, so the conflict list is current for anything authored through
+entity, timeline or field-definition routes. `POST /evaluate` is still needed after an
+ungated change - a delete, a relationship write - or lore altered outside the API.
 
 Rules deliberately left out. **Exclusive relationship overlap**: `RelationshipType` has a
 forward name, an inverse name and a symmetric flag, and `LoreRelationship` carries no
@@ -206,8 +214,10 @@ asked.
 - An age rule needs a structured way to say **when** an age was true - a reference year on
   the fact, or an age recorded against a timeline entry. Until one exists, `Age` is a
   meaning Lorex records and reasons about nothing.
-- Evaluation only runs when asked. Nothing triggers it on write, so a conflict list is as
-  fresh as the last evaluation and no more.
+- Evaluation runs on gated writes and on request. The ungated routes - every delete, every
+  relationship write - still trigger nothing, so a conflict list can lag those until the next
+  `POST /evaluate`. A delete only removes findings, so what lags there is a stale Pending row
+  rather than a missing one.
 
 ## Blockers
 

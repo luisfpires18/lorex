@@ -160,16 +160,20 @@ public sealed class CanonIntegrityEndpointTests(LorexApiFactory factory) : IClas
         await Evaluate(client, universe.Id);
         var opened = Assert.Single((await List(client, universe.Id)).Items);
 
+        // The write itself reconciles, so the conflict is already Resolved before anything
+        // asks for an evaluation.
         await SetStatus(client, universe.Id, target, CanonStatus.Canon);
-        var summary = await Evaluate(client, universe.Id);
-
-        Assert.Equal(0, summary.Detected);
-        Assert.Equal(1, summary.Resolved);
 
         var resolved = Assert.Single((await List(client, universe.Id)).Items);
         Assert.Equal(opened.Id, resolved.Id);
         Assert.Equal(CanonConflictStatus.Resolved, resolved.Status);
         Assert.NotNull(resolved.ResolvedAt);
+
+        // And an explicit evaluation afterwards has nothing left to find or to change.
+        var summary = await Evaluate(client, universe.Id);
+        Assert.Equal(0, summary.Detected);
+        Assert.Equal(0, summary.Resolved);
+        Assert.Equal(resolved.UpdatedAt, Assert.Single((await List(client, universe.Id)).Items).UpdatedAt);
     }
 
     [Fact]
@@ -182,18 +186,21 @@ public sealed class CanonIntegrityEndpointTests(LorexApiFactory factory) : IClas
         var opened = Assert.Single((await List(client, universe.Id)).Items);
 
         var promoted = await SetStatus(client, universe.Id, target, CanonStatus.Canon);
-        await Evaluate(client, universe.Id);
+        Assert.Equal(
+            CanonConflictStatus.Resolved,
+            Assert.Single((await List(client, universe.Id)).Items).Status);
 
         await SetStatus(client, universe.Id, promoted, CanonStatus.Draft);
-        var summary = await Evaluate(client, universe.Id);
-
-        Assert.Equal(1, summary.Reopened);
-        Assert.Equal(0, summary.Created);
 
         var reopened = Assert.Single((await List(client, universe.Id)).Items);
         Assert.Equal(opened.Id, reopened.Id);
         Assert.Equal(CanonConflictStatus.Pending, reopened.Status);
         Assert.Null(reopened.ResolvedAt);
+
+        var summary = await Evaluate(client, universe.Id);
+        Assert.Equal(1, summary.Detected);
+        Assert.Equal(0, summary.Created);
+        Assert.Equal(0, summary.Reopened);
     }
 
     [Fact]
@@ -233,17 +240,18 @@ public sealed class CanonIntegrityEndpointTests(LorexApiFactory factory) : IClas
         await Dismiss(client, universe.Id, conflict.Id);
 
         // A dismissal suppresses an issue that is still there. Once it is gone there is
-        // nothing left to suppress, so the conflict resolves like any other.
+        // nothing left to suppress, so the conflict resolves like any other - on the write
+        // that fixed it, not on some later evaluation.
         await SetStatus(client, universe.Id, target, CanonStatus.Canon);
-        var summary = await Evaluate(client, universe.Id);
-
-        Assert.Equal(0, summary.Detected);
-        Assert.Equal(1, summary.Resolved);
 
         var resolved = Assert.Single((await List(client, universe.Id)).Items);
         Assert.Equal(conflict.Id, resolved.Id);
         Assert.Equal(CanonConflictStatus.Resolved, resolved.Status);
         Assert.NotNull(resolved.ResolvedAt);
+
+        var summary = await Evaluate(client, universe.Id);
+        Assert.Equal(0, summary.Detected);
+        Assert.Equal(0, summary.Resolved);
     }
 
     [Fact]
@@ -257,14 +265,12 @@ public sealed class CanonIntegrityEndpointTests(LorexApiFactory factory) : IClas
         await Dismiss(client, universe.Id, conflict.Id);
 
         var promoted = await SetStatus(client, universe.Id, target, CanonStatus.Canon);
-        await Evaluate(client, universe.Id);
+        Assert.Equal(
+            CanonConflictStatus.Resolved,
+            Assert.Single((await List(client, universe.Id)).Items).Status);
 
         // The old dismissal was about the old occurrence. It must not swallow this one.
         await SetStatus(client, universe.Id, promoted, CanonStatus.Draft);
-        var summary = await Evaluate(client, universe.Id);
-
-        Assert.Equal(1, summary.Reopened);
-        Assert.Equal(0, summary.Created);
 
         var reopened = Assert.Single((await List(client, universe.Id)).Items);
         Assert.Equal(conflict.Id, reopened.Id);

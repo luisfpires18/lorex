@@ -31,10 +31,25 @@ public sealed class CanonIntegrityEvaluator(LorexDbContext db, IEnumerable<ICano
 {
     public async Task<CanonEvaluationSummary> EvaluateAsync(
         Guid universeId,
+        CancellationToken cancellationToken) =>
+        await ReconcileAsync(universeId, await DetectAsync(universeId, cancellationToken), cancellationToken);
+
+    /// <summary>
+    /// The recording half, over findings someone else has already collected.
+    ///
+    /// Split out for <see cref="CanonPromotionGate"/>, which has to know what the rules say
+    /// about a candidate <em>before</em> it decides whether to keep it. Once it decides to
+    /// keep it, those same findings are the accepted state of the universe and are reconciled
+    /// here rather than gathered a third time - which also guarantees the conflict table
+    /// describes exactly the lore that was committed, not lore re-read a moment later.
+    ///
+    /// The caller owns the transaction. Nothing here opens one.
+    /// </summary>
+    public async Task<CanonEvaluationSummary> ReconcileAsync(
+        Guid universeId,
+        Dictionary<string, CanonFinding> findings,
         CancellationToken cancellationToken)
     {
-        var findings = await DetectAsync(universeId, cancellationToken);
-
         var existing = await db.CanonConflicts
             .Include(conflict => conflict.Subjects)
             .Where(conflict => conflict.UniverseId == universeId)
