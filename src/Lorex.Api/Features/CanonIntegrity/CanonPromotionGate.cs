@@ -93,6 +93,49 @@ public sealed class CanonPromotionGate(LorexDbContext db, CanonIntegrityEvaluato
     }
 
     /// <summary>
+    /// The same transaction and the same reconciliation as <see cref="RunAsync"/>, without the
+    /// gate.
+    ///
+    /// Gating and reconciling are separate needs and the routes that want them are not the same
+    /// set. A write is gated only where it can introduce a High finding; it needs reconciling
+    /// wherever it changes anything a rule reads, High or not. A Canon relationship pointed at a
+    /// draft entity can never be worse than Medium, so there is nothing to refuse - but it is a
+    /// real finding and the conflict table has to say so as soon as the write lands. Likewise a
+    /// delete, which can only ever take findings away and so has nothing to refuse either, but
+    /// leaves conflicts standing about lore that no longer exists.
+    ///
+    /// So this collects the findings once, after the write, and reconciles them. There is no
+    /// baseline and no comparison: nothing here can be refused, and paying for a second rule
+    /// sweep to prove that would be waste.
+    ///
+    /// Ownership is not checked here, exactly as in <see cref="RunAsync"/>. The caller proves it
+    /// before entering.
+    /// </summary>
+    public async Task<IResult> RecordAsync(
+        Guid universeId,
+        Func<CancellationToken, Task<IResult>> mutate,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        var result = await mutate(cancellationToken);
+
+        if (!Succeeded(result))
+        {
+            await AbandonAsync(transaction, cancellationToken);
+            return result;
+        }
+
+        await evaluator.ReconcileAsync(
+            universeId,
+            await evaluator.DetectAsync(universeId, cancellationToken),
+            cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
+
+    /// <summary>
     /// The High findings the universe already carries, as a set of fingerprints. Severity comes
     /// from the finding rather than from the recorded conflict, so a conflict the author
     /// dismissed still counts as pre-existing: dismissing is a statement about an issue that is

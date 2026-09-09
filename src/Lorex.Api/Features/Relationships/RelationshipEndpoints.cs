@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Lorex.Api.Data;
+using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Universes;
 using Microsoft.AspNetCore.Mvc;
@@ -13,15 +14,19 @@ namespace Lorex.Api.Features.Relationships;
 /// universe ownership first, then re-resolves every client id inside that universe, so no
 /// id crosses a universe boundary and nothing another owner holds is ever disclosed.
 ///
-/// None of these routes is behind the Canon promotion gate, and that is a conclusion rather
-/// than an omission. Of the six rules, only <c>CANON-REL-001</c> reads relationships at all,
-/// and it is Medium - a Canon link resting on a draft endpoint is a loose end, not an
-/// impossibility. The three High rules read declared years and Canon moments, neither of which
-/// a relationship can touch, so no relationship write can introduce a High finding. Gating
-/// them anyway would sweep the rules twice per write to prove an empty set every time. The
+/// These writes are reconciled but not gated, which is the distinction Phase 014 turns on.
+/// Only <c>CANON-REL-001</c> reads relationships, and it is Medium - a Canon link resting on a
+/// draft endpoint is a loose end, not an impossibility - while the three High rules read
+/// declared years and Canon moments, neither of which a relationship can touch. So no
+/// relationship write can introduce a High finding and there is nothing here to refuse;
+/// gating anyway would sweep the rules a second time per write to prove an empty set. The
 /// moment a High rule does read a relationship - exclusivity overlap is the obvious candidate,
-/// and it needs schema that does not exist yet - these routes get the same one-line wrapper
-/// the entity and timeline writes use.
+/// and it needs schema that does not exist yet - these routes swap <c>RecordAsync</c> for
+/// <c>RunAsync</c> and nothing else changes.
+///
+/// Reconciling is a separate question from gating, and the answer here is yes: a Medium
+/// finding is still a finding, and the conflict table has to describe the relationship that
+/// was just written rather than the one that was there before.
 /// </summary>
 public static class RelationshipEndpoints
 {
@@ -92,6 +97,7 @@ public static class RelationshipEndpoints
         [FromBody] RelationshipRequest request,
         ClaimsPrincipal principal,
         LorexDbContext db,
+        CanonPromotionGate canon,
         CancellationToken cancellationToken)
     {
         if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
@@ -99,6 +105,18 @@ public static class RelationshipEndpoints
             return Results.NotFound();
         }
 
+        return await canon.RecordAsync(
+            universeId,
+            token => CreateCoreAsync(universeId, request, db, token),
+            cancellationToken);
+    }
+
+    private static async Task<IResult> CreateCoreAsync(
+        Guid universeId,
+        RelationshipRequest request,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
         if (RelationshipValidation.ValidateRelationship(request) is { } errors)
         {
             return Results.ValidationProblem(errors);
@@ -140,6 +158,7 @@ public static class RelationshipEndpoints
         [FromBody] RelationshipRequest request,
         ClaimsPrincipal principal,
         LorexDbContext db,
+        CanonPromotionGate canon,
         CancellationToken cancellationToken)
     {
         if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
@@ -147,6 +166,19 @@ public static class RelationshipEndpoints
             return Results.NotFound();
         }
 
+        return await canon.RecordAsync(
+            universeId,
+            token => UpdateCoreAsync(universeId, relationshipId, request, db, token),
+            cancellationToken);
+    }
+
+    private static async Task<IResult> UpdateCoreAsync(
+        Guid universeId,
+        Guid relationshipId,
+        RelationshipRequest request,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
         var relationship = await db.Relationships.FirstOrDefaultAsync(
             candidate => candidate.Id == relationshipId && candidate.UniverseId == universeId,
             cancellationToken);
@@ -186,6 +218,7 @@ public static class RelationshipEndpoints
         Guid relationshipId,
         ClaimsPrincipal principal,
         LorexDbContext db,
+        CanonPromotionGate canon,
         CancellationToken cancellationToken)
     {
         if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
@@ -193,6 +226,18 @@ public static class RelationshipEndpoints
             return Results.NotFound();
         }
 
+        return await canon.RecordAsync(
+            universeId,
+            token => DeleteCoreAsync(universeId, relationshipId, db, token),
+            cancellationToken);
+    }
+
+    private static async Task<IResult> DeleteCoreAsync(
+        Guid universeId,
+        Guid relationshipId,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
         var relationship = await db.Relationships.FirstOrDefaultAsync(
             candidate => candidate.Id == relationshipId && candidate.UniverseId == universeId,
             cancellationToken);

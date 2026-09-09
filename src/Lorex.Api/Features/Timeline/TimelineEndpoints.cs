@@ -248,12 +248,16 @@ public static class TimelineEndpoints
         return Results.Ok(updated);
     }
 
-    /// <summary>Not gated: removing a moment removes the only findings it could contribute to.</summary>
+    /// <summary>
+    /// Reconciled but not gated: removing a moment removes the only findings it could
+    /// contribute to, so there is nothing to refuse and everything to resolve.
+    /// </summary>
     private static async Task<IResult> DeleteAsync(
         Guid universeId,
         Guid entryId,
         ClaimsPrincipal principal,
         LorexDbContext db,
+        CanonPromotionGate canon,
         CancellationToken cancellationToken)
     {
         if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
@@ -261,6 +265,18 @@ public static class TimelineEndpoints
             return Results.NotFound();
         }
 
+        return await canon.RecordAsync(
+            universeId,
+            token => DeleteCoreAsync(universeId, entryId, db, token),
+            cancellationToken);
+    }
+
+    private static async Task<IResult> DeleteCoreAsync(
+        Guid universeId,
+        Guid entryId,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
         var entry = await db.TimelineEntries.FirstOrDefaultAsync(
             candidate => candidate.Id == entryId && candidate.UniverseId == universeId,
             cancellationToken);

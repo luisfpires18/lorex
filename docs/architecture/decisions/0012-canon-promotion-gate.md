@@ -61,13 +61,23 @@ entity create and update - which is where Canon status, structured field values 
 therefore declared years are written - timeline create and update, and the field-definition
 update that declares what a field *means*.
 
-Not gated, each for a stated reason rather than by omission:
+**Gating and reconciling are separate questions with different answers.** A write is gated
+only where it can introduce a High finding. It is reconciled wherever it changes anything any
+rule reads, whatever the severity. So the gate has a second entry point, `RecordAsync`, which
+is the same transaction and the same `DetectAsync`/`ReconcileAsync` with no baseline and no
+comparison - there is nothing on those routes to refuse, and a second rule sweep to prove it
+would be waste.
 
-| Path | Why not |
-| --- | --- |
-| every delete | Every High rule reads facts a record contributes. Removing one can only take findings away. |
-| adding a field definition | A field that has just been created holds no values, so its declared meaning has nothing to read. |
-| all relationship writes | No High rule reads a relationship. `CANON-REL-001` does, and it is Medium. |
+Reconciled but not gated, each for a stated reason rather than by omission:
+
+| Path | Why not gated | Why still reconciled |
+| --- | --- | --- |
+| entity, timeline delete | Every rule reads facts a record contributes, so removing one only takes findings away. | A conflict about lore that no longer exists is worse than no conflict. |
+| relationship create, update, delete | No High rule reads a relationship. | `CANON-REL-001` does, and Medium findings are still findings. |
+
+Neither gated nor reconciled: adding a field definition, which holds no values yet, so its
+declared meaning has nothing to read. Deleting a type, field or option is refused outright
+while it holds authored data, so it cannot change a finding either.
 
 **Ownership is proved before the gate is entered**, so an unauthorised request answers the
 same empty 404 as before and never costs a rule sweep over lore that is not the caller's.
@@ -93,10 +103,13 @@ Everything in the payload is inside the universe the caller has already proved t
 - A gated write costs two rule sweeps and, when accepted, a reconciliation. They are the
   same queries and writes `POST /evaluate` already performs over one universe, and the
   ungated paths above are ungated partly to keep that off the cheap routes.
-- The conflict list is now current for everything that goes through a gated route, rather
-  than as stale as the last explicit evaluation. `POST /evaluate` remains, and is still the
-  only way to refresh after a change made through an ungated route - a delete, a
-  relationship write - or to lore altered outside the API.
+- The conflict list is current for every route that can change a finding, gated or not.
+  `POST /evaluate` remains for lore altered outside the API, for a rule set that has changed
+  between releases, and as the way to re-derive the whole table on demand.
+- One wording lag is left: `CANON-REL-001` quotes the relationship type's name, which is not
+  part of the fingerprint, so renaming a relation kind leaves that sentence stale until the
+  next evaluation. Cosmetic - no status, fingerprint or subject moves - and relationship-type
+  routes stay out of this for that reason.
 - Entity update's own delete-then-insert transaction joins the gate's rather than nesting,
   which SQLite does not support. Run ungated it still opens its own.
 - Nothing is gated by *asking* for it. A route is gated because its handler is wrapped, so

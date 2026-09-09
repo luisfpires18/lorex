@@ -552,6 +552,144 @@ public sealed class CanonPromotionGateTests(LorexApiFactory factory) : IClassFix
         Assert.Equal("CANON-LIFE-001", Assert.Single(high).RuleCode);
     }
 
+    // ---------- Reconciled without being gated ----------
+
+    /// <summary>
+    /// A relationship write can never be refused - no High rule reads one - and it is still a
+    /// write the rules care about. `CANON-REL-001` is Medium, so the relationship stands and
+    /// the conflict is recorded by the same request. No evaluation is asked for anywhere here.
+    /// </summary>
+    [Fact]
+    public async Task A_canon_relationship_onto_a_draft_records_its_medium_conflict_immediately()
+    {
+        var (client, universe) = await SignedInWithUniverse("recrel");
+        var settled = await CreateEntity(client, universe.Id, "Elrond", CanonStatus.Canon);
+        var draft = await CreateEntity(client, universe.Id, "A Rumoured Figure", CanonStatus.Draft);
+        var kind = await RelationshipType(client, universe.Id, "Knows", "Known by");
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/universes/{universe.Id}/relationships",
+            new RelationshipRequest(kind.Id, settled.Id, draft.Id, CanonStatus.Canon, null, null, null));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var conflict = Assert.Single((await List(client, universe.Id)).Items);
+        Assert.Equal("CANON-REL-001", conflict.RuleCode);
+        Assert.Equal(CanonConflictSeverity.Medium, conflict.Severity);
+        Assert.Equal(CanonConflictStatus.Pending, conflict.Status);
+        Assert.Contains(
+            conflict.Subjects,
+            subject => subject.Kind == CanonSubjectKind.Entity && subject.SubjectId == draft.Id);
+    }
+
+    /// <summary>
+    /// Both ways out of that conflict, each on the write that takes it: lowering the
+    /// relationship's own status, and removing the relationship altogether.
+    /// </summary>
+    [Fact]
+    public async Task Lowering_a_relationship_out_of_canon_resolves_its_conflict_immediately()
+    {
+        var (client, universe) = await SignedInWithUniverse("recrelfix");
+        var (relationship, kind, settled, draft) = await CanonRelationshipOntoDraft(client, universe.Id);
+        var opened = Assert.Single((await List(client, universe.Id)).Items);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/universes/{universe.Id}/relationships/{relationship.Id}",
+            new RelationshipRequest(kind.Id, settled.Id, draft.Id, CanonStatus.Draft, null, null, null));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var resolved = Assert.Single((await List(client, universe.Id)).Items);
+        Assert.Equal(opened.Id, resolved.Id);
+        Assert.Equal(CanonConflictStatus.Resolved, resolved.Status);
+        Assert.NotNull(resolved.ResolvedAt);
+    }
+
+    [Fact]
+    public async Task Deleting_a_relationship_resolves_its_conflict_immediately()
+    {
+        var (client, universe) = await SignedInWithUniverse("recreldel");
+        var (relationship, _, _, _) = await CanonRelationshipOntoDraft(client, universe.Id);
+        var opened = Assert.Single((await List(client, universe.Id)).Items);
+
+        var response = await client.DeleteAsync(
+            $"/api/universes/{universe.Id}/relationships/{relationship.Id}");
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        var resolved = Assert.Single((await List(client, universe.Id)).Items);
+        Assert.Equal(opened.Id, resolved.Id);
+        Assert.Equal(CanonConflictStatus.Resolved, resolved.Status);
+        Assert.NotNull(resolved.ResolvedAt);
+    }
+
+    /// <summary>
+    /// Deleting the lore a finding is about. The conflict cannot be repaired any more - the
+    /// record it describes is gone - so it has to stop being reported on the delete itself,
+    /// rather than sitting Pending against something that no longer exists.
+    /// </summary>
+    [Fact]
+    public async Task Deleting_a_participating_entity_resolves_the_conflict_immediately()
+    {
+        var (client, universe) = await SignedInWithUniverse("recentdel");
+        var (_, _, _, draft) = await CanonRelationshipOntoDraft(client, universe.Id);
+        var opened = Assert.Single((await List(client, universe.Id)).Items);
+
+        var response = await client.DeleteAsync($"/api/universes/{universe.Id}/entities/{draft.Id}");
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        var resolved = Assert.Single((await List(client, universe.Id)).Items);
+        Assert.Equal(opened.Id, resolved.Id);
+        Assert.Equal(CanonConflictStatus.Resolved, resolved.Status);
+        Assert.NotNull(resolved.ResolvedAt);
+    }
+
+    [Fact]
+    public async Task Deleting_a_timeline_entry_resolves_the_conflict_immediately()
+    {
+        var (client, universe) = await SignedInWithUniverse("rectimedel");
+        var draft = await CreateEntity(client, universe.Id, "A Rumoured Figure", CanonStatus.Draft);
+        var moment = await Moment(client, universe.Id, "The Council", 3018, [draft.Id], CanonStatus.Canon);
+
+        var opened = Assert.Single((await List(client, universe.Id)).Items);
+        Assert.Equal("CANON-TIME-001", opened.RuleCode);
+
+        var response = await client.DeleteAsync($"/api/universes/{universe.Id}/timeline/{moment.Id}");
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        var resolved = Assert.Single((await List(client, universe.Id)).Items);
+        Assert.Equal(opened.Id, resolved.Id);
+        Assert.Equal(CanonConflictStatus.Resolved, resolved.Status);
+    }
+
+    /// <summary>
+    /// The ungated path is one transaction too. A relationship whose target does not resolve
+    /// inside this universe is refused, and the refusal takes the whole request with it: no
+    /// relationship is stored, and no reconciliation runs, so the conflict standing beside it
+    /// is not touched either.
+    /// </summary>
+    [Fact]
+    public async Task A_refused_relationship_write_stores_nothing_and_reconciles_nothing()
+    {
+        var (client, universe) = await SignedInWithUniverse("recatomic");
+        var (relationship, kind, settled, _) = await CanonRelationshipOntoDraft(client, universe.Id);
+        var opened = Assert.Single((await List(client, universe.Id)).Items);
+
+        var elsewhere = await CreateUniverse(client, "World recatomic two");
+        var outsider = await CreateEntity(client, elsewhere.Id, "Somewhere Else", CanonStatus.Canon);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/universes/{universe.Id}/relationships/{relationship.Id}",
+            new RelationshipRequest(kind.Id, settled.Id, outsider.Id, CanonStatus.Canon, null, null, null));
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var stored = (await client.GetFromJsonAsync<RelationshipDetail>(
+            $"/api/universes/{universe.Id}/relationships/{relationship.Id}"))!;
+        Assert.Equal(CanonStatus.Canon, stored.CanonStatus);
+
+        var after = Assert.Single((await List(client, universe.Id)).Items);
+        Assert.Equal(opened.Id, after.Id);
+        Assert.Equal(opened.Status, after.Status);
+        Assert.Equal(opened.UpdatedAt, after.UpdatedAt);
+    }
+
     // ---------- The boundary the gate must not weaken ----------
 
     /// <summary>
@@ -735,6 +873,36 @@ public sealed class CanonPromotionGateTests(LorexApiFactory factory) : IClassFix
         return (await response.Content.ReadFromJsonAsync<TimelineEntryResponse>())!;
     }
 
+    /// <summary>
+    /// A Canon relationship pointing at a draft entity: one `CANON-REL-001` finding, recorded
+    /// by the write that created it.
+    /// </summary>
+    private static async Task<(RelationshipDetail Relationship, RelationshipTypeResponse Kind,
+        EntityDetail Settled, EntityDetail Draft)> CanonRelationshipOntoDraft(
+        HttpClient client,
+        Guid universeId)
+    {
+        var settled = await CreateEntity(client, universeId, "Elrond", CanonStatus.Canon);
+        var draft = await CreateEntity(client, universeId, "A Rumoured Figure", CanonStatus.Draft);
+        var kind = await RelationshipType(client, universeId, "Knows", "Known by");
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/universes/{universeId}/relationships",
+            new RelationshipRequest(kind.Id, settled.Id, draft.Id, CanonStatus.Canon, null, null, null));
+        response.EnsureSuccessStatusCode();
+
+        return ((await response.Content.ReadFromJsonAsync<RelationshipDetail>())!, kind, settled, draft);
+    }
+
+    private static async Task<UniverseDetail> CreateUniverse(HttpClient client, string name)
+    {
+        var response = await client.PostAsJsonAsync(
+            "/api/universes",
+            new CreateUniverseRequest(name, null, null));
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<UniverseDetail>())!;
+    }
+
     private static async Task<RelationshipTypeResponse> RelationshipType(
         HttpClient client,
         Guid universeId,
@@ -761,13 +929,7 @@ public sealed class CanonPromotionGateTests(LorexApiFactory factory) : IClassFix
     private async Task<(HttpClient Client, UniverseDetail Universe)> SignedInWithUniverse(string tag)
     {
         var client = await SignedInClient($"user-{tag}");
-
-        var response = await client.PostAsJsonAsync(
-            "/api/universes",
-            new CreateUniverseRequest($"World {tag}", null, null));
-        response.EnsureSuccessStatusCode();
-
-        return (client, (await response.Content.ReadFromJsonAsync<UniverseDetail>())!);
+        return (client, await CreateUniverse(client, $"World {tag}"));
     }
 
     private static async Task<EntityTypeResponse> CharacterType(HttpClient client, Guid universeId)

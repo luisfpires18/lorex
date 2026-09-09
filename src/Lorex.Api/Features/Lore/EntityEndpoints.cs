@@ -309,15 +309,18 @@ public static class EntityEndpoints
     }
 
     /// <summary>
-    /// Not gated, and deliberately so. Every High rule reads facts an entity contributes - its
-    /// declared years, its Canon participation in a moment - so deleting one can only take
-    /// findings away. A gate here would sweep the rules twice to prove nothing every time.
+    /// Reconciled but not gated. Every rule reads facts an entity contributes - its declared
+    /// years, its Canon participation in a moment, the relationships and references that rest
+    /// on it - so deleting one can only take findings away, and there is nothing to refuse.
+    /// Those findings still have to stop being reported: a conflict about lore that no longer
+    /// exists is worse than no conflict at all.
     /// </summary>
     private static async Task<IResult> DeleteAsync(
         Guid universeId,
         Guid entityId,
         ClaimsPrincipal principal,
         LorexDbContext db,
+        CanonPromotionGate canon,
         CancellationToken cancellationToken)
     {
         if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
@@ -325,6 +328,18 @@ public static class EntityEndpoints
             return Results.NotFound();
         }
 
+        return await canon.RecordAsync(
+            universeId,
+            token => DeleteCoreAsync(universeId, entityId, db, token),
+            cancellationToken);
+    }
+
+    private static async Task<IResult> DeleteCoreAsync(
+        Guid universeId,
+        Guid entityId,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
         var entity = await db.Entities.FirstOrDefaultAsync(
             candidate => candidate.Id == entityId && candidate.UniverseId == universeId,
             cancellationToken);

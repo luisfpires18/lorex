@@ -43,10 +43,13 @@ that gives High severity teeth. No UI.
   rule holds identically on both paths. The refusal is 409
   ProblemDetails plus `code: "canon_promotion_blocked"` and a `blockingFindings` array (rule
   code, severity, fingerprint, title, explanation, subject ids). Low and Medium never block.
-  Gated: entity create/update, timeline create/update, field-definition update (where meaning
-  is declared on a field that already holds values). Not gated, for stated reasons: every
-  delete, adding a field definition, and all relationship writes - no High rule reads a
-  relationship. Ownership is proved before the gate, so a 404 still costs no rule sweep. See
+  Gating and reconciling are separate questions. **Gated** (can introduce High): entity
+  create/update, timeline create/update, field-definition update. **Reconciled but not gated**
+  via `RecordAsync` - the same transaction and the same detect/reconcile, no baseline, nothing
+  to refuse: entity delete, timeline delete, and relationship create/update/delete.
+  **Neither**: adding a field definition (no values yet), and the type/field/option deletes
+  that are refused outright while they hold data. Ownership is proved first either way, so a
+  404 still costs no rule sweep. See
   `docs/architecture/decisions/0012-canon-promotion-gate.md`.
 - Consequence worth knowing: a High conflict can no longer be authored through the API at
   all. One exists only as lore settled before the gate, which is what the rule tests now seed
@@ -106,13 +109,16 @@ that gives High severity teeth. No UI.
   **No Canon Integrity UI exists yet.**
 - Universes: create, read, update, archive, unarchive, delete once archived.
 - Auth: ASP.NET Core Identity with a cookie session.
-- Tests: 238 API integration tests (92 for Canon Integrity), 38 Playwright tests. The gate
+- Tests: 244 API integration tests (98 for Canon Integrity), 38 Playwright tests. The gate
   half proves an existing High blocks nothing, each of the three High rules blocks the write
   that introduces it, a refusal leaves lore and conflict lifecycle untouched and records
   nothing, Medium never blocks and is recorded by the write that causes it, a fixing write
   resolves on the spot, a dismissal survives an unrelated write, one write moves lore and
-  both conflict transitions together, the entity/timeline/semantic paths are gated,
-  relationships stay usable, and the ownership boundary is unchanged. The
+  both conflict transitions together, the entity/timeline/semantic paths are gated, and the
+  ownership boundary is unchanged. The reconcile-without-gate half proves a Canon
+  relationship onto a draft records its Medium conflict on the spot, lowering or deleting
+  that relationship resolves it on the spot, deleting a participating entity or a timeline
+  entry resolves it, and a refused relationship write stores nothing and reconciles nothing. The
   structural half covers detection, each rule, idempotence, a rename refreshing rather than
   duplicating, a fingerprint change on materially different facts, the whole lifecycle, both
   filters, deterministic paging and the ownership boundaries. The chronology half adds
@@ -132,9 +138,9 @@ Phase 014 complete on `feat/014/canon-promotion-gates`, branched from `dev`. **N
 not pushed.** Backend only. Release build clean, 234/234 API tests green, no schema change -
 `has-pending-model-changes` reports none, so no tenth migration.
 
-Gated writes now reconcile, so the conflict list is current for anything authored through
-entity, timeline or field-definition routes. `POST /evaluate` is still needed after an
-ungated change - a delete, a relationship write - or lore altered outside the API.
+Every route that can change a finding now reconciles, so the conflict list is current without
+being asked. `POST /evaluate` remains for lore altered outside the API and to re-derive the
+table on demand.
 
 Rules deliberately left out. **Exclusive relationship overlap**: `RelationshipType` has a
 forward name, an inverse name and a symmetric flag, and `LoreRelationship` carries no
@@ -214,10 +220,10 @@ asked.
 - An age rule needs a structured way to say **when** an age was true - a reference year on
   the fact, or an age recorded against a timeline entry. Until one exists, `Age` is a
   meaning Lorex records and reasons about nothing.
-- Evaluation runs on gated writes and on request. The ungated routes - every delete, every
-  relationship write - still trigger nothing, so a conflict list can lag those until the next
-  `POST /evaluate`. A delete only removes findings, so what lags there is a stale Pending row
-  rather than a missing one.
+- Evaluation runs on every write that can change a finding, and on request. The one lag left
+  is cosmetic: `CANON-REL-001` quotes the relationship type's name, which is not in the
+  fingerprint, so renaming a relation kind leaves that sentence stale until the next
+  `POST /evaluate`. No status, fingerprint or subject moves.
 
 ## Blockers
 

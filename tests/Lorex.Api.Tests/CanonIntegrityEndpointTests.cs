@@ -28,14 +28,18 @@ public sealed class CanonIntegrityEndpointTests(LorexApiFactory factory) : IClas
         var (client, universe) = await SignedInWithUniverse("ciopen");
         await CanonRelationshipOntoDraft(client, universe.Id);
 
+        // The relationship write reconciles, so the conflict is already open. An explicit
+        // evaluation then finds the same one and changes nothing.
+        var conflict = Assert.Single((await List(client, universe.Id)).Items);
+        Assert.Equal("CANON-REL-001", conflict.RuleCode);
+
         var summary = await Evaluate(client, universe.Id);
 
         Assert.Equal(1, summary.Detected);
-        Assert.Equal(1, summary.Created);
+        Assert.Equal(0, summary.Created);
+        Assert.Equal(1, summary.Persisted);
         Assert.Equal(0, summary.Resolved);
-
-        var conflict = Assert.Single((await List(client, universe.Id)).Items);
-        Assert.Equal("CANON-REL-001", conflict.RuleCode);
+        Assert.Equal(conflict.UpdatedAt, Assert.Single((await List(client, universe.Id)).Items).UpdatedAt);
     }
 
     [Fact]
@@ -386,10 +390,13 @@ public sealed class CanonIntegrityEndpointTests(LorexApiFactory factory) : IClas
                 null));
         response.EnsureSuccessStatusCode();
 
+        // The retarget reconciled as it landed: the old fingerprint is gone and a new one is
+        // open, so a later evaluation has nothing left to do.
         var summary = await Evaluate(client, universe.Id);
 
-        Assert.Equal(1, summary.Created);
-        Assert.Equal(1, summary.Resolved);
+        Assert.Equal(0, summary.Created);
+        Assert.Equal(0, summary.Resolved);
+        Assert.Equal(1, summary.Persisted);
 
         var page = await List(client, universe.Id);
         Assert.Equal(2, page.Items.Count);
@@ -697,13 +704,22 @@ public sealed class CanonIntegrityEndpointTests(LorexApiFactory factory) : IClas
         var first = await CreateUniverse(client, "World one");
         var second = await CreateUniverse(client, "World two");
 
+        // A write reconciles its own universe and no other. The first world's relationship
+        // opens a conflict there and leaves the second world empty.
         var (_, _, firstTarget) = await CanonRelationshipOntoDraft(client, first.Id);
-        await CanonRelationshipOntoDraft(client, second.Id);
-
-        await Evaluate(client, first.Id);
 
         var conflict = Assert.Single((await List(client, first.Id)).Items);
         Assert.Empty((await List(client, second.Id)).Items);
+
+        // And the second world's own write opens its own conflict without disturbing the first.
+        await CanonRelationshipOntoDraft(client, second.Id);
+
+        Assert.Single((await List(client, second.Id)).Items);
+        var stillThere = Assert.Single((await List(client, first.Id)).Items);
+        Assert.Equal(conflict.Id, stillThere.Id);
+        Assert.Equal(conflict.UpdatedAt, stillThere.UpdatedAt);
+
+        await Evaluate(client, first.Id);
 
         // Every subject belongs to the universe the conflict was found in.
         Assert.Contains(
@@ -766,8 +782,15 @@ public sealed class CanonIntegrityEndpointTests(LorexApiFactory factory) : IClas
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Empty(await response.Content.ReadAsStringAsync());
 
-        // The refusal did no work either: the owner's first evaluation still finds it new.
-        Assert.Equal(1, (await Evaluate(owner, universe.Id)).Created);
+        // The refusal did no work either: what the owner sees is exactly what their own write
+        // recorded, and nothing the intruder did opened, resolved or refreshed anything.
+        var conflict = Assert.Single((await List(owner, universe.Id)).Items);
+        var summary = await Evaluate(owner, universe.Id);
+
+        Assert.Equal(0, summary.Created);
+        Assert.Equal(0, summary.Resolved);
+        Assert.Equal(1, summary.Persisted);
+        Assert.Equal(conflict.UpdatedAt, Assert.Single((await List(owner, universe.Id)).Items).UpdatedAt);
     }
 
     [Fact]
