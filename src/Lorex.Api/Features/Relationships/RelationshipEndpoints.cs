@@ -64,7 +64,9 @@ public static class RelationshipEndpoints
         }
 
         var entityExists = await db.Entities.AnyAsync(
-            entity => entity.Id == entityId && entity.UniverseId == universeId,
+            entity => entity.Id == entityId
+                && entity.UniverseId == universeId
+                && entity.DeletedAt == null,
             cancellationToken);
 
         if (!entityExists)
@@ -179,9 +181,9 @@ public static class RelationshipEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        var relationship = await db.Relationships.FirstOrDefaultAsync(
-            candidate => candidate.Id == relationshipId && candidate.UniverseId == universeId,
-            cancellationToken);
+        // Hidden means unreachable, for writes as well as reads. A link waiting on a trashed
+        // end is not the author's to edit until they decide what to do with that end.
+        var relationship = await FindLiveAsync(db, universeId, relationshipId, cancellationToken);
 
         if (relationship is null)
         {
@@ -238,9 +240,9 @@ public static class RelationshipEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        var relationship = await db.Relationships.FirstOrDefaultAsync(
-            candidate => candidate.Id == relationshipId && candidate.UniverseId == universeId,
-            cancellationToken);
+        // A link with an end in the Trash is not deletable either. Letting one go here would
+        // destroy dependent lore on the author's behalf for a link they cannot even see.
+        var relationship = await FindLiveAsync(db, universeId, relationshipId, cancellationToken);
 
         if (relationship is null)
         {
@@ -253,6 +255,22 @@ public static class RelationshipEndpoints
 
         return Results.NoContent();
     }
+
+    /// <summary>
+    /// One relationship, only while both of its ends are live. Every read hides a link whose
+    /// endpoint is in the Trash, so every write refuses the same one.
+    /// </summary>
+    private static Task<LoreRelationship?> FindLiveAsync(
+        LorexDbContext db,
+        Guid universeId,
+        Guid relationshipId,
+        CancellationToken cancellationToken) =>
+        db.Relationships.FirstOrDefaultAsync(
+            candidate => candidate.Id == relationshipId
+                && candidate.UniverseId == universeId
+                && candidate.SourceEntity!.DeletedAt == null
+                && candidate.TargetEntity!.DeletedAt == null,
+            cancellationToken);
 
     // ---------- Ownership ----------
 
@@ -278,8 +296,12 @@ public static class RelationshipEndpoints
             errors["relationshipTypeId"] = ["Choose a relationship type from this universe."];
         }
 
+        // Trashed entries are not choosable. Nothing round-trips a relationship, so refusing
+        // one here cannot destroy an existing link - it only stops a new one being authored
+        // against lore that is not in the world.
         var resolvedEntities = await db.Entities
             .Where(entity => entity.UniverseId == universeId
+                && entity.DeletedAt == null
                 && (entity.Id == request.SourceEntityId || entity.Id == request.TargetEntityId))
             .Select(entity => entity.Id)
             .ToListAsync(cancellationToken);
@@ -305,7 +327,10 @@ public static class RelationshipEndpoints
         Guid relationshipId,
         CancellationToken cancellationToken) =>
         await db.Relationships.AsNoTracking()
-            .Where(relationship => relationship.Id == relationshipId && relationship.UniverseId == universeId)
+            .Where(relationship => relationship.Id == relationshipId
+                && relationship.UniverseId == universeId
+                && relationship.SourceEntity!.DeletedAt == null
+                && relationship.TargetEntity!.DeletedAt == null)
             .Select(relationship => new RelationshipDetail(
                 relationship.Id,
                 relationship.RelationshipTypeId,
@@ -335,8 +360,15 @@ public static class RelationshipEndpoints
         Guid entityId,
         CancellationToken cancellationToken)
     {
+        // A link with one end in the Trash is stored, untouched, and simply not shown: it is
+        // a row of its own that nothing round-trips, so hiding it destroys nothing and it
+        // reappears, both readings intact, the moment that end is restored. Contrast the
+        // entity-reference field and timeline participation, which the client rewrites
+        // wholesale on every save and which are therefore shown and marked instead.
         var rows = await db.Relationships.AsNoTracking()
             .Where(relationship => relationship.UniverseId == universeId
+                && relationship.SourceEntity!.DeletedAt == null
+                && relationship.TargetEntity!.DeletedAt == null
                 && (relationship.SourceEntityId == entityId || relationship.TargetEntityId == entityId))
             .Select(relationship => new
             {

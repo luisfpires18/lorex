@@ -254,6 +254,47 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
         Assert.Null(coast.Content);
     }
 
+    /// <summary>
+    /// The Trash is authored lore the owner has not thrown away irrecoverably, so a backup that
+    /// omitted it would turn a recoverable mistake into a permanent one the moment the file was
+    /// read back. It travels whole, and it travels marked: <c>deletedAt</c> is what tells a
+    /// reader which entries are live, and it is why the format is at version 2.
+    /// </summary>
+    [Fact]
+    public async Task A_trashed_entry_is_carried_whole_and_marked_as_trashed()
+    {
+        var (client, universe) = await SignedInWithUniverse("exptrash");
+        var built = await BuildRichUniverse(client, universe.Id);
+
+        (await client.DeleteAsync(
+            $"/api/universes/{universe.Id}/entities/{built.Coast.Id}")).EnsureSuccessStatusCode();
+
+        var backup = await Backup(client, universe.Id);
+
+        // The version says the entities collection no longer means "everything here is live".
+        Assert.Equal(2, backup.FormatVersion);
+
+        var coast = backup.Payload.Entities.Single(entity => entity.Id == built.Coast.Id);
+
+        Assert.NotNull(coast.DeletedAt);
+        Assert.Equal(DateTimeKind.Utc, coast.DeletedAt!.Value.Kind);
+        Assert.Equal("Drowned Coast", coast.Name);
+        Assert.Equal(built.CharacterTypeId, coast.EntityTypeId);
+        Assert.NotEmpty(coast.Revisions);
+
+        // Everything that pointed at it is still stored, so the backup still carries it: a
+        // backup taken while an entry is in the Trash is a backup of a restorable world.
+        Assert.Contains(
+            backup.Payload.Relationships,
+            relationship => relationship.TargetEntityId == built.Coast.Id);
+        Assert.Contains(
+            backup.Payload.TimelineEntries,
+            entry => entry.ParticipantEntityIds.Contains(built.Coast.Id));
+
+        // A live entry says so by carrying nothing.
+        Assert.Null(backup.Payload.Entities.Single(entity => entity.Id == built.Warden.Id).DeletedAt);
+    }
+
     [Fact]
     public async Task A_null_value_stays_a_null_and_never_becomes_an_empty_one()
     {

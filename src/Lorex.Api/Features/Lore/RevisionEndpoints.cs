@@ -15,7 +15,11 @@ namespace Lorex.Api.Features.Lore;
 /// same capture. Nothing on this surface rewrites or removes a revision.
 ///
 /// Ownership is proved against the universe on every route, exactly as the rest of the lore
-/// surface does, and a revision is only ever reached through the entry that owns it.
+/// surface does, and a revision is only ever reached through the entry that owns it - so a
+/// trashed entry's history is not reachable here, and is not touched either. Restoring an
+/// entry from the Trash and restoring one of its revisions are different operations: the first
+/// puts back the rows exactly as they were stored and writes no version, the second replays an
+/// older snapshot over the live entry and writes one. See ADR 0013 and ADR 0015.
 /// </summary>
 public static class RevisionEndpoints
 {
@@ -52,8 +56,13 @@ public static class RevisionEndpoints
             return Results.NotFound();
         }
 
+        // Reached through the entry, so a trashed entry's history is not reachable either.
+        // Nothing is deleted - the revisions are all still there and are readable again the
+        // moment the entry is restored.
         var entityExists = await db.Entities.AnyAsync(
-            entity => entity.Id == entityId && entity.UniverseId == universeId,
+            entity => entity.Id == entityId
+                && entity.UniverseId == universeId
+                && entity.DeletedAt == null,
             cancellationToken);
 
         if (!entityExists)
@@ -166,7 +175,8 @@ public static class RevisionEndpoints
             .FirstOrDefaultAsync(
                 revision => revision.Id == revisionId
                     && revision.EntityId == entityId
-                    && revision.Entity!.UniverseId == universeId,
+                    && revision.Entity!.UniverseId == universeId
+                    && revision.Entity.DeletedAt == null,
                 cancellationToken);
 
     /// <summary>

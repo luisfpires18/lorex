@@ -58,6 +58,11 @@ internal static class CanonLifespanReader
         var rows = await context.Db.EntityFieldValues.AsNoTracking()
             .Where(value =>
                 value.Entity!.UniverseId == context.UniverseId
+
+                // A trashed entry declares nothing. Its values are still stored and come back
+                // intact on restore, but while it is in the Trash it is not part of the world
+                // and no rule may reason from it.
+                && value.Entity.DeletedAt == null
                 && value.Entity.CanonStatus == CanonStatus.Canon
                 && value.NumberValue != null
                 && (value.FieldDefinition!.Semantic == EntityFieldSemantic.BirthYear
@@ -105,7 +110,9 @@ internal static class CanonLifespanReader
                 && entry.CanonStatus == CanonStatus.Canon
                 && (entry.DateKind == TimelineDateKind.Exact || entry.DateKind == TimelineDateKind.Range)
                 && entry.EntityLinks.Any(link =>
-                    link.Entity!.CanonStatus == CanonStatus.Canon && subjects.Contains(link.EntityId)))
+                    link.Entity!.DeletedAt == null
+                    && link.Entity.CanonStatus == CanonStatus.Canon
+                    && subjects.Contains(link.EntityId)))
             .Select(entry => new CanonMoment(
                 entry.Id,
                 entry.Title,
@@ -113,7 +120,8 @@ internal static class CanonLifespanReader
                 entry.StartYear,
                 entry.EndYear,
                 entry.EntityLinks
-                    .Where(link => link.Entity!.CanonStatus == CanonStatus.Canon
+                    .Where(link => link.Entity!.DeletedAt == null
+                        && link.Entity.CanonStatus == CanonStatus.Canon
                         && subjects.Contains(link.EntityId))
                     .Select(link => link.EntityId)
                     .ToList()))

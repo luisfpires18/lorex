@@ -319,8 +319,13 @@ public static class CanonIntegrityEndpoints
 
         if (wanted.TryGetValue(CanonSubjectKind.Entity, out var entityIds))
         {
+            // Live entries only. A subject in the Trash has no page to open, so naming it
+            // here would offer the reader a link into a 404; leaving it unresolved is what
+            // makes the screen say the lore is no longer here, which is exactly true.
             var found = await db.Entities.AsNoTracking()
-                .Where(entity => entity.UniverseId == universeId && entityIds.Contains(entity.Id))
+                .Where(entity => entity.UniverseId == universeId
+                    && entity.DeletedAt == null
+                    && entityIds.Contains(entity.Id))
                 .Select(entity => new { entity.Id, entity.Name })
                 .ToListAsync(cancellationToken);
 

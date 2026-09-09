@@ -38,7 +38,14 @@ public sealed record TimelineDate(
     TimelineDatePrecision StartPrecision,
     TimelineDatePrecision EndPrecision);
 
-/// <summary>One entity taking part, resolved enough to render without a second request.</summary>
+/// <summary>
+/// One entity taking part, resolved enough to render without a second request.
+///
+/// <paramref name="IsTrashed"/> says the participant is currently in the Trash. It is still
+/// reported, deliberately: the client sends a moment's whole participant set back on every
+/// save, so dropping it from the response would delete the participation the next time the
+/// author edited the moment's date. The client shows it as unavailable and does not link it.
+/// </summary>
 public sealed record TimelineEntityLink(
     Guid EntityId,
     string Name,
@@ -46,7 +53,8 @@ public sealed record TimelineEntityLink(
     string EntityTypeName,
     string? EntityTypeIcon,
     string? EntityTypeAccentColor,
-    CanonStatus CanonStatus);
+    CanonStatus CanonStatus,
+    bool IsTrashed);
 
 public sealed record TimelineEntryResponse(
     Guid Id,

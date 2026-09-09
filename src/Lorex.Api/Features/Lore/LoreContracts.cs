@@ -69,6 +69,13 @@ public sealed record EntityRequest(
     IReadOnlyList<string>? Tags,
     IReadOnlyList<FieldValueInput>? Fields);
 
+/// <summary>
+/// <paramref name="ReferencedEntityIsTrashed"/> says the reference still points at real lore
+/// that is currently in the Trash. The id and the name are still reported, deliberately: this
+/// value belongs to the *live* entry holding it, and the client sends its whole field set back
+/// on every save, so hiding the reference would delete it the next time the author touched an
+/// unrelated field. The client greys it out instead of following it.
+/// </summary>
 public sealed record FieldValueResponse(
     Guid FieldDefinitionId,
     string Name,
@@ -80,7 +87,8 @@ public sealed record FieldValueResponse(
     IReadOnlyList<Guid> OptionIds,
     IReadOnlyList<string> OptionValues,
     Guid? ReferencedEntityId,
-    string? ReferencedEntityName);
+    string? ReferencedEntityName,
+    bool ReferencedEntityIsTrashed);
 
 /// <summary>Card row. Carries enough to render a type-aware card, and no universe or owner id.</summary>
 public sealed record EntitySummary(

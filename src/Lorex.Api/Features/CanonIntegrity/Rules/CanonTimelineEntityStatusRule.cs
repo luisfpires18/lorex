@@ -25,12 +25,15 @@ public sealed class CanonTimelineEntityStatusRule : ICanonIntegrityRule
             .Where(entry =>
                 entry.UniverseId == context.UniverseId
                 && entry.CanonStatus == CanonStatus.Canon
-                && entry.EntityLinks.Any(link => link.Entity!.CanonStatus != CanonStatus.Canon))
+                && entry.EntityLinks.Any(link =>
+                    link.Entity!.DeletedAt == null
+                    && link.Entity.CanonStatus != CanonStatus.Canon))
             .Select(entry => new Row(
                 entry.Id,
                 entry.Title,
                 entry.EntityLinks
-                    .Where(link => link.Entity!.CanonStatus != CanonStatus.Canon)
+                    .Where(link => link.Entity!.DeletedAt == null
+                        && link.Entity.CanonStatus != CanonStatus.Canon)
                     .Select(link => new Offender(link.EntityId, link.Entity!.Name, link.Entity.CanonStatus))
                     .ToList()))
             .ToListAsync(cancellationToken);

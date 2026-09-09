@@ -327,6 +327,10 @@ public static class TimelineEndpoints
             return requested;
         }
 
+        // A trashed entry is deliberately still resolvable here. The form posts the whole
+        // participant set on every save, so refusing one would turn an unrelated edit to this
+        // moment into a validation failure or silently drop the participation. Nothing new can
+        // be pointed at a trashed entry regardless, because the picker never offers one.
         var resolved = await db.Entities.AsNoTracking()
             .Where(entity => entity.UniverseId == universeId && requested.Contains(entity.Id))
             .Select(entity => entity.Id)
@@ -417,7 +421,8 @@ public static class TimelineEndpoints
                     link.Entity.EntityType!.Name,
                     link.Entity.EntityType.Icon,
                     link.Entity.EntityType.AccentColor,
-                    link.Entity.CanonStatus))
+                    link.Entity.CanonStatus,
+                    link.Entity.DeletedAt != null))
                 .ToList(),
             entry.CreatedAt,
             entry.UpdatedAt);

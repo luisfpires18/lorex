@@ -25,8 +25,14 @@ public sealed record UniverseBackup(
     /// Bumped whenever the payload's shape or meaning changes in a way a reader must notice.
     /// Adding a nullable member that an older reader can ignore does not count; removing,
     /// renaming or re-meaning one does.
+    ///
+    /// 2 - Phase 019 added <see cref="BackupEntity.DeletedAt"/>. The member itself is nullable
+    /// and ignorable, but it re-means the <c>entities</c> collection: membership no longer
+    /// implies the entry is live, and a reader that ignored it would restore an author's Trash
+    /// into their world as ordinary lore. That is the "re-meaning" case above, so it is a bump.
+    /// A version 1 file still means exactly what it always meant - every entry in it is live.
     /// </summary>
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
 
     public static UniverseBackup Of(UniverseBackupPayload payload, DateTime generatedAt) =>
         new(FormatName, CurrentVersion, generatedAt, payload);
@@ -102,6 +108,12 @@ public sealed record BackupTag(Guid Id, string Name);
 ///
 /// <paramref name="Content"/> is the Tiptap document exactly as stored - the same string,
 /// not a re-serialised object graph - so the article round-trips byte for byte.
+///
+/// <paramref name="DeletedAt"/> is when the entry was moved to the Trash, or null while it is
+/// live. Trashed entries are carried in full, with their values, aliases, tags and history:
+/// they are authored lore the owner has not thrown away irrecoverably, and a backup that
+/// silently omitted them would turn a recoverable mistake into a permanent one. It is why this
+/// format is at version 2 - see <see cref="UniverseBackup.CurrentVersion"/> and ADR 0014.
 /// </summary>
 public sealed record BackupEntity(
     Guid Id,
@@ -111,6 +123,7 @@ public sealed record BackupEntity(
     string? Content,
     CanonStatus CanonStatus,
     bool IsArchived,
+    DateTime? DeletedAt,
     DateTime CreatedAt,
     DateTime UpdatedAt,
     IReadOnlyList<string> Aliases,
