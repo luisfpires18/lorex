@@ -10,14 +10,20 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   full snapshot (ADR 0013), captured inside the promotion gate's transaction; a version is put
   back by replaying it through the ordinary gated update. The dossier carries the history
   section under the relations.
-- **Now: Phase 018 - Export / Backup.** Not started; no branch yet.
+- **Phase 018 - Export / Backup.** Complete on `feat/018/export-backup`, **not merged and not
+  pushed**. `GET /api/universes/{id}/export` hands the owner one versioned JSON file holding
+  the universe's authored data, read in a single transaction with every collection ordered in
+  memory so unchanged lore exports byte-identical payloads. What is in a backup and what is
+  deliberately rebuilt instead: ADR 0014. Export only - nothing reads a backup back in, and
+  the Settings screen says so.
 
 ## Baseline
 
-- 264 API integration tests, 45 Playwright tests, green. No frontend unit runner exists; the
+- 286 API integration tests, 46 Playwright tests, green. No frontend unit runner exists; the
   web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings.
-- 10 migrations, latest `AddEntityRevisions`; `has-pending-model-changes` reports none.
+- 10 migrations, latest `AddEntityRevisions`; `has-pending-model-changes` reports none. Phase
+  018 changed no schema - a backup only reads.
 - Six rules in `src/Lorex.Api/Features/CanonIntegrity/Rules/`: three structural (Medium),
   three chronological (High). Behaviour: ADR 0010, 0011, 0012.
 
@@ -35,6 +41,8 @@ see Deferred. RTK and Graphify judged independently.
 - RTK works in the `Bash` tool. `rtk gain` ~21.8%, drifting down as more work runs through
   chained or piped commands the wrapper bypasses by design. Correctness record still clean;
   the one recorded diagnostic loss remains `rtk npm run dev` swallowing Vite's startup banner.
+  Phase 018 added no new evidence: nearly every command was piped or chained, so the wrapper
+  bypassed it, and no unfiltered rerun was needed.
 - Graphify unused in every task so far. Targeted `Grep` over `SYSTEMS.md`-named files has
   answered every question.
 

@@ -1,6 +1,7 @@
 using Lorex.Api.Data;
 using Lorex.Api.Features.Auth;
 using Lorex.Api.Features.CanonIntegrity;
+using Lorex.Api.Features.Export;
 using Lorex.Api.Features.Health;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Relationships;
@@ -54,6 +55,7 @@ app.MapRelationshipTypeEndpoints();
 app.MapRelationshipEndpoints();
 app.MapTimelineEndpoints();
 app.MapCanonIntegrityEndpoints();
+app.MapUniverseExportEndpoints();
 
 await app.MigrateLorexDatabaseAsync();
 
