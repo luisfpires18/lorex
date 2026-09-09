@@ -49,6 +49,7 @@ app.MapAuthEndpoints();
 app.MapUniverseEndpoints();
 app.MapEntityTypeEndpoints();
 app.MapEntityEndpoints();
+app.MapEntityRevisionEndpoints();
 app.MapRelationshipTypeEndpoints();
 app.MapRelationshipEndpoints();
 app.MapTimelineEndpoints();

@@ -16,9 +16,11 @@ One ADR per durable decision. Rationale lives in the ADR, never here.
 | 0010 | Canon conflicts are derived findings keyed by a fingerprint | [0010-canon-conflict-lifecycle.md](0010-canon-conflict-lifecycle.md) |
 | 0011 | A field declares what it means, in a closed enum, on Number only | [0011-semantic-field-codes.md](0011-semantic-field-codes.md) |
 | 0012 | High conflicts block only the write that introduces them | [0012-canon-promotion-gate.md](0012-canon-promotion-gate.md) |
+| 0013 | An entry's history is a full snapshot per accepted write | [0013-entity-revision-snapshots.md](0013-entity-revision-snapshots.md) |
 
-All accepted. Next number: `0013`.
+All accepted. Next number: `0014`.
 
 Known limitations are recorded in the ADR that owns them - cross-era ordering in 0009 and
-0011, the `Age` reference year and exclusive-relationship overlap in 0011, and what the
-promotion gate does not claim about stored High conflicts in 0012.
+0011, the `Age` reference year and exclusive-relationship overlap in 0011, what the
+promotion gate does not claim about stored High conflicts in 0012, and unbounded history
+growth in 0013.

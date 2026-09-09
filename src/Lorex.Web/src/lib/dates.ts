@@ -10,6 +10,23 @@ export function formatDate(iso: string) {
   return Number.isNaN(parsed.getTime()) ? '' : formatter.format(parsed)
 }
 
+const stampFormatter = new Intl.DateTimeFormat(undefined, {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+})
+
+/**
+ * Formats an API timestamp down to the minute, for the places where two entries on the
+ * same day have to be told apart - a document history, and nothing else so far.
+ */
+export function formatDateTime(iso: string) {
+  const parsed = new Date(iso)
+  return Number.isNaN(parsed.getTime()) ? '' : stampFormatter.format(parsed)
+}
+
 /**
  * Reads an API timestamp into the value a `<input type="date">` wants. The leading date
  * part is taken verbatim rather than through `Date`, so a stored UTC day is never shifted

@@ -51,6 +51,11 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Lore/EntityEndpoints.cs` | Entity CRUD, search, filters, paging, tags. |
 | `Features/Lore/EntityTypeEndpoints.cs` | Entity types and their field definitions. |
 | `Features/Lore/EntityTypeDefaults.cs` | Idempotent seeding of the starter types. |
+| `Features/Lore/RevisionModel.cs` | `EntityRevision` and its alias, tag and value snapshot rows. |
+| `Features/Lore/RevisionConfiguration.cs` | Revision schema: the per-entry version index, and where a key deliberately is not. |
+| `Features/Lore/RevisionCapture.cs` | Reads the entry back after a write, compares it to the last version, records the next. |
+| `Features/Lore/RevisionEndpoints.cs` | History list, one version, and the restore that replays it through the entity update. |
+| `Features/Lore/RevisionContracts.cs` | Response records for history and one version. |
 | `Features/Lore/LoreContent.cs` | Structural validation of the Tiptap article. |
 | `Features/Lore/LoreValidation.cs` | Shared lore input checks and LIKE escaping. |
 | `Features/Relationships/RelationshipModel.cs` | `RelationshipType` and `LoreRelationship`. |
@@ -88,12 +93,12 @@ Repository index. Paths and one-line responsibilities only.
 | `src/lib/api.ts` | Same-origin fetch wrapper and `ApiError`. |
 | `src/auth/` | Session context, `useAuth`, and the route guards. |
 | `src/universes/` | Universe API client and types. |
-| `src/lore/` | Lore API client, shared types, document and field helpers. |
+| `src/lore/` | Lore API client, shared types, document and field helpers, and the revision client. |
 | `src/relationships/` | Relationship API client, DTO types, and both-readings helper. |
 | `src/timeline/` | Timeline API client, DTO types, date formatting and year grouping. |
 | `src/canon/` | Canon Integrity API client, DTO types, and the reader for the promotion gate's 409. |
 | `src/lib/dates.ts` | Timestamp formatting, date-input round trips, and spans. |
-| `src/components/` | `AuthLayout`, `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker` (single and multi, one shared search), `RelationshipSection`, `RelationshipTypeManager`, `TimelineEntryForm`, `ConflictEntry`, `CanonBlockNotice` (the one refused-write presentation, shared by every gated form). |
+| `src/components/` | `AuthLayout`, `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker` (single and multi, one shared search), `EntityHistory`, `RelationshipSection`, `RelationshipTypeManager`, `TimelineEntryForm`, `ConflictEntry`, `CanonBlockNotice` (the one refused-write presentation, shared by every gated form). |
 | `src/pages/` | Login, Register, Universes browser, and the workspace: Overview, Lore, entry page, Timeline, Canon, Types and Settings. |
 | `vite.config.ts` | Dev server port 5173, proxy to the API, build config. |
 
@@ -106,6 +111,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.Api.Tests/AuthEndpointTests.cs` | Registration, sign-in, session and logout. |
 | `Lorex.Api.Tests/UniverseEndpointTests.cs` | Universe CRUD and the ownership invariant. |
 | `Lorex.Api.Tests/LoreEndpointTests.cs` | Lore CRUD, field kinds, and cross-universe isolation. |
+| `Lorex.Api.Tests/EntityRevisionTests.cs` | What makes a version, what a version keeps, ownership, and what a restore may do. |
 | `Lorex.Api.Tests/RelationshipEndpointTests.cs` | Relationship CRUD, both perspectives, and cross-owner isolation. |
 | `Lorex.Api.Tests/TimelineEndpointTests.cs` | Date kinds, participation, ordering, paging, and ownership. |
 | `Lorex.Api.Tests/CanonIntegrityEndpointTests.cs` | Conflict lifecycle, fingerprinting, the structural rules, filters and ownership. |
@@ -118,6 +124,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.E2E/specs/lore.spec.ts` | Author an entry, edit it, filter, and cross-owner isolation. |
 | `Lorex.E2E/specs/relationships.spec.ts` | Both readings, relation kinds, refusals, and the universe and owner boundaries. |
 | `Lorex.E2E/specs/timeline.spec.ts` | Date kinds through the drawer, order, filters, paging, refusals, and the owner boundary. |
+| `Lorex.E2E/specs/history.spec.ts` | One journey: versions accumulate, an old one is read in place and put back. |
 | `Lorex.E2E/specs/canon.spec.ts` | The review screen, conflict identity across runs, the promotion gate's refusals, reconciliation on write, and the universe and owner boundaries. |
 
 ## `scripts`
