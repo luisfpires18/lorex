@@ -196,7 +196,12 @@ required before the wrapper went live. Phase 013 started in a fresh conversation
 hook fired on the first `Bash` call: `git status` ran as `rtk git status`. The wrapper is
 active, its rewrite is a pure prefix, and no permission decision reaches Claude Code.
 
-## The PATH break (2026-09-08, Phase 013)
+## The PATH break (2026-09-08, Phase 013) - resolved 2026-09-09
+
+**Resolved by the restart, as predicted.** Task 2 opened with a filtered `git status` and
+filtered a `dotnet build` later in the session. The rest of this section is kept as the
+record of the diagnosis.
+
 
 **The live hook rewrites commands the `Bash` tool cannot then run.** Every rewritten command
 in the first real session failed with `/usr/bin/bash: line 1: rtk: command not found`,
@@ -225,7 +230,7 @@ the `Bash`-matched hook does not touch, so it runs unfiltered and correct.
 
 | Date | Command | Why the filtered output was not enough |
 | --- | --- | --- |
-| - | - | - |
+| - | - | none through Task 2 |
 
 ## Per-task results
 
@@ -267,7 +272,54 @@ generated migration before committing (it is a plain additive column plus a filt
 no SQLite table rebuild); keeping validation at the edge returning `ValidationProblem` rather
 than letting bad input reach EF Core; projecting to DTOs inside the query; `AsNoTracking` on
 every rule read; and no service or repository layer around the rules.
-### Task 2 - pending
+### Task 2 - Phase 014, Canon promotion gates (2026-09-09)
+
+Backend only: one gate service, five wrapped write paths, a 409 contract, 17 new tests, no
+migration. The desktop app had been restarted since Task 1, which is what this task was
+waiting on.
+
+**RTK**
+
+| Question | Answer |
+| --- | --- |
+| Live hook working after the restart | **Yes.** The PATH break is gone. `git status` returned `* dev...origin/dev` / `clean — nothing to commit` - filtered output, not exit 127. |
+| Command categories filtered | Four commands, three categories: `git status`, `git checkout -b <branch> dev`, `wc -l <files>`, and `dotnet build Lorex.slnx`. The build is the one that matters: 10 lines of MSBuild boilerplate collapsed to `ok dotnet build: 3 projects, 0 errors, 0 warnings (00:00:01.66)`. `wc -l` gained a `Σ` total line, which is a rewrite of the output rather than a trim, and was correct. |
+| `rtk gain` | 19 commands, 727 tokens, 16.4%. Session delta over the Phase 012 baseline (15 / 592 / 14.1%): **4 commands, 135 tokens**. |
+| Safety-wrapper bypasses | Every compound command (`&&`, `;`, `\|`) ran unfiltered, as designed - including the opening `git status --porcelain && …`. `cat <file>` ran unfiltered twice, the substitution rule rejecting `rtk read`. `grep` and `ls` were not rewritten. No bypass cost anything; each simply ran normally. |
+| Unfiltered reruns caused by missing diagnostics | **Zero.** `rtk proxy` was not used. No filtered output was ambiguous enough to need the raw log. |
+| Incorrect command execution | **Zero.** No command ran with altered meaning. |
+| Non-RTK failure worth separating | One `cat > file <<'EOF'` heredoc failed to parse in the `Bash` tool. Probed afterwards with a plain `cat`: RTK did **not** rewrite it, so this was a shell-quoting failure in the tool, not the hook. Recorded because it looked like an RTK fault for one command and was not. |
+
+What the number does *not* capture: the hook matches `Bash` only, and `dotnet test` (four
+runs) plus most `dotnet build` runs went through the `PowerShell` tool, where nothing is
+filtered. RTK's own probe table already showed `dotnet test` is not rewritten at all. So the
+16.4% is a floor. The single filtered build saved 87%, which is where the value is.
+
+Verdict material: RTK is safe and it works. Whether it is worth keeping now turns on command
+mix, not on correctness - two tasks in, the wrapper has never let a rewritten command change
+meaning, and has never withheld a diagnostic.
+
+**Graphify**
+
+Not used, again, and deliberately not forced. The task was another narrow vertical slice:
+the rule engine, three endpoint files, and the two test suites that exercise them. The one
+genuinely broad question - *which write paths can introduce a High finding?* - was answered
+by reading the three High rules and seeing what tables they touch, which is six greps and is
+the authoritative answer rather than an inferred one. A graph query would have been slower
+and less certain. Nothing was surfaced that a targeted read missed.
+
+Two tasks with no Graphify use is itself a finding: this repository is small enough, and
+`SYSTEMS.md` accurate enough, that the graph has not yet had a question to answer.
+
+**aspnet-core-guidance**
+
+Used. Materially helped with: keeping the gate a plain scoped service rather than a
+repository or a pipeline behaviour; wrapping handlers in place instead of introducing a
+middleware; `Results.Problem` with extensions as the refusal shape, matching the existing
+409s; and confirming that EF Core queries read the database rather than the change tracker,
+which is the fact the whole apply-then-roll-back design rests on.
+
+
 ### Task 3 - pending
 ### Task 4 - pending
 

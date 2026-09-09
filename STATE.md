@@ -2,8 +2,9 @@
 
 ## Current state
 
-Phase 013 (Canon Integrity chronology rules) complete on its branch. The backend half of
-Canon Integrity exists: persistence, a rule engine, six rules, and a review API. No UI.
+Phase 014 (Canon promotion gates) complete on its branch. The backend half of Canon
+Integrity exists: persistence, a rule engine, six rules, a review API, and a promotion gate
+that gives High severity teeth. No UI.
 
 - Canon Integrity: a conflict is a derived finding, never lore. Lorex records that
   something looks wrong and changes nothing about the records it describes. `CanonConflict`
@@ -29,8 +30,22 @@ Canon Integrity exists: persistence, a rule engine, six rules, and a review API.
   entity-reference field points at a non-Canon entry).
 - Three are chronological and High. `CANON-LIFE-001` (declared birth year after declared
   death year), `CANON-LIFE-002` (Canon moment wholly before a Canon participant's birth),
-  `CANON-LIFE-003` (wholly after its death). Severity is still wired to nothing - no
-  promotion gate yet.
+  `CANON-LIFE-003` (wholly after its death).
+- Promotion gate: a write is refused when it introduces a High **fingerprint** that was not
+  already there - never because the universe contains one. `CanonPromotionGate` opens a
+  transaction, collects the baseline High fingerprints, applies the candidate, collects them
+  again, and rolls back on any addition. Only detection runs, so a rejected candidate leaves
+  the lore and the recorded conflicts - dismissals included - untouched. The refusal is 409
+  ProblemDetails plus `code: "canon_promotion_blocked"` and a `blockingFindings` array (rule
+  code, severity, fingerprint, title, explanation, subject ids). Low and Medium never block.
+  Gated: entity create/update, timeline create/update, field-definition update (where meaning
+  is declared on a field that already holds values). Not gated, for stated reasons: every
+  delete, adding a field definition, and all relationship writes - no High rule reads a
+  relationship. Ownership is proved before the gate, so a 404 still costs no rule sweep. See
+  `docs/architecture/decisions/0012-canon-promotion-gate.md`.
+- Consequence worth knowing: a High conflict can no longer be authored through the API at
+  all. One exists only as lore settled before the gate, which is what the rule tests now seed
+  by promoting a draft straight in the database.
 - Semantic field codes: `EntityFieldDefinition.Semantic`, a nullable `EntityFieldSemantic`
   scalar column - `BirthYear`, `DeathYear`, `Age`. Optional, null by default, and the only
   way a rule learns what a field is about. No display name is ever matched and no meaning is
@@ -86,7 +101,11 @@ Canon Integrity exists: persistence, a rule engine, six rules, and a review API.
   **No Canon Integrity UI exists yet.**
 - Universes: create, read, update, archive, unarchive, delete once archived.
 - Auth: ASP.NET Core Identity with a cookie session.
-- Tests: 217 API integration tests (71 for Canon Integrity), 38 Playwright tests. The
+- Tests: 234 API integration tests (88 for Canon Integrity), 38 Playwright tests. The gate
+  half proves an existing High blocks nothing, each of the three High rules blocks the write
+  that introduces it, a refusal leaves lore and conflict lifecycle untouched, Medium never
+  blocks, the entity/timeline/semantic paths are gated, relationships stay usable, and the
+  ownership boundary is unchanged. The
   structural half covers detection, each rule, idempotence, a rename refreshing rather than
   duplicating, a fingerprint change on materially different facts, the whole lifecycle, both
   filters, deterministic paging and the ownership boundaries. The chronology half adds
@@ -102,14 +121,12 @@ Canon Integrity exists: persistence, a rule engine, six rules, and a review API.
 
 ## Current phase
 
-Phase 013 complete and merged into `dev`. Semantic field codes and `CANON-LIFE-001`,
-`CANON-LIFE-002` and `CANON-LIFE-003` are done. Current branch is `dev`. Merged from
-`feat/013/canon-integrity-rules`, 3 commits, `--no-ff`, no conflicts. Feature branch
-retained. `dev` published to `origin/dev`. Backend only. Release build clean, 217/217 API
-tests green, all nine migrations verified against a fresh SQLite file.
+Phase 014 complete on `feat/014/canon-promotion-gates`, branched from `dev`. **Not merged,
+not pushed.** Backend only. Release build clean, 234/234 API tests green, no schema change -
+`has-pending-model-changes` reports none, so no tenth migration.
 
-Detection only. Promotion is **not** gated: a High conflict blocks nothing yet, which is
-Phase 014's job.
+Detection is still explicit: nothing evaluates on write. The gate detects without recording,
+so a conflict list is still as fresh as the last `POST /evaluate` and no more.
 
 Rules deliberately left out. **Exclusive relationship overlap**: `RelationshipType` has a
 forward name, an inverse name and a symmetric flag, and `LoreRelationship` carries no
@@ -119,28 +136,27 @@ nothing records which moment; inferring a current year would be inventing a fact
 semantic exists so the meaning can be declared, and waits for a structured reference year.
 **Invalid ranges** are refused at write time already and are not re-reported as conflicts.
 
-Tooling trial, task 1 of 3-4. RTK 0.48.0 and Graphify are judged independently; method,
+Tooling trial, task 2 of 3-4. RTK 0.48.0 and Graphify are judged independently; method,
 probes and per-task results live in `docs/tooling/agent-tooling-trial.md`.
 
-- **Graphify: unused.** Targeted reads were sufficient for a narrow vertical slice through
-  files `SYSTEMS.md` already names.
-- **RTK: inconclusive.** The hook itself worked - it went live in a fresh conversation and
-  behaved exactly as designed, a pure-prefix rewrite with no permission decision. The
-  executable was then unavailable to the host's stale PATH, so every rewritten command
-  failed with `rtk: command not found` and nothing was filtered. `rtk gain` is unchanged
-  from the Phase 012 baseline, confirming it ran nothing. No command executed with altered
-  meaning.
-- **A fresh host or session must re-measure RTK** before any verdict. Measuring it again on
-  this host without a restart would record another zero.
+- **Graphify: unused again.** No dependency question arose that a targeted `Grep` over
+  `SYSTEMS.md`-named files did not answer outright.
+- **RTK: working, and now actually measured.** The host restart fixed the PATH break. Four
+  commands filtered this session; a successful `dotnet build` collapsed to one line. `rtk
+  gain` 19 commands / 727 tokens / 16.4%, up from the 15 / 592 / 14.1% baseline. Zero
+  unfiltered reruns, zero commands executed with altered meaning.
+- **Caveat that shapes the number:** the hook matches `Bash` only, and the heavy commands
+  (`dotnet test`, `dotnet build`) mostly ran through the `PowerShell` tool, unfiltered. The
+  measured saving is a floor, not a ceiling.
 
 ## Immediate next step
 
-Phase 014: `feat/014/canon-promotion-gates`, branched from `dev`. High severity now has a
-meaning to enforce: refuse the promotion that would introduce a provable contradiction, and
-decide what the author is told when it is refused. Nothing in 013 needs another backend
-slice first.
+Review `feat/014/canon-promotion-gates` and merge it into `dev` when satisfied. Then the
+Canon Integrity UI: the review screen the backend has had no client for since Phase 012, and
+the 409 the gate now returns, which is the first refusal a user can trigger by ordinary
+editing and currently surfaces nowhere. `blockingFindings` is shaped for it.
 
-Task 2 of the tooling trial runs with it.
+Task 3 of the tooling trial runs with whatever comes next.
 
 ## Remote
 
