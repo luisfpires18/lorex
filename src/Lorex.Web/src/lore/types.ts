@@ -44,6 +44,48 @@ export const FIELD_KIND_LABELS: Record<FieldKindValue, string> = {
   [FieldKind.EntityReference]: 'Link to an entity',
 }
 
+/**
+ * Mirrors the backend enum. What a field *means*, for the few meanings Canon Integrity can
+ * reason about. Null is the normal case: an ordinary field means nothing to Lorex, and
+ * nothing is ever inferred from a field's name - ADR 0011.
+ */
+export const FieldSemantic = {
+  BirthYear: 1,
+  DeathYear: 2,
+  Age: 3,
+} as const
+
+export type FieldSemanticValue = (typeof FieldSemantic)[keyof typeof FieldSemantic]
+
+export const FIELD_SEMANTIC_LABELS: Record<FieldSemanticValue, string> = {
+  [FieldSemantic.BirthYear]: 'Birth year',
+  [FieldSemantic.DeathYear]: 'Death year',
+  [FieldSemantic.Age]: 'Age',
+}
+
+/** The order the meanings are offered in: the two a rule reads today, then the one it does not. */
+export const FIELD_SEMANTIC_ORDER: FieldSemanticValue[] = [
+  FieldSemantic.BirthYear,
+  FieldSemantic.DeathYear,
+  FieldSemantic.Age,
+]
+
+/**
+ * Which kinds may carry each meaning. Mirrors `LoreValidation.IsSemanticCompatible`, and
+ * like it this is written per meaning rather than as one rule about Number, because the
+ * next meaning added will not be a year. The API validates it again regardless.
+ */
+const SEMANTIC_KINDS: Record<FieldSemanticValue, FieldKindValue[]> = {
+  [FieldSemantic.BirthYear]: [FieldKind.Number],
+  [FieldSemantic.DeathYear]: [FieldKind.Number],
+  [FieldSemantic.Age]: [FieldKind.Number],
+}
+
+/** The meanings a field of this kind may be given. Empty for every kind that may carry none. */
+export function semanticsFor(kind: FieldKindValue): FieldSemanticValue[] {
+  return FIELD_SEMANTIC_ORDER.filter((semantic) => SEMANTIC_KINDS[semantic].includes(kind))
+}
+
 export interface FieldOption {
   id: string
   value: string
@@ -58,6 +100,7 @@ export interface FieldDefinition {
   displayOrder: number
   defaultValue: string | null
   options: FieldOption[]
+  semantic: FieldSemanticValue | null
 }
 
 export interface EntityType {

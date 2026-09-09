@@ -7,15 +7,17 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 
 - Phases 001-016 done. Sequence log: `docs/architecture/branching.md`.
 - **Phase 016** (Canon Integrity E2E / hardening) on `test/016/canon-integrity-hardening`,
-  **not merged, not pushed**. Five Playwright scenarios in `tests/Lorex.E2E/specs/canon.spec.ts`
+  **not merged, not pushed**. Six Playwright scenarios in `tests/Lorex.E2E/specs/canon.spec.ts`
   cover the review screen, conflict identity across runs, the promotion gate, reconciliation
-  on write, and the universe/owner boundary. One defect found and fixed: the entry page's
-  one-click Canon step swallowed the gate's 409.
+  on write, the Canon-meaning control, and the universe/owner boundary. Two defects found and
+  fixed: the entry page's one-click Canon step swallowed the gate's 409, and
+  `EntityFieldSemantic` had no control in the client, so no chronology rule was reachable
+  without calling the API.
 - **Next: no phase chosen.** The security follow-ups below are the largest open item.
 
 ## Baseline
 
-- 246 API integration tests, 43 Playwright tests, green. No frontend unit runner exists; the
+- 246 API integration tests, 44 Playwright tests, green. No frontend unit runner exists; the
   web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings.
 - 9 migrations, latest `AddEntityFieldSemantics`; `has-pending-model-changes` reports none.
@@ -46,8 +48,6 @@ see Deferred. RTK and Graphify judged independently.
   backed by tests. Outstanding: rate limiting, header/cookie hardening, dependency review, auth.
 - **Cross-era ordering** unsolved, and it bounds the chronology rules. ADR 0009, ADR 0011.
 - **`Age`** is declarable but read by nothing until a structured reference year exists. ADR 0011.
-- **Does `EntityFieldSemantic` get a minimal Types-screen control before work moves past
-  Canon Integrity?** Behaviour and its consequences: ADR 0011. Not decided, not scoped.
 - **Tooling trial verdict.** Four tasks measured, `docs/tooling/agent-tooling-trial.md`
   holds the evidence. Keep / conditional / remove is the owner's call, per tool.
 

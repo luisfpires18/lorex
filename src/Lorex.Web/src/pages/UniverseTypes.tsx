@@ -9,8 +9,18 @@ import {
   deleteEntityType,
   deleteField,
   listEntityTypes,
+  updateField,
 } from '../lore/api'
-import { FIELD_KIND_LABELS, FieldKind, type EntityType, type FieldKindValue } from '../lore/types'
+import {
+  FIELD_KIND_LABELS,
+  FIELD_SEMANTIC_LABELS,
+  FieldKind,
+  semanticsFor,
+  type EntityType,
+  type FieldDefinition,
+  type FieldKindValue,
+  type FieldSemanticValue,
+} from '../lore/types'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
 const KIND_ORDER: FieldKindValue[] = [
@@ -36,6 +46,8 @@ export default function UniverseTypes() {
   const [fieldKind, setFieldKind] = useState<FieldKindValue>(FieldKind.ShortText)
   const [fieldRequired, setFieldRequired] = useState(false)
   const [fieldOptions, setFieldOptions] = useState('')
+  const [fieldSemantic, setFieldSemantic] = useState<FieldSemanticValue | null>(null)
+  const [busyFieldId, setBusyFieldId] = useState<string | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -101,13 +113,48 @@ export default function UniverseTypes() {
               .map((option) => option.trim())
               .filter(Boolean)
           : null,
+        semantic: fieldSemantic,
       })
       setFieldName('')
       setFieldOptions('')
       setFieldRequired(false)
+      setFieldSemantic(null)
       await refresh()
     } catch (error: unknown) {
       report(error, 'That field could not be added.')
+    }
+  }
+
+  /**
+   * Declares, changes or withdraws what one existing field means. Everything else about the
+   * definition is sent back as it stands: this control edits the meaning and nothing else.
+   *
+   * The route is gated, so pointing a meaning at a field a hundred Canon entries have
+   * already filled in can be refused. That refusal, and the "only one field may mean it"
+   * validation, both arrive as ordinary API errors and are reported like any other.
+   */
+  async function changeMeaning(
+    typeId: string,
+    field: FieldDefinition,
+    semantic: FieldSemanticValue | null,
+  ) {
+    setMessage(null)
+    setBusyFieldId(field.id)
+    try {
+      await updateField(universe.id, typeId, field.id, {
+        name: field.name,
+        kind: field.kind,
+        isRequired: field.isRequired,
+        displayOrder: field.displayOrder,
+        defaultValue: field.defaultValue,
+        options: field.options.map((option) => option.value),
+        semantic,
+      })
+      await refresh()
+    } catch (error: unknown) {
+      report(error, 'That meaning could not be changed.')
+    } finally {
+      setBusyFieldId(null)
     }
   }
 
@@ -176,11 +223,36 @@ export default function UniverseTypes() {
                 {type.fields.length > 0 ? (
                   <ul className="types__fieldlist">
                     {type.fields.map((field) => (
-                      <li key={field.id}>
+                      <li key={field.id} data-field-name={field.name}>
                         <span className="types__fieldname">{field.name}</span>
                         <span className="types__fieldkind">{FIELD_KIND_LABELS[field.kind]}</span>
                         {field.isRequired ? (
                           <span className="types__fieldkind">required</span>
+                        ) : null}
+                        {semanticsFor(field.kind).length > 0 ? (
+                          <select
+                            className="types__meaning"
+                            aria-label={`Canon meaning of ${field.name}`}
+                            value={field.semantic ?? ''}
+                            disabled={busyFieldId === field.id}
+                            onChange={(event) =>
+                              void changeMeaning(
+                                type.id,
+                                field,
+                                event.target.value === ''
+                                  ? null
+                                  : (Number(event.target.value) as FieldSemanticValue),
+                              )
+                            }
+                            data-testid={`field-meaning-${field.name}`}
+                          >
+                            <option value="">No meaning</option>
+                            {semanticsFor(field.kind).map((semantic) => (
+                              <option key={semantic} value={semantic}>
+                                {FIELD_SEMANTIC_LABELS[semantic]}
+                              </option>
+                            ))}
+                          </select>
                         ) : null}
                         <button
                           className="token__remove"
@@ -213,9 +285,15 @@ export default function UniverseTypes() {
                       id={`field-kind-${type.id}`}
                       className="field__input field__input--select"
                       value={fieldKind}
-                      onChange={(event) =>
-                        setFieldKind(Number(event.target.value) as FieldKindValue)
-                      }
+                      onChange={(event) => {
+                        const kind = Number(event.target.value) as FieldKindValue
+                        setFieldKind(kind)
+                        // A meaning belongs to a shape. Switching away from one that can
+                        // carry it drops it rather than sending a pair the API refuses.
+                        setFieldSemantic((current) =>
+                          current !== null && semanticsFor(kind).includes(current) ? current : null,
+                        )
+                      }}
                     >
                       {KIND_ORDER.map((kind) => (
                         <option key={kind} value={kind}>
@@ -232,6 +310,38 @@ export default function UniverseTypes() {
                       value={fieldOptions}
                       onChange={(event) => setFieldOptions(event.target.value)}
                     />
+                  ) : null}
+
+                  {semanticsFor(fieldKind).length > 0 ? (
+                    <div className="field">
+                      <label className="field__label" htmlFor={`field-semantic-${type.id}`}>
+                        Canon meaning
+                      </label>
+                      <select
+                        id={`field-semantic-${type.id}`}
+                        className="field__input field__input--select"
+                        value={fieldSemantic ?? ''}
+                        onChange={(event) =>
+                          setFieldSemantic(
+                            event.target.value === ''
+                              ? null
+                              : (Number(event.target.value) as FieldSemanticValue),
+                          )
+                        }
+                        data-testid={`field-semantic-${type.name}`}
+                      >
+                        <option value="">None</option>
+                        {semanticsFor(fieldKind).map((semantic) => (
+                          <option key={semantic} value={semantic}>
+                            {FIELD_SEMANTIC_LABELS[semantic]}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="field__hint">
+                        Read by the deterministic Canon Integrity rules, never by a reader, and
+                        never guessed from the field&rsquo;s name. Most fields need none.
+                      </p>
+                    </div>
                   ) : null}
 
                   <label className="check">

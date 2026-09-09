@@ -20,6 +20,5 @@ One ADR per durable decision. Rationale lives in the ADR, never here.
 All accepted. Next number: `0013`.
 
 Known limitations are recorded in the ADR that owns them - cross-era ordering in 0009 and
-0011, the `Age` reference year, exclusive-relationship overlap and the missing client
-control for `EntityFieldSemantic` in 0011, and what the promotion gate does not claim about
-stored High conflicts in 0012.
+0011, the `Age` reference year and exclusive-relationship overlap in 0011, and what the
+promotion gate does not claim about stored High conflicts in 0012.

@@ -63,10 +63,13 @@ field names changes nothing at all.
 Nothing happens by accident. A universe that has declared no meanings gets exactly the
 Phase 011 behaviour, and no universe declares one without being asked to.
 
-The declaration is backend and API only. `EntityFieldSemantic` is bound on the
-field-definition contract, so a client may set it when adding or updating a field; no
-control in `src/Lorex.Web` writes it today. Until one exists, a semantic is reachable only
-by calling the API directly, and with it the three chronological rules that read one.
+The declaration is an author's, made in one place. The Types screen offers a **Canon
+meaning** control - None, Birth year, Death year, Age - on the field being added and on each
+existing field that can carry one, so declaring, changing and withdrawing a meaning are all
+reachable there and nowhere else in the client. It appears only for kinds that may hold a
+meaning, so the client cannot assemble a pair the API would refuse; everything the API does
+refuse - a second field claiming the same meaning, a declaration the promotion gate blocks -
+surfaces as an ordinary error on that screen.
 
 The vocabulary is a commitment. Semantic codes are persisted and rules key off them, so
 removing or renumbering a member is a migration, not an edit. Adding one is cheap.

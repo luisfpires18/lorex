@@ -1383,6 +1383,22 @@ a {
   padding: 0.05rem 0.4rem;
 }
 
+/* The meaning a field carries, edited where the field is listed. Sized to the chips beside
+   it rather than to the form below, because it annotates the row it sits on. */
+.types__meaning {
+  font-family: inherit;
+  font-size: 0.72rem;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  padding: 0.05rem 0.3rem;
+  max-width: 9rem;
+}
+
+.types__meaning:disabled {
+  opacity: 0.55;
+}
+
 .types__add,
 .types__new {
   display: flex;

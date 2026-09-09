@@ -407,9 +407,14 @@ freeze valid edits. It cannot be built through the product, because no currently
 can persist a new High contradiction - re-derived from the wrapped routes and now stated
 precisely in ADR 0012, along with what that does and does not claim about the stored table.
 The property was proved in the direction that is reachable: a refusal leaves the rest of the
-universe editable, and Medium never blocks. Separately, `EntityFieldSemantic` turns out to
-have no control in the web client, so the three chronological rules are reachable only by
-calling the API; ADR 0011 now says so.
+universe editable, and Medium never blocks. Separately, `EntityFieldSemantic` turned out to
+have no control in the web client, so no chronological rule was reachable without calling the
+API. That gap was closed inside this phase with a Canon-meaning control on the Types screen,
+and ADR 0011 now describes it; the E2E suite builds its lifespan fixtures through that
+control rather than through the API, which is what makes the High-rule coverage a real user
+journey. Nothing in the tooling picture changed while doing it - the commands were the same
+compound `cd … && …` shapes RTK bypasses, and no question arose that Graphify would have
+answered.
 
 ### Task 5 - not planned
 

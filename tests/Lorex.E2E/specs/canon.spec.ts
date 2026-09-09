@@ -14,9 +14,9 @@ const PASSWORD = 'Test-password-123!'
 const Canon = { idea: 0, draft: 1, canon: 2 } as const
 
 /** Field kinds, matching `EntityFieldKind`. */
-const FieldKind = { number: 2, entityReference: 7 } as const
+const FieldKind = { entityReference: 7 } as const
 
-/** Field semantics, matching `EntityFieldSemantic`. Not authorable through the UI. */
+/** Field semantics, matching `EntityFieldSemantic`. The value each Canon meaning stores. */
 const Semantic = { birthYear: 1, deathYear: 2 } as const
 
 /** Conflict statuses, matching `CanonConflictStatus`. */
@@ -155,37 +155,57 @@ async function link(
   await expect(page.getByTestId('relationship-form')).toHaveCount(0)
 }
 
-// ---------- Seeding what the UI cannot author ----------
+// ---------- Authoring types and their fields ----------
 
-/**
- * A type whose Born and Died fields declare what they mean.
- *
- * `EntityFieldSemantic` is bound on the field-definition contract but has no control on
- * the Types screen, so the only way an author reaches the chronology rules today is
- * through the API. Seeded here rather than pretended to be a UI flow.
- */
-async function seedLifespanType(page: Page, universeId: string, typeName: string) {
-  const created = await page.request.post(`/api/universes/${universeId}/entity-types`, {
-    data: { name: typeName },
-  })
-  expect(created.ok()).toBeTruthy()
-  const typeId = (await created.json()).id as string
-
-  for (const [name, semantic] of [
-    ['Born', Semantic.birthYear],
-    ['Died', Semantic.deathYear],
-  ] as const) {
-    const field = await page.request.post(
-      `/api/universes/${universeId}/entity-types/${typeId}/fields`,
-      { data: { name, kind: FieldKind.number, isRequired: false, semantic } },
-    )
-    expect(field.ok()).toBeTruthy()
-  }
-
-  return typeId
+async function openFields(page: Page, universeId: string, typeName: string) {
+  await page.goto(`/app/universes/${universeId}/types`)
+  await page.getByTestId(`fields-${typeName}`).click()
+  await expect(page.getByLabel('Field name')).toBeVisible()
 }
 
-/** A type carrying one entity-reference field, which the Types screen can build but not name here. */
+/** Adds one field through the Types screen, with the meaning the author chose for it. */
+async function addFieldTo(
+  page: Page,
+  typeName: string,
+  field: { name: string; kind: string; meaning?: string },
+) {
+  await page.getByLabel('Field name').fill(field.name)
+  await page.getByLabel('Kind', { exact: true }).selectOption({ label: field.kind })
+
+  if (field.meaning) {
+    await page.getByTestId(`field-semantic-${typeName}`).selectOption({ label: field.meaning })
+  }
+
+  await page.getByTestId(`add-field-${typeName}`).click()
+}
+
+/**
+ * A type whose Born and Died fields declare what they mean, built the way an author builds
+ * one: a type, two Number fields, and the Canon meaning chosen on each as it is added.
+ */
+async function addLifespanType(page: Page, universeId: string, typeName: string) {
+  await page.goto(`/app/universes/${universeId}/types`)
+  await page.getByLabel('New type').fill(typeName)
+  await page.getByTestId('add-type').click()
+  await expect(page.locator(`[data-type-name="${typeName}"]`)).toBeVisible()
+
+  await openFields(page, universeId, typeName)
+
+  for (const [name, meaning, semantic] of [
+    ['Born', 'Birth year', Semantic.birthYear],
+    ['Died', 'Death year', Semantic.deathYear],
+  ] as const) {
+    await addFieldTo(page, typeName, { name, kind: 'Number', meaning })
+    await expect(page.getByTestId(`field-meaning-${name}`)).toHaveValue(String(semantic))
+  }
+}
+
+// ---------- Seeded for brevity ----------
+
+/**
+ * A type carrying one entity-reference field. The Types screen builds this perfectly well;
+ * it is seeded here only because the tests below are about findings rather than about types.
+ */
 async function seedReferenceType(page: Page, universeId: string, typeName: string, field: string) {
   const created = await page.request.post(`/api/universes/${universeId}/entity-types`, {
     data: { name: typeName },
@@ -418,7 +438,7 @@ test.describe('canon integrity', () => {
   }) => {
     await signUp(page)
     const universeId = await newUniverse(page, unique('Corvin Reach '))
-    await seedLifespanType(page, universeId, 'Bloodline')
+    await addLifespanType(page, universeId, 'Bloodline')
 
     // A creation can be refused too, and then the entry it names was rolled back - so the
     // notice states the subjects without linking to rows that never survived.
@@ -479,9 +499,12 @@ test.describe('canon integrity', () => {
       page.getByTestId('canon-blocked').getByRole('link', { name: 'Entry' }),
     ).toHaveCount(1)
 
-    // Correcting the fact that disagreed is all it takes.
+    // Correcting the fact that disagreed is all it takes. The read view returning with the
+    // corrected year is what says the write landed - the stepper is pressed optimistically
+    // and would say so either way.
     await page.getByLabel('Died').fill('600')
     await page.getByTestId('save-entity').click()
+    await expect(page.getByTestId('entry-fields')).toContainText('600')
     await expect(page.getByTestId('canon-blocked')).toHaveCount(0)
     await expect(page.getByTestId('canon-canon')).toHaveAttribute('aria-pressed', 'true')
 
@@ -526,6 +549,69 @@ test.describe('canon integrity', () => {
     await page.getByLabel('Summary').fill('Carries the banner and little else.')
     await page.getByTestId('save-entity').click()
     await expect(page.getByTestId('entry-summary')).toContainText('Carries the banner')
+  })
+
+  test('a meaning is declared, refused, cleared and redeclared on the Types screen, and only a Number field is ever offered one', async ({
+    page,
+  }) => {
+    await signUp(page)
+    const universeId = await newUniverse(page, unique('Meaning '))
+    await addLifespanType(page, universeId, 'Bloodline')
+
+    // A Number field may mean nothing at all, which is the normal case.
+    await addFieldTo(page, 'Bloodline', { name: 'Height', kind: 'Number' })
+    await expect(page.getByTestId('field-meaning-Height')).toHaveValue('')
+
+    // Only one field on a type may carry a meaning, and the API says so in its own words.
+    await addFieldTo(page, 'Bloodline', {
+      name: 'Also born',
+      kind: 'Number',
+      meaning: 'Birth year',
+    })
+    await expect(page.getByTestId('types-error')).toContainText('already a birth year')
+    await expect(page.locator('[data-field-name="Also born"]')).toHaveCount(0)
+
+    // A meaning belongs to a shape. Switching the kind to one that cannot carry it takes
+    // the control away rather than letting an invalid pair be submitted.
+    await page.getByLabel('Kind', { exact: true }).selectOption({ label: 'Short text' })
+    await expect(page.getByTestId('field-semantic-Bloodline')).toHaveCount(0)
+    await addFieldTo(page, 'Bloodline', { name: 'Epithet', kind: 'Short text' })
+    await expect(page.locator('[data-field-name="Epithet"]')).toBeVisible()
+    await expect(page.getByTestId('field-meaning-Epithet')).toHaveCount(0)
+
+    // A lifespan that runs backwards, still only a Draft and so still ordinary work.
+    const corvin = await newEntry(page, universeId, {
+      name: 'Corvin',
+      typeName: 'Bloodline',
+      numbers: { Born: '500', Died: '400' },
+      canon: 'draft',
+    })
+
+    // Withdraw what Died means. The chronology rule has nothing to read, so the promotion
+    // it was refusing goes through.
+    await openFields(page, universeId, 'Bloodline')
+    await page.getByTestId('field-meaning-Died').selectOption('')
+    await expect(page.getByTestId('field-meaning-Died')).toHaveValue('')
+    await promote(page, universeId, corvin, 'canon')
+
+    // Declaring it again tells the rules something new about lore that is already Canon, so
+    // this write is gated like any other and is refused with the reason.
+    await openFields(page, universeId, 'Bloodline')
+    await page.getByTestId('field-meaning-Died').selectOption(String(Semantic.deathYear))
+    await expect(page.getByTestId('types-error')).toContainText('was not saved')
+    await expect(page.getByTestId('field-meaning-Died')).toHaveValue('')
+
+    // Correct the year that disagreed, and the same declaration is ordinary.
+    await page.goto(entryUrl(universeId, corvin))
+    await page.getByTestId('edit-entity').click()
+    await page.getByLabel('Died').fill('600')
+    await page.getByTestId('save-entity').click()
+    await expect(page.getByTestId('entry-fields')).toContainText('600')
+
+    await openFields(page, universeId, 'Bloodline')
+    await page.getByTestId('field-meaning-Died').selectOption(String(Semantic.deathYear))
+    await expect(page.getByTestId('field-meaning-Died')).toHaveValue(String(Semantic.deathYear))
+    await expect(page.getByTestId('types-error')).toHaveCount(0)
   })
 
   test('a write reconciles the findings it touches, a rename rewords one without losing it, and a delete closes it', async ({
