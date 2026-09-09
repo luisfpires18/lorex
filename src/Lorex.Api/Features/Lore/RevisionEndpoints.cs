@@ -1,0 +1,336 @@
+using System.Security.Claims;
+using Lorex.Api.Data;
+using Lorex.Api.Features.CanonIntegrity;
+using Lorex.Api.Features.Universes;
+using Microsoft.EntityFrameworkCore;
+
+namespace Lorex.Api.Features.Lore;
+
+/// <summary>
+/// An entry's history, and putting an older version back.
+///
+/// Read-only apart from the restore, and the restore writes nothing here: it replays a
+/// snapshot through the ordinary entity update, so it passes the same validation and the
+/// same Canon promotion gate as any other edit and is recorded as the next revision by the
+/// same capture. Nothing on this surface rewrites or removes a revision.
+///
+/// Ownership is proved against the universe on every route, exactly as the rest of the lore
+/// surface does, and a revision is only ever reached through the entry that owns it.
+/// </summary>
+public static class RevisionEndpoints
+{
+    /// <summary>The machine-readable marker on the 409 a restore answers when it cannot be replayed.</summary>
+    public const string NotRestorableCode = "revision_not_restorable";
+
+    public static IEndpointRouteBuilder MapEntityRevisionEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var group = endpoints
+            .MapGroup("/api/universes/{universeId:guid}/entities/{entityId:guid}/revisions")
+            .WithTags("Entities")
+            .RequireAuthorization();
+
+        group.MapGet("/", ListAsync).WithName("ListEntityRevisions");
+        group.MapGet("/{revisionId:guid}", GetAsync).WithName("GetEntityRevision");
+        group.MapPost("/{revisionId:guid}/restore", RestoreAsync).WithName("RestoreEntityRevision");
+
+        return endpoints;
+    }
+
+    /// <summary>
+    /// Newest first, which is the order a history is read in. Rows are small - no article and
+    /// no values - so the whole history of one entry is one response.
+    /// </summary>
+    private static async Task<IResult> ListAsync(
+        Guid universeId,
+        Guid entityId,
+        ClaimsPrincipal principal,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
+        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        {
+            return Results.NotFound();
+        }
+
+        var entityExists = await db.Entities.AnyAsync(
+            entity => entity.Id == entityId && entity.UniverseId == universeId,
+            cancellationToken);
+
+        if (!entityExists)
+        {
+            return Results.NotFound();
+        }
+
+        var revisions = await db.EntityRevisions.AsNoTracking()
+            .Where(revision => revision.EntityId == entityId)
+            .OrderByDescending(revision => revision.Number)
+            .Select(revision => new EntityRevisionSummary(
+                revision.Id,
+                revision.Number,
+                revision.Kind,
+                revision.Changes,
+                revision.Name,
+                revision.CanonStatus,
+                revision.RestoredFromRevisionId,
+                revision.CreatedAt))
+            .ToListAsync(cancellationToken);
+
+        return Results.Ok(revisions);
+    }
+
+    private static async Task<IResult> GetAsync(
+        Guid universeId,
+        Guid entityId,
+        Guid revisionId,
+        ClaimsPrincipal principal,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
+        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        {
+            return Results.NotFound();
+        }
+
+        var revision = await LoadAsync(db, universeId, entityId, revisionId, cancellationToken);
+
+        return revision is null ? Results.NotFound() : Results.Ok(Describe(revision));
+    }
+
+    /// <summary>
+    /// Puts an older version back as an ordinary edit.
+    ///
+    /// The snapshot is replayed through <see cref="EntityEndpoints.UpdateCoreAsync"/> under the
+    /// promotion gate, so a restore that would make the universe newly self-contradictory is
+    /// refused with the same 409 any other write would get, and the entry is left untouched.
+    /// The restore itself becomes the next revision, marked as a restore and naming what it
+    /// came from; the version it restored is not moved, rewritten or removed.
+    ///
+    /// A snapshot is only replayable while everything it names still exists. Rather than let
+    /// the ordinary write silently drop an option or a reference that has since been deleted -
+    /// which would put back something that is not what the author saw - the ids are checked
+    /// first and a restore that cannot be exact is refused outright.
+    /// </summary>
+    private static async Task<IResult> RestoreAsync(
+        Guid universeId,
+        Guid entityId,
+        Guid revisionId,
+        ClaimsPrincipal principal,
+        LorexDbContext db,
+        CanonPromotionGate gate,
+        CancellationToken cancellationToken)
+    {
+        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        {
+            return Results.NotFound();
+        }
+
+        var revision = await LoadAsync(db, universeId, entityId, revisionId, cancellationToken);
+
+        if (revision is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (await MissingReferencesAsync(db, universeId, revision, cancellationToken) is { Count: > 0 } missing)
+        {
+            return NotRestorable(missing);
+        }
+
+        var request = RequestFrom(revision);
+
+        return await gate.RunAsync(
+            universeId,
+            token => EntityEndpoints.UpdateCoreAsync(
+                universeId,
+                entityId,
+                request,
+                db,
+                token,
+                EntityRevisionKind.Restored,
+                revision.Id),
+            cancellationToken);
+    }
+
+    // ---------- Reading ----------
+
+    private static Task<EntityRevision?> LoadAsync(
+        LorexDbContext db,
+        Guid universeId,
+        Guid entityId,
+        Guid revisionId,
+        CancellationToken cancellationToken) =>
+        db.EntityRevisions.AsNoTracking()
+            .Include(revision => revision.Aliases)
+            .Include(revision => revision.Tags)
+            .Include(revision => revision.FieldValues)
+            .FirstOrDefaultAsync(
+                revision => revision.Id == revisionId
+                    && revision.EntityId == entityId
+                    && revision.Entity!.UniverseId == universeId,
+                cancellationToken);
+
+    /// <summary>
+    /// One version for the reader. Multi-select stored a row per option, so the rows are
+    /// folded back into one value per field, exactly as the live detail does.
+    /// </summary>
+    private static EntityRevisionDetail Describe(EntityRevision revision)
+    {
+        var fields = revision.FieldValues
+            .GroupBy(value => new { value.FieldDefinitionId, value.FieldName, value.Kind, value.DisplayOrder })
+            .OrderBy(group => group.Key.DisplayOrder)
+            .ThenBy(group => group.Key.FieldName, StringComparer.Ordinal)
+            .Select(group => new EntityRevisionFieldResponse(
+                group.Key.FieldDefinitionId,
+                group.Key.FieldName,
+                group.Key.Kind,
+                group.Select(value => value.TextValue).FirstOrDefault(text => text != null),
+                group.Select(value => value.NumberValue).FirstOrDefault(number => number != null),
+                group.Select(value => value.BooleanValue).FirstOrDefault(flag => flag != null),
+                group.Select(value => value.DateValue).FirstOrDefault(date => date != null),
+                [.. group.Where(value => value.OptionValue != null)
+                    .Select(value => value.OptionValue!)
+                    .Order(StringComparer.Ordinal)],
+                group.Select(value => value.ReferencedEntityName).FirstOrDefault(name => name != null)))
+            .ToList();
+
+        return new EntityRevisionDetail(
+            revision.Id,
+            revision.Number,
+            revision.Kind,
+            revision.Changes,
+            revision.RestoredFromRevisionId,
+            revision.CreatedAt,
+            revision.EntityTypeId,
+            revision.EntityTypeName,
+            revision.Name,
+            revision.Summary,
+            revision.Content,
+            revision.CanonStatus,
+            [.. revision.Aliases.Select(alias => alias.Value).Order(StringComparer.Ordinal)],
+            [.. revision.Tags.Select(tag => tag.Name).Order(StringComparer.Ordinal)],
+            fields);
+    }
+
+    // ---------- Restoring ----------
+
+    /// <summary>
+    /// What the snapshot names that the universe no longer has, in the author's words. Empty
+    /// when the version can be put back exactly as it was recorded.
+    /// </summary>
+    private static async Task<List<string>> MissingReferencesAsync(
+        LorexDbContext db,
+        Guid universeId,
+        EntityRevision revision,
+        CancellationToken cancellationToken)
+    {
+        var missing = new List<string>();
+
+        var typeExists = await db.EntityTypes.AnyAsync(
+            type => type.Id == revision.EntityTypeId && type.UniverseId == universeId,
+            cancellationToken);
+
+        if (!typeExists)
+        {
+            missing.Add($"the type \"{revision.EntityTypeName}\"");
+        }
+
+        var fieldIds = revision.FieldValues.Select(value => value.FieldDefinitionId).Distinct().ToList();
+
+        var liveFieldIds = await db.EntityFieldDefinitions.AsNoTracking()
+            .Where(field => fieldIds.Contains(field.Id)
+                && field.EntityTypeId == revision.EntityTypeId
+                && field.EntityType!.UniverseId == universeId)
+            .Select(field => field.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var value in revision.FieldValues
+            .Where(value => !liveFieldIds.Contains(value.FieldDefinitionId))
+            .DistinctBy(value => value.FieldDefinitionId))
+        {
+            missing.Add($"the field \"{value.FieldName}\"");
+        }
+
+        var optionIds = revision.FieldValues
+            .Where(value => value.OptionId is not null)
+            .Select(value => value.OptionId!.Value)
+            .Distinct()
+            .ToList();
+
+        var liveOptionIds = await db.EntityFieldOptions.AsNoTracking()
+            .Where(option => optionIds.Contains(option.Id)
+                && option.FieldDefinition!.EntityType!.UniverseId == universeId)
+            .Select(option => option.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var value in revision.FieldValues
+            .Where(value => value.OptionId is { } id && !liveOptionIds.Contains(id)))
+        {
+            missing.Add($"the choice \"{value.OptionValue ?? value.FieldName}\"");
+        }
+
+        var referencedIds = revision.FieldValues
+            .Where(value => value.ReferencedEntityId is not null)
+            .Select(value => value.ReferencedEntityId!.Value)
+            .Distinct()
+            .ToList();
+
+        var liveReferencedIds = await db.Entities.AsNoTracking()
+            .Where(entity => referencedIds.Contains(entity.Id) && entity.UniverseId == universeId)
+            .Select(entity => entity.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var value in revision.FieldValues
+            .Where(value => value.ReferencedEntityId is { } id && !liveReferencedIds.Contains(id)))
+        {
+            missing.Add($"the entry \"{value.ReferencedEntityName ?? value.FieldName}\"");
+        }
+
+        return missing;
+    }
+
+    /// <summary>
+    /// The snapshot as an ordinary update request. Multi-select option rows are folded back
+    /// into one input per field, which is the shape the write path expects from a client.
+    /// </summary>
+    private static EntityRequest RequestFrom(EntityRevision revision)
+    {
+        var fields = revision.FieldValues
+            .GroupBy(value => value.FieldDefinitionId)
+            .Select(group => new FieldValueInput(
+                group.Key,
+                group.Select(value => value.TextValue).FirstOrDefault(text => text != null),
+                group.Select(value => value.NumberValue).FirstOrDefault(number => number != null),
+                group.Select(value => value.BooleanValue).FirstOrDefault(flag => flag != null),
+                group.Select(value => value.DateValue).FirstOrDefault(date => date != null),
+                [.. group.Where(value => value.OptionId is not null).Select(value => value.OptionId!.Value)],
+                group.Select(value => value.ReferencedEntityId).FirstOrDefault(id => id != null)))
+            .ToList();
+
+        return new EntityRequest(
+            revision.EntityTypeId,
+            revision.Name,
+            revision.Summary,
+            revision.Content,
+            revision.CanonStatus,
+            [.. revision.Aliases.Select(alias => alias.Value)],
+            [.. revision.Tags.Select(tag => tag.Name)],
+            fields);
+    }
+
+    /// <summary>
+    /// ProblemDetails, like every other refusal on this API, with a stable code so a client
+    /// need not match prose. The names quoted are the ones the snapshot itself recorded, all
+    /// of them inside the universe the caller has already proved they own.
+    /// </summary>
+    private static IResult NotRestorable(IReadOnlyList<string> missing) =>
+        Results.Problem(
+            title: "Version cannot be restored",
+            detail: $"This version still refers to {string.Join(", ", missing)}, "
+                + "which no longer exists, so it cannot be put back exactly as it was.",
+            statusCode: StatusCodes.Status409Conflict,
+            extensions: new Dictionary<string, object?>
+            {
+                ["code"] = NotRestorableCode,
+                ["missing"] = missing,
+            });
+}

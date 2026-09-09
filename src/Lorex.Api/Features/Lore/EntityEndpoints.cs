@@ -211,6 +211,11 @@ public static class EntityEndpoints
 
         await db.SaveChangesAsync(cancellationToken);
 
+        // Inside the gate's transaction, so a candidate that is refused takes its first
+        // version down with it.
+        await EntityRevisions.CaptureAsync(
+            db, entity.Id, EntityRevisionKind.Created, restoredFromRevisionId: null, cancellationToken);
+
         var detail = await LoadDetailAsync(db, universeId, entity.Id, cancellationToken);
         return Results.Created($"/api/universes/{universeId}/entities/{entity.Id}", detail);
     }
@@ -240,12 +245,20 @@ public static class EntityEndpoints
             cancellationToken);
     }
 
-    private static async Task<IResult> UpdateCoreAsync(
+    /// <summary>
+    /// The one write path for an existing entry, shared with the restore route so a restored
+    /// version is validated, gated, reconciled and recorded exactly like an ordinary edit.
+    /// <paramref name="kind"/> and <paramref name="restoredFromRevisionId"/> change nothing
+    /// about the write; they only say what the resulting revision is called.
+    /// </summary>
+    internal static async Task<IResult> UpdateCoreAsync(
         Guid universeId,
         Guid entityId,
         EntityRequest request,
         LorexDbContext db,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        EntityRevisionKind kind = EntityRevisionKind.Edited,
+        Guid? restoredFromRevisionId = null)
     {
         var entity = await db.Entities.FirstOrDefaultAsync(
             candidate => candidate.Id == entityId && candidate.UniverseId == universeId,
@@ -302,6 +315,12 @@ public static class EntityEndpoints
         }
 
         await db.SaveChangesAsync(cancellationToken);
+
+        // Before the commit, and inside the gate's transaction when there is one: the edit and
+        // the version it produced land together or neither does. A write that changed nothing
+        // records nothing.
+        await EntityRevisions.CaptureAsync(db, entity.Id, kind, restoredFromRevisionId, cancellationToken);
+
         await transaction.CommitAsync(cancellationToken);
 
         var detail = await LoadDetailAsync(db, universeId, entity.Id, cancellationToken);
