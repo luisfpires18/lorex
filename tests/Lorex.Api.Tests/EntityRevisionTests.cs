@@ -148,19 +148,42 @@ public sealed class EntityRevisionTests(LorexApiFactory factory) : IClassFixture
         Assert.Single(await Revisions(client, universe.Id, entity.Id));
     }
 
+    /// <summary>
+    /// Trashing an entry hides its history without touching it.
+    ///
+    /// ADR 0013 made <c>EntityId</c> a cascading key so history dies with the entry, and said
+    /// Trash was a later concern. It is this one: since Phase 019 the author's own removal no
+    /// longer deletes the row, so the cascade never fires and the versions are simply out of
+    /// reach until the entry comes back. Only deleting the whole universe still takes them.
+    /// </summary>
     [Fact]
-    public async Task Deleting_an_entry_takes_its_history_with_it()
+    public async Task Trashing_an_entry_hides_its_history_and_restoring_gives_it_back()
     {
         var (client, universe) = await SignedInWithUniverse("revdelete");
         var entity = await CreateEntity(client, universe.Id, "Duilin");
+        await Put(client, universe.Id, entity with { Name = "Duilin of the Swallow" });
 
-        var deleted = await client.DeleteAsync($"/api/universes/{universe.Id}/entities/{entity.Id}");
-        deleted.EnsureSuccessStatusCode();
+        var before = await Revisions(client, universe.Id, entity.Id);
+        Assert.Equal(2, before.Count);
+
+        (await client.DeleteAsync($"/api/universes/{universe.Id}/entities/{entity.Id}"))
+            .EnsureSuccessStatusCode();
 
         var response = await client.GetAsync(
             $"/api/universes/{universe.Id}/entities/{entity.Id}/revisions");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        (await client.PostAsync($"/api/universes/{universe.Id}/trash/{entity.Id}/restore", null))
+            .EnsureSuccessStatusCode();
+
+        var after = await Revisions(client, universe.Id, entity.Id);
+
+        // The same versions, unchanged and un-added-to: neither trashing nor restoring is an
+        // edit to the entry, so neither writes one.
+        Assert.Equal(
+            before.Select(revision => (revision.Id, revision.Number)),
+            after.Select(revision => (revision.Id, revision.Number)));
     }
 
     // ---------- What a version keeps ----------
@@ -419,21 +442,33 @@ public sealed class EntityRevisionTests(LorexApiFactory factory) : IClassFixture
     /// A version that names lore since deleted cannot be put back as it was. Dropping the
     /// dangling part quietly would restore something the author never wrote, so the whole
     /// restore is refused and says what is missing.
+    ///
+    /// The dangling part is a removed *choice*. Since Phase 019 an entry the author removes is
+    /// not deleted, so a snapshot's entity reference can no longer dangle by that route - the
+    /// case below covers what happens instead. An option is still genuinely removable once
+    /// nothing holds it, so it is what this refusal is now proved with.
     /// </summary>
     [Fact]
     public async Task A_restore_naming_lore_that_is_gone_is_refused_rather_than_partly_applied()
     {
         var (client, universe) = await SignedInWithUniverse("revrestoregone");
         var type = await CharacterType(client, universe.Id);
-        var mentor = await AddField(client, universe.Id, type.Id, "Mentor", EntityFieldKind.EntityReference);
+        var house = await AddField(
+            client, universe.Id, type.Id, "House", EntityFieldKind.Select, options: ["Swallow", "Arch"]);
 
-        var elder = await CreateEntity(client, universe.Id, "Turgon");
         var entity = await CreateEntity(
             client, universe.Id, "Egalmoth",
-            fields: [new FieldValueInput(mentor.Id, null, null, null, null, null, elder.Id)]);
+            fields: [new FieldValueInput(house.Id, null, null, null, null, [Option(house, "Swallow")], null)]);
 
-        await Put(client, universe.Id, entity with { Name = "Egalmoth of the Arch" });
-        (await client.DeleteAsync($"/api/universes/{universe.Id}/entities/{elder.Id}"))
+        // Move off the choice, then take the choice away. Removing it is only allowed because
+        // nothing holds it any more - but version 1 still names it.
+        await Put(
+            client, universe.Id, entity with { Name = "Egalmoth of the Arch" },
+            fields: [new FieldValueInput(house.Id, null, null, null, null, [Option(house, "Arch")], null)]);
+
+        (await client.PutAsJsonAsync(
+            $"/api/universes/{universe.Id}/entity-types/{type.Id}/fields/{house.Id}",
+            new FieldDefinitionRequest("House", EntityFieldKind.Select, false, null, null, ["Arch"])))
             .EnsureSuccessStatusCode();
 
         var first = (await Revisions(client, universe.Id, entity.Id)).Single(r => r.Number == 1);
@@ -444,10 +479,46 @@ public sealed class EntityRevisionTests(LorexApiFactory factory) : IClassFixture
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         var problem = await response.Content.ReadAsStringAsync();
         Assert.Contains(RevisionEndpoints.NotRestorableCode, problem, StringComparison.Ordinal);
-        Assert.Contains("Turgon", problem, StringComparison.Ordinal);
+        Assert.Contains("Swallow", problem, StringComparison.Ordinal);
 
         Assert.Equal("Egalmoth of the Arch", (await Entity(client, universe.Id, entity.Id)).Name);
         Assert.Equal(2, (await Revisions(client, universe.Id, entity.Id)).Count);
+    }
+
+    /// <summary>
+    /// A version naming an entry that is merely in the Trash is restorable, and putting it back
+    /// reconnects the reference rather than dropping it. The entry it names still exists - that
+    /// is what the Trash means - so there is nothing dangling to refuse.
+    /// </summary>
+    [Fact]
+    public async Task A_restore_naming_an_entry_in_the_trash_puts_the_reference_back()
+    {
+        var (client, universe) = await SignedInWithUniverse("revrestoretrashed");
+        var type = await CharacterType(client, universe.Id);
+        var mentor = await AddField(client, universe.Id, type.Id, "Mentor", EntityFieldKind.EntityReference);
+
+        var elder = await CreateEntity(client, universe.Id, "Turgon");
+        var entity = await CreateEntity(
+            client, universe.Id, "Egalmoth",
+            fields: [new FieldValueInput(mentor.Id, null, null, null, null, null, elder.Id)]);
+
+        // Clear the reference, then trash the entry it used to name.
+        await Put(client, universe.Id, entity with { Name = "Egalmoth of the Arch" }, fields: []);
+        (await client.DeleteAsync($"/api/universes/{universe.Id}/entities/{elder.Id}"))
+            .EnsureSuccessStatusCode();
+
+        var first = (await Revisions(client, universe.Id, entity.Id)).Single(r => r.Number == 1);
+        var response = await client.PostAsync(
+            $"/api/universes/{universe.Id}/entities/{entity.Id}/revisions/{first.Id}/restore",
+            content: null);
+
+        response.EnsureSuccessStatusCode();
+
+        var restored = await Entity(client, universe.Id, entity.Id);
+        var reference = restored.Fields.Single(field => field.FieldDefinitionId == mentor.Id);
+
+        Assert.Equal(elder.Id, reference.ReferencedEntityId);
+        Assert.True(reference.ReferencedEntityIsTrashed);
     }
 
     // ---------- Helpers ----------

@@ -164,6 +164,23 @@ public sealed class LoreEntity
 
     public bool IsArchived { get; set; }
 
+    /// <summary>
+    /// When this entry was moved to Trash, or null while it is live. The marker *is* the
+    /// Trash: the row and every row that points at it stay exactly where they are, so a
+    /// restore has nothing to rebuild and nothing dependent is destroyed on the way in.
+    ///
+    /// Deliberately a timestamp rather than a flag - the Trash listing has to show when an
+    /// entry was thrown away, and two columns that must agree is one too many.
+    ///
+    /// Not an EF global query filter. A filter follows navigations, and the reads that must
+    /// see a trashed entry (the backup, the Trash itself) and the reads that must not (browse,
+    /// search, pickers, every Canon rule) are both reached through those same navigations;
+    /// <c>IgnoreQueryFilters</c> is all-or-nothing per query and could not separate them. Every
+    /// read therefore says which it wants. See
+    /// <c>docs/architecture/decisions/0015-entity-trash-and-restore.md</c>.
+    /// </summary>
+    public DateTime? DeletedAt { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }

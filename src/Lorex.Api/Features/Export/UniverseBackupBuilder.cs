@@ -166,6 +166,9 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
         Guid universeId,
         CancellationToken cancellationToken)
     {
+        // Every entry, the Trash included. A backup is the whole world as it currently stands,
+        // and an entry the author can still restore is part of that world; each carries its own
+        // DeletedAt so a reader can tell which is which.
         var entities = await db.Entities.AsNoTracking()
             .Where(entity => entity.UniverseId == universeId)
             .ToListAsync(cancellationToken);
@@ -236,6 +239,7 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                     entity.Content,
                     entity.CanonStatus,
                     entity.IsArchived,
+                    Utc(entity.DeletedAt),
                     Utc(entity.CreatedAt),
                     Utc(entity.UpdatedAt),
                     aliasesByEntity.GetValueOrDefault(entity.Id, []),

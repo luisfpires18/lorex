@@ -174,6 +174,9 @@ public static class EntityTypeEndpoints
             return Results.NotFound();
         }
 
+        // Entries in the Trash count. The foreign key is Restrict precisely so a type cannot
+        // be pulled out from under lore that is still restorable, and an entry that came back
+        // to a type that no longer exists would not be the entry the author threw away.
         var inUse = await db.Entities.CountAsync(
             entity => entity.EntityTypeId == typeId,
             cancellationToken);
@@ -183,8 +186,10 @@ public static class EntityTypeEndpoints
             return Results.Problem(
                 title: "Type is in use",
                 detail: inUse == 1
-                    ? "1 entity still uses this type. Move or delete it first."
-                    : $"{inUse} entities still use this type. Move or delete them first.",
+                    ? "1 entry still uses this type, counting anything in the Trash. "
+                        + "Move it to another type first."
+                    : $"{inUse} entries still use this type, counting anything in the Trash. "
+                        + "Move them to another type first.",
                 statusCode: StatusCodes.Status409Conflict);
         }
 

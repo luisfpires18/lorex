@@ -352,7 +352,7 @@ test.describe('timeline', () => {
     )
   })
 
-  test('an entry leaving the world takes its participation with it and leaves the moment standing', async ({
+  test('an entry moved to the Trash keeps its place on the moment, marked, and comes back with it', async ({
     page,
   }) => {
     await signUp(page)
@@ -372,25 +372,37 @@ test.describe('timeline', () => {
       moment(page, 'The last council of Minas Tirith').locator('.moment__player'),
     ).toHaveCount(2)
 
-    // A timeline entry is a chronology record, not a lore entity: deleting one of the
-    // entries it names drops the participation and leaves the moment itself standing.
+    // A timeline entry is a chronology record, not a lore entity, and since Phase 019
+    // removing one of the entries it names destroys nothing: the participation stays stored
+    // and is shown as unavailable rather than dropped, because the form posts the whole
+    // participant set back and hiding it would delete it on the next save.
     const removed = await page.request.delete(`/api/universes/${universeId}/entities/${gone}`)
     expect(removed.status()).toBe(204)
 
     await page.reload()
     const council = moment(page, 'The last council of Minas Tirith')
     await expect(council).toBeVisible()
-    await expect(council.locator('.moment__player')).toHaveCount(1)
+    await expect(council.locator('.moment__player')).toHaveCount(2)
     await expect(council.locator('.moment__cast')).toContainText('Boromir')
-    await expect(council.locator('.moment__cast')).not.toContainText('Denethor')
+    await expect(council.locator('.moment__cast')).toContainText('Denethor (in Trash)')
 
-    // And the moment can still be edited afterwards, with only the survivor on it.
+    // The one in the Trash is named but not a link: it has no page to open.
+    await expect(council.getByRole('link', { name: 'Denethor', exact: true })).toHaveCount(0)
+
+    // An unrelated edit to the moment keeps it.
     await page.getByTestId('edit-moment-The last council of Minas Tirith').click()
-    await expect(page.getByTestId('participants')).toContainText('Boromir')
-    await expect(page.getByTestId('participants')).not.toContainText('Denethor')
+    await expect(page.getByTestId('participants')).toContainText('Denethor (in Trash)')
     await page.getByTestId('save-moment').click()
     await expect(page.getByTestId('moment-form')).toHaveCount(0)
-    await expect(council.locator('.moment__player')).toHaveCount(1)
+    await expect(council.locator('.moment__player')).toHaveCount(2)
+
+    // Restoring the entry makes the moment read exactly as it did before.
+    const back = await page.request.post(`/api/universes/${universeId}/trash/${gone}/restore`)
+    expect(back.status()).toBe(200)
+
+    await page.reload()
+    await expect(council.locator('.moment__cast')).not.toContainText('(in Trash)')
+    await expect(council.getByRole('link', { name: 'Denethor', exact: true })).toBeVisible()
   })
 
   test('an edit moves a moment to its new place, and everything it was given survives a reload', async ({

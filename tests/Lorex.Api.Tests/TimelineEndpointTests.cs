@@ -376,8 +376,17 @@ public sealed class TimelineEndpointTests(LorexApiFactory factory) : IClassFixtu
         Assert.Equal(["Frodo", "Sam"], updated.Entities.Select(link => link.Name).ToArray());
     }
 
+    /// <summary>
+    /// Trashing a participant leaves the moment standing, and leaves the participation stored.
+    ///
+    /// Since Phase 019 an entry is not destroyed by the author removing it, so the link is not
+    /// destroyed either. It is reported and marked rather than dropped: the form posts a
+    /// moment's whole participant set on every save, so hiding a participant here would delete
+    /// the participation the next time the author touched the date. Restoring the entry makes
+    /// the moment read exactly as it did before.
+    /// </summary>
     [Fact]
-    public async Task Deleting_a_participant_leaves_the_moment_standing()
+    public async Task Trashing_a_participant_leaves_the_moment_standing_and_the_participation_stored()
     {
         var (client, universe) = await SignedInWithUniverse("tldelparticipant");
         var frodo = await CreateEntity(client, universe.Id, "Frodo");
@@ -392,8 +401,18 @@ public sealed class TimelineEndpointTests(LorexApiFactory factory) : IClassFixtu
 
         var read = await Get(client, universe.Id, entry.Id);
 
-        var remaining = Assert.Single(read.Entities);
-        Assert.Equal("Frodo", remaining.Name);
+        Assert.Equal("They set out", read.Title);
+        Assert.Equal(["Frodo", "Sam"], read.Entities.Select(link => link.Name).ToArray());
+        Assert.False(read.Entities.Single(link => link.EntityId == frodo.Id).IsTrashed);
+        Assert.True(read.Entities.Single(link => link.EntityId == sam.Id).IsTrashed);
+
+        (await client.PostAsync($"/api/universes/{universe.Id}/trash/{sam.Id}/restore", null))
+            .EnsureSuccessStatusCode();
+
+        var back = await Get(client, universe.Id, entry.Id);
+
+        Assert.Equal(["Frodo", "Sam"], back.Entities.Select(link => link.Name).ToArray());
+        Assert.All(back.Entities, link => Assert.False(link.IsTrashed));
     }
 
     [Fact]

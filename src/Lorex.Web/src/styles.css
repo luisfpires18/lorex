@@ -2164,6 +2164,14 @@ a {
   border-bottom-color: var(--rule-strong);
 }
 
+/* Named, so the author knows the moment still holds it, and unemphasised, so it does not
+   read as somewhere to click. */
+.moment__player--trashed {
+  color: var(--rule-strong);
+  font-style: italic;
+  border-bottom-color: transparent;
+}
+
 .moment__dot {
   width: 0.4rem;
   height: 0.4rem;
@@ -2730,4 +2738,68 @@ a {
   .finding__rule {
     margin-top: 0;
   }
+}
+
+/* ---------- Trash ----------
+
+   A list, not a gallery. The screen exists to answer one question and offer one action, so
+   it is laid out as rows rather than as cards: cards invite browsing, and nothing here is
+   meant to be browsed. */
+
+.trash__head {
+  margin-bottom: 1.75rem;
+}
+
+.trash__title {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(1.7rem, 2.6vw, 2.1rem);
+  margin: 0;
+}
+
+.trash__lede {
+  margin: 0.5rem 0 0;
+  max-width: 46rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.trash__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.trash__row {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.85rem 0.25rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.trash__dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--rule-strong);
+  flex: none;
+}
+
+.trash__what {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.trash__name {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+
+.trash__meta {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
 }

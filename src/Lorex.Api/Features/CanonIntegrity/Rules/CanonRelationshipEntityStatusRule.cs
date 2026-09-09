@@ -26,8 +26,14 @@ public sealed class CanonRelationshipEntityStatusRule : ICanonIntegrityRule
             .Where(relationship =>
                 relationship.UniverseId == context.UniverseId
                 && relationship.CanonStatus == CanonStatus.Canon
-                && (relationship.SourceEntity!.CanonStatus != CanonStatus.Canon
-                    || relationship.TargetEntity!.CanonStatus != CanonStatus.Canon))
+
+                // Both ends live. The row survives its endpoint being trashed - that is the
+                // whole point of the Trash - but a link with one end out of the world is not
+                // a claim about canon, and it becomes one again when the entry is restored.
+                && relationship.SourceEntity!.DeletedAt == null
+                && relationship.TargetEntity!.DeletedAt == null
+                && (relationship.SourceEntity.CanonStatus != CanonStatus.Canon
+                    || relationship.TargetEntity.CanonStatus != CanonStatus.Canon))
             .Select(relationship => new Row(
                 relationship.Id,
                 relationship.RelationshipType!.Name,

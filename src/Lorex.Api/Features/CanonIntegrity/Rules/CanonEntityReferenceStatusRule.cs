@@ -6,6 +6,10 @@ namespace Lorex.Api.Features.CanonIntegrity.Rules;
 /// <summary>
 /// A Canon entity whose entity-reference field points at an entry that is not Canon.
 ///
+/// Neither end may be in the Trash. A reference to a trashed entry is a reference the author
+/// cannot follow and the UI does not offer, so calling it a canon problem would be reporting
+/// a contradiction about lore that is not currently in the world.
+///
 /// The field's meaning is never consulted - only its kind. Nothing here knows what
 /// "Homeland" or "Mentor" is supposed to mean, and no field name is hardcoded, so the rule
 /// works on types the author invents. One finding per pointing field, because each is
@@ -24,10 +28,12 @@ public sealed class CanonEntityReferenceStatusRule : ICanonIntegrityRule
         var rows = await context.Db.EntityFieldValues.AsNoTracking()
             .Where(value =>
                 value.Entity!.UniverseId == context.UniverseId
+                && value.Entity.DeletedAt == null
                 && value.Entity.CanonStatus == CanonStatus.Canon
                 && value.FieldDefinition!.Kind == EntityFieldKind.EntityReference
                 && value.ReferencedEntityId != null
-                && value.ReferencedEntity!.CanonStatus != CanonStatus.Canon)
+                && value.ReferencedEntity!.DeletedAt == null
+                && value.ReferencedEntity.CanonStatus != CanonStatus.Canon)
             .Select(value => new Row(
                 value.EntityId,
                 value.Entity!.Name,

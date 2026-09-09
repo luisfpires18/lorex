@@ -58,7 +58,12 @@ public static class EntityEndpoints
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
-        var query = db.Entities.AsNoTracking().Where(entity => entity.UniverseId == universeId);
+        // The Trash is not a filter on this listing, it is outside it. An entry the author
+        // threw away must not come back through browse, search, a tag or a picker, and
+        // includeArchived deliberately does not reach it: archiving and trashing are
+        // different statements about an entry.
+        var query = db.Entities.AsNoTracking()
+            .Where(entity => entity.UniverseId == universeId && entity.DeletedAt == null);
 
         if (!includeArchived)
         {
@@ -133,7 +138,9 @@ public static class EntityEndpoints
             return Results.NotFound();
         }
 
-        var detail = await LoadDetailAsync(db, universeId, entityId, cancellationToken);
+        // A trashed entry is not reachable through the ordinary entity surface at all. It is
+        // still owned, still stored and still listed in the Trash; here it is simply absent.
+        var detail = await LoadDetailAsync(db, universeId, entityId, cancellationToken, liveOnly: true);
         return detail is null ? Results.NotFound() : Results.Ok(detail);
     }
 
@@ -260,8 +267,12 @@ public static class EntityEndpoints
         EntityRevisionKind kind = EntityRevisionKind.Edited,
         Guid? restoredFromRevisionId = null)
     {
+        // Trashed is not editable. Restore is the only write a trashed entry accepts, and it
+        // puts back exactly what was stored - so nothing here can quietly rewrite it first.
         var entity = await db.Entities.FirstOrDefaultAsync(
-            candidate => candidate.Id == entityId && candidate.UniverseId == universeId,
+            candidate => candidate.Id == entityId
+                && candidate.UniverseId == universeId
+                && candidate.DeletedAt == null,
             cancellationToken);
 
         if (entity is null)
@@ -328,11 +339,19 @@ public static class EntityEndpoints
     }
 
     /// <summary>
-    /// Reconciled but not gated. Every rule reads facts an entity contributes - its declared
-    /// years, its Canon participation in a moment, the relationships and references that rest
-    /// on it - so deleting one can only take findings away, and there is nothing to refuse.
-    /// Those findings still have to stop being reported: a conflict about lore that no longer
-    /// exists is worse than no conflict at all.
+    /// Moves the entry to the Trash. Nothing is erased: the row stays, and so does every row
+    /// that points at it - aliases, values, tags, relationships from both ends, timeline
+    /// participation and the whole revision history. It simply stops being live.
+    ///
+    /// Reconciled but not gated, exactly as the destructive delete this replaced was. Every
+    /// rule reads facts an entity contributes - its declared years, its Canon participation,
+    /// the relationships and references that rest on it - and a trashed entry contributes
+    /// none of them, so taking it out of the live set can only remove findings. There is
+    /// nothing to refuse. Those findings do have to stop being reported, which is what
+    /// <see cref="CanonPromotionGate.RecordAsync"/> is for: a conflict about lore the author
+    /// has thrown away is worse than no conflict at all.
+    ///
+    /// See <c>docs/architecture/decisions/0015-entity-trash-and-restore.md</c>.
     /// </summary>
     private static async Task<IResult> DeleteAsync(
         Guid universeId,
@@ -349,18 +368,25 @@ public static class EntityEndpoints
 
         return await canon.RecordAsync(
             universeId,
-            token => DeleteCoreAsync(universeId, entityId, db, token),
+            token => TrashCoreAsync(universeId, entityId, db, token),
             cancellationToken);
     }
 
-    private static async Task<IResult> DeleteCoreAsync(
+    /// <summary>
+    /// Marks one live entry as trashed. An entry already in the Trash answers 404 rather than
+    /// having its timestamp rewritten, so trashing twice cannot quietly move the moment the
+    /// author threw it away.
+    /// </summary>
+    internal static async Task<IResult> TrashCoreAsync(
         Guid universeId,
         Guid entityId,
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
         var entity = await db.Entities.FirstOrDefaultAsync(
-            candidate => candidate.Id == entityId && candidate.UniverseId == universeId,
+            candidate => candidate.Id == entityId
+                && candidate.UniverseId == universeId
+                && candidate.DeletedAt == null,
             cancellationToken);
 
         if (entity is null)
@@ -368,7 +394,9 @@ public static class EntityEndpoints
             return Results.NotFound();
         }
 
-        db.Entities.Remove(entity);
+        // UpdatedAt is left alone. It says when the lore was last authored, and being thrown
+        // away is not an edit to it - the Trash reads DeletedAt for its own ordering.
+        entity.DeletedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
 
         return Results.NoContent();
@@ -385,10 +413,15 @@ public static class EntityEndpoints
             return Results.NotFound();
         }
 
+        // Counted over live entries only, because this list is the browse filter: a tag
+        // promising three entries and then filtering to none would be a lie about the Trash.
         var tags = await db.Tags.AsNoTracking()
             .Where(tag => tag.UniverseId == universeId)
             .OrderBy(tag => tag.Name)
-            .Select(tag => new TagResponse(tag.Id, tag.Name, tag.EntityTags.Count))
+            .Select(tag => new TagResponse(
+                tag.Id,
+                tag.Name,
+                tag.EntityTags.Count(link => link.Entity!.DeletedAt == null)))
             .ToListAsync(cancellationToken);
 
         return Results.Ok(tags);
@@ -668,6 +701,12 @@ public static class EntityEndpoints
 
                 // The target must be in the same universe, so a reference cannot be used
                 // to probe for entities elsewhere.
+                //
+                // A target in the Trash is deliberately still writable. The client sends its
+                // whole field set on every save, so refusing one would turn any unrelated
+                // edit to this entry into a validation failure - or, worse, silently drop the
+                // reference. Discoverability is the picker's job: the entity listing never
+                // offers a trashed entry, so a *new* reference to one cannot be authored.
                 var referenceExists = await db.Entities.AnyAsync(
                     candidate => candidate.Id == referenceId && candidate.UniverseId == universeId,
                     cancellationToken);
@@ -694,14 +733,22 @@ public static class EntityEndpoints
 
     // ---------- Reading ----------
 
-    private static async Task<EntityDetail?> LoadDetailAsync(
+    /// <summary>
+    /// One entry for the reader. <paramref name="liveOnly"/> is what the ordinary entity
+    /// surface passes; the write paths and the restore leave it false, because they have
+    /// already decided what they are looking at and are describing what they just stored.
+    /// </summary>
+    internal static async Task<EntityDetail?> LoadDetailAsync(
         LorexDbContext db,
         Guid universeId,
         Guid entityId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool liveOnly = false)
     {
         var entity = await db.Entities.AsNoTracking()
-            .Where(candidate => candidate.Id == entityId && candidate.UniverseId == universeId)
+            .Where(candidate => candidate.Id == entityId
+                && candidate.UniverseId == universeId
+                && (!liveOnly || candidate.DeletedAt == null))
             .Select(candidate => new
             {
                 candidate.Id,
@@ -732,6 +779,8 @@ public static class EntityEndpoints
                     OptionValue = value.Option != null ? value.Option.Value : null,
                     value.ReferencedEntityId,
                     ReferencedName = value.ReferencedEntity != null ? value.ReferencedEntity.Name : null,
+                    ReferencedTrashed = value.ReferencedEntity != null
+                        && value.ReferencedEntity.DeletedAt != null,
                 }).ToList(),
                 candidate.CreatedAt,
                 candidate.UpdatedAt,
@@ -760,7 +809,8 @@ public static class EntityEndpoints
                 group.Where(value => value.OptionId != null).Select(value => value.OptionId!.Value).ToList(),
                 group.Where(value => value.OptionValue != null).Select(value => value.OptionValue!).ToList(),
                 group.Select(value => value.ReferencedEntityId).FirstOrDefault(id => id != null),
-                group.Select(value => value.ReferencedName).FirstOrDefault(name => name != null)))
+                group.Select(value => value.ReferencedName).FirstOrDefault(name => name != null),
+                group.Any(value => value.ReferencedTrashed)))
             .ToList();
 
         return new EntityDetail(

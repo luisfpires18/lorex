@@ -6,6 +6,7 @@ using Lorex.Api.Features.Health;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.Timeline;
+using Lorex.Api.Features.Trash;
 using Lorex.Api.Features.Universes;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -55,6 +56,7 @@ app.MapRelationshipTypeEndpoints();
 app.MapRelationshipEndpoints();
 app.MapTimelineEndpoints();
 app.MapCanonIntegrityEndpoints();
+app.MapTrashEndpoints();
 app.MapUniverseExportEndpoints();
 
 await app.MigrateLorexDatabaseAsync();

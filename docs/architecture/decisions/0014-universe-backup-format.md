@@ -29,6 +29,22 @@ round-trips byte for byte.
 future importer can tell which contract it is looking at. The version is bumped when the
 payload's shape or meaning changes in a way a reader must notice.
 
+**Version 2 (Phase 019) carries the Trash.** ADR 0015 made an entry the author removes a
+row that is marked rather than deleted, so `BackupEntity.deletedAt` is now part of the
+format: null while an entry is live, and the moment it was trashed otherwise. A trashed
+entry travels whole - values, aliases, tags, history - and so does everything that points at
+it, because a backup that omitted recoverable lore would turn a recoverable mistake into a
+permanent one the first time the file was read back.
+
+That is a bump rather than the "nullable member an older reader can ignore" case, and the
+distinction is worth stating. The member is nullable and ignorable; what is not ignorable is
+what it does to the `entities` collection, whose membership no longer implies an entry is
+live. A reader that skipped `deletedAt` would restore an author's Trash into their world as
+ordinary lore. That is the "re-meaning" clause above, so `formatVersion` is 2. Nothing about
+version 1 changes: a version 1 file still means exactly what it always meant, which is that
+every entry in it is live - a fact that was previously true by construction and is now
+written down.
+
 **Only the authored data.** The test for inclusion is: did a person write this, or would
 Lorex produce it again from what a person wrote?
 
@@ -36,7 +52,7 @@ Lorex produce it again from what a person wrote?
 | --- | --- |
 | Universe name, description, accent, archived flag, timestamps | `OwnerId` |
 | Entity types, field definitions with their declared `Semantic`, options | - |
-| Entries: name, summary, Tiptap article, canon status, archived flag | - |
+| Entries: name, summary, Tiptap article, canon status, archived flag, `deletedAt` | - |
 | Aliases, tags, stored values including entity references | Alias and value row ids |
 | Relationship types and relationships | - |
 | Timeline entries, their signed date components and era labels, participants | Derived date precision |

@@ -108,7 +108,16 @@ public sealed class LoreEntityConfiguration : IEntityTypeConfiguration<LoreEntit
             .HasForeignKey(entity => entity.EntityTypeId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(entity => new { entity.UniverseId, entity.IsArchived, entity.UpdatedAt });
+        // Browse and Trash are the same shape read from opposite sides of DeletedAt, so one
+        // index serves both: every ordinary listing is UniverseId + DeletedAt is null, and the
+        // Trash is UniverseId + DeletedAt is not null.
+        builder.HasIndex(entity => new
+        {
+            entity.UniverseId,
+            entity.DeletedAt,
+            entity.IsArchived,
+            entity.UpdatedAt,
+        });
         builder.HasIndex(entity => new { entity.UniverseId, entity.EntityTypeId });
         builder.HasIndex(entity => new { entity.UniverseId, entity.Name });
     }
