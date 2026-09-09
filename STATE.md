@@ -6,14 +6,13 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 ## Roadmap position
 
 - Phases 001-016 done. Sequence log: `docs/architecture/branching.md`.
-- **Phase 016** (Canon Integrity E2E / hardening) on `test/016/canon-integrity-hardening`,
-  **not merged, not pushed**. Six Playwright scenarios in `tests/Lorex.E2E/specs/canon.spec.ts`
-  cover the review screen, conflict identity across runs, the promotion gate, reconciliation
-  on write, the Canon-meaning control, and the universe/owner boundary. Two defects found and
-  fixed: the entry page's one-click Canon step swallowed the gate's 409, and
-  `EntityFieldSemantic` had no control in the client, so no chronology rule was reachable
-  without calling the API.
-- **Next: no phase chosen.** The security follow-ups below are the largest open item.
+- **Phase 016** (Canon Integrity E2E / hardening) merged into `dev`. Six Playwright scenarios
+  in `tests/Lorex.E2E/specs/canon.spec.ts` cover the review screen, conflict identity across
+  runs, the promotion gate, reconciliation on write, the Canon-meaning control, and the
+  universe/owner boundary. Two defects fixed: the entry page's one-click Canon step swallowed
+  the gate's 409, and `EntityFieldSemantic` had no control in the client, so no chronology
+  rule was reachable without calling the API.
+- **Now: Phase 017 - Revision / History.** Not started; no branch yet.
 
 ## Baseline
 
