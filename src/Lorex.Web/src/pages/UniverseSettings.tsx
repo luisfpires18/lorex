@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { UniverseForm } from '../components/UniverseForm'
+import { downloadUniverseBackup } from '../export/api'
 import { deleteUniverse, setUniverseArchived, updateUniverse } from '../universes/api'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
@@ -12,6 +13,25 @@ export default function UniverseSettings() {
   const [busy, setBusy] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const [exporting, setExporting] = useState(false)
+  const [exportedAs, setExportedAs] = useState<string | null>(null)
+  const [exportError, setExportError] = useState<string | null>(null)
+
+  async function exportBackup() {
+    setExporting(true)
+    setExportedAs(null)
+    setExportError(null)
+    try {
+      setExportedAs(await downloadUniverseBackup(universe.id))
+    } catch (problem: unknown) {
+      setExportError(
+        problem instanceof Error ? problem.message : 'That backup could not be prepared.',
+      )
+    } finally {
+      setExporting(false)
+    }
+  }
 
   async function toggleArchived() {
     setBusy(true)
@@ -63,6 +83,35 @@ export default function UniverseSettings() {
             setSaved(true)
           }}
         />
+      </section>
+
+      <section className="settings__section">
+        <h3 className="settings__heading">Backup</h3>
+        <p className="settings__note">
+          Download this universe as a single file: its entries and their articles, types and fields,
+          tags, relationships, the timeline, and every entry&rsquo;s history. Nothing about your
+          account is in it. Lorex cannot read a backup back in yet, so keep the file somewhere you
+          trust.
+        </p>
+        <button
+          className="button button--quiet"
+          type="button"
+          onClick={exportBackup}
+          disabled={exporting}
+          data-testid="export-universe"
+        >
+          {exporting ? 'Preparing backup' : 'Download backup'}
+        </button>
+        {exportedAs ? (
+          <p className="settings__saved" role="status" data-testid="export-done">
+            Saved as {exportedAs}.
+          </p>
+        ) : null}
+        {exportError ? (
+          <p className="form__message" role="alert" data-testid="export-error">
+            {exportError}
+          </p>
+        ) : null}
       </section>
 
       <section className="settings__section">

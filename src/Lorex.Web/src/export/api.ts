@@ -1,0 +1,63 @@
+import { ApiError } from '../lib/api'
+
+/**
+ * Downloading a backup, which is the one place the client asks for a file rather than JSON.
+ *
+ * `apiFetch` cannot be reused here: it parses the body, and the body is the artefact. So this
+ * makes the same same-origin, cookie-carrying request by hand and reads the response as a blob
+ * instead. A failure still arrives as ProblemDetails and is still raised as an `ApiError`, so
+ * the page handles it exactly as it handles any other refusal.
+ */
+const FALLBACK_FILE_NAME = 'lorex-universe.json'
+
+/**
+ * The name the server chose, out of `Content-Disposition`. Only the basename is kept: a
+ * response is not allowed to steer where the file lands.
+ */
+function fileNameFrom(header: string | null) {
+  const match = header?.match(/filename="?([^";]+)"?/i)
+  const name = match?.[1]?.split(/[/\\]/).pop()?.trim()
+
+  return name && name.length > 0 ? name : FALLBACK_FILE_NAME
+}
+
+/** Hands the blob to the browser as a download, then lets go of the object URL. */
+function save(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+
+  anchor.href = url
+  anchor.download = fileName
+  document.body.append(anchor)
+  anchor.click()
+  anchor.remove()
+
+  // Revoked on the next turn: revoking synchronously can race the download starting.
+  setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
+/**
+ * Downloads one universe's backup and returns the filename it was saved under, so the page
+ * can say which file to look for.
+ */
+export async function downloadUniverseBackup(universeId: string): Promise<string> {
+  const response = await fetch(`/api/universes/${universeId}/export`, {
+    credentials: 'same-origin',
+    headers: { Accept: 'application/json' },
+  })
+
+  if (!response.ok) {
+    const isJson = response.headers.get('content-type')?.includes('json') ?? false
+    const problem = isJson ? ((await response.json()) as { detail?: string; title?: string }) : null
+
+    throw new ApiError(
+      response.status,
+      problem?.detail ?? problem?.title ?? 'That backup could not be prepared. Try again.',
+    )
+  }
+
+  const fileName = fileNameFrom(response.headers.get('content-disposition'))
+  save(await response.blob(), fileName)
+
+  return fileName
+}
