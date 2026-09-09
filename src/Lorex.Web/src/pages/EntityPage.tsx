@@ -5,6 +5,9 @@ import { LoreArticle, LoreEditor } from '../components/LoreEditor'
 import { RelationshipSection } from '../components/RelationshipSection'
 import { emptyValue, isEmptyDocument } from '../lore/document'
 import { TokenInput } from '../components/TokenInput'
+import { blockingFindingsOf } from '../canon/blocked'
+import type { CanonBlockingFinding } from '../canon/types'
+import { CanonBlockNotice } from '../components/CanonBlockNotice'
 import { ApiError } from '../lib/api'
 import { formatDate } from '../lib/dates'
 import {
@@ -81,6 +84,7 @@ export default function EntityPage() {
   )
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
+  const [blocked, setBlocked] = useState<CanonBlockingFinding[] | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
@@ -154,6 +158,7 @@ export default function EntityPage() {
 
     setMessage(null)
     setFieldErrors({})
+    setBlocked(null)
     setIsSaving(true)
 
     const definitions = selectedType?.fields ?? []
@@ -183,7 +188,12 @@ export default function EntityPage() {
         await navigate(`/app/universes/${universe.id}/lore/${saved.id}`, { replace: true })
       }
     } catch (error: unknown) {
-      if (error instanceof ApiError) {
+      // A refusal from the promotion gate is not a save failure to report in one line:
+      // the draft is still on screen and still editable, and the findings say why.
+      const blocking = blockingFindingsOf(error)
+      if (blocking) {
+        setBlocked(blocking)
+      } else if (error instanceof ApiError) {
         setFieldErrors(error.fieldErrors)
         setMessage(
           Object.keys(error.fieldErrors).length === 0
@@ -351,6 +361,12 @@ export default function EntityPage() {
         ) : null}
       </header>
 
+      {blocked ? (
+        // A blocked creation names an entry that was rolled back, so its ids lead
+        // nowhere. Only an edit of something already stored can be linked.
+        <CanonBlockNotice universeId={universe.id} findings={blocked} linkSubjects={!isNew} />
+      ) : null}
+
       {message ? (
         <p className="form__message" role="alert" data-testid="entry-error">
           {message}
@@ -477,6 +493,7 @@ export default function EntityPage() {
                   setIsEditing(false)
                   setMessage(null)
                   setFieldErrors({})
+                  setBlocked(null)
                 }}
               >
                 Cancel

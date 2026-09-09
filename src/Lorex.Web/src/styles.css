@@ -2223,3 +2223,353 @@ a {
     padding: 1.25rem;
   }
 }
+
+/* ---------- Canon integrity ----------
+
+   A finding is an editorial objection, so it is set as marginalia rather than as a row.
+   The severity stands out in the margin the way the year does on the chronology, because
+   it is the one thing that decides whether this needs attention now, and the bar beside
+   it carries the same weight: solid for High, which refuses a save, a hairline for
+   Medium, dashed for Low, which is only a remark.
+
+   Findings that are no longer live - dismissed, or closed by evaluation - are set back in
+   the muted ink rather than hidden, so a list that has been worked through still reads as
+   one. */
+
+.integrity__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.integrity__title {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(1.7rem, 2.6vw, 2.1rem);
+  margin: 0;
+}
+
+.integrity__lede {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  max-width: 46ch;
+}
+
+/* What blocking actually means, stated once and permanently, so nothing else on the
+   screen has to imply it. */
+.integrity__law {
+  margin: 1.5rem 0 0;
+  padding-left: 0.9rem;
+  border-left: 2px solid var(--rule-strong);
+  color: var(--muted);
+  font-size: 0.85rem;
+  max-width: 66ch;
+}
+
+.integrity__law strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.integrity__run {
+  margin: 1.25rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.integrity__ledger {
+  list-style: none;
+  margin: 2rem 0 0;
+  padding: 0;
+}
+
+.finding {
+  position: relative;
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  column-gap: 2rem;
+  padding-bottom: 2.5rem;
+}
+
+.finding:last-child {
+  padding-bottom: 0.5rem;
+}
+
+.finding__margin {
+  text-align: right;
+  padding-right: 1.25rem;
+}
+
+/* The bar stands in the gutter and runs the height of the note it marks, so severity is
+   legible before a word of it is read. */
+.finding__mark {
+  position: absolute;
+  left: 7.5rem;
+  top: 0.2rem;
+  bottom: 2.5rem;
+  width: 2px;
+  background: var(--rule);
+}
+
+.finding:last-child .finding__mark {
+  bottom: 0.5rem;
+}
+
+.finding[data-severity='2'] .finding__mark {
+  width: 3px;
+  background: var(--danger);
+}
+
+.finding[data-severity='1'] .finding__mark {
+  background: var(--rule-strong);
+}
+
+.finding[data-severity='0'] .finding__mark {
+  width: 0;
+  border-right: 1px dashed var(--rule-strong);
+}
+
+.finding__severity {
+  display: block;
+  font-family: var(--display);
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.finding[data-severity='2'] .finding__severity {
+  color: var(--danger);
+}
+
+.finding__rule {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.finding__body {
+  min-width: 0;
+}
+
+/* Settled business is set back, not removed. */
+.finding[data-status='1'] .finding__body,
+.finding[data-status='2'] .finding__body {
+  color: var(--muted);
+}
+
+.finding[data-status='1'] .finding__title,
+.finding[data-status='2'] .finding__title {
+  color: var(--muted);
+}
+
+.finding__stamp {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.7rem;
+  margin: 0;
+}
+
+.finding__when {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+/* Open is the only status worth marking; the closed ones stay quiet. */
+.chip[data-conflict='0'] {
+  border-color: var(--rule-strong);
+  color: var(--ink);
+}
+
+.finding__title {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(1.05rem, 1.6vw, 1.3rem);
+  margin: 0.3rem 0 0.4rem;
+  overflow-wrap: anywhere;
+}
+
+.finding__account {
+  margin: 0 0 0.7rem;
+  max-width: 64ch;
+  font-size: 0.95rem;
+}
+
+.finding__subjects {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 1.25rem;
+  margin: 0 0 0.7rem;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.finding__role,
+.refusal__role {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  margin-right: 0.4rem;
+}
+
+.finding__kind {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.finding__gone {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.finding__tools {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+}
+
+.finding__note {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  max-width: 52ch;
+}
+
+/* ---------- A refused write ----------
+
+   Not a failure banner. The draft underneath it is intact, and the only thing that did
+   not happen is the save, so this reads as a returned page with the objection written
+   beside it. */
+
+.refusal {
+  margin: 0 0 1.5rem;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--danger);
+  border-left-width: 3px;
+  background: var(--surface);
+}
+
+.refusal__eyebrow {
+  margin: 0 0 0.3rem;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--danger);
+}
+
+.refusal__title {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 1.15rem;
+}
+
+.refusal__lede {
+  margin: 0.35rem 0 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+  max-width: 58ch;
+}
+
+.refusal__findings {
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.refusal__finding {
+  padding-top: 0.9rem;
+  margin-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+}
+
+.refusal__finding:first-child {
+  padding-top: 0;
+  margin-top: 0;
+  border-top: 0;
+}
+
+.refusal__rule {
+  margin: 0;
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.refusal__what {
+  margin: 0.15rem 0 0.3rem;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.refusal__account {
+  margin: 0 0 0.5rem;
+  font-size: 0.88rem;
+  max-width: 58ch;
+}
+
+.refusal__subjects {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 1.25rem;
+  margin: 0;
+  padding: 0;
+  font-size: 0.82rem;
+}
+
+.refusal__aside {
+  margin: 1rem 0 0;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.8rem;
+  color: var(--muted);
+  max-width: 62ch;
+}
+
+/* ---------- Canon integrity on a narrow screen ---------- */
+
+@media (max-width: 40rem) {
+  .finding {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0.4rem;
+    padding-left: 0.9rem;
+    border-left: 2px solid var(--rule);
+  }
+
+  .finding[data-severity='2'] {
+    border-left-color: var(--danger);
+  }
+
+  .finding__margin {
+    text-align: left;
+    padding-right: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+  }
+
+  .finding__mark {
+    display: none;
+  }
+
+  .finding__severity {
+    font-size: 0.95rem;
+  }
+
+  .finding__rule {
+    margin-top: 0;
+  }
+}
