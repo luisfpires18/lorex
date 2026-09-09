@@ -1604,6 +1604,148 @@ a {
   flex-wrap: wrap;
 }
 
+/* ---------- Entry history ---------- */
+
+/* Set as a document history, not a log: the same rules and margins the relations list
+   uses, so the dossier reads as one page rather than as a page with a table bolted on. */
+.history {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--rule);
+}
+
+.history__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.history__title {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 1.35rem;
+}
+
+.history__quiet {
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+  font-style: italic;
+  max-width: 52ch;
+}
+
+.history__list {
+  list-style: none;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.version {
+  display: grid;
+  grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr) auto;
+  gap: 0 1.25rem;
+  align-items: start;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.version__when {
+  margin: 0;
+  padding-right: 1.25rem;
+  border-right: 1px solid var(--rule-strong);
+  min-height: 1.5rem;
+  text-align: right;
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.version__body {
+  min-width: 0;
+}
+
+.version__what {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 1.1rem;
+  line-height: 1.3;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+/* The version on screen is the one the dossier above already shows, so it is marked
+   rather than repeated. */
+.version__now {
+  margin-left: 0.6rem;
+  font-family: inherit;
+  font-style: italic;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.version__meta {
+  margin: 0.15rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.85rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.version__tools {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem 0.9rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.version__tools .button--quiet {
+  padding: 0;
+  border: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.version__tools .button--quiet:hover:not(:disabled) {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+/* An opened version spans the whole row and is inset, so it reads as the page it was
+   rather than as another row in the list. */
+.version__snapshot {
+  grid-column: 1 / -1;
+  margin: 1rem 0 0.25rem;
+  padding: 1.1rem 1.25rem 1.25rem;
+  border-left: 2px solid var(--rule-strong);
+  background: var(--surface);
+}
+
+.snapshot__name {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 1.4rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.snapshot__kind {
+  margin: 0.2rem 0 0.9rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 /* ---------- Entity picker ---------- */
 
 .picker {

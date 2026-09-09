@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import { EntityHistory } from '../components/EntityHistory'
 import { FieldInput } from '../components/FieldInputs'
 import { LoreArticle, LoreEditor } from '../components/LoreEditor'
 import { RelationshipSection } from '../components/RelationshipSection'
@@ -86,6 +87,10 @@ export default function EntityPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [blocked, setBlocked] = useState<CanonBlockingFinding[] | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+
+  // Bumped after every accepted write, so the history reloads without either component
+  // holding the other's state.
+  const [historyKey, setHistoryKey] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -183,6 +188,7 @@ export default function EntityPage() {
       setDetail(saved)
       setDraft(draftFromDetail(saved))
       setIsEditing(false)
+      setHistoryKey((key) => key + 1)
 
       if (isNew) {
         await navigate(`/app/universes/${universe.id}/lore/${saved.id}`, { replace: true })
@@ -243,6 +249,7 @@ export default function EntityPage() {
       })
       setDetail(saved)
       setDraft(draftFromDetail(saved))
+      setHistoryKey((key) => key + 1)
     } catch (error: unknown) {
       setDraft({ ...updated, canonStatus: previous })
 
@@ -255,6 +262,16 @@ export default function EntityPage() {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  /** After a restore the stored lore is a version the page has not seen. Read it back. */
+  async function reloadAfterRestore() {
+    if (entityId === undefined) return
+
+    const loaded = await getEntity(universe.id, entityId)
+    setDetail(loaded)
+    setDraft(draftFromDetail(loaded))
+    setHistoryKey((key) => key + 1)
   }
 
   async function remove() {
@@ -483,11 +500,19 @@ export default function EntityPage() {
       </div>
 
       {!isNew && !isEditing ? (
-        <RelationshipSection
-          universeId={universe.id}
-          entityId={entityId}
-          entityName={detail?.name ?? ''}
-        />
+        <>
+          <RelationshipSection
+            universeId={universe.id}
+            entityId={entityId}
+            entityName={detail?.name ?? ''}
+          />
+          <EntityHistory
+            universeId={universe.id}
+            entityId={entityId}
+            reloadKey={historyKey}
+            onRestored={() => void reloadAfterRestore()}
+          />
+        </>
       ) : null}
 
       <footer className="entry__actions">
