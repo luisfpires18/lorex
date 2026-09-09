@@ -1,0 +1,118 @@
+import { Link } from 'react-router-dom'
+import {
+  CONFLICT_STATUS_LABELS,
+  CanonConflictStatus,
+  CanonSubjectKind,
+  SEVERITY_LABELS,
+  SUBJECT_KIND_LABELS,
+} from '../canon/types'
+import type { CanonConflict, CanonConflictSubject } from '../canon/types'
+import { formatDate } from '../lib/dates'
+
+interface Props {
+  universeId: string
+  conflict: CanonConflict
+  isBusy: boolean
+  onDismiss: () => void
+  onReopen: () => void
+}
+
+/**
+ * One finding, read as an editorial note rather than a row.
+ *
+ * The severity stands out in the margin the way a year does on the chronology, because it
+ * is the first thing that decides whether this needs attention now. Everything the rule
+ * already wrote - the title, the explanation - is shown as written: the wording is the
+ * backend's, and rephrasing it here would put two voices on the same finding.
+ */
+export function ConflictEntry({ universeId, conflict, isBusy, onDismiss, onReopen }: Props) {
+  const isResolved = conflict.status === CanonConflictStatus.Resolved
+  const isDismissed = conflict.status === CanonConflictStatus.Dismissed
+
+  return (
+    <li
+      className="finding"
+      data-severity={conflict.severity}
+      data-status={conflict.status}
+      data-testid={`finding-${conflict.ruleCode}`}
+    >
+      <div className="finding__margin">
+        <span className="finding__mark" aria-hidden="true" />
+        <span className="finding__severity">{SEVERITY_LABELS[conflict.severity]}</span>
+        <span className="finding__rule">{conflict.ruleCode}</span>
+      </div>
+
+      <div className="finding__body">
+        <p className="finding__stamp">
+          <span className="chip" data-conflict={conflict.status}>
+            {CONFLICT_STATUS_LABELS[conflict.status]}
+          </span>
+          <span className="finding__when">
+            {isResolved && conflict.resolvedAt
+              ? `Resolved ${formatDate(conflict.resolvedAt)}`
+              : `Found ${formatDate(conflict.createdAt)}`}
+          </span>
+        </p>
+
+        <h3 className="finding__title">{conflict.title}</h3>
+        <p className="finding__account">{conflict.explanation}</p>
+
+        {conflict.subjects.length > 0 ? (
+          <ul className="finding__subjects">
+            {conflict.subjects.map((subject) => (
+              <li key={`${subject.kind}-${subject.subjectId}-${subject.role}`}>
+                <span className="finding__role">{subject.role}</span>
+                {subjectName(universeId, subject)}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
+        <div className="finding__tools">
+          {isResolved ? (
+            <p className="finding__note">
+              Evaluation closed this. It comes back on its own if the problem does.
+            </p>
+          ) : (
+            <button
+              className="button button--quiet"
+              type="button"
+              disabled={isBusy}
+              onClick={isDismissed ? onReopen : onDismiss}
+              data-testid={`${isDismissed ? 'reopen' : 'dismiss'}-${conflict.id}`}
+            >
+              {isDismissed ? 'Reopen' : 'Dismiss'}
+            </button>
+          )}
+          {isDismissed ? (
+            <p className="finding__note">
+              Set aside while it lasts. Fixing it closes it; reintroducing it opens it again.
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </li>
+  )
+}
+
+/**
+ * A named subject, linked when it has a page of its own. Only an entry does. A null name
+ * means the record has gone and the universe has not been evaluated since, which is worth
+ * saying plainly rather than showing a link into nothing.
+ */
+function subjectName(universeId: string, subject: CanonConflictSubject) {
+  if (subject.name === null) {
+    return <span className="finding__gone">no longer here</span>
+  }
+
+  if (subject.kind === CanonSubjectKind.Entity) {
+    return <Link to={`/app/universes/${universeId}/lore/${subject.subjectId}`}>{subject.name}</Link>
+  }
+
+  return (
+    <span title={SUBJECT_KIND_LABELS[subject.kind]}>
+      {subject.name}
+      <span className="finding__kind"> · {SUBJECT_KIND_LABELS[subject.kind].toLowerCase()}</span>
+    </span>
+  )
+}

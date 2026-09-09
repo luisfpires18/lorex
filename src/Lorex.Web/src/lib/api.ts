@@ -1,20 +1,41 @@
-/** Shape of an RFC 7807 response, plus the field errors ASP.NET Core adds. */
+/**
+ * Shape of an RFC 7807 response, plus the field errors ASP.NET Core adds and the
+ * extensions this API flattens alongside them. `code` is a stable machine-readable
+ * marker on the refusals that carry one, so a client never has to match prose.
+ */
 interface ProblemDetails {
   title?: string
   detail?: string
   errors?: Record<string, string[]>
+  code?: string
 }
 
-/** A failed request, carrying per-field messages when the API supplied them. */
+/**
+ * A failed request, carrying per-field messages when the API supplied them.
+ *
+ * `code` and `problem` exist for the refusals that say more than a sentence. The whole
+ * body is kept rather than parsed here, because what a given code carries alongside it is
+ * that feature's business - see `canon/blocked.ts` for the one case that has any.
+ */
 export class ApiError extends Error {
   readonly status: number
   readonly fieldErrors: Record<string, string>
+  readonly code: string | null
+  readonly problem: unknown
 
-  constructor(status: number, message: string, fieldErrors: Record<string, string> = {}) {
+  constructor(
+    status: number,
+    message: string,
+    fieldErrors: Record<string, string> = {},
+    code: string | null = null,
+    problem: unknown = null,
+  ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.fieldErrors = fieldErrors
+    this.code = code
+    this.problem = problem
   }
 }
 
@@ -58,7 +79,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
       Object.values(fieldErrors)[0] ??
       problem.title ??
       'Something went wrong. Try again.'
-    throw new ApiError(response.status, message, fieldErrors)
+    throw new ApiError(response.status, message, fieldErrors, problem.code ?? null, payload)
   }
 
   return payload as T

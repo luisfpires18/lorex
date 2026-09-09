@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthProvider'
 import { RequireAuth, RequireGuest } from './auth/routes'
+import CanonPage from './pages/CanonPage'
 import EntityPage from './pages/EntityPage'
 import LoginPage from './pages/LoginPage'
 import LorePage from './pages/LorePage'
@@ -30,6 +31,7 @@ export default function App() {
               <Route path="lore/new" element={<EntityPage />} />
               <Route path="lore/:entityId" element={<EntityPage />} />
               <Route path="timeline" element={<TimelinePage />} />
+              <Route path="canon" element={<CanonPage />} />
               <Route path="types" element={<UniverseTypes />} />
               <Route path="settings" element={<UniverseSettings />} />
             </Route>

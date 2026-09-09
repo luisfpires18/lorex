@@ -139,6 +139,11 @@ export default function UniverseWorkspace() {
             </NavLink>
           </li>
           <li>
+            <NavLink to="canon" className="sidebar__link" data-testid="workspace-canon">
+              Canon
+            </NavLink>
+          </li>
+          <li>
             <NavLink to="types" className="sidebar__link" data-testid="workspace-types">
               Types
             </NavLink>

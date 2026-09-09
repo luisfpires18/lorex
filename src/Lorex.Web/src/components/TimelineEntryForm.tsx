@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { EntityMultiPicker, type EntityChoice } from './EntityPicker'
+import { CanonBlockNotice } from './CanonBlockNotice'
+import { blockingFindingsOf } from '../canon/blocked'
+import type { CanonBlockingFinding } from '../canon/types'
 import { ApiError } from '../lib/api'
 import { CANON_LABELS, CANON_ORDER, CanonStatus, type CanonStatusValue } from '../lore/types'
 import { createTimelineEntry, updateTimelineEntry } from '../timeline/api'
@@ -104,6 +107,7 @@ export function TimelineEntryForm({ universeId, entry, onClose, onSaved }: Timel
   const [draft, setDraft] = useState<MomentDraft>(() => (entry ? draftFrom(entry) : EMPTY))
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
+  const [blocked, setBlocked] = useState<CanonBlockingFinding[] | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
@@ -146,6 +150,7 @@ export function TimelineEntryForm({ universeId, entry, onClose, onSaved }: Timel
   async function save() {
     setMessage(null)
     setFieldErrors({})
+    setBlocked(null)
     setIsSaving(true)
 
     const input = {
@@ -171,7 +176,12 @@ export function TimelineEntryForm({ universeId, entry, onClose, onSaved }: Timel
       }
       onSaved()
     } catch (error: unknown) {
-      if (error instanceof ApiError) {
+      // The gate's refusal is its own thing: the draft below is intact and the only
+      // useful thing to say is what disagreed with it.
+      const blocking = blockingFindingsOf(error)
+      if (blocking) {
+        setBlocked(blocking)
+      } else if (error instanceof ApiError) {
         setFieldErrors(error.fieldErrors)
         setMessage(
           Object.keys(error.fieldErrors).length === 0
@@ -296,6 +306,10 @@ export function TimelineEntryForm({ universeId, entry, onClose, onSaved }: Timel
         </header>
 
         <div className="drawer__body">
+          {blocked ? (
+            <CanonBlockNotice universeId={universeId} findings={blocked} linkSubjects />
+          ) : null}
+
           {message ? (
             <p className="form__message" role="alert" data-testid="moment-error">
               {message}
