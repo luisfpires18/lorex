@@ -660,6 +660,77 @@ public sealed class CanonPromotionGateTests(LorexApiFactory factory) : IClassFix
     }
 
     /// <summary>
+    /// A rename changes no fact the rules test, only a word one of them quotes. So the same
+    /// conflict is reworded in place - same id, same fingerprint, same subjects, same status -
+    /// and the new wording is stored by the rename itself, with nothing asked to evaluate.
+    /// </summary>
+    [Fact]
+    public async Task Renaming_a_relationship_type_rewords_its_conflict_immediately()
+    {
+        var (client, universe) = await SignedInWithUniverse("recrename");
+        var (_, kind, _, draft) = await CanonRelationshipOntoDraft(client, universe.Id);
+
+        var before = Assert.Single((await List(client, universe.Id)).Items);
+        Assert.Contains("Knows", before.Title, StringComparison.Ordinal);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/universes/{universe.Id}/relationship-types/{kind.Id}",
+            new RelationshipTypeRequest("Is sworn to", "Holds the oath of", false, null, null));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var after = Assert.Single((await List(client, universe.Id)).Items);
+
+        // The same conflict, not a second one: identity and subjects are untouched, because
+        // the name was never part of the fingerprint.
+        Assert.Equal(before.Id, after.Id);
+        Assert.Equal(before.Status, after.Status);
+        Assert.Equal(CanonConflictStatus.Pending, after.Status);
+        Assert.Null(after.ResolvedAt);
+        Assert.Equal(before.Subjects.Count, after.Subjects.Count);
+        Assert.Contains(
+            after.Subjects,
+            subject => subject.Kind == CanonSubjectKind.Entity && subject.SubjectId == draft.Id);
+
+        // And the wording is current, with no evaluation asked for.
+        Assert.Contains("Is sworn to", after.Title, StringComparison.Ordinal);
+        Assert.Contains("Is sworn to", after.Explanation, StringComparison.Ordinal);
+        Assert.DoesNotContain("Knows", after.Title, StringComparison.Ordinal);
+
+        // An explicit evaluation afterwards agrees and changes nothing further.
+        var summary = await Evaluate(client, universe.Id);
+        Assert.Equal(0, summary.Created);
+        Assert.Equal(0, summary.Resolved);
+        Assert.Equal(1, summary.Persisted);
+        Assert.Equal(after.UpdatedAt, Assert.Single((await List(client, universe.Id)).Items).UpdatedAt);
+    }
+
+    /// <summary>
+    /// The same rename over a conflict the author has dismissed. Rewording is not a lifecycle
+    /// event, so the dismissal stands: the author decided about this issue, and the issue is
+    /// still the same one under a new label.
+    /// </summary>
+    [Fact]
+    public async Task Renaming_a_relationship_type_leaves_a_dismissal_standing()
+    {
+        var (client, universe) = await SignedInWithUniverse("recrenamedismissed");
+        var (_, kind, _, _) = await CanonRelationshipOntoDraft(client, universe.Id);
+
+        var conflict = Assert.Single((await List(client, universe.Id)).Items);
+        await Dismiss(client, universe.Id, conflict.Id);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/universes/{universe.Id}/relationship-types/{kind.Id}",
+            new RelationshipTypeRequest("Is sworn to", "Holds the oath of", false, null, null));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var after = Assert.Single((await List(client, universe.Id)).Items);
+        Assert.Equal(conflict.Id, after.Id);
+        Assert.Equal(CanonConflictStatus.Dismissed, after.Status);
+        Assert.Null(after.ResolvedAt);
+        Assert.Contains("Is sworn to", after.Title, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// The ungated path is one transaction too. A relationship whose target does not resolve
     /// inside this universe is refused, and the refusal takes the whole request with it: no
     /// relationship is stored, and no reconciliation runs, so the conflict standing beside it

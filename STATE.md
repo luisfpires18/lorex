@@ -46,8 +46,10 @@ that gives High severity teeth. No UI.
   Gating and reconciling are separate questions. **Gated** (can introduce High): entity
   create/update, timeline create/update, field-definition update. **Reconciled but not gated**
   via `RecordAsync` - the same transaction and the same detect/reconcile, no baseline, nothing
-  to refuse: entity delete, timeline delete, and relationship create/update/delete.
-  **Neither**: adding a field definition (no values yet), and the type/field/option deletes
+  to refuse: entity delete, timeline delete, relationship create/update/delete, and
+  relationship-type update, whose name `CANON-REL-001` quotes but never fingerprints, so a
+  rename rewords the same conflict in place and a dismissal survives it. **Neither**: adding a
+  field or relationship type (nothing references them yet), and the type/field/option deletes
   that are refused outright while they hold data. Ownership is proved first either way, so a
   404 still costs no rule sweep. See
   `docs/architecture/decisions/0012-canon-promotion-gate.md`.
@@ -109,7 +111,7 @@ that gives High severity teeth. No UI.
   **No Canon Integrity UI exists yet.**
 - Universes: create, read, update, archive, unarchive, delete once archived.
 - Auth: ASP.NET Core Identity with a cookie session.
-- Tests: 244 API integration tests (98 for Canon Integrity), 38 Playwright tests. The gate
+- Tests: 246 API integration tests (100 for Canon Integrity), 38 Playwright tests. The gate
   half proves an existing High blocks nothing, each of the three High rules blocks the write
   that introduces it, a refusal leaves lore and conflict lifecycle untouched and records
   nothing, Medium never blocks and is recorded by the write that causes it, a fixing write
@@ -118,7 +120,9 @@ that gives High severity teeth. No UI.
   ownership boundary is unchanged. The reconcile-without-gate half proves a Canon
   relationship onto a draft records its Medium conflict on the spot, lowering or deleting
   that relationship resolves it on the spot, deleting a participating entity or a timeline
-  entry resolves it, and a refused relationship write stores nothing and reconciles nothing. The
+  entry resolves it, renaming a relation kind rewords the same conflict in place without
+  disturbing its id, status or a dismissal, and a refused relationship write stores nothing and
+  reconciles nothing. The
   structural half covers detection, each rule, idempotence, a rename refreshing rather than
   duplicating, a fingerprint change on materially different facts, the whole lifecycle, both
   filters, deterministic paging and the ownership boundaries. The chronology half adds
@@ -220,10 +224,9 @@ asked.
 - An age rule needs a structured way to say **when** an age was true - a reference year on
   the fact, or an age recorded against a timeline entry. Until one exists, `Age` is a
   meaning Lorex records and reasons about nothing.
-- Evaluation runs on every write that can change a finding, and on request. The one lag left
-  is cosmetic: `CANON-REL-001` quotes the relationship type's name, which is not in the
-  fingerprint, so renaming a relation kind leaves that sentence stale until the next
-  `POST /evaluate`. No status, fingerprint or subject moves.
+- Evaluation runs on every write that can change a finding or the wording of one, and on
+  request. No route leaves the conflict table stale. `POST /evaluate` remains for lore altered
+  outside the API and to re-derive the table on demand.
 
 ## Blockers
 

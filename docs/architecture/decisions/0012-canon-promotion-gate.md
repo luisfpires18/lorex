@@ -74,10 +74,11 @@ Reconciled but not gated, each for a stated reason rather than by omission:
 | --- | --- | --- |
 | entity, timeline delete | Every rule reads facts a record contributes, so removing one only takes findings away. | A conflict about lore that no longer exists is worse than no conflict. |
 | relationship create, update, delete | No High rule reads a relationship. | `CANON-REL-001` does, and Medium findings are still findings. |
+| relationship type update | A rename changes no fact any rule tests. | `CANON-REL-001` quotes the type's name in the sentence it stores, and the name is not in the fingerprint, so the same conflict is reworded in place. |
 
-Neither gated nor reconciled: adding a field definition, which holds no values yet, so its
-declared meaning has nothing to read. Deleting a type, field or option is refused outright
-while it holds authored data, so it cannot change a finding either.
+Neither gated nor reconciled: adding a field or relationship type, neither of which anything
+references yet. Deleting a type, field or option is refused outright while it holds authored
+data, so it cannot change a finding either.
 
 **Ownership is proved before the gate is entered**, so an unauthorised request answers the
 same empty 404 as before and never costs a rule sweep over lore that is not the caller's.
@@ -103,13 +104,13 @@ Everything in the payload is inside the universe the caller has already proved t
 - A gated write costs two rule sweeps and, when accepted, a reconciliation. They are the
   same queries and writes `POST /evaluate` already performs over one universe, and the
   ungated paths above are ungated partly to keep that off the cheap routes.
-- The conflict list is current for every route that can change a finding, gated or not.
-  `POST /evaluate` remains for lore altered outside the API, for a rule set that has changed
-  between releases, and as the way to re-derive the whole table on demand.
-- One wording lag is left: `CANON-REL-001` quotes the relationship type's name, which is not
-  part of the fingerprint, so renaming a relation kind leaves that sentence stale until the
-  next evaluation. Cosmetic - no status, fingerprint or subject moves - and relationship-type
-  routes stay out of this for that reason.
+- The conflict list is current for every route that can change a finding or the wording of
+  one, gated or not. `POST /evaluate` remains for lore altered outside the API, for a rule set
+  that has changed between releases, and as the way to re-derive the whole table on demand.
+- Reconciling a rename costs nothing beyond a rule sweep and needs no special case, because
+  ADR 0010 already put names outside the fingerprint and `Refresh` already rewrites the title,
+  explanation and subjects of a matching conflict whatever its status. A dismissal survives a
+  rewording, which is the behaviour that decision was made for.
 - Entity update's own delete-then-insert transaction joins the gate's rather than nesting,
   which SQLite does not support. Run ungated it still opens its own.
 - Nothing is gated by *asking* for it. A route is gated because its handler is wrapped, so
