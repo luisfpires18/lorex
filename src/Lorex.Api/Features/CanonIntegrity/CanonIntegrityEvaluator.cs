@@ -33,7 +33,7 @@ public sealed class CanonIntegrityEvaluator(LorexDbContext db, IEnumerable<ICano
         Guid universeId,
         CancellationToken cancellationToken)
     {
-        var findings = await CollectAsync(universeId, cancellationToken);
+        var findings = await DetectAsync(universeId, cancellationToken);
 
         var existing = await db.CanonConflicts
             .Include(conflict => conflict.Subjects)
@@ -102,8 +102,12 @@ public sealed class CanonIntegrityEvaluator(LorexDbContext db, IEnumerable<ICano
     /// Every rule's findings, keyed by fingerprint. Rules run in rule-code order so a
     /// collision between two rules resolves the same way on every run; in practice the
     /// rule code is part of the fingerprint, so one cannot happen between different rules.
+    ///
+    /// Detection on its own, with nothing recorded and nothing reconciled. Evaluation starts
+    /// here and then writes; <see cref="CanonPromotionGate"/> stops here, because a candidate
+    /// that is about to be rolled back must not leave a mark on the conflict table.
     /// </summary>
-    private async Task<Dictionary<string, CanonFinding>> CollectAsync(
+    public async Task<Dictionary<string, CanonFinding>> DetectAsync(
         Guid universeId,
         CancellationToken cancellationToken)
     {

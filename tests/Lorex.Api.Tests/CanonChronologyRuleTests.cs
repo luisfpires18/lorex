@@ -1,10 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
+using Lorex.Api.Data;
 using Lorex.Api.Features.Auth;
 using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Timeline;
 using Lorex.Api.Features.Universes;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Lorex.Api.Tests;
 
@@ -639,6 +642,43 @@ public sealed class CanonChronologyRuleTests(LorexApiFactory factory) : IClassFi
 
     // ---------- Helpers ----------
 
+    /// <summary>
+    /// Settles lore that the Canon promotion gate would now refuse to let anyone author.
+    ///
+    /// These tests are about detection, not about the gate: nearly all of them need a universe
+    /// that already contradicts itself, and Phase 014 made every route capable of authoring one
+    /// answer 409 instead. So the lore is written through the API as a draft - always legal,
+    /// because a draft is allowed to be wrong - and promoted straight in the database, standing
+    /// in for lore that was settled before the gate existed. That is the one case the gate
+    /// cannot prevent and must tolerate, which is exactly what these fixtures then exercise the
+    /// rules against. The gate's own behaviour is <see cref="CanonPromotionGateTests"/>.
+    /// </summary>
+    private async Task Settle(Guid entityId, Guid? entryId = null)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<LorexDbContext>();
+
+        if (entityId != Guid.Empty)
+        {
+            (await db.Entities.FirstAsync(entity => entity.Id == entityId)).CanonStatus = CanonStatus.Canon;
+        }
+
+        if (entryId is { } id)
+        {
+            (await db.TimelineEntries.FirstAsync(entry => entry.Id == id)).CanonStatus = CanonStatus.Canon;
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>What the database currently says, which a gated write is not allowed to change.</summary>
+    private async Task<CanonStatus> StoredStatus(Guid entityId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<LorexDbContext>();
+        return (await db.Entities.AsNoTracking().FirstAsync(entity => entity.Id == entityId)).CanonStatus;
+    }
+
     private sealed record LifespanFieldPair(FieldDefinitionResponse Birth, FieldDefinitionResponse Death);
 
     /// <summary>The Character type gains a declared birth year and death year, once per universe.</summary>
@@ -651,15 +691,30 @@ public sealed class CanonChronologyRuleTests(LorexApiFactory factory) : IClassFi
             await AddField(client, universeId, type.Id, "Died", EntityFieldKind.Number, EntityFieldSemantic.DeathYear));
     }
 
-    private static Task<EntityDetail> Character(
+    private async Task<EntityDetail> Character(
         HttpClient client,
         Guid universeId,
         string name,
         LifespanFieldPair fields,
         double? birth,
         double? death,
-        CanonStatus status = CanonStatus.Canon) =>
-        CreateEntity(client, universeId, name, status, Years(fields, birth, death));
+        CanonStatus status = CanonStatus.Canon)
+    {
+        var entity = await CreateEntity(
+            client, universeId, name, CanonStatus.Draft, Years(fields, birth, death));
+
+        if (status != CanonStatus.Canon)
+        {
+            return entity;
+        }
+
+        await Settle(entity.Id);
+        return await Reload(client, universeId, entity.Id);
+    }
+
+    private static async Task<EntityDetail> Reload(HttpClient client, Guid universeId, Guid entityId) =>
+        (await client.GetFromJsonAsync<EntityDetail>(
+            $"/api/universes/{universeId}/entities/{entityId}"))!;
 
     private static List<FieldValueInput> Years(LifespanFieldPair fields, double? birth, double? death)
     {
@@ -681,7 +736,7 @@ public sealed class CanonChronologyRuleTests(LorexApiFactory factory) : IClassFi
     private static FieldValueInput Number(Guid fieldId, double value) =>
         new(fieldId, null, value, null, null, null, null);
 
-    private static Task<EntityDetail> SetYears(
+    private Task<EntityDetail> SetYears(
         HttpClient client,
         Guid universeId,
         EntityDetail entity,
@@ -690,7 +745,7 @@ public sealed class CanonChronologyRuleTests(LorexApiFactory factory) : IClassFi
         double? death) =>
         Save(client, universeId, entity, fields: Years(fields, birth, death));
 
-    private static async Task<TimelineEntryResponse> Moment(
+    private async Task<TimelineEntryResponse> Moment(
         HttpClient client,
         Guid universeId,
         string title,
@@ -704,9 +759,20 @@ public sealed class CanonChronologyRuleTests(LorexApiFactory factory) : IClassFi
         var response = await client.PostAsJsonAsync(
             $"/api/universes/{universeId}/timeline",
             new TimelineEntryRequest(
-                title, null, status, kind, startYear, null, null, endYear, null, null, era, participants));
+                title, null, CanonStatus.Draft, kind, startYear, null, null, endYear, null, null,
+                era, participants));
         response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<TimelineEntryResponse>())!;
+
+        var entry = (await response.Content.ReadFromJsonAsync<TimelineEntryResponse>())!;
+
+        if (status != CanonStatus.Canon)
+        {
+            return entry;
+        }
+
+        await Settle(Guid.Empty, entry.Id);
+        return (await client.GetFromJsonAsync<TimelineEntryResponse>(
+            $"/api/universes/{universeId}/timeline/{entry.Id}"))!;
     }
 
     private async Task<HttpClient> SignedInClient(string username)
@@ -781,12 +847,20 @@ public sealed class CanonChronologyRuleTests(LorexApiFactory factory) : IClassFi
         return (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
     }
 
-    private static async Task<EntityDetail> Save(
+    /// <summary>
+    /// Rewrites an entity's field values without tripping the promotion gate, by dropping it to
+    /// a draft for the duration of the write and settling it again afterwards. Same reasoning as
+    /// <see cref="Settle"/>: what is under test here is what the rules make of the result, not
+    /// whether the API would have let an author get there.
+    /// </summary>
+    private async Task<EntityDetail> Save(
         HttpClient client,
         Guid universeId,
         EntityDetail entity,
         IReadOnlyList<FieldValueInput> fields)
     {
+        var settled = await StoredStatus(entity.Id);
+
         var response = await client.PutAsJsonAsync(
             $"/api/universes/{universeId}/entities/{entity.Id}",
             new EntityRequest(
@@ -794,12 +868,19 @@ public sealed class CanonChronologyRuleTests(LorexApiFactory factory) : IClassFi
                 entity.Name,
                 entity.Summary,
                 entity.Content,
-                entity.CanonStatus,
+                CanonStatus.Draft,
                 entity.Aliases,
                 entity.Tags,
                 fields));
         response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
+
+        if (settled != CanonStatus.Canon)
+        {
+            return (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
+        }
+
+        await Settle(entity.Id);
+        return await Reload(client, universeId, entity.Id);
     }
 
     private static async Task<CanonEvaluationResponse> Evaluate(HttpClient client, Guid universeId)

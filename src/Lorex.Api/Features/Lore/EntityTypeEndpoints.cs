@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Lorex.Api.Data;
+using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Universes;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -260,6 +261,15 @@ public static class EntityTypeEndpoints
         return Results.Ok(types.First(type => type.Id == typeId));
     }
 
+    /// <summary>
+    /// Gated, because this is where meaning is declared on a field that may already hold
+    /// values. Pointing <c>DeathYear</c> at a number field a hundred Canon characters have
+    /// filled in tells the chronology rules something new about every one of them at once,
+    /// which is a straightforward way to introduce a High finding.
+    ///
+    /// Adding a field is not gated: a field that has just been created holds no values, so
+    /// whatever it is declared to mean, there is nothing yet for a rule to read.
+    /// </summary>
     private static async Task<IResult> UpdateFieldAsync(
         Guid universeId,
         Guid typeId,
@@ -267,6 +277,7 @@ public static class EntityTypeEndpoints
         [FromBody] FieldDefinitionRequest request,
         ClaimsPrincipal principal,
         LorexDbContext db,
+        CanonPromotionGate gate,
         CancellationToken cancellationToken)
     {
         var entityType = await FindTypeAsync(db, universeId, typeId, principal, cancellationToken);
@@ -275,6 +286,20 @@ public static class EntityTypeEndpoints
             return Results.NotFound();
         }
 
+        return await gate.RunAsync(
+            universeId,
+            token => UpdateFieldCoreAsync(universeId, typeId, fieldId, request, db, token),
+            cancellationToken);
+    }
+
+    private static async Task<IResult> UpdateFieldCoreAsync(
+        Guid universeId,
+        Guid typeId,
+        Guid fieldId,
+        FieldDefinitionRequest request,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
         var definition = await db.EntityFieldDefinitions
             .Include(field => field.Options)
             .FirstOrDefaultAsync(field => field.Id == fieldId && field.EntityTypeId == typeId, cancellationToken);

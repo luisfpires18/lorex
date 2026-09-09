@@ -67,7 +67,8 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/CanonIntegrity/CanonIntegrityConfiguration.cs` | Conflict schema: the unique fingerprint index and the review index. |
 | `Features/CanonIntegrity/CanonIntegrityRule.cs` | `ICanonIntegrityRule`, the finding record and the fingerprint hash. |
 | `Features/CanonIntegrity/CanonIntegrityEvaluator.cs` | Runs the rules over one universe and reconciles by fingerprint. |
-| `Features/CanonIntegrity/CanonIntegritySetup.cs` | The registered rule set and evaluator. |
+| `Features/CanonIntegrity/CanonPromotionGate.cs` | Refuses a write that introduces a new High fingerprint; `JoinedTransaction`. |
+| `Features/CanonIntegrity/CanonIntegritySetup.cs` | The registered rule set, evaluator and promotion gate. |
 | `Features/CanonIntegrity/CanonIntegrityEndpoints.cs` | List, get, evaluate, dismiss, reopen; subject-name resolution. |
 | `Features/CanonIntegrity/CanonIntegrityContracts.cs` | Response records for conflicts and evaluation. |
 | `Features/CanonIntegrity/CanonRuleText.cs` | Shared wording and length fitting for rule titles and explanations. |
@@ -107,6 +108,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.Api.Tests/TimelineEndpointTests.cs` | Date kinds, participation, ordering, paging, and ownership. |
 | `Lorex.Api.Tests/CanonIntegrityEndpointTests.cs` | Conflict lifecycle, fingerprinting, the structural rules, filters and ownership. |
 | `Lorex.Api.Tests/CanonChronologyRuleTests.cs` | Semantic field assignment, the three chronology rules and every case they must stay quiet on. |
+| `Lorex.Api.Tests/CanonPromotionGateTests.cs` | What the gate refuses, what a refusal leaves behind, and what it must never block. |
 | `Lorex.E2E/playwright.config.ts` | Starts API + web, runs Chromium. |
 | `Lorex.E2E/specs/smoke.spec.ts` | Frontend-loads smoke suite. |
 | `Lorex.E2E/specs/auth.spec.ts` | Register, sign out, guard, sign back in. |

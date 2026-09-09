@@ -12,6 +12,16 @@ namespace Lorex.Api.Features.Relationships;
 /// time from the relationship type, never stored as a second row. Every route proves
 /// universe ownership first, then re-resolves every client id inside that universe, so no
 /// id crosses a universe boundary and nothing another owner holds is ever disclosed.
+///
+/// None of these routes is behind the Canon promotion gate, and that is a conclusion rather
+/// than an omission. Of the six rules, only <c>CANON-REL-001</c> reads relationships at all,
+/// and it is Medium - a Canon link resting on a draft endpoint is a loose end, not an
+/// impossibility. The three High rules read declared years and Canon moments, neither of which
+/// a relationship can touch, so no relationship write can introduce a High finding. Gating
+/// them anyway would sweep the rules twice per write to prove an empty set every time. The
+/// moment a High rule does read a relationship - exclusivity overlap is the obvious candidate,
+/// and it needs schema that does not exist yet - these routes get the same one-line wrapper
+/// the entity and timeline writes use.
 /// </summary>
 public static class RelationshipEndpoints
 {

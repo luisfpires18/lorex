@@ -23,6 +23,10 @@ public static class CanonIntegritySetup
 
         services.AddScoped<CanonIntegrityEvaluator>();
 
+        // The one place a High finding is allowed to stop something happening. Scoped, because
+        // it runs a transaction on the request's own context.
+        services.AddScoped<CanonPromotionGate>();
+
         return services;
     }
 }
