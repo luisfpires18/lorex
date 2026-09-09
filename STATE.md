@@ -5,21 +5,18 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 
 ## Roadmap position
 
-- Phases 001-016 done. Sequence log: `docs/architecture/branching.md`.
-- **Phase 016** (Canon Integrity E2E / hardening) merged into `dev`. Six Playwright scenarios
-  in `tests/Lorex.E2E/specs/canon.spec.ts` cover the review screen, conflict identity across
-  runs, the promotion gate, reconciliation on write, the Canon-meaning control, and the
-  universe/owner boundary. Two defects fixed: the entry page's one-click Canon step swallowed
-  the gate's 409, and `EntityFieldSemantic` had no control in the client, so no chronology
-  rule was reachable without calling the API.
-- **Now: Phase 017 - Revision / History.** Not started; no branch yet.
+- Phases 001-016 done and merged. Sequence log: `docs/architecture/branching.md`.
+- **Now: Phase 017 - Revision / History**, on `feat/017/revision-history`. Not merged, not
+  pushed. Every accepted entity write records a full snapshot (ADR 0013), captured inside the
+  promotion gate's transaction, and a version can be put back by replaying it through the
+  ordinary gated update. The dossier grows a history section under the relations.
 
 ## Baseline
 
-- 246 API integration tests, 44 Playwright tests, green. No frontend unit runner exists; the
+- 264 API integration tests, 45 Playwright tests, green. No frontend unit runner exists; the
   web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings.
-- 9 migrations, latest `AddEntityFieldSemantics`; `has-pending-model-changes` reports none.
+- 10 migrations, latest `AddEntityRevisions`; `has-pending-model-changes` reports none.
 - Six rules in `src/Lorex.Api/Features/CanonIntegrity/Rules/`: three structural (Medium),
   three chronological (High). Behaviour: ADR 0010, 0011, 0012.
 
@@ -34,12 +31,11 @@ happen only when the owner asks.
 Task 4 of 3-4 done. The agreed number of tasks is complete and **the verdict is owed** -
 see Deferred. RTK and Graphify judged independently.
 
-- RTK works in the `Bash` tool. `rtk gain` ~23.2% and essentially flat across Task 4: a
-  Playwright phase runs almost everything as `cd … && …`, which the wrapper bypasses by
-  design, so RTK had close to nothing to filter. Correctness record still clean; the one
-  recorded diagnostic loss remains `rtk npm run dev` swallowing Vite's startup banner.
-- Graphify unused in all four tasks. Targeted `Grep` over `SYSTEMS.md`-named files has
-  answered every question so far.
+- RTK works in the `Bash` tool. `rtk gain` ~21.8%, drifting down as more work runs through
+  chained or piped commands the wrapper bypasses by design. Correctness record still clean;
+  the one recorded diagnostic loss remains `rtk npm run dev` swallowing Vite's startup banner.
+- Graphify unused in every task so far. Targeted `Grep` over `SYSTEMS.md`-named files has
+  answered every question.
 
 ## Deferred / owner decisions
 
