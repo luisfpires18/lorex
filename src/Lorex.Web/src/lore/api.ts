@@ -6,6 +6,7 @@ import type {
   EntityQuery,
   EntityType,
   FieldKindValue,
+  FieldSemanticValue,
   TagSummary,
 } from './types'
 
@@ -54,11 +55,30 @@ export interface FieldInput {
   displayOrder: number | null
   defaultValue: string | null
   options: string[] | null
+
+  /** Null unless the author declares a meaning. Never guessed from the name - ADR 0011. */
+  semantic: FieldSemanticValue | null
 }
 
 export function addField(universeId: string, typeId: string, input: FieldInput) {
   return apiFetch<EntityType>(`${base(universeId)}/entity-types/${typeId}/fields`, {
     method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+/**
+ * Replaces one field definition. Gated by the promotion gate on the API, because declaring
+ * a meaning on a field that already holds values can introduce a High finding all at once.
+ */
+export function updateField(
+  universeId: string,
+  typeId: string,
+  fieldId: string,
+  input: FieldInput,
+) {
+  return apiFetch<EntityType>(`${base(universeId)}/entity-types/${typeId}/fields/${fieldId}`, {
+    method: 'PUT',
     body: JSON.stringify(input),
   })
 }
