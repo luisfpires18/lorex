@@ -230,7 +230,7 @@ the `Bash`-matched hook does not touch, so it runs unfiltered and correct.
 
 | Date | Command | Why the filtered output was not enough |
 | --- | --- | --- |
-| - | - | none through Task 2 |
+| - | - | none through Task 3 |
 
 ## Per-task results
 
@@ -320,7 +320,47 @@ middleware; `Results.Problem` with extensions as the refusal shape, matching the
 which is the fact the whole apply-then-roll-back design rests on.
 
 
-### Task 3 - pending
+### Task 3 - Phase 015, Canon Integrity UI (2026-09-09)
+
+Frontend only: a review screen, a reusable refusal presentation, one additive change to the
+shared `ApiError`. First task in this trial that was not backend work, and the first run of
+the repository-native context workflow with no hand-fed summary.
+
+**RTK**
+
+| Question | Answer |
+| --- | --- |
+| Live hook working | **Yes.** `git status`, `git checkout -b`, standalone `grep` and `npm run dev` all rewrote to a pure `rtk ` prefix and ran. |
+| Command categories filtered | Three that mattered: `git status` (repeatedly), standalone `grep` over source, and `npm run dev`. `grep` is new - Task 2 recorded it as not rewritten, and it is now the single largest line in `rtk gain`. |
+| `rtk gain` | Meter 23.5%; the by-command table sums to ~33 commands / ~3.6K tokens. Delta over Task 2 (19 / 727 / 16.4%): roughly **14 commands, ~2.9K tokens**, dominated by 11 `rtk grep` at 39.5% average. |
+| Safety-wrapper bypasses | Most of the session. Every `;`-joined or piped command, every `python - <<'PY'` heredoc (newline rule), and every `cd … && …`. All ran unfiltered and correctly. |
+| Unfiltered reruns caused by missing diagnostics | **Zero.** `rtk proxy` was not used. |
+| Incorrect command execution | **Zero.** No command ran with altered meaning, `npm run dev` included - the server served pages normally. |
+| First observed diagnostic loss | `rtk npm run dev` produced an **empty** background-task log: Vite's startup banner and its "ready in Xms" line were filtered away entirely. Nothing was lost that blocked the work - the server was confirmed by loading a page - but this is the first case where filtered output withheld something wanted, and a long-running server is exactly the shape of command where a banner is the only signal. Not a `proxy` rerun, so it is recorded here rather than in the table above. |
+
+Verdict material: the first task where RTK's savings are visible rather than marginal, and
+the reason is command mix, not a change in the tool - a frontend task greps and runs `git
+status` far more than a backend task does. Against that, the first diagnostic loss also
+appeared, on a long-running command. Both point the same way: RTK earns its place on short,
+noisy, repeated commands and should be kept away from anything whose only output is a
+startup banner.
+
+**Graphify**
+
+Not used, a third time, and again not forced. The routing worked: `CLAUDE.md` -> `STATE.md`
+-> `SYSTEMS.md` named every file this task needed, and the two questions with any breadth -
+*which write paths can return the 409* and *which subject kinds have a route* - were each
+one `grep` with an authoritative answer. Three tasks with no Graphify use is now a strong
+signal rather than a coincidence.
+
+**phase-workflow**
+
+Used. Its value here was ordering rather than instruction: investigate-then-constrain caught
+the `.canon` class-name collision as a constraint question before any CSS was written -
+though not before it was written wrongly once - and the wrap-up list is what kept `STATE.md`
+and `SYSTEMS.md` from drifting. The "argue against the plan once" step is what removed the
+entity-type field editor from scope, on the evidence that no client for that route exists.
+
 ### Task 4 - pending
 
 ## Decision

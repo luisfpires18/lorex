@@ -6,16 +6,17 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 ## Roadmap position
 
 - Phases 001-014 done. Sequence log: `docs/architecture/branching.md`.
-- **Phase 014** (Canon promotion gates) merged into `dev`. Backend only. Canon Integrity is
-  complete server-side - persistence, six rules, review API, promotion gate - and has **no UI**.
-- **Now:** AI/context workflow maintenance. No product change.
-- **Next: Phase 015 - Canon Integrity UI.** The review screen with no client since Phase 012,
-  and the gate's 409 (`canon_promotion_blocked` + `blockingFindings`), which ordinary editing
-  can now trigger and which surfaces nowhere.
+- **Phase 015** (Canon Integrity UI) implemented on `feat/015/canon-integrity-ui`,
+  **not merged**. Frontend only. Canon Integrity now has a review screen at
+  `/app/universes/:id/canon` and the gate's 409 is presented as a refusal rather than a
+  save failure, on entity and timeline saves.
+- **Next: Phase 016 - hardening.** Owns the E2E coverage this phase deliberately did not
+  add, and whatever the security follow-ups below turn into.
 
 ## Baseline
 
-- 246 API integration tests, 38 Playwright tests, green on Release.
+- 246 API integration tests, 38 Playwright tests, green on Release. No frontend unit runner
+  exists; the web checks are `typecheck`, `lint`, `format:check` and `build`.
 - 9 migrations, latest `AddEntityFieldSemantics`; `has-pending-model-changes` reports none.
 - Six rules in `src/Lorex.Api/Features/CanonIntegrity/Rules/`: three structural (Medium),
   three chronological (High). Behaviour: ADR 0010, 0011, 0012.
@@ -28,13 +29,13 @@ happen only when the owner asks.
 
 ## Tooling trial
 
-Task 2 of 3-4 done, **no verdict yet**. RTK and Graphify judged independently.
+Task 3 of 3-4 done, **no verdict yet**. RTK and Graphify judged independently.
 
-- RTK works in the `Bash` tool; the earlier PATH break was fixed by the host restart. Last
-  measure `rtk gain` 19 commands / 727 tokens / 16.4% - a floor, because the hook matches
-  `Bash` only and the heavy `dotnet` commands mostly run through `PowerShell`.
-- Graphify unused in both tasks. Targeted `Grep` over `SYSTEMS.md`-named files has answered
-  every question so far.
+- RTK works in the `Bash` tool. Last measure `rtk gain` ~33 commands / ~3.6K tokens / 23.5%;
+  the jump came from a frontend command mix (`grep`, `git status`), not from the tool. First
+  diagnostic loss recorded: `rtk npm run dev` swallowed Vite's whole startup banner.
+- Graphify unused in all three tasks. Targeted `Grep` over `SYSTEMS.md`-named files has
+  answered every question so far.
 
 ## Deferred / owner decisions
 
