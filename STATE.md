@@ -5,11 +5,12 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 
 ## Roadmap position
 
-- Phases 001-016 done and merged. Sequence log: `docs/architecture/branching.md`.
-- **Now: Phase 017 - Revision / History**, on `feat/017/revision-history`. Not merged, not
-  pushed. Every accepted entity write records a full snapshot (ADR 0013), captured inside the
-  promotion gate's transaction, and a version can be put back by replaying it through the
-  ordinary gated update. The dossier grows a history section under the relations.
+- Phases 001-017 done and merged. Sequence log: `docs/architecture/branching.md`.
+- **Phase 017** (Revision / History) merged into `dev`. Every accepted entity write records a
+  full snapshot (ADR 0013), captured inside the promotion gate's transaction; a version is put
+  back by replaying it through the ordinary gated update. The dossier carries the history
+  section under the relations.
+- **Now: Phase 018 - Export / Backup.** Not started; no branch yet.
 
 ## Baseline
 
