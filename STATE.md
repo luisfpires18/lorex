@@ -11,15 +11,22 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   transaction with every collection ordered in memory so unchanged lore exports byte-identical
   payloads. What is in a backup and what is deliberately rebuilt instead: ADR 0014. Export
   only - nothing reads a backup back in, and the Settings screen says so.
-- **Now: Phase 019 - Trash / Recovery.** Not started; no branch yet.
+- **Phase 019** (Trash / Recovery) built on `feat/019/trash-recovery`. **Not merged, not
+  pushed.** `DELETE` on an entry now sets `DeletedAt` instead of removing the row, so nothing
+  that pointed at it is destroyed; `GET /api/universes/{id}/trash` lists what was thrown away
+  and `POST .../trash/{entityId}/restore` puts one back under the promotion gate. Entries are
+  the only trashable thing. Semantics: ADR 0015. The backup format is at version 2 because a
+  backup now carries the Trash - ADR 0014 argues the bump.
 
 ## Baseline
 
-- 286 API integration tests, 46 Playwright tests, green. No frontend unit runner exists; the
+- 305 API integration tests, 47 Playwright tests, green. No frontend unit runner exists; the
   web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
-  format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings.
-- 10 migrations, latest `AddEntityRevisions`; `has-pending-model-changes` reports none. Phase
-  018 changed no schema - a backup only reads.
+  format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
+  Prettier has to be pointed at that config explicitly when run from `tests/Lorex.E2E`.
+- 11 migrations, latest `AddEntityTrash`; `has-pending-model-changes` reports none. That one
+  adds `Entities.DeletedAt` and swaps the browse index for
+  `(UniverseId, DeletedAt, IsArchived, UpdatedAt)`, verified against a fresh SQLite file.
 - Six rules in `src/Lorex.Api/Features/CanonIntegrity/Rules/`: three structural (Medium),
   three chronological (High). Behaviour: ADR 0010, 0011, 0012.
 
@@ -50,6 +57,10 @@ see Deferred. RTK and Graphify judged independently.
 - **`Age`** is declarable but read by nothing until a structured reference year exists. ADR 0011.
 - **Tooling trial verdict.** Four tasks measured, `docs/tooling/agent-tooling-trial.md`
   holds the evidence. Keep / conditional / remove is the owner's call, per tool.
+- **Permanent deletion.** Deferred by Phase 019, so nothing removes an entry for good short of
+  deleting the universe. One consequence is a dead end: a type used only by trashed entries
+  cannot be deleted, and the only way to free it is to restore the entry, move it to another
+  type and trash it again. ADR 0015 records the tradeoff.
 
 ## Blockers
 
