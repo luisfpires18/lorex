@@ -46,11 +46,8 @@ see Deferred. RTK and Graphify judged independently.
   backed by tests. Outstanding: rate limiting, header/cookie hardening, dependency review, auth.
 - **Cross-era ordering** unsolved, and it bounds the chronology rules. ADR 0009, ADR 0011.
 - **`Age`** is declarable but read by nothing until a structured reference year exists. ADR 0011.
-- **`EntityFieldSemantic` has no control on the Types screen.** It is bound on the
-  field-definition contract but nothing in `src/Lorex.Web` writes it, so the three
-  chronological rules - every High rule there is - are unreachable through the UI alone.
-  ADR 0011 assumes a field editor that declares meaning; the E2E suite seeds semantics
-  through the API for exactly this reason. Either build the control or amend the ADR.
+- **Does `EntityFieldSemantic` get a minimal Types-screen control before work moves past
+  Canon Integrity?** Behaviour and its consequences: ADR 0011. Not decided, not scoped.
 - **Tooling trial verdict.** Four tasks measured, `docs/tooling/agent-tooling-trial.md`
   holds the evidence. Keep / conditional / remove is the owner's call, per tool.
 

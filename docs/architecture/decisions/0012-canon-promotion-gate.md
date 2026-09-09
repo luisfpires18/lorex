@@ -97,10 +97,24 @@ Everything in the payload is inside the universe the caller has already proved t
   baseline. Otherwise a mistake would be unfixable except by deleting it.
 - Low and Medium never block. A Canon moment resting on a draft character is still ordinary
   work in progress and still reported.
-- **A High conflict can no longer be authored through the API at all.** Every route that
-  could reach one refuses. The only way one exists is lore settled before this phase, which
-  is precisely the case the gate is built to tolerate - and it is how the rule tests now
-  seed their fixtures, since they are about detection rather than about the gate.
+- **No currently gated authoring route can persist a new High contradiction.** Taken
+  together the wrapped routes close every path a rule reads: entity create and update carry
+  canon status and the declared years, timeline create and update carry a moment's date,
+  canon status and participants, and the field-definition update carries the meaning that
+  makes a year a year. The ungated paths cannot introduce one either, for the reasons given
+  in the table above - they either only remove facts, or write nothing any High rule reads.
+
+  This is a statement about the routes as they stand, not about the table. A stored High
+  conflict remains an expected state, from three directions: lore settled before this phase,
+  data loaded outside the API - a restore, an import, a direct write, a rule set whose
+  severities changed between releases - and any future write path, which is ungated until
+  someone wraps it. Tolerating those is the whole point of comparing fingerprint sets rather
+  than counting.
+
+  The practical consequence is that an "existing High conflict" cannot be *constructed*
+  through the product. End-to-end tests driving the UI or the API can only reach the
+  refusals; the rule tests seed their fixtures beneath the gate, because they are about
+  detection rather than about the gate.
 - A gated write costs two rule sweeps and, when accepted, a reconciliation. They are the
   same queries and writes `POST /evaluate` already performs over one universe, and the
   ungated paths above are ungated partly to keep that off the cheap routes.

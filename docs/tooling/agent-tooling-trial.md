@@ -400,17 +400,16 @@ every area touched" is what caught that the E2E project has no `format:check` of
 three projects. The "argue against the plan once" step is what stopped an attempt to
 manufacture a pre-existing High conflict for a scenario the product cannot reach - see below.
 
-**Durable finding, recorded in `STATE.md` rather than here**
+**Durable findings, recorded in the ADRs that own them**
 
 The brief asked for a scenario proving that an *existing, unrelated* High conflict does not
-freeze valid edits. It cannot be built through the product: ADR 0012 already concludes that
-"a High conflict can no longer be authored through the API at all", and re-deriving that from
-the routes confirmed it - entity create/update, timeline create/update and the field-semantic
-update are all gated, and every other path either only removes facts or writes a field that
-holds no values yet. The property was proved in the direction that is reachable: a refusal
-leaves the rest of the universe editable, and Medium never blocks. Separately, the three
-chronological rules turn out to be unreachable from the UI at all, because
-`EntityFieldSemantic` has no control on the Types screen.
+freeze valid edits. It cannot be built through the product, because no currently gated route
+can persist a new High contradiction - re-derived from the wrapped routes and now stated
+precisely in ADR 0012, along with what that does and does not claim about the stored table.
+The property was proved in the direction that is reachable: a refusal leaves the rest of the
+universe editable, and Medium never blocks. Separately, `EntityFieldSemantic` turns out to
+have no control in the web client, so the three chronological rules are reachable only by
+calling the API; ADR 0011 now says so.
 
 ### Task 5 - not planned
 

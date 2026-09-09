@@ -61,8 +61,12 @@ rewords a conflict and never changes whether it is found; translating a whole un
 field names changes nothing at all.
 
 Nothing happens by accident. A universe that has declared no meanings gets exactly the
-Phase 011 behaviour, and an author who never opens the field editor never meets any of
-this.
+Phase 011 behaviour, and no universe declares one without being asked to.
+
+The declaration is backend and API only. `EntityFieldSemantic` is bound on the
+field-definition contract, so a client may set it when adding or updating a field; no
+control in `src/Lorex.Web` writes it today. Until one exists, a semantic is reachable only
+by calling the API directly, and with it the three chronological rules that read one.
 
 The vocabulary is a commitment. Semantic codes are persisted and rules key off them, so
 removing or renumbering a member is a migration, not an edit. Adding one is cheap.
