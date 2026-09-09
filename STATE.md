@@ -2,8 +2,9 @@
 
 ## Current state
 
-Phase 013 (Canon Integrity chronology rules) complete on its branch. The backend half of
-Canon Integrity exists: persistence, a rule engine, six rules, and a review API. No UI.
+Phase 014 (Canon promotion gates) complete on its branch. The backend half of Canon
+Integrity exists: persistence, a rule engine, six rules, a review API, and a promotion gate
+that gives High severity teeth. No UI.
 
 - Canon Integrity: a conflict is a derived finding, never lore. Lorex records that
   something looks wrong and changes nothing about the records it describes. `CanonConflict`
@@ -29,8 +30,32 @@ Canon Integrity exists: persistence, a rule engine, six rules, and a review API.
   entity-reference field points at a non-Canon entry).
 - Three are chronological and High. `CANON-LIFE-001` (declared birth year after declared
   death year), `CANON-LIFE-002` (Canon moment wholly before a Canon participant's birth),
-  `CANON-LIFE-003` (wholly after its death). Severity is still wired to nothing - no
-  promotion gate yet.
+  `CANON-LIFE-003` (wholly after its death).
+- Promotion gate: a write is refused when it introduces a High **fingerprint** that was not
+  already there - never because the universe contains one. `CanonPromotionGate` opens a
+  transaction, collects the baseline High fingerprints, applies the candidate, collects them
+  again, and rolls back on any addition. Nothing is reconciled before that decision, so a
+  rejected candidate leaves the lore and the recorded conflicts - dismissals included -
+  untouched. An accepted candidate **is** reconciled, from the findings already in hand and
+  inside the same transaction, so lore and conflicts commit together and the table describes
+  the lore that was actually stored. `CanonIntegrityEvaluator.ReconcileAsync` is the shared
+  half: `POST /evaluate` is detect-then-reconcile over the same method, so every lifecycle
+  rule holds identically on both paths. The refusal is 409
+  ProblemDetails plus `code: "canon_promotion_blocked"` and a `blockingFindings` array (rule
+  code, severity, fingerprint, title, explanation, subject ids). Low and Medium never block.
+  Gating and reconciling are separate questions. **Gated** (can introduce High): entity
+  create/update, timeline create/update, field-definition update. **Reconciled but not gated**
+  via `RecordAsync` - the same transaction and the same detect/reconcile, no baseline, nothing
+  to refuse: entity delete, timeline delete, relationship create/update/delete, and
+  relationship-type update, whose name `CANON-REL-001` quotes but never fingerprints, so a
+  rename rewords the same conflict in place and a dismissal survives it. **Neither**: adding a
+  field or relationship type (nothing references them yet), and the type/field/option deletes
+  that are refused outright while they hold data. Ownership is proved first either way, so a
+  404 still costs no rule sweep. See
+  `docs/architecture/decisions/0012-canon-promotion-gate.md`.
+- Consequence worth knowing: a High conflict can no longer be authored through the API at
+  all. One exists only as lore settled before the gate, which is what the rule tests now seed
+  by promoting a draft straight in the database.
 - Semantic field codes: `EntityFieldDefinition.Semantic`, a nullable `EntityFieldSemantic`
   scalar column - `BirthYear`, `DeathYear`, `Age`. Optional, null by default, and the only
   way a rule learns what a field is about. No display name is ever matched and no meaning is
@@ -86,7 +111,18 @@ Canon Integrity exists: persistence, a rule engine, six rules, and a review API.
   **No Canon Integrity UI exists yet.**
 - Universes: create, read, update, archive, unarchive, delete once archived.
 - Auth: ASP.NET Core Identity with a cookie session.
-- Tests: 217 API integration tests (71 for Canon Integrity), 38 Playwright tests. The
+- Tests: 246 API integration tests (100 for Canon Integrity), 38 Playwright tests. The gate
+  half proves an existing High blocks nothing, each of the three High rules blocks the write
+  that introduces it, a refusal leaves lore and conflict lifecycle untouched and records
+  nothing, Medium never blocks and is recorded by the write that causes it, a fixing write
+  resolves on the spot, a dismissal survives an unrelated write, one write moves lore and
+  both conflict transitions together, the entity/timeline/semantic paths are gated, and the
+  ownership boundary is unchanged. The reconcile-without-gate half proves a Canon
+  relationship onto a draft records its Medium conflict on the spot, lowering or deleting
+  that relationship resolves it on the spot, deleting a participating entity or a timeline
+  entry resolves it, renaming a relation kind rewords the same conflict in place without
+  disturbing its id, status or a dismissal, and a refused relationship write stores nothing and
+  reconciles nothing. The
   structural half covers detection, each rule, idempotence, a rename refreshing rather than
   duplicating, a fingerprint change on materially different facts, the whole lifecycle, both
   filters, deterministic paging and the ownership boundaries. The chronology half adds
@@ -102,14 +138,13 @@ Canon Integrity exists: persistence, a rule engine, six rules, and a review API.
 
 ## Current phase
 
-Phase 013 complete and merged into `dev`. Semantic field codes and `CANON-LIFE-001`,
-`CANON-LIFE-002` and `CANON-LIFE-003` are done. Current branch is `dev`. Merged from
-`feat/013/canon-integrity-rules`, 3 commits, `--no-ff`, no conflicts. Feature branch
-retained. `dev` published to `origin/dev`. Backend only. Release build clean, 217/217 API
-tests green, all nine migrations verified against a fresh SQLite file.
+Phase 014 complete on `feat/014/canon-promotion-gates`, branched from `dev`. **Not merged,
+not pushed.** Backend only. Release build clean, 234/234 API tests green, no schema change -
+`has-pending-model-changes` reports none, so no tenth migration.
 
-Detection only. Promotion is **not** gated: a High conflict blocks nothing yet, which is
-Phase 014's job.
+Every route that can change a finding now reconciles, so the conflict list is current without
+being asked. `POST /evaluate` remains for lore altered outside the API and to re-derive the
+table on demand.
 
 Rules deliberately left out. **Exclusive relationship overlap**: `RelationshipType` has a
 forward name, an inverse name and a symmetric flag, and `LoreRelationship` carries no
@@ -119,28 +154,27 @@ nothing records which moment; inferring a current year would be inventing a fact
 semantic exists so the meaning can be declared, and waits for a structured reference year.
 **Invalid ranges** are refused at write time already and are not re-reported as conflicts.
 
-Tooling trial, task 1 of 3-4. RTK 0.48.0 and Graphify are judged independently; method,
+Tooling trial, task 2 of 3-4. RTK 0.48.0 and Graphify are judged independently; method,
 probes and per-task results live in `docs/tooling/agent-tooling-trial.md`.
 
-- **Graphify: unused.** Targeted reads were sufficient for a narrow vertical slice through
-  files `SYSTEMS.md` already names.
-- **RTK: inconclusive.** The hook itself worked - it went live in a fresh conversation and
-  behaved exactly as designed, a pure-prefix rewrite with no permission decision. The
-  executable was then unavailable to the host's stale PATH, so every rewritten command
-  failed with `rtk: command not found` and nothing was filtered. `rtk gain` is unchanged
-  from the Phase 012 baseline, confirming it ran nothing. No command executed with altered
-  meaning.
-- **A fresh host or session must re-measure RTK** before any verdict. Measuring it again on
-  this host without a restart would record another zero.
+- **Graphify: unused again.** No dependency question arose that a targeted `Grep` over
+  `SYSTEMS.md`-named files did not answer outright.
+- **RTK: working, and now actually measured.** The host restart fixed the PATH break. Four
+  commands filtered this session; a successful `dotnet build` collapsed to one line. `rtk
+  gain` 19 commands / 727 tokens / 16.4%, up from the 15 / 592 / 14.1% baseline. Zero
+  unfiltered reruns, zero commands executed with altered meaning.
+- **Caveat that shapes the number:** the hook matches `Bash` only, and the heavy commands
+  (`dotnet test`, `dotnet build`) mostly ran through the `PowerShell` tool, unfiltered. The
+  measured saving is a floor, not a ceiling.
 
 ## Immediate next step
 
-Phase 014: `feat/014/canon-promotion-gates`, branched from `dev`. High severity now has a
-meaning to enforce: refuse the promotion that would introduce a provable contradiction, and
-decide what the author is told when it is refused. Nothing in 013 needs another backend
-slice first.
+Review `feat/014/canon-promotion-gates` and merge it into `dev` when satisfied. Then the
+Canon Integrity UI: the review screen the backend has had no client for since Phase 012, and
+the 409 the gate now returns, which is the first refusal a user can trigger by ordinary
+editing and currently surfaces nowhere. `blockingFindings` is shaped for it.
 
-Task 2 of the tooling trial runs with it.
+Task 3 of the tooling trial runs with whatever comes next.
 
 ## Remote
 
@@ -190,8 +224,9 @@ asked.
 - An age rule needs a structured way to say **when** an age was true - a reference year on
   the fact, or an age recorded against a timeline entry. Until one exists, `Age` is a
   meaning Lorex records and reasons about nothing.
-- Evaluation only runs when asked. Nothing triggers it on write, so a conflict list is as
-  fresh as the last evaluation and no more.
+- Evaluation runs on every write that can change a finding or the wording of one, and on
+  request. No route leaves the conflict table stale. `POST /evaluate` remains for lore altered
+  outside the API and to re-derive the table on demand.
 
 ## Blockers
 

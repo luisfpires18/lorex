@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Lorex.Api.Data;
+using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Universes;
 using Microsoft.AspNetCore.Mvc;
@@ -96,11 +97,17 @@ public static class TimelineEndpoints
         return entry is null ? Results.NotFound() : Results.Ok(entry);
     }
 
+    /// <summary>
+    /// Gated: a Canon moment dated outside a Canon participant's declared lifespan is exactly
+    /// what <c>CANON-LIFE-002</c> and <c>CANON-LIFE-003</c> report, and this route is where
+    /// the date, the Canon status and the participants all arrive at once.
+    /// </summary>
     private static async Task<IResult> CreateAsync(
         Guid universeId,
         [FromBody] TimelineEntryRequest request,
         ClaimsPrincipal principal,
         LorexDbContext db,
+        CanonPromotionGate gate,
         CancellationToken cancellationToken)
     {
         if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
@@ -108,6 +115,18 @@ public static class TimelineEndpoints
             return Results.NotFound();
         }
 
+        return await gate.RunAsync(
+            universeId,
+            token => CreateCoreAsync(universeId, request, db, token),
+            cancellationToken);
+    }
+
+    private static async Task<IResult> CreateCoreAsync(
+        Guid universeId,
+        TimelineEntryRequest request,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
         if (TimelineValidation.Validate(request) is { } errors)
         {
             return Results.ValidationProblem(errors);
@@ -146,12 +165,17 @@ public static class TimelineEndpoints
         return Results.Created($"/api/universes/{universeId}/timeline/{entry.Id}", created);
     }
 
+    /// <summary>
+    /// Gated for the same reasons as creation: redating a moment, promoting it to Canon or
+    /// adding a participant can each put a Canon moment outside a Canon lifespan.
+    /// </summary>
     private static async Task<IResult> UpdateAsync(
         Guid universeId,
         Guid entryId,
         [FromBody] TimelineEntryRequest request,
         ClaimsPrincipal principal,
         LorexDbContext db,
+        CanonPromotionGate gate,
         CancellationToken cancellationToken)
     {
         if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
@@ -159,6 +183,19 @@ public static class TimelineEndpoints
             return Results.NotFound();
         }
 
+        return await gate.RunAsync(
+            universeId,
+            token => UpdateCoreAsync(universeId, entryId, request, db, token),
+            cancellationToken);
+    }
+
+    private static async Task<IResult> UpdateCoreAsync(
+        Guid universeId,
+        Guid entryId,
+        TimelineEntryRequest request,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
         var entry = await db.TimelineEntries
             .Include(candidate => candidate.EntityLinks)
             .FirstOrDefaultAsync(
@@ -211,11 +248,16 @@ public static class TimelineEndpoints
         return Results.Ok(updated);
     }
 
+    /// <summary>
+    /// Reconciled but not gated: removing a moment removes the only findings it could
+    /// contribute to, so there is nothing to refuse and everything to resolve.
+    /// </summary>
     private static async Task<IResult> DeleteAsync(
         Guid universeId,
         Guid entryId,
         ClaimsPrincipal principal,
         LorexDbContext db,
+        CanonPromotionGate canon,
         CancellationToken cancellationToken)
     {
         if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
@@ -223,6 +265,18 @@ public static class TimelineEndpoints
             return Results.NotFound();
         }
 
+        return await canon.RecordAsync(
+            universeId,
+            token => DeleteCoreAsync(universeId, entryId, db, token),
+            cancellationToken);
+    }
+
+    private static async Task<IResult> DeleteCoreAsync(
+        Guid universeId,
+        Guid entryId,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
         var entry = await db.TimelineEntries.FirstOrDefaultAsync(
             candidate => candidate.Id == entryId && candidate.UniverseId == universeId,
             cancellationToken);

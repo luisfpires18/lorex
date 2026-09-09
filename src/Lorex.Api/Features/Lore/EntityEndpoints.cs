@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Lorex.Api.Data;
+using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Universes;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -136,11 +137,18 @@ public static class EntityEndpoints
         return detail is null ? Results.NotFound() : Results.Ok(detail);
     }
 
+    /// <summary>
+    /// Creating an entity can introduce a High finding: a new Canon entity may declare a birth
+    /// after its death, or become a Canon participant a moment is already outside the lifespan
+    /// of. So the write runs under the promotion gate, which rolls it back if it does.
+    /// Ownership is proved first, so an unowned universe never costs a rule sweep.
+    /// </summary>
     private static async Task<IResult> CreateAsync(
         Guid universeId,
         [FromBody] EntityRequest request,
         ClaimsPrincipal principal,
         LorexDbContext db,
+        CanonPromotionGate gate,
         CancellationToken cancellationToken)
     {
         if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
@@ -148,6 +156,18 @@ public static class EntityEndpoints
             return Results.NotFound();
         }
 
+        return await gate.RunAsync(
+            universeId,
+            token => CreateCoreAsync(universeId, request, db, token),
+            cancellationToken);
+    }
+
+    private static async Task<IResult> CreateCoreAsync(
+        Guid universeId,
+        EntityRequest request,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
         if (LoreValidation.ValidateEntity(request) is { } errors)
         {
             return Results.ValidationProblem(errors);
@@ -195,12 +215,18 @@ public static class EntityEndpoints
         return Results.Created($"/api/universes/{universeId}/entities/{entity.Id}", detail);
     }
 
+    /// <summary>
+    /// The structured-field edit path, and the one most likely to break a lifespan: this is
+    /// where a birth or death year is written, and where an entity is promoted to Canon. Gated
+    /// for both reasons.
+    /// </summary>
     private static async Task<IResult> UpdateAsync(
         Guid universeId,
         Guid entityId,
         [FromBody] EntityRequest request,
         ClaimsPrincipal principal,
         LorexDbContext db,
+        CanonPromotionGate gate,
         CancellationToken cancellationToken)
     {
         if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
@@ -208,6 +234,19 @@ public static class EntityEndpoints
             return Results.NotFound();
         }
 
+        return await gate.RunAsync(
+            universeId,
+            token => UpdateCoreAsync(universeId, entityId, request, db, token),
+            cancellationToken);
+    }
+
+    private static async Task<IResult> UpdateCoreAsync(
+        Guid universeId,
+        Guid entityId,
+        EntityRequest request,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
         var entity = await db.Entities.FirstOrDefaultAsync(
             candidate => candidate.Id == entityId && candidate.UniverseId == universeId,
             cancellationToken);
@@ -245,8 +284,9 @@ public static class EntityEndpoints
         // replaced wholesale. The old rows are deleted straight against the database
         // first: EF Core does not promise to order deletes ahead of inserts within one
         // SaveChanges, and re-saving an unchanged alias or tag would then collide with the
-        // row still in the table. The transaction keeps the two steps atomic.
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        // row still in the table. The transaction keeps the two steps atomic - and joins the
+        // promotion gate's rather than nesting inside it.
+        await using var transaction = await JoinedTransaction.BeginAsync(db, cancellationToken);
 
         await db.EntityAliases.Where(alias => alias.EntityId == entityId)
             .ExecuteDeleteAsync(cancellationToken);
@@ -268,11 +308,19 @@ public static class EntityEndpoints
         return Results.Ok(detail);
     }
 
+    /// <summary>
+    /// Reconciled but not gated. Every rule reads facts an entity contributes - its declared
+    /// years, its Canon participation in a moment, the relationships and references that rest
+    /// on it - so deleting one can only take findings away, and there is nothing to refuse.
+    /// Those findings still have to stop being reported: a conflict about lore that no longer
+    /// exists is worse than no conflict at all.
+    /// </summary>
     private static async Task<IResult> DeleteAsync(
         Guid universeId,
         Guid entityId,
         ClaimsPrincipal principal,
         LorexDbContext db,
+        CanonPromotionGate canon,
         CancellationToken cancellationToken)
     {
         if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
@@ -280,6 +328,18 @@ public static class EntityEndpoints
             return Results.NotFound();
         }
 
+        return await canon.RecordAsync(
+            universeId,
+            token => DeleteCoreAsync(universeId, entityId, db, token),
+            cancellationToken);
+    }
+
+    private static async Task<IResult> DeleteCoreAsync(
+        Guid universeId,
+        Guid entityId,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
         var entity = await db.Entities.FirstOrDefaultAsync(
             candidate => candidate.Id == entityId && candidate.UniverseId == universeId,
             cancellationToken);

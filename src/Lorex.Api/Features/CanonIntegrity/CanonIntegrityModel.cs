@@ -12,8 +12,9 @@ public enum CanonConflictSeverity
     Medium = 1,
 
     /// <summary>
-    /// Logically incompatible or structurally impossible. A later promotion-gate phase
-    /// will refuse the action that introduces one of these; nothing blocks yet.
+    /// Logically incompatible or structurally impossible. The only severity that blocks: a
+    /// write that would introduce a new one is refused with 409 by
+    /// <see cref="CanonPromotionGate"/>. High findings already on record block nothing.
     /// </summary>
     High = 2,
 }

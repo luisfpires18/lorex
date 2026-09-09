@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Lorex.Api.Data;
+using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Universes;
 using Microsoft.AspNetCore.Mvc;
@@ -104,12 +105,27 @@ public static class RelationshipTypeEndpoints
             types.First(type => type.Id == relationshipType.Id));
     }
 
+    /// <summary>
+    /// Reconciled but not gated, and for a reason worth writing down: this route changes no
+    /// fact any rule tests, only a word one of them quotes.
+    ///
+    /// <c>CANON-REL-001</c> reads this type's name into the sentence it stores, while its
+    /// fingerprint is the relationship and the offending endpoint - so a rename rewords an
+    /// existing conflict in place and cannot open, close or duplicate one. Without reconciling
+    /// here, that sentence would name a relation kind the author has already renamed, until
+    /// somebody happened to ask for an evaluation. Nothing here can reach High, so there is
+    /// nothing to refuse.
+    ///
+    /// Creating a type is not covered: a type with no relationships on it is quoted by nothing.
+    /// Deleting one is refused outright while it is in use, so it cannot change a finding either.
+    /// </summary>
     private static async Task<IResult> UpdateAsync(
         Guid universeId,
         Guid typeId,
         [FromBody] RelationshipTypeRequest request,
         ClaimsPrincipal principal,
         LorexDbContext db,
+        CanonPromotionGate canon,
         CancellationToken cancellationToken)
     {
         var relationshipType = await FindTypeAsync(db, universeId, typeId, principal, cancellationToken);
@@ -118,6 +134,20 @@ public static class RelationshipTypeEndpoints
             return Results.NotFound();
         }
 
+        return await canon.RecordAsync(
+            universeId,
+            token => UpdateCoreAsync(universeId, typeId, request, relationshipType, db, token),
+            cancellationToken);
+    }
+
+    private static async Task<IResult> UpdateCoreAsync(
+        Guid universeId,
+        Guid typeId,
+        RelationshipTypeRequest request,
+        RelationshipType relationshipType,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
         if (RelationshipValidation.ValidateType(request) is { } errors)
         {
             return Results.ValidationProblem(errors);
