@@ -5,13 +5,12 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 
 ## Roadmap position
 
-- Phases 001-014 done. Sequence log: `docs/architecture/branching.md`.
-- **Phase 015** (Canon Integrity UI) implemented on `feat/015/canon-integrity-ui`,
-  **not merged**. Frontend only. Canon Integrity now has a review screen at
-  `/app/universes/:id/canon` and the gate's 409 is presented as a refusal rather than a
-  save failure, on entity and timeline saves.
-- **Next: Phase 016 - hardening.** Owns the E2E coverage this phase deliberately did not
-  add, and whatever the security follow-ups below turn into.
+- Phases 001-015 done. Sequence log: `docs/architecture/branching.md`.
+- **Phase 015** (Canon Integrity UI) merged into `dev`. Frontend only. Canon Integrity has
+  a review screen at `/app/universes/:id/canon`, and the gate's 409 is presented as a
+  refusal rather than a save failure on entity and timeline saves.
+- **Now: Phase 016 - hardening.** Owns the E2E coverage Phase 015 deliberately did not add,
+  and whatever the security follow-ups below turn into.
 
 ## Baseline
 
