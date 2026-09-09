@@ -138,8 +138,9 @@ that gives High severity teeth. No UI.
 
 ## Current phase
 
-Phase 014 complete on `feat/014/canon-promotion-gates`, branched from `dev`. **Not merged,
-not pushed.** Backend only. Release build clean, 234/234 API tests green, no schema change -
+Phase 014 complete and merged into `dev`. Merged from `feat/014/canon-promotion-gates`, 5
+commits, `--no-ff`, no conflicts. Feature branch retained. `dev` published to `origin/dev`.
+Backend only. Release build clean, 246/246 API tests green, no schema change -
 `has-pending-model-changes` reports none, so no tenth migration.
 
 Every route that can change a finding now reconciles, so the conflict list is current without
@@ -169,12 +170,14 @@ probes and per-task results live in `docs/tooling/agent-tooling-trial.md`.
 
 ## Immediate next step
 
-Review `feat/014/canon-promotion-gates` and merge it into `dev` when satisfied. Then the
-Canon Integrity UI: the review screen the backend has had no client for since Phase 012, and
-the 409 the gate now returns, which is the first refusal a user can trigger by ordinary
-editing and currently surfaces nowhere. `blockingFindings` is shaped for it.
+**AI workflow audit and hardening**, before more feature work. Fourteen phases have been
+built through this workflow and it has never been reviewed as a thing in its own right: the
+router and tooling rules, the state and index files, the skills, the hooks, and the RTK and
+Graphify trial that is two tasks into a 3-4 task evaluation and owes a verdict.
 
-Task 3 of the tooling trial runs with whatever comes next.
+**Phase 015 remains the Canon Integrity UI**: the review screen the backend has had no client
+for since Phase 012, and the 409 the gate now returns - the first refusal a user can trigger
+by ordinary editing, and it surfaces nowhere. `blockingFindings` is shaped for it.
 
 ## Remote
 

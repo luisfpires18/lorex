@@ -54,8 +54,9 @@ docs/007/architecture-update
 | 011 | `feat/011/canon-integrity-domain` | merged into `dev` |
 | 012 | `chore/012/rtk-token-trial` | merged into `dev` |
 | 013 | `feat/013/canon-integrity-rules` | merged into `dev` |
+| 014 | `feat/014/canon-promotion-gates` | merged into `dev` |
 
-Next free number: `014`.
+Next free number: `015`.
 
 ## Rules for automation
 
