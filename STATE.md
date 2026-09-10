@@ -32,7 +32,7 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 
 ## Baseline
 
-- **335 API integration tests, 54 Playwright tests**, green. No frontend unit runner exists;
+- **335 API integration tests, 57 Playwright tests**, green. No frontend unit runner exists;
   the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
