@@ -5,22 +5,18 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 
 ## Roadmap position
 
-- Phases 001-019 done and merged. Sequence log: `docs/architecture/branching.md`.
-- **Phase 018** (Export / Backup) merged into `dev`. `GET /api/universes/{id}/export` hands the
-  owner one versioned JSON file holding the universe's authored data, read in a single
-  transaction with every collection ordered in memory so unchanged lore exports byte-identical
-  payloads. What is in a backup and what is deliberately rebuilt instead: ADR 0014. Export
-  only - nothing reads a backup back in, and the Settings screen says so.
+- Phases 001-020 done and merged. Sequence log: `docs/architecture/branching.md`.
 - **Phase 019** (Trash / Recovery) merged into `dev`. `DELETE` on an entry sets `DeletedAt`
   instead of removing the row, so nothing that pointed at it is destroyed;
   `GET /api/universes/{id}/trash` lists what was thrown away and
   `POST .../trash/{entityId}/restore` puts one back under the promotion gate. Entries are the
   only trashable thing. Semantics: ADR 0015. The backup format is at version 2 because a backup
   now carries the Trash - ADR 0014 argues the bump.
-- **Phase 020** (Full-Text Search) on `feat/020/full-text-search`, not merged. Entity search now
-  reads the article an author wrote, not only the name, aliases and summary, and orders hits by
-  relevance instead of recency. `GET /api/universes/{id}/entities` is unchanged apart from what
+- **Phase 020** (Full-Text Search) merged into `dev`. Entity search now reads the article an
+  author wrote, not only the name, aliases and summary, and orders hits by relevance instead
+  of recency. `GET /api/universes/{id}/entities` is unchanged apart from what
   `search` means. Index shape, synchronization and query semantics: ADR 0016.
+- **Now: Phase 021 - PWA / Mobile Refinement.** Not started; no branch yet.
 
 ## Baseline
 

@@ -60,8 +60,9 @@ docs/007/architecture-update
 | 017 | `feat/017/revision-history` | merged into `dev` |
 | 018 | `feat/018/export-backup` | merged into `dev` |
 | 019 | `feat/019/trash-recovery` | merged into `dev` |
+| 020 | `feat/020/full-text-search` | merged into `dev` |
 
-Next free number: `020`.
+Next free number: `021`.
 
 ## Rules for automation
 
