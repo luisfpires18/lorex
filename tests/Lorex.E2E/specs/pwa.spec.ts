@@ -107,6 +107,52 @@ test.describe('installability', () => {
     }
   })
 
+  test('every install icon carries the struck X', async ({ page, request }) => {
+    // The SVG is the source; `python scripts/render-icons.py` rasterises the rest from it.
+    const svg = await (await request.get('/icon.svg')).text()
+    expect(svg).toContain('M150 150 L362 362 M362 150 L150 362')
+    expect(svg).toContain('aria-label="Lorex"')
+
+    await page.goto('/login')
+
+    for (const src of [
+      '/icon-512.png',
+      '/icon-maskable-512.png',
+      '/icon-192.png',
+      '/apple-touch-icon.png',
+    ]) {
+      // Probe the raster rather than trust the filename: ink where the two strokes cross,
+      // and plate where the old upright used to stand.
+      const probe = await page.evaluate(async (url) => {
+        const image = new Image()
+        image.src = url
+        await image.decode()
+        const canvas = document.createElement('canvas')
+        canvas.width = image.width
+        canvas.height = image.height
+        const context = canvas.getContext('2d')!
+        context.drawImage(image, 0, 0)
+        const brightnessAt = (fx: number, fy: number) => {
+          const [r, g, b] = context.getImageData(
+            Math.round(image.width * fx),
+            Math.round(image.height * fy),
+            1,
+            1,
+          ).data
+          return r + g + b
+        }
+        const plate = brightnessAt(0.02, 0.02)
+        return {
+          crossing: brightnessAt(0.5, 0.5) > plate + 200,
+          upright: brightnessAt(0.34, 0.5) > plate + 200,
+        }
+      }, src)
+
+      expect(probe.crossing, `${src} has no ink where the strokes cross`).toBeTruthy()
+      expect(probe.upright, `${src} still carries the old upright`).toBeFalsy()
+    }
+  })
+
   test('the document carries the metadata an install and a phone need', async ({ page }) => {
     await page.goto('/login')
 

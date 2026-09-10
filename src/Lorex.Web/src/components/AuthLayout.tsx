@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 
+import { Wordmark } from './Wordmark'
+
 interface AuthLayoutProps {
   heading: string
   intro: string
@@ -16,7 +18,7 @@ export function AuthLayout({ heading, intro, children, footer }: AuthLayoutProps
     <div className="auth">
       <aside className="auth__plate">
         <div className="auth__mark">
-          <span className="wordmark wordmark--large">Lorex</span>
+          <Wordmark large />
           <span className="auth__rule" aria-hidden="true" />
           <p className="auth__pitch">
             A workroom for the worlds you keep — their people, places, history and the rules that
