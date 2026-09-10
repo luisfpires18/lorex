@@ -1,6 +1,6 @@
 # ADR 0019 - An entry has one image, held in a private bucket and served by Lorex
 
-Status: accepted (2026-09-10)
+Status: accepted (2026-09-10). The two decisions it left open were taken the same day; see Consequences.
 
 ## Context
 
@@ -15,8 +15,8 @@ together. Whatever is built has to say what happens when one of them succeeds an
 not, and the answer has to be one an author would accept.
 
 ADR 0014's premise is affected. It argued for a single JSON backup partly on the grounds that
-"media is not in the product". It is now. That consequence is recorded below rather than
-resolved here.
+"media is not in the product". It is now, and ADR 0014 has been amended: version 3 of the format
+is an archive carrying the originals.
 
 ## Decision
 
@@ -130,20 +130,22 @@ behind - and no temporary path is invented that nobody would come back to clean 
 
 ## Consequences
 
-- **A backup is no longer lossless, and ADR 0014's premise no longer holds.** `formatVersion`
-  stays 2 and the export is unchanged: it carries no image metadata and no bytes. This is
-  recorded, not decided - the choice between a metadata-only JSON with a stated reduced
-  guarantee, an archive containing JSON plus media, and a deferral with an explicit contract
-  version is the owner's. `STATE.md` carries it as an open decision. Nothing here weakens the
-  guarantee silently; it says plainly that it is weakened and what the options are.
-- **Revision history does not track the image**, which joins relationships and timeline
-  participation in ADR 0013's list of entry state that a snapshot deliberately does not hold.
-  Restoring an old version leaves the current picture alone rather than restoring a previous
-  one. That is the honest interim: a replacement deletes the objects it supersedes, so an old
-  revision could not restore an image whose bytes no longer exist, and making restore *look*
-  complete would be worse than saying it is not. Making it genuinely complete means retaining
-  historical originals, which is a storage and cleanup commitment - also an owner decision, also
-  in `STATE.md`.
+- **A backup carries the originals, so it stays lossless.** ADR 0014 moved to version 3: the
+  download is a ZIP holding `backup.json` plus `media/entities/{entityId}/original.{ext}`, and it
+  does not depend on this bucket - or any bucket - still being there. Only the original travels;
+  the thumbnail is regenerated, because it is derived from the original by a fixed recipe and a
+  second copy would be one more thing to keep in step. An object the store cannot produce fails
+  the export loudly rather than thinning it. No object key, bucket, endpoint or URL is in the
+  file: they describe this installation, not the picture.
+- **Superseded objects are still deleted, and revision restore still does not restore an image.**
+  Nothing historical is retained - a replacement or a removal cleans the previous original and
+  thumbnail exactly as described above, and that was chosen over keeping every version's picture
+  forever, which would grow storage without bound and needs a cleanup story tied to a history
+  pruning design that does not exist. What follows is that an old version cannot put back bytes
+  that are gone, so it does not pretend to: restoring leaves the entry's current picture alone.
+  The change itself *is* recorded - setting, replacing and removing an image each write a version
+  flagged `Image` (ADR 0013) - so history is truthful about what an author did, and the history
+  screen states the limit rather than leaving it to be discovered.
 - **The image is not lore the Canon rules read.** No rule looks at it, so setting one is not
   gated by the promotion gate (ADR 0012) and is not a revision-worthy write. The entry's
   `UpdatedAt` is left alone for the same reason the Trash marker leaves it alone: it says when

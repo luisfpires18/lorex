@@ -32,17 +32,24 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   may carry one picture: uploaded through the API, decoded and thumbnailed server-side, stored
   as two objects in one private Cloudflare R2 bucket, and served back only through an
   authenticated owner-scoped Lorex route. ADR 0019.
+  - **Backup is an archive.** Format version 3: the download is `lorex-<slug>-<date>.zip`
+    holding `backup.json` plus `media/entities/{entityId}/original.{ext}`. Originals only -
+    thumbnails are derived and regenerated. No object key, bucket, endpoint or URL is in the
+    file, so a backup does not depend on R2 surviving. A media object that cannot be read fails
+    the export loudly rather than thinning it. ADR 0014.
+  - **History records an image change; a restore does not put a picture back.** Superseded
+    objects are still deleted, so nothing historical is retained and an old version has no bytes
+    to restore. Setting, replacing and removing each write a version flagged `Image`, and the
+    history screen states the limit. ADR 0013, ADR 0019.
   - **No Cloudflare resource exists yet**, and none was created. See Deferred.
-  - Two decisions the feature deliberately did **not** take - backup and revision semantics -
-    are open and waiting on the owner. See Deferred.
 
 ## Baseline
 
-- **361 API integration tests, 60 Playwright tests**, green. No frontend unit runner exists;
+- **374 API integration tests, 62 Playwright tests**, green. No frontend unit runner exists;
   the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
-- The test host no longer migrates itself, so all 361 tests boot through the same startup path a
+- The test host no longer migrates itself, so all 374 tests boot through the same startup path a
   deployment uses.
 - 13 migrations, latest `AddEntityImages` - one `CREATE TABLE`, no table rebuild.
   `has-pending-model-changes` reports none. `AddEntitySearchIndex` is raw SQL - an FTS5 virtual
@@ -90,39 +97,6 @@ tool has changed the picture.
 - **`Age`** is declarable but read by nothing until a structured reference year exists. ADR 0011.
 - **Tooling trial verdict.** `docs/tooling/agent-tooling-trial.md` holds the evidence. Keep /
   conditional / remove is the owner's call, per tool.
-- **DECISION OWED - what a backup does about images.** ADR 0014 argued for one JSON file partly
-  because "media is not in the product". It now is, and the export was deliberately left
-  untouched: `formatVersion` stays 2 and carries no image metadata and no bytes. So a backup is
-  no longer lossless, and that is said out loud rather than allowed to happen quietly. Three
-  models, none of them chosen:
-  1. **Metadata-only JSON** - carry asset id, object keys, content type and dimensions; bump to
-     `formatVersion` 3. Small change, no new format, and a restore into the same bucket would
-     reconnect. Honest, but the guarantee is explicitly reduced: the file alone is not a world.
-  2. **An archive** - a zip holding `backup.json` plus the media, which is what "lossless"
-     actually requires. Changes the download, the browser handling, the export test's
-     byte-for-byte determinism check, and everything a future import will read. Largest change,
-     and the only one that keeps ADR 0014's original promise.
-  3. **Defer, with the contract versioned and the gap documented** - what the branch does today.
-     Costs nothing now, and the second backup format change becomes the price later.
-  Recommendation: **1 now, 2 when an import exists.** Metadata is what makes a future archive
-  possible and a restore reconnectable, and it is a two-line change to the payload; turning a
-  download into an archive is worth doing once, alongside the importer that reads it.
-- **DECISION OWED - whether history can restore an old image.** Revisions do not track the image
-  at all today, which puts it alongside relationships and timeline participation in ADR 0013's
-  list of entry state a snapshot does not hold. Restoring an old version leaves the current
-  picture alone. It is the honest interim, because a replacement deletes the objects it
-  supersedes, so an old revision could not restore bytes that no longer exist. Three models:
-  1. **Leave it out**, and say so in the history UI. Free, and no storage grows. An author who
-     restores a version does not get the picture that version had.
-  2. **Record the image on a revision but do not restore it** - history reads "the image
-     changed" and shows what it was called. Cheap, honest, and still cannot put it back.
-  3. **Retain historical originals** - a replacement stops deleting the superseded pair, so every
-     version's image survives. The only model where restore is complete. It also means storage
-     grows with every replacement and never shrinks, needs a cleanup story tied to revision
-     pruning that ADR 0013 does not have, and needs the object lifecycle rewritten.
-  Recommendation: **2.** It makes history truthful about what changed without committing to an
-  unbounded, uncollected pile of superseded images - and 3 is a decision worth taking with a
-  history-pruning design, not ahead of one.
 - **Cloudflare R2 does not exist yet.** No bucket, no token, no App Service setting, and nothing
   in this repository creates any of them. Until the owner does it, every image route answers 503
   and nothing else is affected. Exact steps: `docs/deployment/cloudflare-r2.md`.
@@ -144,6 +118,12 @@ None. Follow-ups, not blocking:
 - Orphaned media objects are swept best-effort and never retried. A delete that fails after the
   database has committed logs a warning naming the key and leaves the object; the entry is
   correct either way. ADR 0019 argues the trade.
+- A backup archive is assembled whole in memory before it is sent, so that a missing image can be
+  refused rather than truncated. Bounded by 8 MB per picture; worth revisiting only if a world
+  ever holds enough media to matter. ADR 0014.
+- Restoring a revision does not put back the picture that version had, and cannot: the objects
+  were deleted when it was superseded. History records the change and the screen says so.
+  ADR 0013.
 - The DEV topology's accepted costs, all in ADR 0018 and the runbook: SQLite lives on an SMB
   share with one writer, a redeploy is a short outage, Data Protection keys are unencrypted at
   rest, there is no automated backup, and a rollback cannot undo a migration. Production needs a

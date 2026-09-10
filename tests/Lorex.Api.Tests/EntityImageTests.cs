@@ -618,6 +618,113 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         Assert.DoesNotContain("thumbnailKey", detail, StringComparison.OrdinalIgnoreCase);
     }
 
+    // ---------- History ----------
+
+    [Fact]
+    public async Task Setting_replacing_and_removing_a_picture_are_each_recorded_as_history()
+    {
+        var (client, universe, type) = await World("imghist");
+        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
+
+        var created = await History(client, universe.Id, entry.Id);
+        Assert.Single(created);
+
+        // Three writes, three versions. An image change is author-visible state, so a history
+        // that stayed the same length across all three would be quietly omitting what was done.
+        await Uploaded(client, universe.Id, entry.Id, Png(400, 400), "first.png");
+        await Uploaded(client, universe.Id, entry.Id, Jpeg(500, 500), "second.jpg");
+        (await client.DeleteAsync(ImageRoute(universe.Id, entry.Id))).EnsureSuccessStatusCode();
+
+        var versions = await History(client, universe.Id, entry.Id);
+
+        Assert.Equal(4, versions.Count);
+
+        // Newest first, and each of the three says the same thing: the picture moved, and
+        // nothing else did.
+        foreach (var version in versions.Take(3))
+        {
+            Assert.Equal(EntityRevisionChange.Image, version.Changes);
+            Assert.Equal(EntityRevisionKind.Edited, version.Kind);
+        }
+
+        Assert.Equal([4, 3, 2, 1], versions.Select(version => version.Number));
+    }
+
+    [Fact]
+    public async Task A_version_holds_no_trace_of_the_picture_it_was_taken_beside()
+    {
+        var (client, universe, type) = await World("imghistbare");
+        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
+
+        var stored = await Uploaded(client, universe.Id, entry.Id, Png(400, 400), "portrait.png");
+
+        var version = (await History(client, universe.Id, entry.Id))[0];
+        var raw = await client.GetStringAsync(
+            $"/api/universes/{universe.Id}/entities/{entry.Id}/revisions/{version.Id}");
+
+        // No bytes, no asset id, no key. A replacement deletes the objects it supersedes, so a
+        // key recorded here would name nothing - the change is remembered, the picture is not.
+        Assert.DoesNotContain(stored.AssetId.ToString("D"), raw, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("universes/", raw, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("portrait.png", raw, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("image", raw, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Putting_an_old_version_back_leaves_the_current_picture_alone()
+    {
+        var (client, universe, type) = await World("imghistrestore");
+        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
+
+        // A version written before there was ever a picture.
+        (await client.PutAsJsonAsync(
+            Entity(universe.Id, entry.Id),
+            new EntityRequest(type, "Alenna of Tidewatch", null, null, CanonStatus.Idea, null, null, null)))
+            .EnsureSuccessStatusCode();
+
+        var beforeAnyPicture = (await History(client, universe.Id, entry.Id))
+            .Single(version => version.Number == 1);
+
+        var stored = await Uploaded(client, universe.Id, entry.Id, Png(400, 400), "portrait.png");
+
+        var restore = await client.PostAsync(
+            $"/api/universes/{universe.Id}/entities/{entry.Id}/revisions/{beforeAnyPicture.Id}/restore",
+            null);
+        restore.EnsureSuccessStatusCode();
+
+        var restored = (await restore.Content.ReadFromJsonAsync<EntityDetail>())!;
+
+        // The lore went back; the picture did not move. Restoring cannot put back an image whose
+        // objects were deleted when it was superseded, so it does not pretend to - it leaves the
+        // entry's current picture exactly where it is, which is what the history screen says.
+        Assert.Equal("Alenna Vance", restored.Name);
+        Assert.Equal(stored.AssetId, restored.Image!.AssetId);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await client.GetAsync(ImageUrl(universe.Id, entry.Id, stored.AssetId, "original"))).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_picture_that_would_not_store_records_no_history()
+    {
+        var (client, universe, type) = await World("imghistfail");
+        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
+
+        var before = await History(client, universe.Id, entry.Id);
+
+        // Refused at the gate, so nothing was stored and nothing happened to remember.
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            (await Upload(client, universe.Id, entry.Id, [1, 2, 3, 4], "portrait.png")).StatusCode);
+
+        // And a removal of an image that is not there is not an event either.
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (await client.DeleteAsync(ImageRoute(universe.Id, entry.Id))).StatusCode);
+
+        Assert.Equal(before.Count, (await History(client, universe.Id, entry.Id)).Count);
+    }
+
     // ---------- Routes ----------
 
     private static string ImageRoute(Guid universeId, Guid entityId) =>
@@ -662,6 +769,16 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
 
     private static async Task<EntityDetail> Detail(HttpClient client, Guid universeId, Guid entityId) =>
         (await client.GetFromJsonAsync<EntityDetail>($"/api/universes/{universeId}/entities/{entityId}"))!;
+
+    private static string Entity(Guid universeId, Guid entityId) =>
+        $"/api/universes/{universeId}/entities/{entityId}";
+
+    private static async Task<IReadOnlyList<EntityRevisionSummary>> History(
+        HttpClient client,
+        Guid universeId,
+        Guid entityId) =>
+        (await client.GetFromJsonAsync<List<EntityRevisionSummary>>(
+            $"{Entity(universeId, entityId)}/revisions"))!;
 
     private static async Task<EntityPage> Page(HttpClient client, Guid universeId) =>
         (await client.GetFromJsonAsync<EntityPage>(

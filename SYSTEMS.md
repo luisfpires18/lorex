@@ -102,8 +102,9 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Trash/TrashEndpoints.cs` | The Trash listing and the gated restore. Entries only. |
 | `Features/Trash/TrashContracts.cs` | Response records for the Trash. |
 | `Features/Export/UniverseBackup.cs` | The backup format, as records. The contract a future import reads. |
-| `Features/Export/UniverseBackupBuilder.cs` | Reads one universe in a single transaction and orders every collection. |
-| `Features/Export/UniverseExportEndpoints.cs` | The export route, the download filename, and how a backup is written. |
+| `Features/Export/UniverseBackupArchive.cs` | Archive layout, the media list, and the deterministic ZIP writer. |
+| `Features/Export/UniverseBackupBuilder.cs` | Reads one universe and its media in a single transaction, and orders every collection. |
+| `Features/Export/UniverseExportEndpoints.cs` | The export route, the download filename, and the one failure a backup can have. |
 | `appsettings.json` | Non-secret defaults; empty connection string. |
 | `appsettings.Development.json` | Dev connection string and CORS origins. |
 | `appsettings.AzureDev.json` | Azure DEV paths, forwarded headers and log levels. No secret. |
@@ -124,7 +125,7 @@ Repository index. Paths and one-line responsibilities only.
 | `src/auth/` | Session context, `useAuth`, and the route guards. |
 | `src/universes/` | Universe API client and types. |
 | `src/lore/` | Lore API client, shared types, document and field helpers, the revision client, and the image client that composes an asset's URL. |
-| `src/export/` | Backup download: the request, the server's filename, and handing the blob to the browser. |
+| `src/export/` | Backup download: the request, the server's filename, and handing the archive to the browser. |
 | `src/trash/` | Trash API client and DTO types. |
 | `src/relationships/` | Relationship API client, DTO types, and both-readings helper. |
 | `src/timeline/` | Timeline API client, DTO types, date formatting and year grouping. |
@@ -163,11 +164,12 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.E2E/specs/relationships.spec.ts` | Both readings, relation kinds, refusals, and the universe and owner boundaries. |
 | `Lorex.E2E/specs/timeline.spec.ts` | Date kinds through the drawer, order, filters, paging, refusals, and the owner boundary. |
 | `Lorex.E2E/specs/history.spec.ts` | One journey: versions accumulate, an old one is read in place and put back. |
-| `Lorex.E2E/specs/export.spec.ts` | One journey: the click produces a real file on disk, named and readable. |
+| `Lorex.E2E/specs/export.spec.ts` | One journey: the click produces a real archive on disk, named and readable. |
+| `Lorex.E2E/specs/support/zip.ts` | Reads a downloaded archive's table of contents. Not a spec. |
 | `Lorex.E2E/specs/trash.spec.ts` | One journey: an entry and its connection leave together and one restore returns both. |
 | `Lorex.E2E/specs/canon.spec.ts` | The review screen, conflict identity across runs, the promotion gate's refusals, reconciliation on write, and the universe and owner boundaries. |
 | `Lorex.E2E/specs/mobile.spec.ts` | One journey at 390px: navigation, authoring, a reachable action, the drawer picker, and no sideways scroll. |
-| `Lorex.E2E/specs/entity-image.spec.ts` | One journey: add, replace and remove a picture; the phone layout; and what the worker may not keep. |
+| `Lorex.E2E/specs/entity-image.spec.ts` | Add, replace and remove a picture; the phone layout; what history says; what a backup carries; what the worker may not keep. |
 | `Lorex.E2E/specs/pwa.spec.ts` | Manifest, icons and metadata, and what the service worker is never allowed to cache. |
 
 ## `scripts`

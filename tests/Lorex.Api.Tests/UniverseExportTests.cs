@@ -1,5 +1,8 @@
+using System.IO.Compression;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Lorex.Api.Features.Auth;
 using Lorex.Api.Features.CanonIntegrity;
@@ -8,14 +11,18 @@ using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.Timeline;
 using Lorex.Api.Features.Universes;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace Lorex.Api.Tests;
 
 /// <summary>
 /// The backup a universe hands back.
 ///
-/// Four claims carry this file. A backup holds everything the author wrote and nothing the
-/// installation owns - no account, no configuration, no path. It is internally coherent, so
+/// Five claims carry this file. A backup holds everything the author wrote and nothing the
+/// installation owns - no account, no configuration, no path, and nothing about the bucket its
+/// pictures happen to live in. It carries the pictures themselves, so it does not stop being a
+/// backup the day the bucket does. It is internally coherent, so
 /// every id in it resolves inside the same file. It is deterministic, so two exports of
 /// unchanged lore differ only in the moment stamped on the envelope. And it is reachable
 /// only by the one person who owns the universe.
@@ -41,7 +48,7 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
         var response = await client.GetAsync(Route(universe.Id));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("application/zip", response.Content.Headers.ContentType?.MediaType);
 
         var backup = await Read(response);
 
@@ -142,7 +149,7 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
 
         Assert.Equal("attachment", disposition?.DispositionType);
         Assert.StartsWith("lorex-tide-ash-the-drowned-coast-", disposition?.FileName?.Trim('"'), StringComparison.Ordinal);
-        Assert.EndsWith(".json", disposition?.FileName?.Trim('"'), StringComparison.Ordinal);
+        Assert.EndsWith(".zip", disposition?.FileName?.Trim('"'), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -150,8 +157,8 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
     {
         var moment = new DateTime(2026, 9, 9, 12, 0, 0, DateTimeKind.Utc);
 
-        Assert.Equal("lorex-universe-20260909.json", UniverseExportEndpoints.FileNameFor("世界", moment));
-        Assert.Equal("lorex-universe-20260909.json", UniverseExportEndpoints.FileNameFor("...", moment));
+        Assert.Equal("lorex-universe-20260909.zip", UniverseExportEndpoints.FileNameFor("世界", moment));
+        Assert.Equal("lorex-universe-20260909.zip", UniverseExportEndpoints.FileNameFor("...", moment));
     }
 
     [Fact]
@@ -161,7 +168,7 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
         var universe = await CreateUniverse(client, "Quiet World");
         await BuildRichUniverse(client, universe.Id);
 
-        var raw = await (await client.GetAsync(Route(universe.Id))).Content.ReadAsStringAsync();
+        var raw = await RawExport(client, universe.Id);
 
         foreach (var forbidden in (string[])
         [
@@ -271,8 +278,10 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
 
         var backup = await Backup(client, universe.Id);
 
-        // The version says the entities collection no longer means "everything here is live".
-        Assert.Equal(2, backup.FormatVersion);
+        // Since version 2 the entities collection no longer means "everything here is live", and
+        // every version after it inherits that.
+        Assert.Equal(UniverseBackup.CurrentVersion, backup.FormatVersion);
+        Assert.True(backup.FormatVersion >= 2);
 
         var coast = backup.Payload.Entities.Single(entity => entity.Id == built.Coast.Id);
 
@@ -608,6 +617,244 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
         Assert.Equal(3, payload.Entities.Count);
     }
 
+    // ---------- The media beside the document ----------
+
+    [Fact]
+    public async Task An_archive_holds_the_document_first_and_the_original_of_every_picture()
+    {
+        var (client, universe) = await SignedInWithUniverse("expmedia");
+        var character = await CharacterType(client, universe.Id);
+
+        var warden = await Create(client, universe.Id, character, "Alenna Vance", CanonStatus.Canon);
+        var uploaded = await Upload(client, universe.Id, warden.Id, Png(320, 200), "portrait.png");
+
+        var archive = await RawArchive(client, universe.Id);
+        var names = EntryNames(archive);
+
+        // The document is the first entry, so a reader finds it without scanning the whole file.
+        Assert.Equal(BackupArchive.DocumentPath, names[0]);
+
+        var mediaPath = $"media/entities/{warden.Id:D}/original.png";
+        Assert.Contains(mediaPath, names);
+
+        // The bytes are the ones that were uploaded, not a re-encoding of them.
+        Assert.Equal(
+            _factory.Media.Bytes(OriginalKey(universe.Id, warden.Id, uploaded.AssetId, "png")),
+            EntryBytes(archive, mediaPath));
+
+        // And the document says where to look, with the shape and identity a reader needs.
+        var backup = JsonSerializer.Deserialize<UniverseBackup>(
+            DocumentText(archive), UniverseBackupJson.Options)!;
+
+        var image = backup.Payload.Entities.Single(entity => entity.Id == warden.Id).Image!;
+
+        Assert.Equal(uploaded.AssetId, image.AssetId);
+        Assert.Equal(mediaPath, image.MediaPath);
+        Assert.Equal("image/png", image.ContentType);
+        Assert.Equal("portrait.png", image.FileName);
+        Assert.Equal(320, image.Width);
+        Assert.Equal(200, image.Height);
+        Assert.True(image.ByteSize > 0);
+    }
+
+    [Fact]
+    public async Task A_thumbnail_is_never_carried_because_a_reader_can_make_one()
+    {
+        var (client, universe) = await SignedInWithUniverse("expthumb");
+        var character = await CharacterType(client, universe.Id);
+
+        var warden = await Create(client, universe.Id, character, "Alenna Vance", CanonStatus.Canon);
+        await Upload(client, universe.Id, warden.Id, Png(320, 200), "portrait.png");
+
+        var archive = await RawArchive(client, universe.Id);
+        var document = DocumentText(archive);
+
+        // It exists in the bucket - it is simply derived, so a reader regenerates it rather
+        // than being handed a second copy of every picture to keep in step.
+        Assert.Equal(
+            2,
+            _factory.Media.Keys.Count(key => key.Contains(warden.Id.ToString("D"), StringComparison.Ordinal)));
+
+        Assert.DoesNotContain(
+            EntryNames(archive),
+            name => name.Contains("thumbnail", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain("thumbnail", document, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("webp", document, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task An_entry_without_a_picture_carries_no_image_and_no_media()
+    {
+        var (client, universe) = await SignedInWithUniverse("expnopic");
+        var character = await CharacterType(client, universe.Id);
+
+        var warden = await Create(client, universe.Id, character, "Alenna Vance", CanonStatus.Canon);
+
+        var archive = await RawArchive(client, universe.Id);
+        var backup = JsonSerializer.Deserialize<UniverseBackup>(
+            DocumentText(archive), UniverseBackupJson.Options)!;
+
+        Assert.Null(backup.Payload.Entities.Single(entity => entity.Id == warden.Id).Image);
+
+        // A world with no pictures never reaches the object store at all, so a backup of one
+        // works whether or not media storage is configured.
+        Assert.Equal([BackupArchive.DocumentPath], EntryNames(archive));
+    }
+
+    [Fact]
+    public async Task Several_pictures_are_written_in_one_order_whatever_the_world_looks_like()
+    {
+        var (client, universe) = await SignedInWithUniverse("exporder");
+        var character = await CharacterType(client, universe.Id);
+
+        var entries = new List<Guid>();
+        foreach (var name in new[] { "Zenna Marr", "Alenna Vance", "Corin Ash" })
+        {
+            var entry = await Create(client, universe.Id, character, name, CanonStatus.Canon);
+            await Upload(client, universe.Id, entry.Id, Png(120 + entries.Count, 100), $"{name}.png");
+            entries.Add(entry.Id);
+        }
+
+        var media = EntryNames(await RawArchive(client, universe.Id)).Skip(1).ToList();
+
+        // Ordered by the archive path, which is built from ids - so the order does not move when
+        // an author renames a character, and two backups of unchanged lore stay comparable.
+        Assert.Equal(media.Order(StringComparer.Ordinal), media);
+        Assert.Equal(3, media.Count);
+        Assert.All(
+            entries,
+            id => Assert.Contains(media, path => path.Contains(id.ToString("D"), StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public async Task A_trashed_entrys_picture_is_carried_with_it()
+    {
+        var (client, universe) = await SignedInWithUniverse("exptrashpic");
+        var character = await CharacterType(client, universe.Id);
+
+        var warden = await Create(client, universe.Id, character, "Alenna Vance", CanonStatus.Canon);
+        var uploaded = await Upload(client, universe.Id, warden.Id, Png(200, 200), "portrait.png");
+
+        (await client.DeleteAsync($"/api/universes/{universe.Id}/entities/{warden.Id}"))
+            .EnsureSuccessStatusCode();
+
+        var archive = await RawArchive(client, universe.Id);
+        var backup = JsonSerializer.Deserialize<UniverseBackup>(
+            DocumentText(archive), UniverseBackupJson.Options)!;
+        var entry = backup.Payload.Entities.Single(candidate => candidate.Id == warden.Id);
+
+        // The entry is in the Trash and travels whole (ADR 0015). Its picture is part of "whole".
+        Assert.NotNull(entry.DeletedAt);
+        Assert.Equal(uploaded.AssetId, entry.Image!.AssetId);
+        Assert.NotEmpty(EntryBytes(archive, entry.Image.MediaPath));
+    }
+
+    [Fact]
+    public async Task A_backup_never_reaches_into_another_universes_media()
+    {
+        var client = await SignedInClient("user-expmediacross");
+        var mine = await CreateUniverse(client, "World expmediacross-mine");
+        var theirs = await CreateUniverse(client, "World expmediacross-other");
+
+        var here = await Create(
+            client, mine.Id, await CharacterType(client, mine.Id), "Alenna Vance", CanonStatus.Canon);
+        var there = await Create(
+            client, theirs.Id, await CharacterType(client, theirs.Id), "Corin Ash", CanonStatus.Canon);
+
+        await Upload(client, mine.Id, here.Id, Png(200, 200), "here.png");
+        await Upload(client, theirs.Id, there.Id, Png(200, 200), "there.png");
+
+        var archive = await RawArchive(client, mine.Id);
+        var names = EntryNames(archive);
+
+        Assert.Contains(names, path => path.Contains(here.Id.ToString("D"), StringComparison.Ordinal));
+        Assert.DoesNotContain(names, path => path.Contains(there.Id.ToString("D"), StringComparison.Ordinal));
+        Assert.DoesNotContain(there.Id.ToString("D"), DocumentText(archive), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_picture_the_store_cannot_produce_fails_the_backup_rather_than_thinning_it()
+    {
+        var (client, universe) = await SignedInWithUniverse("expmediagone");
+        var character = await CharacterType(client, universe.Id);
+
+        var warden = await Create(client, universe.Id, character, "Alenna Vance", CanonStatus.Canon);
+        var uploaded = await Upload(client, universe.Id, warden.Id, Png(200, 200), "portrait.png");
+
+        // The row still names it; the bucket has lost it. A backup is a promise about
+        // completeness, so this is a refusal and not a smaller archive.
+        _factory.Media.Evict(OriginalKey(universe.Id, warden.Id, uploaded.AssetId, "png"));
+
+        var response = await client.GetAsync(Route(universe.Id));
+
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(UniverseExportEndpoints.MediaMissingCode, problem.GetProperty("code").GetString());
+        Assert.Contains(
+            warden.Id.ToString("D"), problem.GetProperty("detail").GetString()!, StringComparison.Ordinal);
+
+        // Nothing that looks like a usable file was handed over.
+        Assert.NotEqual("application/zip", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task Nothing_about_the_bucket_reaches_the_portable_file()
+    {
+        var (client, universe) = await SignedInWithUniverse("expmedialeak");
+        var character = await CharacterType(client, universe.Id);
+
+        var warden = await Create(client, universe.Id, character, "Alenna Vance", CanonStatus.Canon);
+        await Upload(client, universe.Id, warden.Id, Png(200, 200), "portrait.png");
+
+        var document = DocumentText(await RawArchive(client, universe.Id));
+
+        // The object key is how this installation reaches the bytes. It is not the picture's
+        // identity, it means nothing on another machine, and a restore does not need it - so it
+        // is not in the file, and neither is anything else about where the bucket is.
+        Assert.DoesNotContain("universes/", document, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("originalKey", document, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("thumbnailKey", document, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("objectKey", document, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("cloudflare", document, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("bucket", document, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("accesskey", document, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("https://", document, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Unchanged_lore_and_unchanged_pictures_produce_the_same_archive()
+    {
+        var (client, universe) = await SignedInWithUniverse("expmediastable");
+        var character = await CharacterType(client, universe.Id);
+
+        foreach (var name in new[] { "Alenna Vance", "Corin Ash" })
+        {
+            var entry = await Create(client, universe.Id, character, name, CanonStatus.Canon);
+            await Upload(client, universe.Id, entry.Id, Png(200, 160), $"{name}.png");
+        }
+
+        var first = await RawArchive(client, universe.Id);
+        var second = await RawArchive(client, universe.Id);
+
+        // Same entries, same order.
+        Assert.Equal(EntryNames(first), EntryNames(second));
+
+        // Same media, byte for byte.
+        foreach (var name in EntryNames(first).Where(path => path != BackupArchive.DocumentPath))
+        {
+            Assert.Equal(EntryBytes(first, name), EntryBytes(second, name));
+        }
+
+        // Same document, apart from the one volatile member the envelope is allowed to carry.
+        Assert.Equal(PayloadText(DocumentText(first)), PayloadText(DocumentText(second)));
+
+        // And no clock reached the archive itself: every entry carries the same fixed stamp,
+        // so two exports cannot differ over when they were taken.
+        using var zip = new ZipArchive(new MemoryStream(first, writable: false), ZipArchiveMode.Read);
+        Assert.All(zip.Entries, entry => Assert.Equal(BackupArchive.Timestamp, entry.LastWriteTime));
+    }
+
     // ---------- Helpers ----------
 
     private static string Route(Guid universeId) => $"/api/universes/{universeId}/export";
@@ -615,18 +862,45 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
     private static async Task<UniverseBackup> Read(HttpResponseMessage response)
     {
         response.EnsureSuccessStatusCode();
-        var raw = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<UniverseBackup>(raw, UniverseBackupJson.Options)!;
+        return JsonSerializer.Deserialize<UniverseBackup>(
+            DocumentText(await response.Content.ReadAsByteArrayAsync()),
+            UniverseBackupJson.Options)!;
     }
 
     private static async Task<UniverseBackup> Backup(HttpClient client, Guid universeId) =>
         await Read(await client.GetAsync(Route(universeId)));
 
-    private static async Task<string> RawExport(HttpClient client, Guid universeId)
+    /// <summary>The downloaded archive, whole.</summary>
+    private static async Task<byte[]> RawArchive(HttpClient client, Guid universeId)
     {
         var response = await client.GetAsync(Route(universeId));
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadAsStringAsync();
+        return await response.Content.ReadAsByteArrayAsync();
+    }
+
+    /// <summary>The document inside the archive, as text.</summary>
+    private static async Task<string> RawExport(HttpClient client, Guid universeId) =>
+        DocumentText(await RawArchive(client, universeId));
+
+    private static string DocumentText(byte[] archive) =>
+        Encoding.UTF8.GetString(EntryBytes(archive, BackupArchive.DocumentPath));
+
+    /// <summary>Entry names in the order the archive stores them, which is the order they were written.</summary>
+    private static IReadOnlyList<string> EntryNames(byte[] archive)
+    {
+        using var zip = new ZipArchive(new MemoryStream(archive, writable: false), ZipArchiveMode.Read);
+        return [.. zip.Entries.Select(entry => entry.FullName)];
+    }
+
+    private static byte[] EntryBytes(byte[] archive, string path)
+    {
+        using var zip = new ZipArchive(new MemoryStream(archive, writable: false), ZipArchiveMode.Read);
+        var entry = zip.GetEntry(path) ?? throw new InvalidOperationException($"No '{path}' in the archive.");
+
+        using var reading = entry.Open();
+        using var buffer = new MemoryStream();
+        reading.CopyTo(buffer);
+        return buffer.ToArray();
     }
 
     /// <summary>The deterministic half of the file, as text, so two exports can be compared.</summary>
@@ -638,6 +912,57 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
 
     private static BackupFieldValue Value(BackupEntity entity, Guid fieldId) =>
         entity.FieldValues.First(value => value.FieldDefinitionId == fieldId);
+
+    // ---------- Pictures ----------
+
+    private static async Task<Guid> CharacterType(HttpClient client, Guid universeId)
+    {
+        var types = (await client.GetFromJsonAsync<List<EntityTypeResponse>>(
+            $"/api/universes/{universeId}/entity-types"))!;
+        return types.First(type => type.Name == "Character").Id;
+    }
+
+    private static async Task<EntityImageRef> Upload(
+        HttpClient client,
+        Guid universeId,
+        Guid entityId,
+        byte[] bytes,
+        string fileName)
+    {
+        using var form = new MultipartFormDataContent();
+        var file = new ByteArrayContent(bytes);
+        file.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        form.Add(file, "file", fileName);
+
+        var response = await client.PutAsync($"/api/universes/{universeId}/entities/{entityId}/image", form);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<EntityImageRef>())!;
+    }
+
+    /// <summary>Where the original sits in the bucket - an internal address, never in the file.</summary>
+    private static string OriginalKey(Guid universeId, Guid entityId, Guid assetId, string extension) =>
+        $"universes/{universeId:D}/entities/{entityId:D}/primary/{assetId:D}/original.{extension}";
+
+    /// <summary>Not a flat colour: two entries whose pictures differ must produce different bytes.</summary>
+    private static byte[] Png(int width, int height)
+    {
+        using var image = new Image<Rgba32>(width, height);
+        image.ProcessPixelRows(accessor =>
+        {
+            for (var y = 0; y < accessor.Height; y++)
+            {
+                var row = accessor.GetRowSpan(y);
+                for (var x = 0; x < row.Length; x++)
+                {
+                    row[x] = new Rgba32((byte)(x % 251), (byte)(y % 241), (byte)((x + y) % 239));
+                }
+            }
+        });
+
+        using var buffer = new MemoryStream();
+        image.SaveAsPng(buffer);
+        return buffer.ToArray();
+    }
 
     private async Task<HttpClient> SignedInClient(string username)
     {

@@ -152,10 +152,22 @@ Uploads are capped at 8 MB and 24 megapixels by the API, so an entry's two objec
   the database has committed, the new image stays the entry's image and the old pair is left in
   the bucket with a warning logged against its key. Nothing retries it. At this scale the cost of
   an orphan is a few hundred kilobytes; the cost of a retry queue is a subsystem.
-- **A backup does not contain image bytes.** `GET /api/universes/{id}/export` is still one JSON
-  file of authored data, and media is not in it. See ADR 0019 and `STATE.md`; the format is an
-  open owner decision, not an oversight.
-- **Revision history does not track the image.** Restoring an old version of an entry leaves its
-  current picture alone. Also an open owner decision - ADR 0019.
 - **There is no lifecycle rule on the bucket.** Do not add one that expires objects: the database
   is the only record of which objects are live, and an expiry would silently break entries.
+- **Replacing or removing a picture deletes the one it superseded.** Nothing historical is kept,
+  so the bucket holds at most two objects per entry - the live original and its thumbnail.
+
+## What this bucket is not
+
+**It is not where a backup lives.** `GET /api/universes/{id}/export` hands the owner a ZIP
+holding `backup.json` and every entry's original image beside it, so a backup keeps working if
+this bucket is emptied, misconfigured or deleted. Thumbnails are not in it: they are derived and
+an importer regenerates them. Nothing in the file names the bucket, the endpoint, an object key
+or a URL. ADR 0014.
+
+If an object a backup needs cannot be read, the export fails with `backup_media_missing` and
+names the entry. It does not hand over a smaller archive.
+
+**It is not a history of anything.** A revision records that an entry's picture changed, never
+which picture it was, because the superseded objects are gone. Restoring an old version leaves
+the entry's current image untouched, and the history screen says so. ADR 0013, ADR 0019.

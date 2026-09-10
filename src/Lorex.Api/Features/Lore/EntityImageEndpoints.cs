@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Lorex.Api.Data;
+using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Media;
 using Lorex.Api.Features.Universes;
 using Microsoft.AspNetCore.Mvc;
@@ -178,6 +179,11 @@ public static partial class EntityImageEndpoints
 
         try
         {
+            // The association and the version that records it commit together or not at all.
+            // A history that had lost the moment the picture changed would be worse than one
+            // that never claimed to hold it - see ADR 0013 and ADR 0019.
+            await using var transaction = await JoinedTransaction.BeginAsync(db, cancellationToken);
+
             if (existing is null)
             {
                 db.EntityImages.Add(new EntityImage
@@ -210,6 +216,19 @@ public static partial class EntityImageEndpoints
             // The entry's own UpdatedAt is left alone. It says when the lore was last authored,
             // and the image carries its own timestamp - the same reasoning the Trash marker uses.
             await db.SaveChangesAsync(cancellationToken);
+
+            // No snapshot can see this, because a revision holds no image: the objects a past
+            // version pointed at are deleted when it is superseded, so a key kept in history
+            // would name nothing. The change is recorded rather than copied.
+            await EntityRevisions.CaptureAsync(
+                db,
+                entityId,
+                EntityRevisionKind.Edited,
+                restoredFromRevisionId: null,
+                cancellationToken,
+                also: EntityRevisionChange.Image);
+
+            await transaction.CommitAsync(cancellationToken);
         }
         catch (Exception)
         {
@@ -275,9 +294,24 @@ public static partial class EntityImageEndpoints
         var originalKey = image.OriginalKey;
         var thumbnailKey = image.ThumbnailKey;
 
-        db.EntityImages.Remove(image);
-        await db.SaveChangesAsync(cancellationToken);
+        await using (var transaction = await JoinedTransaction.BeginAsync(db, cancellationToken))
+        {
+            db.EntityImages.Remove(image);
+            await db.SaveChangesAsync(cancellationToken);
 
+            await EntityRevisions.CaptureAsync(
+                db,
+                entityId,
+                EntityRevisionKind.Edited,
+                restoredFromRevisionId: null,
+                cancellationToken,
+                also: EntityRevisionChange.Image);
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        // Only past the commit, so the objects are removed after the entry has stopped naming
+        // them - never the other way round.
         await SweepAsync(
             store,
             loggerFactory.CreateLogger("Lorex.EntityImages"),

@@ -1,5 +1,7 @@
+import { readFile } from 'node:fs/promises'
 import { deflateSync } from 'node:zlib'
 import { expect, test, type Page } from '@playwright/test'
+import { entryNames } from './support/zip'
 
 /**
  * One journey, for the parts of an entry's picture only a browser can prove.
@@ -188,6 +190,70 @@ test.describe('an entry with a picture', () => {
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       ),
     ).toBeLessThanOrEqual(0)
+  })
+
+  test('history records the picture, and says it will not put one back', async ({ page }) => {
+    await signUp(page)
+    await createUniverse(page)
+
+    await page.getByTestId('workspace-lore').click()
+    await page.waitForURL(/\/lore$/)
+    await page.getByTestId('new-entity').click()
+    await page.waitForURL(/\/lore\/new$/)
+    await page.getByLabel('Name').fill(unique('Alenna Vance '))
+    await page.getByTestId('save-entity').click()
+    await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
+
+    // Nothing here has ever had a picture, so the note would only be noise.
+    await expect(page.getByTestId('history-image-note')).toHaveCount(0)
+
+    await page.getByTestId('edit-entity').click()
+    await page
+      .getByTestId('entity-image-input')
+      .setInputFiles(upload('first.png', 300, 300, [30, 90, 170]))
+    await expect(page.getByTestId('entity-image-preview')).toBeVisible()
+    await page.getByRole('button', { name: 'Cancel' }).click()
+
+    // The version is there, it says what moved, and the panel says what a restore will not do.
+    await expect(
+      page.getByTestId('history-list').getByTestId('version-what').first(),
+    ).toContainText('the image')
+    await expect(page.getByTestId('history-image-note')).toContainText(
+      'Images are not included when restoring a revision.',
+    )
+  })
+
+  test('a backup carries the picture beside the lore', async ({ page }) => {
+    await signUp(page)
+    await createUniverse(page)
+
+    await page.getByTestId('workspace-lore').click()
+    await page.waitForURL(/\/lore$/)
+    await page.getByTestId('new-entity').click()
+    await page.waitForURL(/\/lore\/new$/)
+    await page.getByLabel('Name').fill(unique('Alenna Vance '))
+    await page
+      .getByTestId('entity-image-input')
+      .setInputFiles(upload('first.png', 480, 320, [30, 90, 170]))
+    await page.getByTestId('save-entity').click()
+    await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
+    const entityId = page.url().split('/').pop()!
+
+    await page.getByTestId('workspace-settings').click()
+    await page.waitForURL(/\/settings$/)
+
+    const downloading = page.waitForEvent('download')
+    await page.getByTestId('export-universe').click()
+    const download = await downloading
+
+    expect(download.suggestedFilename()).toMatch(/\.zip$/)
+
+    // The document, and the entry's original beside it - which is the whole point of the
+    // archive: a backup does not stop being one the day the bucket does.
+    expect(entryNames(await readFile((await download.path())!))).toEqual([
+      'backup.json',
+      `media/entities/${entityId}/original.png`,
+    ])
   })
 
   test('the service worker never keeps an entry image', async ({ page }) => {

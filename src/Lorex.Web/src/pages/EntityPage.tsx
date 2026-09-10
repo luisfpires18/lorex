@@ -488,9 +488,12 @@ export default function EntityPage() {
                 image={detail?.image ?? null}
                 pending={pendingImage}
                 onPending={setPendingImage}
-                onChanged={(image) =>
+                onChanged={(image) => {
                   setDetail((current) => (current ? { ...current, image } : current))
-                }
+                  // An image change is a version like any other, so the history beside it is
+                  // read again rather than left sitting one write behind.
+                  setHistoryKey((key) => key + 1)
+                }}
                 disabled={isSaving}
               />
 

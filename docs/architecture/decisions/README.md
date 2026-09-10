@@ -17,7 +17,7 @@ One ADR per durable decision. Rationale lives in the ADR, never here.
 | 0011 | A field declares what it means, in a closed enum, on Number only | [0011-semantic-field-codes.md](0011-semantic-field-codes.md) |
 | 0012 | High conflicts block only the write that introduces them | [0012-canon-promotion-gate.md](0012-canon-promotion-gate.md) |
 | 0013 | An entry's history is a full snapshot per accepted write | [0013-entity-revision-snapshots.md](0013-entity-revision-snapshots.md) |
-| 0014 | A backup is one versioned JSON file holding a universe's authored data | [0014-universe-backup-format.md](0014-universe-backup-format.md) |
+| 0014 | A backup is one versioned archive holding a universe's authored data | [0014-universe-backup-format.md](0014-universe-backup-format.md) |
 | 0015 | An entry is trashed by a marker, and nothing that points at it is destroyed | [0015-entity-trash-and-restore.md](0015-entity-trash-and-restore.md) |
 | 0016 | Lore is searched by a SQLite FTS5 index the write path keeps in step | [0016-sqlite-full-text-search.md](0016-sqlite-full-text-search.md) |
 | 0017 | Lorex installs as an app shell and caches build output only | [0017-pwa-shell-and-caching.md](0017-pwa-shell-and-caching.md) |

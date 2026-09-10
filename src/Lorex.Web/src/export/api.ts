@@ -7,8 +7,11 @@ import { ApiError } from '../lib/api'
  * makes the same same-origin, cookie-carrying request by hand and reads the response as a blob
  * instead. A failure still arrives as ProblemDetails and is still raised as an `ApiError`, so
  * the page handles it exactly as it handles any other refusal.
+ *
+ * The artefact is a ZIP: the backup document plus every entry's original picture beside it. The
+ * client neither opens it nor knows what is inside - it asks, and it saves what comes back.
  */
-const FALLBACK_FILE_NAME = 'lorex-universe.json'
+const FALLBACK_FILE_NAME = 'lorex-universe.zip'
 
 /**
  * The name the server chose, out of `Content-Disposition`. Only the basename is kept: a
@@ -43,7 +46,9 @@ function save(blob: Blob, fileName: string) {
 export async function downloadUniverseBackup(universeId: string): Promise<string> {
   const response = await fetch(`/api/universes/${universeId}/export`, {
     credentials: 'same-origin',
-    headers: { Accept: 'application/json' },
+    // The archive when it works, ProblemDetails when it does not - and a refusal is read as
+    // JSON below, so both have to be asked for.
+    headers: { Accept: 'application/zip, application/json' },
   })
 
   if (!response.ok) {

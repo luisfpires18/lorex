@@ -1,6 +1,6 @@
-# ADR 0014 - A backup is one versioned JSON file holding a universe's authored data
+# ADR 0014 - A backup is one versioned archive holding a universe's authored data
 
-Status: accepted (2026-09-09)
+Status: accepted (2026-09-09), amended 2026-09-10 (version 3: the file became an archive)
 
 ## Context
 
@@ -17,12 +17,41 @@ The hard part is not serialising rows. It is deciding which rows are a world.
 
 ## Decision
 
-**One file, JSON, universe-scoped.** No archive: there is nothing to put beside the data -
-media is not in the product - so a container would be structure for its own sake. JSON is
-the interchange format here, not general-purpose storage, so ADR 0007's objection to JSON
-in the database does not apply. The one JSON that is already stored as JSON, the Tiptap
-article, travels as the exact string the column holds, never re-parsed and re-emitted, so it
-round-trips byte for byte.
+**One file, universe-scoped, JSON at its centre.** JSON is the interchange format here, not
+general-purpose storage, so ADR 0007's objection to JSON in the database does not apply. The one
+JSON that is already stored as JSON, the Tiptap article, travels as the exact string the column
+holds, never re-parsed and re-emitted, so it round-trips byte for byte.
+
+**Version 3 (2026-09-10) makes that file an archive**, because there is now something to put
+beside the data. This decision originally read "no archive: there is nothing to put beside the
+data - media is not in the product". Entry images made that false (ADR 0019), and the premise
+went with it. A backup that named pictures living in a Cloudflare bucket would stop being a
+backup the moment the bucket did - which is precisely the moment a backup is for - so the
+pictures travel with the lore:
+
+```
+backup.json
+media/entities/{entityId}/original.{jpg|png|webp}
+```
+
+`backup.json` is exactly the document this ADR has always described. Each entry's `image`
+carries the identity and shape of its picture and the archive-relative `mediaPath` where the
+bytes sit. What it deliberately does not carry is the object key, the bucket, the endpoint or a
+URL: those are how *this installation* reaches the file today, they mean nothing on another
+machine, and a restore does not need any of them. The download is `application/zip`, named
+`lorex-<slug>-<date>.zip`.
+
+**Only the original, never the thumbnail.** A thumbnail is derived - a fixed square crop at a
+fixed size in a fixed format - so a reader regenerates it from the original. Carrying one would
+double the media in every backup and add a second copy that has to be trusted to match.
+
+**A picture that cannot be read fails the backup.** The archive is assembled whole in memory
+before a single byte is sent, so a missing object is a 500 carrying the code
+`backup_media_missing` and the entry it belongs to - not a 200 with a smaller file. Streaming
+could only have reported it by truncating a download that had already claimed to succeed, and an
+archive that quietly left a picture out would break the promise at the exact moment it mattered.
+A world with no pictures never touches the object store at all, so it exports whether or not
+media storage is configured.
 
 **An explicit envelope, and a version on it.** `format` is `lorex.universe.backup` and
 `formatVersion` is an integer, so a reader can refuse a file that is merely JSON, and a
@@ -45,6 +74,10 @@ version 1 changes: a version 1 file still means exactly what it always meant, wh
 every entry in it is live - a fact that was previously true by construction and is now
 written down.
 
+**Version 3 carries the media.** It is the largest kind of change a version can announce: a
+reader that only knows versions 1 and 2 is handed a file it cannot parse at all, rather than one
+it parses and misunderstands. That is exactly what a version number is for.
+
 **Only the authored data.** The test for inclusion is: did a person write this, or would
 Lorex produce it again from what a person wrote?
 
@@ -57,6 +90,7 @@ Lorex produce it again from what a person wrote?
 | Relationship types and relationships | - |
 | Timeline entries, their signed date components and era labels, participants | Derived date precision |
 | Every entry's revision history (ADR 0013) | - |
+| Each entry's primary image: the original bytes, its asset id, filename, content type, dimensions and archive path | The generated thumbnail, and every R2 object key, bucket name, endpoint and URL |
 | Canon conflicts the author **dismissed** | Pending and resolved conflicts, and all conflict wording |
 | | Tag `Slug` |
 | | Identity tables, configuration, connection strings, file paths |
@@ -87,6 +121,15 @@ revision - is preserved exactly, so a future importer can rebuild the graph and 
 fingerprints alike. `Tag.Slug` is dropped for the same reason: it is `Name.ToLowerInvariant()`
 at the one place a tag is created, so it is a derived index column, not something authored.
 
+**Media is described by identity and by where it sits, never by where it came from.** The asset
+id is carried because it is the identity the entry itself uses, so an importer can recognise the
+same picture across two backups of the same world. The object key is not, and is marked in the
+code as implementation-only: it names a place in one installation's bucket, it is not what the
+picture *is*, and a file that carried it would be describing infrastructure rather than lore.
+Archive paths are built from ids and a fixed leaf for the same reason the object keys are - a
+name is mutable, and a path built from one would change every time an author renamed a
+character, so two backups of unchanged lore would stop being comparable.
+
 **The payload is deterministic; only the envelope is not.** Every collection is sorted in
 memory with an ordinal comparer - never left in the database's order and never sorted by a
 SQLite collation - so two exports of unchanged lore produce a byte-identical `payload` on any
@@ -115,9 +158,14 @@ attachment named for the world and the day, reduced to lowercase ASCII.
   implying a restore exists.
 - The format is the durable commitment, not the code that writes it. `UniverseBackup.cs` is
   the contract; a change there owes a version bump.
-- A backup is large and uncompressed, and history dominates it - snapshots grow with the
-  number of edits (ADR 0013). Compression is a container decision that can be taken later
-  without changing the payload.
+- **The archive is deterministic too.** Entries are written in a fixed order - `backup.json`
+  first, then the media sorted by archive path with an ordinal comparer - and every entry
+  carries a fixed 1980-01-01 stamp rather than the clock, so two exports of unchanged lore and
+  unchanged pictures differ only where `generatedAt` lands inside the document. `backup.json`
+  is deflated; media is stored rather than deflated, because a JPEG, PNG or WebP is already
+  compressed and storing it makes "the original bytes, exactly" the plainest thing to verify.
+- A backup is large, and history dominates the document - snapshots grow with the number of
+  edits (ADR 0013). The container now compresses the document, which is where the growth is.
 - Restoring into a fresh installation will reproduce ids exactly, which is what makes the
   dismissal fingerprints re-apply. An importer that renumbered ids would have to recompute
   them, and should not.
@@ -125,5 +173,7 @@ attachment named for the world and the day, reduced to lowercase ASCII.
   is safe precisely because this file is never embedded in HTML - it is written to disk and
   read back by a parser - and it is what keeps a world written in a non-Latin script legible
   in its own backup.
+- A backup no longer depends on the R2 bucket surviving. It did, briefly, between the arrival of
+  entry images and version 3; that gap is closed, and it is why the format moved.
 - Two things a backup deliberately does not claim to be: an account export, and a disaster
   recovery mechanism. It is one world, taken by hand, by the person who owns it.
