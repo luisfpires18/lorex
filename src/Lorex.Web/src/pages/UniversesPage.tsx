@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { UniverseCard } from '../components/UniverseCard'
 import { UniverseForm } from '../components/UniverseForm'
+import { Wordmark } from '../components/Wordmark'
 import { createUniverse, listUniverses } from '../universes/api'
 import type { UniversePage } from '../universes/types'
 
@@ -62,7 +63,7 @@ export default function UniversesPage() {
   return (
     <div className="home">
       <header className="home__bar">
-        <span className="wordmark">Lorex</span>
+        <Wordmark />
         <div className="home__session">
           <span className="home__user" data-testid="signed-in-user">
             {user?.username}

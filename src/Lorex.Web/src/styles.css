@@ -13,6 +13,10 @@
   --plate: #201f1d;
   --plate-ink: #f0ece3;
   --plate-muted: #a09a90;
+  /* The plate stays graphite in both schemes, so the accent on it is the lifted value
+     in both. Same accent, one step brighter - not a second accent. Named for the plate's
+     ink because `.plate`, the universe card, already owns `--plate-accent` locally. */
+  --plate-ink-accent: #93a6e6;
   --ink: #191713;
   --muted: #6b6459;
   --rule: #d8d0c2;
@@ -81,6 +85,29 @@ a {
   line-height: 1;
   letter-spacing: 0.16em;
   display: block;
+}
+
+/* The X carries the accent and a gap on top of the tracking, so the mark reads as
+   "Lore X" without the letters drifting apart. */
+.wordmark__x {
+  color: var(--accent);
+  margin-left: 0.22em;
+}
+
+.auth__plate .wordmark__x {
+  color: var(--plate-ink-accent);
+}
+
+/* The spoken name, "Lorex", which the drawn mark no longer spells. */
+.wordmark__name {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* ---------- Session hold ---------- */
