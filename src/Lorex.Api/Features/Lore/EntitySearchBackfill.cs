@@ -12,20 +12,34 @@ namespace Lorex.Api.Features.Lore;
 /// what a universe contains.
 ///
 /// Runs before the first request is served, and does one query when there is nothing to do. It
-/// fails loudly if the schema is not there, because a start that carried on would answer every
-/// search with an error instead.
+/// waits on <see cref="LorexDatabaseInitializer"/> first, because it reads <c>Entities</c> and a
+/// schema is not something startup work may assume. It still fails loudly if the tables are not
+/// there afterwards, because a start that carried on would answer every search with an error
+/// instead.
 /// </summary>
-public sealed class EntitySearchBackfill(IServiceScopeFactory scopes) : IHostedService
+public sealed partial class EntitySearchBackfill(
+    LorexDatabaseInitializer database,
+    IServiceScopeFactory scopes,
+    ILogger<EntitySearchBackfill> logger) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        await database.EnsureSchemaAsync(cancellationToken);
+
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<LorexDbContext>();
 
-        await EntitySearchIndex.BackfillAsync(db, cancellationToken);
+        var indexed = await EntitySearchIndex.BackfillAsync(db, cancellationToken);
+        if (indexed > 0)
+        {
+            LogBackfilled(logger, indexed);
+        }
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Search index backfilled {Count} entries.")]
+    private static partial void LogBackfilled(ILogger logger, int count);
 }
 
 public static class LoreSearchSetup
