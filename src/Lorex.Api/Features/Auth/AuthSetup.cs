@@ -21,13 +21,17 @@ public static class AuthSetup
             options.Cookie.HttpOnly = true;
             options.Cookie.SameSite = SameSiteMode.Strict;
 
-            // The SPA is served same-origin through the Vite proxy in development and behind
-            // TLS in production, so the cookie can stay Strict. Development and the test host
-            // run plain HTTP, where demanding Secure would silently drop the cookie; any
-            // HTTPS request still gets a Secure cookie under SameAsRequest.
-            options.Cookie.SecurePolicy = environment.IsProduction()
-                ? CookieSecurePolicy.Always
-                : CookieSecurePolicy.SameAsRequest;
+            // The SPA is served same-origin - through the Vite proxy in development, out of the
+            // API's own wwwroot once deployed - so the cookie can stay Strict.
+            //
+            // Secure is the default and only the two hosts that deliberately run plain HTTP
+            // relax it: development, and the test host. Demanding Secure there would silently
+            // drop the cookie. Every deployed environment is served over HTTPS, so it is the
+            // deployment that has to opt out of plain HTTP, not the other way round.
+            var servesPlainHttp = environment.IsDevelopment() || environment.IsEnvironment("Testing");
+            options.Cookie.SecurePolicy = servesPlainHttp
+                ? CookieSecurePolicy.SameAsRequest
+                : CookieSecurePolicy.Always;
 
             options.ExpireTimeSpan = SessionLifetime;
             options.SlidingExpiration = true;

@@ -1,0 +1,138 @@
+# Validation for Lorex. Runs on every pull request into dev, and is called by the DEV
+# deployment before it publishes anything, so nothing reaches Azure that has not passed here.
+name: CI
+
+on:
+  pull_request:
+    branches: [dev]
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # Superseding a pull request's run is free. Cancelling the validation a queued deployment is
+  # waiting on is not, so only pull requests cancel.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  NODE_VERSION: '22.x'
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore Lorex.slnx
+
+      - name: Build (Release)
+        run: dotnet build Lorex.slnx -c Release --no-restore
+
+      - name: Test
+        run: dotnet test Lorex.slnx -c Release --no-build
+
+      # The schema and the model have to agree. Raw-SQL migrations are invisible to this check
+      # by design - see ADR 0016 - so a green result means "no EF Core model change is owed",
+      # not "the schema is certainly complete".
+      - name: Check for pending model changes
+        run: |
+          dotnet tool restore
+          dotnet ef migrations has-pending-model-changes \
+            --project src/Lorex.Api --configuration Release --no-build
+
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/Lorex.Web
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: src/Lorex.Web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format
+        run: npm run format:check
+
+      # The E2E project has no Prettier of its own: its specs are held to these settings, and
+      # Prettier has to be pointed at this config explicitly to read them from outside the tree.
+      - name: Format (end-to-end specs)
+        run: >
+          npx prettier --check --config .prettierrc.json
+          ../../tests/Lorex.E2E/specs ../../tests/Lorex.E2E/playwright.config.ts
+
+      - name: Build
+        run: npm run build
+
+  e2e:
+    name: End to end
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            src/Lorex.Web/package-lock.json
+            tests/Lorex.E2E/package-lock.json
+
+      - name: Install web dependencies
+        run: npm ci
+        working-directory: src/Lorex.Web
+
+      - name: Install test dependencies
+        run: npm ci
+        working-directory: tests/Lorex.E2E
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: tests/Lorex.E2E
+
+      # Built ahead of time so the API is already compiled when Playwright's webServer runs
+      # `dotnet run`, which otherwise restores and builds inside that server's start timeout.
+      - name: Build the API
+        run: dotnet build src/Lorex.Api
+
+      # Playwright starts the API and the Vite dev server itself; see playwright.config.ts.
+      - name: Run Playwright
+        run: npx playwright test
+        working-directory: tests/Lorex.E2E
+
+      - name: Upload report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: tests/Lorex.E2E/playwright-report
+          retention-days: 7

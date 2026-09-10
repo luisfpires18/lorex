@@ -62,8 +62,9 @@ docs/007/architecture-update
 | 019 | `feat/019/trash-recovery` | merged into `dev` |
 | 020 | `feat/020/full-text-search` | merged into `dev` |
 | 021 | `feat/021/pwa-mobile-refinement` | merged into `dev` |
+| 022 | `feat/022/azure-dev-cicd` | in progress |
 
-Next free number: `022`.
+Next free number: `023`.
 
 ## Rules for automation
 

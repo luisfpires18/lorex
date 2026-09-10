@@ -15,6 +15,9 @@ Repository index. Paths and one-line responsibilities only.
 | `STATE.md` | Operational state only: roadmap position, blockers, deferred decisions. |
 | `graphify-out/` | Generated knowledge graph. Gitignored, manual-only; rebuild with `python -m graphify update .`. |
 | `docs/tooling/` | Agent tooling trial notes (RTK and Graphify evaluation). |
+| `.github/workflows/` | CI on pull requests, and the DEV deployment from `dev`. |
+| `infra/main.bicep` | The two DEV Azure resources: the Linux App Service plan and the site. |
+| `infra/main.parameters.json` | Deployment parameters. Placeholder name; no secret. |
 
 ## `.claude` - session tooling
 
@@ -33,10 +36,14 @@ Repository index. Paths and one-line responsibilities only.
 | --- | --- |
 | `Program.cs` | Composition root and pipeline. |
 | `Data/LorexDbContext.cs` | Single EF Core context; applies feature entity configurations. |
-| `Data/DatabaseSetup.cs` | SQLite registration, data-source path resolution, dev migrations. |
+| `Data/DatabaseSetup.cs` | SQLite registration, data-source path resolution, startup-step wiring. |
+| `Data/LorexDatabaseInitializer.cs` | Migrates once per process, and what other startup work awaits. |
 | `Data/Migrations/` | EF Core migrations. |
+| `Hosting/FrontendHosting.cs` | Serving the built client from `wwwroot`, its cache headers and its fallback. |
+| `Hosting/ProxyHeaders.cs` | Honouring `X-Forwarded-Proto` behind a TLS-terminating proxy. |
 | `Features/Health/HealthEndpoints.cs` | `/health` and `/api/health`. |
 | `Features/Auth/AuthSetup.cs` | Identity registration and cookie session configuration. |
+| `Features/Auth/DataProtectionSetup.cs` | Where the key ring lives, when a path is configured. |
 | `Features/Auth/AuthEndpoints.cs` | Register, login, logout and current-user endpoints. |
 | `Features/Auth/AuthContracts.cs` | Request and response records for the auth surface. |
 | `Features/Auth/LorexUser.cs` | Application user on top of `IdentityUser`. |
@@ -90,6 +97,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Export/UniverseExportEndpoints.cs` | The export route, the download filename, and how a backup is written. |
 | `appsettings.json` | Non-secret defaults; empty connection string. |
 | `appsettings.Development.json` | Dev connection string and CORS origins. |
+| `appsettings.AzureDev.json` | Azure DEV paths, forwarded headers and log levels. No secret. |
 
 ## `src/Lorex.Web` - React client
 
@@ -123,6 +131,7 @@ Repository index. Paths and one-line responsibilities only.
 | --- | --- |
 | `Lorex.Api.Tests/LorexApiFactory.cs` | Boots the real host over in-memory SQLite. |
 | `Lorex.Api.Tests/HealthEndpointTests.cs` | Backend test-infrastructure proof. |
+| `Lorex.Api.Tests/HostStartupTests.cs` | Startup on a real file: migrations before queries, backfill, forwarded scheme. |
 | `Lorex.Api.Tests/AuthEndpointTests.cs` | Registration, sign-in, session and logout. |
 | `Lorex.Api.Tests/UniverseEndpointTests.cs` | Universe CRUD and the ownership invariant. |
 | `Lorex.Api.Tests/LoreEndpointTests.cs` | Lore CRUD, field kinds, and cross-universe isolation. |
@@ -162,5 +171,6 @@ Repository index. Paths and one-line responsibilities only.
 | Path | Responsibility |
 | --- | --- |
 | `architecture/branching.md` | Branch naming and merge rules. |
+| `deployment/azure-dev.md` | The DEV runbook: topology, setup, deploy, limitations, troubleshooting. |
 | `architecture/decisions/README.md` | One-line index of every ADR. |
 | `architecture/decisions/` | ADRs; one small file per durable decision. |

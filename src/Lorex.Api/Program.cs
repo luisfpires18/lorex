@@ -8,12 +8,15 @@ using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.Timeline;
 using Lorex.Api.Features.Trash;
 using Lorex.Api.Features.Universes;
+using Lorex.Api.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks();
 
+builder.Services.AddLorexForwardedHeaders(builder.Configuration);
+builder.Services.AddLorexDataProtection(builder.Configuration, builder.Environment);
 builder.Services.AddLorexDatabase(builder.Configuration, builder.Environment);
 builder.Services.AddLorexAuth(builder.Environment);
 builder.Services.AddCanonIntegrity();
@@ -31,6 +34,10 @@ if (corsOrigins.Length > 0)
 
 var app = builder.Build();
 
+// First: everything after this point may read the request scheme, and behind a TLS-terminating
+// proxy the scheme is only correct once the forwarded header has been applied.
+app.UseLorexForwardedHeaders();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -41,8 +48,10 @@ if (corsOrigins.Length > 0)
     app.UseCors();
 }
 
-// Dev runs over plain HTTP so the local launcher does not depend on a trusted dev certificate.
-// Production hosting is expected to terminate TLS in front of the app.
+// Dev runs the client on the Vite dev server over plain HTTP, so the local launcher does not
+// depend on a trusted dev certificate. A deployment serves the built client from wwwroot and
+// terminates TLS in front of the app.
+app.UseLorexFrontend();
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -60,7 +69,8 @@ app.MapCanonIntegrityEndpoints();
 app.MapTrashEndpoints();
 app.MapUniverseExportEndpoints();
 
-await app.MigrateLorexDatabaseAsync();
+// Last: the client-side routing fallback only answers what no route above claimed.
+app.MapLorexFrontendFallback();
 
 app.Run();
 

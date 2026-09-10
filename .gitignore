@@ -60,6 +60,10 @@ Thumbs.db
 graphify-out/
 *.graphify-bak
 
+# ---------- Published frontend ----------
+# The built client is copied here at publish time so one process serves both halves.
+src/Lorex.Api/wwwroot/
+
 # ---------- Lorex launcher runtime ----------
 .lorex/
 logs/

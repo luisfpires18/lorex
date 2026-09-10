@@ -8,6 +8,10 @@ public static class DatabaseSetup
 {
     public const string ConnectionStringName = "LorexDb";
 
+    /// <summary>
+    /// Registers the context and the startup step that migrates it. Both belong together: an app
+    /// that can reach the database is an app that has to be sure of its schema first.
+    /// </summary>
     public static IServiceCollection AddLorexDatabase(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -20,25 +24,21 @@ public static class DatabaseSetup
         connectionString = ResolveDataSourceDirectory(connectionString, environment.ContentRootPath);
 
         services.AddDbContext<LorexDbContext>(options => options.UseSqlite(connectionString));
+
+        // One instance, reachable two ways: as the first hosted service, and directly by any
+        // other startup step that has to await the schema before it queries a table.
+        services.AddSingleton<LorexDatabaseInitializer>();
+        services.AddHostedService(provider => provider.GetRequiredService<LorexDatabaseInitializer>());
+
         return services;
-    }
-
-    /// <summary>Applies pending migrations. Development-only; deployments run migrations explicitly.</summary>
-    public static async Task MigrateLorexDatabaseAsync(this WebApplication app)
-    {
-        if (!app.Environment.IsDevelopment())
-        {
-            return;
-        }
-
-        using var scope = app.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<LorexDbContext>();
-        await db.Database.MigrateAsync();
     }
 
     /// <summary>
     /// Makes a relative SQLite "Data Source" absolute against the content root and ensures
     /// the target directory exists, so the database lands in a predictable place.
+    ///
+    /// An absolute path is left where it points, which is how a deployment puts the file on
+    /// storage that outlives the deployed content instead of inside it.
     /// </summary>
     private static string ResolveDataSourceDirectory(string connectionString, string contentRootPath)
     {

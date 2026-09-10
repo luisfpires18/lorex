@@ -1,0 +1,105 @@
+# Deploys the DEV environment. Only from dev, only to the one DEV App Service, and only after
+# the same validation a pull request gets.
+#
+# Nothing here is a credential. Sign-in is OIDC federated identity, so the four Azure values are
+# repository or environment variables - identifiers, not secrets - and there is nothing here to
+# leak or rotate. The exact names an owner has to create are in docs/deployment/azure-dev.md.
+name: Deploy DEV
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  NODE_VERSION: '22.x'
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  validate:
+    name: Validate
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Deploy
+    needs: validate
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: ${{ steps.deploy.outputs.webapp-url }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: src/Lorex.Web/package-lock.json
+
+      # One process serves both halves, so the built client is copied into the API's wwwroot
+      # before publish. wwwroot is build output and is not in the repository.
+      - name: Build the client
+        working-directory: src/Lorex.Web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Copy the client into wwwroot
+        run: |
+          rm -rf src/Lorex.Api/wwwroot
+          mkdir -p src/Lorex.Api/wwwroot
+          cp -r src/Lorex.Web/dist/. src/Lorex.Api/wwwroot/
+
+      - name: Publish the API
+        run: dotnet publish src/Lorex.Api -c Release -o publish
+
+      - name: Sign in to Azure
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to App Service
+        id: deploy
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          package: publish
+
+      # A deployment that answers is the only proof worth having. The wait is for the platform
+      # to finish swapping in the new site, not for anything inside the app: Lorex applies its
+      # migrations during startup and does not report healthy before they are done.
+      - name: Check that DEV answers
+        env:
+          HEALTH_URL: ${{ steps.deploy.outputs.webapp-url }}/health
+        run: |
+          for attempt in $(seq 1 10); do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' "$HEALTH_URL" || echo 000)
+            echo "attempt $attempt: $code"
+            if [ "$code" = "200" ]; then exit 0; fi
+            sleep 15
+          done
+          echo "DEV did not answer 200 at $HEALTH_URL"
+          exit 1
+
+      - name: Sign out of Azure
+        if: always()
+        run: az logout || true
