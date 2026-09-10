@@ -16,11 +16,19 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   author wrote, not only the name, aliases and summary, and orders hits by relevance instead
   of recency. `GET /api/universes/{id}/entities` is unchanged apart from what
   `search` means. Index shape, synchronization and query semantics: ADR 0016.
-- **Now: Phase 021 - PWA / Mobile Refinement.** Not started; no branch yet.
+- **Phase 021** (PWA / Mobile Refinement) on `feat/021/pwa-mobile-refinement`, not merged.
+  Lorex installs: a hand-written manifest, four icons drawn from the wordmark, and a service
+  worker that caches build output and refuses `/api`, non-`GET`, navigations and cross-origin
+  outright - ADR 0017 owns the caching, update and privacy policy, and says plainly that
+  nothing works offline. On a narrow screen the workspace chrome folds from ~290px of
+  permanent nav into one 44px-56px sticky bar with a labelled disclosure; the dossier and
+  editor footers stick to the bottom edge so Edit and Save stay in reach; history stacks;
+  hit areas grow only where the pointer is coarse, so the desktop layout is untouched.
+  No backend change.
 
 ## Baseline
 
-- 328 API integration tests, 47 Playwright tests, green. No frontend unit runner exists; the
+- 328 API integration tests, 54 Playwright tests, green. No frontend unit runner exists; the
   web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly when run from `tests/Lorex.E2E`.
@@ -42,14 +50,17 @@ happen only when the owner asks.
 Task 4 of 3-4 done. The agreed number of tasks is complete and **the verdict is owed** -
 see Deferred. RTK and Graphify judged independently.
 
-- RTK works in the `Bash` tool. `rtk gain` ~21.8%, drifting down as more work runs through
-  chained or piped commands the wrapper bypasses by design. Correctness record still clean;
-  the one recorded diagnostic loss remains `rtk npm run dev` swallowing Vite's startup banner.
-  Phase 020 measured 20.1%: `rtk grep`, `git status`, `git diff` and a passing `dotnet build`
-  were rewritten and filtered, everything piped or chained was bypassed by design, and no
-  unfiltered rerun was needed.
-- Graphify unused in every task so far. Targeted `Grep` over `SYSTEMS.md`-named files has
-  answered every question.
+- RTK works in the `Bash` tool. `rtk gain` now 19.4%, down from ~21.8% and from Phase 020's
+  20.1%, and the drift has one cause: the share of work running through chained, piped or
+  heredoc commands the wrapper bypasses by design keeps rising. Correctness record still
+  clean; the one recorded diagnostic loss remains `rtk npm run dev` swallowing Vite's startup
+  banner. Phase 021 filtered `rtk grep` (18 calls, 38.6% average), `git status` (10),
+  `git diff` in five shapes (8), a passing `dotnet build` (3, 87%) and `ls` (2); everything
+  else - every `cd … && …`, every pipe to `tail` or `grep`, every heredoc - was bypassed, and
+  no `rtk proxy` rerun was needed.
+- Graphify unused in every task so far, Phase 021 included. Targeted `Grep` over
+  `SYSTEMS.md`-named files has answered every question, and no dependency question came up
+  that a graph would have answered faster.
 
 ## Deferred / owner decisions
 
@@ -70,3 +81,13 @@ None. Follow-ups, not blocking: search matches whole words and prefixes, so the 
 `LIKE` used to give are gone - ADR 0016 argues the trade. Search is SQLite-only and will be
 redesigned when PostgreSQL arrives. Production needs a persisted Data Protection key ring so
 cookie sessions survive a restart - ADR 0005.
+
+Two for Phase 022, both found while starting the API by hand in Phase 021:
+
+- **The host dies at startup outside Development.** `DatabaseSetup` only migrates in
+  Development, so with `ASPNETCORE_ENVIRONMENT` unset `EntitySearchBackfill` runs against a
+  schema that is not there and throws `SQLite Error 1: 'no such table: Entities'` out of
+  `Program.Main`. Reproduced on a fresh data source; harmless today because every path that
+  runs the API sets Development. Whatever deploys has to decide who applies migrations.
+- **Installability needs a secure context.** It works on `localhost`; the deployed origin has
+  to be HTTPS or no browser will offer the install. Nothing in the app changes for it - ADR 0017.

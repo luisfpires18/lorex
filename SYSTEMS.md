@@ -95,9 +95,14 @@ Repository index. Paths and one-line responsibilities only.
 
 | Path | Responsibility |
 | --- | --- |
+| `index.html` | Document shell: manifest link, icons, theme colours, viewport. |
+| `public/manifest.webmanifest` | Web app manifest: name, start URL, display mode, colours, icons. |
+| `public/sw.js` | Service worker: caches build output only, and what it refuses to touch. |
+| `public/icon.svg` + `icon-*.png` + `apple-touch-icon.png` | The install icons: the wordmark on the plate. |
 | `src/main.tsx` | React entry point. |
+| `src/pwa.ts` | Registers the service worker, in production builds only. |
 | `src/App.tsx` | Routes and providers. |
-| `src/styles.css` | Design tokens and all component styles. |
+| `src/styles.css` | Design tokens, all component styles, and the narrow-screen and touch layers. |
 | `src/lib/api.ts` | Same-origin fetch wrapper and `ApiError`. |
 | `src/auth/` | Session context, `useAuth`, and the route guards. |
 | `src/universes/` | Universe API client and types. |
@@ -109,7 +114,7 @@ Repository index. Paths and one-line responsibilities only.
 | `src/canon/` | Canon Integrity API client, DTO types, and the reader for the promotion gate's 409. |
 | `src/lib/dates.ts` | Timestamp formatting, date-input round trips, and spans. |
 | `src/components/` | `AuthLayout`, `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker` (single and multi, one shared search), `EntityHistory`, `RelationshipSection`, `RelationshipTypeManager`, `TimelineEntryForm`, `ConflictEntry`, `CanonBlockNotice` (the one refused-write presentation, shared by every gated form). |
-| `src/pages/` | Login, Register, Universes browser, and the workspace: Overview, Lore, entry page, Timeline, Canon, Types, Trash and Settings. |
+| `src/pages/` | Login, Register, Universes browser, and the workspace: Overview, Lore, entry page, Timeline, Canon, Types, Trash and Settings. `UniverseWorkspace` also owns the collapsing narrow-screen navigation. |
 | `vite.config.ts` | Dev server port 5173, proxy to the API, build config. |
 
 ## `tests`
@@ -141,6 +146,8 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.E2E/specs/export.spec.ts` | One journey: the click produces a real file on disk, named and readable. |
 | `Lorex.E2E/specs/trash.spec.ts` | One journey: an entry and its connection leave together and one restore returns both. |
 | `Lorex.E2E/specs/canon.spec.ts` | The review screen, conflict identity across runs, the promotion gate's refusals, reconciliation on write, and the universe and owner boundaries. |
+| `Lorex.E2E/specs/mobile.spec.ts` | One journey at 390px: navigation, authoring, a reachable action, the drawer picker, and no sideways scroll. |
+| `Lorex.E2E/specs/pwa.spec.ts` | Manifest, icons and metadata, and what the service worker is never allowed to cache. |
 
 ## `scripts`
 
