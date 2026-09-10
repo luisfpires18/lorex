@@ -6,84 +6,87 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 ## Roadmap position
 
 - Phases 001-021 done and merged. Sequence log: `docs/architecture/branching.md`.
-- **Phase 020** (Full-Text Search) merged into `dev`. Entity search now reads the article an
-  author wrote, not only the name, aliases and summary, and orders hits by relevance instead
-  of recency. `GET /api/universes/{id}/entities` is unchanged apart from what
-  `search` means. Index shape, synchronization and query semantics: ADR 0016.
+- **Phase 020** (Full-Text Search) merged into `dev`. Entity search reads the article an author
+  wrote, not only the name, aliases and summary, and orders hits by relevance. Index shape,
+  synchronization and query semantics: ADR 0016.
 - **Phase 021** (PWA / Mobile Refinement) merged into `dev`. Lorex installs: a hand-written
-  manifest, four icons drawn from the wordmark, and a service worker that caches build output
-  and refuses `/api`, non-`GET`, navigations and cross-origin outright - ADR 0017 owns the
-  caching, update and privacy policy, and says plainly that nothing works offline. On a narrow
-  screen the workspace chrome folds from ~290px of permanent nav into one sticky bar with a
-  labelled disclosure; the dossier and editor footers stick to the bottom edge so Edit and Save
-  stay in reach; history stacks; hit areas grow only where the pointer is coarse, so the
-  desktop layout is untouched. No backend change.
-- **Now: Phase 022 - Azure DEV environment and CI/CD.** Not started; no branch yet. The two
-  items under Blockers are the ones it has to answer first.
+  manifest, four icons, and a service worker that caches build output and refuses `/api`,
+  non-`GET`, navigations and cross-origin outright - ADR 0017, which also says plainly that
+  nothing works offline. Narrow-screen chrome folds into one sticky bar; desktop untouched.
+- **Phase 022** (Azure DEV + CI/CD) **complete on `feat/022/azure-dev-cicd`, not merged and not
+  pushed.** Two commits. The deployment-blocking startup bug is fixed, and DEV has a topology,
+  workflows and a runbook - but nothing exists in Azure yet, because the owner has to create it.
+  - The host no longer dies outside Development. `LorexDatabaseInitializer` migrates once per
+    process in every environment, and the search-index backfill awaits it, so schema readiness is
+    a dependency rather than an accident of registration order. ADR 0018.
+  - DEV is **one Linux App Service** serving the API and the built client from one process, with
+    SQLite and the Data Protection key ring on the site's persistent `/home` share.
+  - `ci.yml` validates every pull request into `dev`; `deploy-dev.yml` calls it and then deploys,
+    from `dev` only, over OIDC. No credential is stored in the repository.
+  - Runbook, limitations and troubleshooting: `docs/deployment/azure-dev.md`.
+- **Next: no phase.** Lorex enters owner-led manual testing, feature polish and fixes. Phase 023
+  is not started.
 
 ## Baseline
 
-- 328 API integration tests, 54 Playwright tests, green. No frontend unit runner exists; the
-  web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
-  format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
-  Prettier has to be pointed at that config explicitly when run from `tests/Lorex.E2E`.
-- 12 migrations, latest `AddEntitySearchIndex`; `has-pending-model-changes` reports none. That
-  one is raw SQL - an FTS5 virtual table and the trigger that empties it - so no EF Core model
-  describes it and the pending check cannot see it either way. Verified against a fresh SQLite
-  file and against an existing one, where the startup backfill indexes what predates it.
-- Six rules in `src/Lorex.Api/Features/CanonIntegrity/Rules/`: three structural (Medium),
-  three chronological (High). Behaviour: ADR 0010, 0011, 0012.
+- 335 API integration tests, 54 Playwright tests, green. No frontend unit runner exists; the web
+  checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no format
+  script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and Prettier
+  has to be pointed at that config explicitly. CI runs all of it.
+- The test host no longer migrates itself, so all 335 tests boot through the same startup path a
+  deployment uses.
+- 12 migrations, latest `AddEntitySearchIndex`; `has-pending-model-changes` reports none, and
+  Phase 022 added no migration. That one is raw SQL - an FTS5 virtual table and the trigger that
+  empties it - so no EF Core model describes it and the pending check cannot see it either way.
+- Six rules in `src/Lorex.Api/Features/CanonIntegrity/Rules/`: three structural (Medium), three
+  chronological (High). Behaviour: ADR 0010, 0011, 0012.
 
 ## Remote
 
-`origin` = https://github.com/luisfpires18/lorex.git (private). `dev` tracks `origin/dev` and
-is the GitHub default branch. `master` is reconciled and published; `dev` -> `master` merges
-happen only when the owner asks.
+`origin` = https://github.com/luisfpires18/lorex.git (private). `dev` tracks `origin/dev` and is
+the GitHub default branch. `master` is reconciled and published; `dev` -> `master` merges happen
+only when the owner asks.
 
 ## Tooling trial
 
-Task 4 of 3-4 done. The agreed number of tasks is complete and **the verdict is owed** -
-see Deferred. RTK and Graphify judged independently.
+Four tasks measured; the agreed number is complete and **the verdict is owed** - see Deferred.
+RTK and Graphify judged independently. Phase 022 was not a trial task and added no evidence
+either way, which is itself the finding.
 
-- RTK works in the `Bash` tool. `rtk gain` now 19.4%, down from ~21.8% and from Phase 020's
-  20.1%, and the drift has one cause: the share of work running through chained, piped or
-  heredoc commands the wrapper bypasses by design keeps rising. Correctness record still
-  clean; the one recorded diagnostic loss remains `rtk npm run dev` swallowing Vite's startup
-  banner. Phase 021 filtered `rtk grep` (18 calls, 38.6% average), `git status` (10),
-  `git diff` in five shapes (8), a passing `dotnet build` (3, 87%) and `ls` (2); everything
-  else - every `cd … && …`, every pipe to `tail` or `grep`, every heredoc - was bypassed, and
-  no `rtk proxy` rerun was needed.
-- Graphify unused in every task so far, Phase 021 included. Targeted `Grep` over
-  `SYSTEMS.md`-named files has answered every question, and no dependency question came up
-  that a graph would have answered faster.
+- RTK: `rtk gain` still 19.4%, unmoved across the whole of Phase 022. Almost every command this
+  phase was compound, piped or a heredoc, which the wrapper bypasses by design, so barely
+  anything reached the filter - one `rtk grep`, a few `git status` and `git diff` rewrites.
+  Correctness record still clean; no `rtk proxy` rerun was needed, in this phase or any other.
+- Graphify: unused again, in Phase 022 as in 020 and 021. Targeted `Grep` and `Read` over
+  `SYSTEMS.md`-named files answered every question.
 
 ## Deferred / owner decisions
 
+- **Azure DEV does not exist yet.** Phase 022 wrote the topology, the workflows and the runbook
+  but created nothing. Before the first deploy the owner has to: deploy `infra/main.bicep` into a
+  resource group; create an Entra app registration with a federated credential for the `dev`
+  GitHub environment and Contributor on that group; create the `dev` GitHub environment and the
+  four variables `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`,
+  `AZURE_WEBAPP_NAME`. Exact steps: `docs/deployment/azure-dev.md`.
 - **Full security audit.** Relationships, timeline and Canon Integrity each had a focused check
   backed by tests. Outstanding: rate limiting, header/cookie hardening, dependency review, auth.
 - **Cross-era ordering** unsolved, and it bounds the chronology rules. ADR 0009, ADR 0011.
 - **`Age`** is declarable but read by nothing until a structured reference year exists. ADR 0011.
-- **Tooling trial verdict.** Four tasks measured, `docs/tooling/agent-tooling-trial.md`
-  holds the evidence. Keep / conditional / remove is the owner's call, per tool.
+- **Tooling trial verdict.** `docs/tooling/agent-tooling-trial.md` holds the evidence. Keep /
+  conditional / remove is the owner's call, per tool.
 - **Permanent deletion.** Deferred by Phase 019, so nothing removes an entry for good short of
   deleting the universe. One consequence is a dead end: a type used only by trashed entries
-  cannot be deleted, and the only way to free it is to restore the entry, move it to another
-  type and trash it again. ADR 0015 records the tradeoff.
+  cannot be deleted, and the only way to free it is to restore the entry, move it to another type
+  and trash it again. ADR 0015 records the tradeoff.
 
 ## Blockers
 
-None. Follow-ups, not blocking: search matches whole words and prefixes, so the substring hits
-`LIKE` used to give are gone - ADR 0016 argues the trade. Search is SQLite-only and will be
-redesigned when PostgreSQL arrives. Production needs a persisted Data Protection key ring so
-cookie sessions survive a restart - ADR 0005.
+None. Follow-ups, not blocking:
 
-Two for Phase 022 to answer, both found while starting the API by hand in Phase 021 and
-neither blocking anything today:
-
-- **The host dies at startup outside Development.** `DatabaseSetup` only migrates in
-  Development, so with `ASPNETCORE_ENVIRONMENT` unset `EntitySearchBackfill` runs against a
-  schema that is not there and throws `SQLite Error 1: 'no such table: Entities'` out of
-  `Program.Main`. Reproduced on a fresh data source; harmless today because every path that
-  runs the API sets Development. Whatever deploys has to decide who applies migrations.
-- **Installability needs a secure context.** It works on `localhost`; the deployed origin has
-  to be HTTPS or no browser will offer the install. Nothing in the app changes for it - ADR 0017.
+- Search matches whole words and prefixes, so the substring hits `LIKE` used to give are gone -
+  ADR 0016 argues the trade. Search is SQLite-only and will be redesigned when PostgreSQL
+  arrives.
+- The DEV topology's accepted costs, all in ADR 0018 and the runbook: SQLite lives on an SMB
+  share with one writer, a redeploy is a short outage, Data Protection keys are unencrypted at
+  rest, there is no automated backup, and a rollback cannot undo a migration. Production needs a
+  real key store and a real database story; neither is Phase 022's business.
