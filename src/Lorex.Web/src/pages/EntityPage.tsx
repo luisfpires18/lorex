@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { EntityHistory } from '../components/EntityHistory'
+import { EntityImageField } from '../components/EntityImageField'
 import { FieldInput } from '../components/FieldInputs'
 import { LoreArticle, LoreEditor } from '../components/LoreEditor'
 import { RelationshipSection } from '../components/RelationshipSection'
 import { emptyValue, isEmptyDocument } from '../lore/document'
+import { entityImageUrl, setEntityImage } from '../lore/images'
 import { TokenInput } from '../components/TokenInput'
 import { blockingFindingsOf } from '../canon/blocked'
 import type { CanonBlockingFinding } from '../canon/types'
@@ -87,6 +89,11 @@ export default function EntityPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [blocked, setBlocked] = useState<CanonBlockingFinding[] | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+
+  // A new entry's picture waits here until the entry exists. Object keys are built from the
+  // entry's id, so there is nowhere to put it before the create call comes back - and inventing
+  // a temporary path would mean writing objects nobody would ever come back to clean up.
+  const [pendingImage, setPendingImage] = useState<File | null>(null)
 
   // Bumped after every accepted write, so the history reloads without either component
   // holding the other's state.
@@ -185,8 +192,27 @@ export default function EntityPage() {
         ? await createEntity(universe.id, input)
         : await updateEntity(universe.id, entityId, input)
 
-      setDetail(saved)
-      setDraft(draftFromDetail(saved))
+      // The entry exists now, so the picture that was waiting has somewhere to go. It is a
+      // separate write and it is allowed to fail on its own: the lore is already stored, so a
+      // refused image says so and leaves everything else alone.
+      let image = saved.image
+      if (isNew && pendingImage) {
+        try {
+          image = await setEntityImage(universe.id, saved.id, pendingImage)
+          setPendingImage(null)
+        } catch (failure: unknown) {
+          setMessage(
+            failure instanceof ApiError
+              ? (failure.fieldErrors.file ?? failure.message)
+              : 'The entry was created, but its image could not be uploaded.',
+          )
+        }
+      }
+
+      const stored = { ...saved, image }
+
+      setDetail(stored)
+      setDraft(draftFromDetail(stored))
       setIsEditing(false)
       setHistoryKey((key) => key + 1)
 
@@ -212,7 +238,7 @@ export default function EntityPage() {
     } finally {
       setIsSaving(false)
     }
-  }, [draft, selectedType, isNew, universe.id, entityId, navigate])
+  }, [draft, selectedType, isNew, universe.id, entityId, navigate, pendingImage])
 
   /**
    * The one-click promotion, which saves on the spot rather than through the editor.
@@ -422,6 +448,21 @@ export default function EntityPage() {
         </p>
       ) : null}
 
+      {!isEditing && detail?.image ? (
+        <figure className="entry__plate" data-testid="entry-image">
+          <img
+            src={entityImageUrl(universe.id, detail.id, detail.image, 'original')}
+            alt={detail.name}
+            // The original's own dimensions. The plate is a band of fixed height, so these give
+            // the browser a definite width for it before a byte has loaded - the picture arrives
+            // into the space it was already occupying rather than pushing the article down.
+            width={detail.image.width}
+            height={detail.image.height}
+            decoding="async"
+          />
+        </figure>
+      ) : null}
+
       <div className="entry__layout">
         <section className="entry__article" aria-label="Article">
           {isEditing ? (
@@ -441,6 +482,21 @@ export default function EntityPage() {
         <aside className="entry__rail">
           {isEditing ? (
             <>
+              <EntityImageField
+                universeId={universe.id}
+                entityId={isNew ? null : entityId}
+                image={detail?.image ?? null}
+                pending={pendingImage}
+                onPending={setPendingImage}
+                onChanged={(image) => {
+                  setDetail((current) => (current ? { ...current, image } : current))
+                  // An image change is a version like any other, so the history beside it is
+                  // read again rather than left sitting one write behind.
+                  setHistoryKey((key) => key + 1)
+                }}
+                disabled={isSaving}
+              />
+
               <TokenInput
                 label="Aliases"
                 name="aliases"

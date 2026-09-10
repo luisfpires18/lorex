@@ -24,6 +24,13 @@ export const RevisionChange = {
   Aliases: 32,
   Tags: 64,
   Fields: 128,
+
+  /**
+   * The primary image was set, replaced or taken away. Recorded, never snapshotted: a
+   * replacement deletes the objects it supersedes, so a version cannot put an old picture back
+   * and does not claim to - see `IMAGES_NOT_RESTORED`.
+   */
+  Image: 256,
 } as const
 
 export type RevisionChangeValue = (typeof RevisionChange)[keyof typeof RevisionChange]
@@ -38,7 +45,16 @@ const CHANGE_WORDS: [RevisionChangeValue, string][] = [
   [RevisionChange.Aliases, 'the aliases'],
   [RevisionChange.Tags, 'the tags'],
   [RevisionChange.Fields, 'the details'],
+  [RevisionChange.Image, 'the image'],
 ]
+
+/** Said once where it matters, not on every row that mentions a picture. */
+export const IMAGES_NOT_RESTORED = 'Images are not included when restoring a revision.'
+
+/** Whether this entry's history mentions a picture at all, so the note is only shown when it means something. */
+export function mentionsImage(revisions: EntityRevisionSummary[]) {
+  return revisions.some((revision) => (revision.changes & RevisionChange.Image) !== 0)
+}
 
 /**
  * What a version changed, as a sentence rather than a list of flags. The first version has

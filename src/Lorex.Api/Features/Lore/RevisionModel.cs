@@ -36,6 +36,18 @@ public enum EntityRevisionChange
     Aliases = 1 << 5,
     Tags = 1 << 6,
     Fields = 1 << 7,
+
+    /// <summary>
+    /// The entry's primary image was set, replaced or taken away.
+    ///
+    /// Recorded, never snapshotted. A revision holds no image bytes, no asset id and no object
+    /// key, because a replacement deletes the objects it supersedes (ADR 0019) - so a key kept
+    /// here would name something that no longer exists, and history would be lying rather than
+    /// remembering. What survives is the true and useful part: that the picture changed, and
+    /// when. Restoring a version therefore leaves the entry's current image exactly as it is,
+    /// which is what the history screen says out loud.
+    /// </summary>
+    Image = 1 << 8,
 }
 
 /// <summary>

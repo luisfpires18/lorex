@@ -29,13 +29,20 @@ internal static class EntityRevisions
     /// <summary>
     /// Records the entry's current state as its next version, unless that state is identical
     /// to the version before it. Saves through the caller's context and transaction.
+    ///
+    /// <paramref name="also"/> is for a change the snapshot cannot see. Today that is exactly
+    /// one thing - the primary image, which is author-visible state that no revision holds a
+    /// copy of (ADR 0019) - and without it an image-only write would compare equal to the
+    /// version before it and record nothing at all, leaving a history that quietly omitted
+    /// something the author did.
     /// </summary>
     internal static async Task CaptureAsync(
         LorexDbContext db,
         Guid entityId,
         EntityRevisionKind kind,
         Guid? restoredFromRevisionId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        EntityRevisionChange also = EntityRevisionChange.None)
     {
         var current = await ReadEntityAsync(db, entityId, cancellationToken);
 
@@ -58,6 +65,8 @@ internal static class EntityRevisions
         var changes = previous is null
             ? EntityRevisionChange.None
             : Difference(Snapshot.From(previous), current);
+
+        changes |= also;
 
         if (previous is not null && changes == EntityRevisionChange.None)
         {

@@ -9,6 +9,11 @@ namespace Lorex.Api.Features.Export;
 /// these shapes and nothing else, so a change here is a format change and owes a
 /// <see cref="UniverseBackup.FormatVersion"/> bump.
 ///
+/// Since version 3 a backup is an archive rather than one file, and these records describe
+/// the <c>backup.json</c> inside it. The media beside it is addressed by
+/// <see cref="BackupEntityImage.MediaPath"/>, which is a path within the same archive and
+/// never a URL, a bucket or an object key.
+///
 /// See <c>docs/architecture/decisions/0014-universe-backup-format.md</c> for what is in a
 /// backup, what is deliberately left out, and why.
 /// </summary>
@@ -31,8 +36,14 @@ public sealed record UniverseBackup(
     /// implies the entry is live, and a reader that ignored it would restore an author's Trash
     /// into their world as ordinary lore. That is the "re-meaning" case above, so it is a bump.
     /// A version 1 file still means exactly what it always meant - every entry in it is live.
+    ///
+    /// 3 - A backup became an archive. The download is a ZIP holding this document as
+    /// <c>backup.json</c> plus every entry's original image beside it, and
+    /// <see cref="BackupEntity.Image"/> names where each one sits. This is the largest kind of
+    /// change the version can carry: a reader that only knows versions 1 and 2 is handed a file
+    /// it cannot parse at all, which is exactly what a version number is for.
     /// </summary>
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     public static UniverseBackup Of(UniverseBackupPayload payload, DateTime generatedAt) =>
         new(FormatName, CurrentVersion, generatedAt, payload);
@@ -129,7 +140,35 @@ public sealed record BackupEntity(
     IReadOnlyList<string> Aliases,
     IReadOnlyList<Guid> TagIds,
     IReadOnlyList<BackupFieldValue> FieldValues,
+    BackupEntityImage? Image,
     IReadOnlyList<BackupRevision> Revisions);
+
+/// <summary>
+/// The entry's primary image, as a reader of the archive needs to see it.
+///
+/// <paramref name="MediaPath"/> is the whole point: a path inside this same archive, holding
+/// the original bytes exactly as the author uploaded them. A backup that only named an object
+/// in a bucket would stop being a backup the moment the bucket did, so the picture travels with
+/// the lore or the export fails.
+///
+/// <b>No object key, no bucket, no endpoint, no URL.</b> Those are how this installation happens
+/// to store the file today; none of them is the picture's identity, and none of them means
+/// anything to a reader on another machine. <paramref name="AssetId"/> is carried because it is
+/// the identity the entry itself uses, so a future importer can recognise the same image across
+/// two backups of the same world.
+///
+/// The thumbnail is deliberately absent. It is derived - a fixed square crop at a fixed size,
+/// in a fixed format - so an importer regenerates it from the original rather than carrying a
+/// second copy of every picture that would have to be trusted to match. See ADR 0019.
+/// </summary>
+public sealed record BackupEntityImage(
+    Guid AssetId,
+    string? FileName,
+    string ContentType,
+    int Width,
+    int Height,
+    long ByteSize,
+    string MediaPath);
 
 /// <summary>
 /// One stored value, in the same typed members the live row uses so a null stays a null and

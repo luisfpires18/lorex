@@ -1,6 +1,6 @@
 # ADR 0013 - An entry's history is a full snapshot per accepted write
 
-Status: accepted (2026-09-09)
+Status: accepted (2026-09-09), amended 2026-09-10 (an image change is recorded, never snapshotted)
 
 ## Context
 
@@ -57,6 +57,24 @@ authored lore only: aliases, tags and values are compared as unordered sets of t
 content, and a field definition's name, kind or display order is deliberately excluded, so
 renaming a field does not fill every entry's history with versions no author created.
 
+**An image change is recorded, and nothing about the image is snapshotted.** A revision holds
+no image bytes, no asset id and no object key. It cannot: replacing or removing a picture deletes
+the objects it supersedes (ADR 0019), so a key kept here would name something that no longer
+exists, and history would be lying rather than remembering. What is true and worth keeping is
+that the picture moved, and when - so `EntityRevisionChange.Image` is set, and that is all.
+
+It is the one change the snapshot comparison cannot see, which is why `CaptureAsync` takes a
+flag for it: without one, an image-only write would compare equal to the version before it and
+record nothing, and the history would quietly omit something the author did. Setting, replacing
+and removing a picture each produce a version, and each says `the image`.
+
+**Restoring a version therefore leaves the entry's current picture exactly where it is.** That is
+a deliberate, stated boundary rather than a gap, and the history screen says so out loud - once,
+under the heading and in the confirmation, and only for an entry whose history mentions a picture
+at all. Making restore genuinely complete would mean retaining every superseded original for as
+long as any version referred to it, which is a storage and cleanup commitment this product has
+not taken; ADR 0019 records why.
+
 **What changed is stored as coarse flags, not a diff.** `EntityRevisionChange` is a small
 closed set - name, summary, article, status, type, aliases, tags, details - computed once at
 capture. It tells a reader where to look. Producing a prose diff of a Tiptap document is
@@ -93,7 +111,9 @@ would put back something the author never wrote.
   `LoreContent` boundary.
 - A revision reflects the entry only. Relationships and timeline participation are their own
   aggregates and are not snapshotted, so restoring a version does not restore who it was
-  related to. That is a deliberate boundary, not an omission.
+  related to. The primary image is on that list too, for a different reason: not that it belongs
+  to another aggregate, but that its bytes are gone by the time an old version could ask for
+  them. All three are deliberate boundaries, not omissions.
 - History is not security auditing and does not become it by growing. There is no actor, no
   IP, no read record and no universe-wide log - the model is single-owner (ADR 0006), so a
   version has exactly one possible author.

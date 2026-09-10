@@ -36,6 +36,16 @@ public static class EntityEndpoints
             entity.EntityType.AccentColor,
             entity.Aliases.OrderBy(alias => alias.Value).Select(alias => alias.Value).ToList(),
             entity.EntityTags.Select(link => link.Tag!.Name).OrderBy(name => name).ToList(),
+            entity.Image == null
+                ? null
+                : new EntityImageRef(
+                    entity.Image.AssetId,
+                    entity.Image.Width,
+                    entity.Image.Height,
+                    entity.Image.ContentType,
+                    entity.Image.FileName,
+                    entity.Image.ByteSize,
+                    entity.Image.UploadedAt),
             entity.UpdatedAt);
 
     public static IEndpointRouteBuilder MapEntityEndpoints(this IEndpointRouteBuilder endpoints)
@@ -859,6 +869,16 @@ public static class EntityEndpoints
                     ReferencedTrashed = value.ReferencedEntity != null
                         && value.ReferencedEntity.DeletedAt != null,
                 }).ToList(),
+                Image = candidate.Image == null
+                    ? null
+                    : new EntityImageRef(
+                        candidate.Image.AssetId,
+                        candidate.Image.Width,
+                        candidate.Image.Height,
+                        candidate.Image.ContentType,
+                        candidate.Image.FileName,
+                        candidate.Image.ByteSize,
+                        candidate.Image.UploadedAt),
                 candidate.CreatedAt,
                 candidate.UpdatedAt,
             })
@@ -904,6 +924,7 @@ public static class EntityEndpoints
             entity.Aliases,
             entity.Tags,
             fields,
+            entity.Image,
             entity.CreatedAt,
             entity.UpdatedAt);
     }

@@ -9,8 +9,10 @@ import { isEmptyDocument } from '../lore/document'
 import {
   describeChanges,
   getRevision,
+  IMAGES_NOT_RESTORED,
   isNotRestorable,
   listRevisions,
+  mentionsImage,
   restoreRevision,
   RevisionKind,
   type EntityRevisionDetail,
@@ -97,8 +99,18 @@ export function EntityHistory({ universeId, entityId, reloadKey, onRestored }: E
     [openId, reloadKey, universeId, entityId],
   )
 
+  // Said once, where a version is about to be put back and where the list is read - not on
+  // every row, and not at all for an entry that has never had a picture.
+  const carriesImages = mentionsImage(revisions)
+
   async function restore(revision: EntityRevisionSummary) {
-    if (!window.confirm(`Put version ${revision.number} back? It becomes the newest version.`)) {
+    const warning = carriesImages ? `\n\n${IMAGES_NOT_RESTORED}` : ''
+
+    if (
+      !window.confirm(
+        `Put version ${revision.number} back? It becomes the newest version.${warning}`,
+      )
+    ) {
       return
     }
 
@@ -134,6 +146,12 @@ export function EntityHistory({ universeId, entityId, reloadKey, onRestored }: E
           History
         </h3>
       </div>
+
+      {carriesImages ? (
+        <p className="history__quiet" data-testid="history-image-note">
+          {IMAGES_NOT_RESTORED}
+        </p>
+      ) : null}
 
       {blocked ? (
         <CanonBlockNotice universeId={universeId} findings={blocked} linkSubjects />

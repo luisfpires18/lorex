@@ -88,10 +88,10 @@ export default function UniverseSettings() {
       <section className="settings__section">
         <h3 className="settings__heading">Backup</h3>
         <p className="settings__note">
-          Download this universe as a single file: its entries and their articles, types and fields,
-          tags, relationships, the timeline, and every entry&rsquo;s history. Nothing about your
-          account is in it. Lorex cannot read a backup back in yet, so keep the file somewhere you
-          trust.
+          Download this universe as a single archive: its entries and their articles, types and
+          fields, tags, relationships, the timeline, every entry&rsquo;s history, and the full-size
+          image of every entry that has one. Nothing about your account is in it. Lorex cannot read
+          a backup back in yet, so keep the file somewhere you trust.
         </p>
         <button
           className="button button--quiet"

@@ -28,11 +28,16 @@ namespace Lorex.Api.Features.Export;
 public sealed class UniverseBackupBuilder(LorexDbContext db)
 {
     /// <summary>
-    /// The payload for one universe, or null when it does not exist. The caller has already
-    /// proved ownership; this does not re-decide it, but it does re-read the universe inside
-    /// the transaction so the snapshot includes the universe row itself.
+    /// The document and the media list for one universe, or null when it does not exist. The
+    /// caller has already proved ownership; this does not re-decide it, but it does re-read the
+    /// universe inside the transaction so the snapshot includes the universe row itself.
+    ///
+    /// The media list is read here rather than by the archive writer, and inside the same
+    /// transaction, so the object keys the writer fetches are the ones belonging to the assets
+    /// the document names. Reading them afterwards would leave a window in which a replacement
+    /// could land, and the archive would then hold a picture the document does not describe.
     /// </summary>
-    public async Task<UniverseBackupPayload?> BuildAsync(
+    public async Task<UniverseBackupSnapshot?> BuildAsync(
         Guid universeId,
         CancellationToken cancellationToken)
     {
@@ -46,6 +51,8 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
             return null;
         }
 
+        var images = await ImagesAsync(universeId, cancellationToken);
+
         var payload = new UniverseBackupPayload(
             new BackupUniverse(
                 universe.Id,
@@ -57,7 +64,7 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                 Utc(universe.UpdatedAt)),
             await EntityTypesAsync(universeId, cancellationToken),
             await TagsAsync(universeId, cancellationToken),
-            await EntitiesAsync(universeId, cancellationToken),
+            await EntitiesAsync(universeId, images, cancellationToken),
             await RelationshipTypesAsync(universeId, cancellationToken),
             await RelationshipsAsync(universeId, cancellationToken),
             await TimelineAsync(universeId, cancellationToken),
@@ -66,8 +73,35 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
         // Read-only, so there is nothing to commit; this just closes the snapshot.
         await transaction.CommitAsync(cancellationToken);
 
-        return payload;
+        return new UniverseBackupSnapshot(
+            payload,
+            [
+                .. images.Values
+                    .Select(image => new BackupMediaObject(
+                        image.EntityId,
+                        BackupArchive.MediaPathFor(image.EntityId, image.ContentType),
+                        image.OriginalKey,
+                        image.ContentType))
+                    .OrderBy(one => one.ArchivePath, StringComparer.Ordinal),
+            ]);
     }
+
+    // ---------- Media ----------
+
+    /// <summary>
+    /// Every entry's primary image, live and trashed alike - a trashed entry is authored lore
+    /// the owner has not thrown away irrecoverably (ADR 0015), and its picture travels with it
+    /// for the same reason the rest of it does.
+    ///
+    /// Only the original. The thumbnail is derived from it by a fixed, deterministic recipe, so
+    /// a reader regenerates it rather than being handed a second copy to keep in step.
+    /// </summary>
+    private async Task<Dictionary<Guid, EntityImage>> ImagesAsync(
+        Guid universeId,
+        CancellationToken cancellationToken) =>
+        await db.EntityImages.AsNoTracking()
+            .Where(image => image.Entity!.UniverseId == universeId)
+            .ToDictionaryAsync(image => image.EntityId, cancellationToken);
 
     // ---------- Types and fields ----------
 
@@ -164,6 +198,7 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
 
     private async Task<IReadOnlyList<BackupEntity>> EntitiesAsync(
         Guid universeId,
+        Dictionary<Guid, EntityImage> images,
         CancellationToken cancellationToken)
     {
         // Every entry, the Trash included. A backup is the whole world as it currently stands,
@@ -245,9 +280,27 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                     aliasesByEntity.GetValueOrDefault(entity.Id, []),
                     tagIdsByEntity.GetValueOrDefault(entity.Id, []),
                     valuesByEntity.GetValueOrDefault(entity.Id, []),
+                    Image(images, entity.Id),
                     revisionsByEntity.GetValueOrDefault(entity.Id, []))),
         ];
     }
+
+    /// <summary>
+    /// One entry's image as the document describes it: identity, shape, and where the bytes sit
+    /// in this archive. The object key it was read from is not here and never is - it names a
+    /// place in this installation's bucket, which is not what the picture *is*.
+    /// </summary>
+    private static BackupEntityImage? Image(Dictionary<Guid, EntityImage> images, Guid entityId) =>
+        images.TryGetValue(entityId, out var image)
+            ? new BackupEntityImage(
+                image.AssetId,
+                image.FileName,
+                image.ContentType,
+                image.Width,
+                image.Height,
+                image.ByteSize,
+                BackupArchive.MediaPathFor(entityId, image.ContentType))
+            : null;
 
     /// <summary>
     /// Every entry's history, keyed by entry and ordered oldest first - the order the versions

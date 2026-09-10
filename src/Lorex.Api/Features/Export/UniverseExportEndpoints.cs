@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Lorex.Api.Data;
 using Lorex.Api.Features.Lore;
+using Lorex.Api.Features.Media;
 using Lorex.Api.Features.Universes;
 
 namespace Lorex.Api.Features.Export;
@@ -19,15 +20,23 @@ namespace Lorex.Api.Features.Export;
 /// stays owned and readable (ADR 0006), and a backup taken just before deleting one is exactly
 /// when a backup is worth most.
 ///
+/// A backup is an archive: <c>backup.json</c> plus every entry's original image beside it. It
+/// became one when entries gained pictures, because a file that only named objects in a bucket
+/// would stop being a backup the moment the bucket did - see ADR 0014 and ADR 0019.
+///
 /// This phase exports only. Nothing here reads a file back in.
 /// </summary>
 public static class UniverseExportEndpoints
 {
     /// <summary>
-    /// Plain JSON rather than a vendor type. The file *is* JSON, every tool already handles
-    /// it, and <see cref="UniverseBackup.Format"/> inside the file is what identifies it.
+    /// A plain ZIP rather than a vendor type. Every operating system opens one without being
+    /// told what it is, and <see cref="UniverseBackup.Format"/> inside the document is still
+    /// what identifies the contents.
     /// </summary>
-    private const string MediaType = "application/json";
+    private const string MediaType = "application/zip";
+
+    /// <summary>Machine-readable marker for the one failure a backup can have of its own.</summary>
+    public const string MediaMissingCode = "backup_media_missing";
 
     public static IEndpointRouteBuilder MapUniverseExportEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -44,6 +53,7 @@ public static class UniverseExportEndpoints
         Guid universeId,
         ClaimsPrincipal principal,
         LorexDbContext db,
+        IMediaObjectStore store,
         CancellationToken cancellationToken)
     {
         if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
@@ -51,9 +61,9 @@ public static class UniverseExportEndpoints
             return Results.NotFound();
         }
 
-        var payload = await new UniverseBackupBuilder(db).BuildAsync(universeId, cancellationToken);
+        var snapshot = await new UniverseBackupBuilder(db).BuildAsync(universeId, cancellationToken);
 
-        if (payload is null)
+        if (snapshot is null)
         {
             // Only reachable if the universe was deleted between the ownership check and the
             // read. Answering 404 keeps that race indistinguishable from every other miss.
@@ -61,10 +71,41 @@ public static class UniverseExportEndpoints
         }
 
         var generatedAt = DateTime.UtcNow;
-        var backup = UniverseBackup.Of(payload, generatedAt);
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(backup, UniverseBackupJson.Options);
+        var backup = UniverseBackup.Of(snapshot.Payload, generatedAt);
 
-        return Results.File(bytes, MediaType, FileNameFor(payload.Universe.Name, generatedAt));
+        byte[] bytes;
+        try
+        {
+            bytes = await UniverseBackupArchiveWriter.WriteAsync(
+                backup,
+                snapshot.Media,
+                async (key, token) => (await store.GetAsync(key, token))?.Content,
+                cancellationToken);
+        }
+        catch (BackupMediaMissingException missing)
+        {
+            // A picture the document names and the store cannot produce. The archive is built
+            // whole before anything is sent precisely so this can be said out loud: an author
+            // is told their backup is incomplete rather than handed one that quietly is.
+            return Results.Problem(
+                title: "That backup could not be completed.",
+                detail: $"An image belonging to entry {missing.EntityId:D} could not be read, so the "
+                    + "backup would have been missing it. Nothing was downloaded.",
+                statusCode: StatusCodes.Status500InternalServerError,
+                extensions: new Dictionary<string, object?> { ["code"] = MediaMissingCode });
+        }
+        catch (MediaStorageUnavailableException unavailable)
+        {
+            // A world with no pictures never reaches the store at all, so this is only ever the
+            // case where there is media to fetch and nowhere configured to fetch it from.
+            return Results.Problem(
+                title: "That backup could not be completed.",
+                detail: unavailable.Message,
+                statusCode: StatusCodes.Status503ServiceUnavailable,
+                extensions: new Dictionary<string, object?> { ["code"] = MediaMissingCode });
+        }
+
+        return Results.File(bytes, MediaType, FileNameFor(snapshot.Payload.Universe.Name, generatedAt));
     }
 
     /// <summary>
@@ -73,7 +114,7 @@ public static class UniverseExportEndpoints
     /// reduced to lowercase ASCII so the file lands intact on any filesystem.
     /// </summary>
     internal static string FileNameFor(string universeName, DateTime generatedAt) =>
-        $"lorex-{Slug(universeName)}-{generatedAt.ToString("yyyyMMdd", CultureInfo.InvariantCulture)}.json";
+        $"lorex-{Slug(universeName)}-{generatedAt.ToString("yyyyMMdd", CultureInfo.InvariantCulture)}.zip";
 
     private static string Slug(string name)
     {

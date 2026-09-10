@@ -155,13 +155,19 @@ Accepted deliberately. Each one is a reason this topology is not a production to
   short outage.
 - **Data Protection keys are unencrypted at rest**, with no rotation policy and no Key Vault.
   Anyone who can read `/home/data/keys` can forge a session cookie.
-- **No automated backup, and no restore path** beyond the per-universe JSON export.
+- **No automated backup, and no restore path** beyond the per-universe export archive.
 - **`AllowedHosts` is `*` by default.** Narrow it to the site hostname
   (`az webapp config appsettings set --settings AllowedHosts=<app-name>.azurewebsites.net`)
   once DEV is reachable; adding a custom domain later means updating it again.
 - **Migrations run on the web process.** A long migration delays the first response after a
   deploy, and two instances would race - another reason there is only one.
 - **Nothing works offline.** The service worker caches build output only, by design - ADR 0017.
+- **Entry images need Cloudflare R2, which is a separate owner setup.** Until the bucket, the
+  token and the five `Media__*` app settings exist, every image route answers 503 and nothing
+  else is affected. Steps, config keys and limitations: [cloudflare-r2.md](cloudflare-r2.md).
+- **A backup is a ZIP, and it does carry image bytes.** The per-universe export is
+  `backup.json` plus every entry's original picture, so it does not depend on R2 surviving -
+  ADR 0014. It is still a manual, per-universe download and still not a disaster-recovery story.
 
 ## Verifying the PWA
 

@@ -35,6 +35,8 @@ public class LorexDbContext(DbContextOptions<LorexDbContext> options)
 
     public DbSet<EntityTag> EntityTags => Set<EntityTag>();
 
+    public DbSet<EntityImage> EntityImages => Set<EntityImage>();
+
     public DbSet<EntityRevision> EntityRevisions => Set<EntityRevision>();
 
     public DbSet<EntityRevisionAlias> EntityRevisionAliases => Set<EntityRevisionAlias>();

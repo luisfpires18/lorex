@@ -51,6 +51,9 @@ chore/<short-kebab-description>
 - The same `<type>` vocabulary, without `<NNN>`, and no entry in the sequence log.
 - They do not consume the next free number: `023` stays reserved for Phase 023.
 - One accepted issue per branch. Unrelated fixes do not travel together.
+- `feat/<short-kebab-description>` is allowed too, and is how a feature the owner asks for
+  during this period is carried. It is unnumbered for the same reason the others are: the
+  number belongs to the roadmap, and stabilization work is not on it.
 
 ## Sequence log
 

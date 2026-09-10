@@ -90,6 +90,26 @@ public sealed record FieldValueResponse(
     string? ReferencedEntityName,
     bool ReferencedEntityIsTrashed);
 
+/// <summary>
+/// The entry's primary image, as identity and shape - never as a URL.
+///
+/// The client composes <c>/api/universes/{u}/entities/{e}/image/{assetId}/{variant}</c> from
+/// these, which is the same derivation on the other side of the wire and keeps the contract
+/// free of anything that would go stale if the route moved. Nothing that names Cloudflare, a
+/// bucket or an endpoint is ever in a response.
+///
+/// <paramref name="Width"/> and <paramref name="Height"/> are the original's, sent so the client
+/// can reserve the right space before a byte of the image has arrived.
+/// </summary>
+public sealed record EntityImageRef(
+    Guid AssetId,
+    int Width,
+    int Height,
+    string ContentType,
+    string? FileName,
+    long ByteSize,
+    DateTime UploadedAt);
+
 /// <summary>Card row. Carries enough to render a type-aware card, and no universe or owner id.</summary>
 public sealed record EntitySummary(
     Guid Id,
@@ -103,6 +123,7 @@ public sealed record EntitySummary(
     string? EntityTypeAccentColor,
     IReadOnlyList<string> Aliases,
     IReadOnlyList<string> Tags,
+    EntityImageRef? Image,
     DateTime UpdatedAt);
 
 public sealed record EntityDetail(
@@ -119,6 +140,7 @@ public sealed record EntityDetail(
     IReadOnlyList<string> Aliases,
     IReadOnlyList<string> Tags,
     IReadOnlyList<FieldValueResponse> Fields,
+    EntityImageRef? Image,
     DateTime CreatedAt,
     DateTime UpdatedAt);
 

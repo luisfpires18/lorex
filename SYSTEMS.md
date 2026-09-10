@@ -58,6 +58,15 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Lore/EntityEndpoints.cs` | Entity CRUD, search, filters, paging, tags. |
 | `Features/Lore/EntityTypeEndpoints.cs` | Entity types and their field definitions. |
 | `Features/Lore/EntityTypeDefaults.cs` | Idempotent seeding of the starter types. |
+| `Features/Lore/EntityImageModel.cs` | `EntityImage`: the one primary image an entry may have. |
+| `Features/Lore/EntityImageConfiguration.cs` | Image schema: the entry's id as both key and foreign key. |
+| `Features/Lore/EntityImageKeys.cs` | The object-key convention, and the lengths the columns allow. |
+| `Features/Lore/EntityImageProcessing.cs` | What is accepted as an image, and the thumbnail made from it. |
+| `Features/Lore/EntityImageEndpoints.cs` | Set, read and remove the image; the replace and cleanup ordering. |
+| `Features/Media/MediaObjectStore.cs` | `IMediaObjectStore`, and what is registered when nothing is configured. |
+| `Features/Media/R2MediaObjectStore.cs` | Cloudflare R2 over its S3-compatible API. |
+| `Features/Media/InMemoryMediaObjectStore.cs` | Objects in a dictionary, for local development and Playwright. |
+| `Features/Media/MediaSetup.cs` | Which store this host runs against, from `Media:Provider`. |
 | `Features/Lore/RevisionModel.cs` | `EntityRevision` and its alias, tag and value snapshot rows. |
 | `Features/Lore/RevisionConfiguration.cs` | Revision schema: the per-entry version index, and where a key deliberately is not. |
 | `Features/Lore/RevisionCapture.cs` | Reads the entry back after a write, compares it to the last version, records the next. |
@@ -93,8 +102,9 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Trash/TrashEndpoints.cs` | The Trash listing and the gated restore. Entries only. |
 | `Features/Trash/TrashContracts.cs` | Response records for the Trash. |
 | `Features/Export/UniverseBackup.cs` | The backup format, as records. The contract a future import reads. |
-| `Features/Export/UniverseBackupBuilder.cs` | Reads one universe in a single transaction and orders every collection. |
-| `Features/Export/UniverseExportEndpoints.cs` | The export route, the download filename, and how a backup is written. |
+| `Features/Export/UniverseBackupArchive.cs` | Archive layout, the media list, and the deterministic ZIP writer. |
+| `Features/Export/UniverseBackupBuilder.cs` | Reads one universe and its media in a single transaction, and orders every collection. |
+| `Features/Export/UniverseExportEndpoints.cs` | The export route, the download filename, and the one failure a backup can have. |
 | `appsettings.json` | Non-secret defaults; empty connection string. |
 | `appsettings.Development.json` | Dev connection string and CORS origins. |
 | `appsettings.AzureDev.json` | Azure DEV paths, forwarded headers and log levels. No secret. |
@@ -114,14 +124,14 @@ Repository index. Paths and one-line responsibilities only.
 | `src/lib/api.ts` | Same-origin fetch wrapper and `ApiError`. |
 | `src/auth/` | Session context, `useAuth`, and the route guards. |
 | `src/universes/` | Universe API client and types. |
-| `src/lore/` | Lore API client, shared types, document and field helpers, and the revision client. |
-| `src/export/` | Backup download: the request, the server's filename, and handing the blob to the browser. |
+| `src/lore/` | Lore API client, shared types, document and field helpers, the revision client, and the image client that composes an asset's URL. |
+| `src/export/` | Backup download: the request, the server's filename, and handing the archive to the browser. |
 | `src/trash/` | Trash API client and DTO types. |
 | `src/relationships/` | Relationship API client, DTO types, and both-readings helper. |
 | `src/timeline/` | Timeline API client, DTO types, date formatting and year grouping. |
 | `src/canon/` | Canon Integrity API client, DTO types, and the reader for the promotion gate's 409. |
 | `src/lib/dates.ts` | Timestamp formatting, date-input round trips, and spans. |
-| `src/components/` | `AuthLayout`, `Wordmark` (the drawn "Lore X", spoken "Lorex"), `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker` (single and multi, one shared search), `EntityHistory`, `RelationshipSection`, `RelationshipTypeManager`, `TimelineEntryForm`, `ConflictEntry`, `CanonBlockNotice` (the one refused-write presentation, shared by every gated form). |
+| `src/components/` | `AuthLayout`, `Wordmark` (the drawn "Lore X", spoken "Lorex"), `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `EntityPortrait` (the card's picture, or its monogram), `EntityImageField` (pick, replace, remove), `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker` (single and multi, one shared search), `EntityHistory`, `RelationshipSection`, `RelationshipTypeManager`, `TimelineEntryForm`, `ConflictEntry`, `CanonBlockNotice` (the one refused-write presentation, shared by every gated form). |
 | `src/pages/` | Login, Register, Universes browser, and the workspace: Overview, Lore, entry page, Timeline, Canon, Types, Trash and Settings. `UniverseWorkspace` also owns the collapsing narrow-screen navigation. |
 | `vite.config.ts` | Dev server port 5173, proxy to the API, build config. |
 
@@ -143,6 +153,8 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.Api.Tests/CanonPromotionGateTests.cs` | What the gate refuses, what a refusal leaves behind, and what it must never block. |
 | `Lorex.Api.Tests/UniverseExportTests.cs` | What a backup holds, what it must never hold, its coherence and its determinism. |
 | `Lorex.Api.Tests/TrashEndpointTests.cs` | What trashing hides, what it must not destroy, and what a restore may refuse. |
+| `Lorex.Api.Tests/TestMediaObjectStore.cs` | The object store the test host runs against, and its two failure hooks. |
+| `Lorex.Api.Tests/EntityImageTests.cs` | What is stored, who may touch it, and what a replace or a remove leaves behind. |
 | `Lorex.Api.Tests/EntitySearchTests.cs` | What full text finds, what it must never find, and what keeps the index in step. |
 | `Lorex.E2E/playwright.config.ts` | Starts API + web, runs Chromium. |
 | `Lorex.E2E/specs/smoke.spec.ts` | Frontend-loads smoke suite. |
@@ -152,10 +164,12 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.E2E/specs/relationships.spec.ts` | Both readings, relation kinds, refusals, and the universe and owner boundaries. |
 | `Lorex.E2E/specs/timeline.spec.ts` | Date kinds through the drawer, order, filters, paging, refusals, and the owner boundary. |
 | `Lorex.E2E/specs/history.spec.ts` | One journey: versions accumulate, an old one is read in place and put back. |
-| `Lorex.E2E/specs/export.spec.ts` | One journey: the click produces a real file on disk, named and readable. |
+| `Lorex.E2E/specs/export.spec.ts` | One journey: the click produces a real archive on disk, named and readable. |
+| `Lorex.E2E/specs/support/zip.ts` | Reads a downloaded archive's table of contents. Not a spec. |
 | `Lorex.E2E/specs/trash.spec.ts` | One journey: an entry and its connection leave together and one restore returns both. |
 | `Lorex.E2E/specs/canon.spec.ts` | The review screen, conflict identity across runs, the promotion gate's refusals, reconciliation on write, and the universe and owner boundaries. |
 | `Lorex.E2E/specs/mobile.spec.ts` | One journey at 390px: navigation, authoring, a reachable action, the drawer picker, and no sideways scroll. |
+| `Lorex.E2E/specs/entity-image.spec.ts` | Add, replace and remove a picture; the phone layout; what history says; what a backup carries; what the worker may not keep. |
 | `Lorex.E2E/specs/pwa.spec.ts` | Manifest, icons and metadata, and what the service worker is never allowed to cache. |
 
 ## `scripts`
@@ -173,5 +187,6 @@ Repository index. Paths and one-line responsibilities only.
 | --- | --- |
 | `architecture/branching.md` | Branch naming and merge rules. |
 | `deployment/azure-dev.md` | The DEV runbook: topology, setup, deploy, limitations, troubleshooting. |
+| `deployment/cloudflare-r2.md` | The R2 runbook: bucket, token, config keys, and what a backup does not hold. |
 | `architecture/decisions/README.md` | One-line index of every ADR. |
 | `architecture/decisions/` | ADRs; one small file per durable decision. |
