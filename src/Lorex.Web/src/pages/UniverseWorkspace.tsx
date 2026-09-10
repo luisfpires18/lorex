@@ -1,7 +1,21 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, NavLink, Outlet, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useId, useState } from 'react'
+import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router-dom'
 import { getUniverse } from '../universes/api'
 import type { UniverseDetail } from '../universes/types'
+
+/**
+ * The sections a universe has, in the order the sidebar lists them. Held as data rather
+ * than as markup because the narrow layout needs the same list twice: once as the list of
+ * links, and once to name the section the author is currently in.
+ */
+const SECTIONS = [
+  { segment: '', label: 'Overview', testId: 'workspace-overview' },
+  { segment: 'lore', label: 'Lore', testId: 'workspace-lore' },
+  { segment: 'timeline', label: 'Timeline', testId: 'workspace-timeline' },
+  { segment: 'canon', label: 'Canon', testId: 'workspace-canon' },
+  { segment: 'types', label: 'Types', testId: 'workspace-types' },
+  { segment: 'trash', label: 'Trash', testId: 'workspace-trash' },
+] as const
 
 /**
  * Sections that exist in the plan but not yet in the product. They are shown so the shape
@@ -20,9 +34,31 @@ export interface WorkspaceContext {
   refresh: (next?: UniverseDetail) => void
 }
 
+/** Which section the current URL is in. `lore/:entityId` is still Lore. */
+function currentSection(pathname: string, id: string | undefined) {
+  const base = `/app/universes/${id ?? ''}`
+  const rest = pathname.startsWith(base) ? pathname.slice(base.length) : ''
+  const segment = rest.replace(/^\/+/, '').split('/')[0] ?? ''
+  if (segment === 'settings') return 'Settings'
+  return SECTIONS.find((section) => section.segment === segment)?.label ?? 'Overview'
+}
+
 export default function UniverseWorkspace() {
   const { id } = useParams<{ id: string }>()
+  const { pathname } = useLocation()
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
+
+  // Only the narrow layout hides the section list; on a wide screen CSS keeps it open and
+  // the toggle is not shown at all, so one piece of state serves both without measuring
+  // the viewport in JavaScript.
+  //
+  // What is stored is the route the list was opened on, not a boolean, so "open" means
+  // "opened here". A section that has just been opened is then never read through the list
+  // that opened it, and arriving by the browser's own back and forward closes it too -
+  // both fall out of the render rather than out of an effect chasing the URL.
+  const [navOpenAt, setNavOpenAt] = useState<string | null>(null)
+  const isNavOpen = navOpenAt === pathname
+  const navId = useId()
 
   const load = useCallback(
     (signal?: AbortSignal) => {
@@ -109,9 +145,28 @@ export default function UniverseWorkspace() {
           L
         </Link>
         <span className="rail__seal" aria-hidden="true" />
+
+        {/* Only rendered into the narrow layout, where the sidebar head is folded away:
+            the bar has to keep saying which universe and which section this is. */}
+        <p className="rail__where" data-testid="workspace-where">
+          <span className="rail__universe">{universe.name}</span>
+          <span className="rail__section">{currentSection(pathname, id)}</span>
+          {universe.isArchived ? <span className="rail__archived">Archived</span> : null}
+        </p>
+
+        <button
+          className="rail__toggle"
+          type="button"
+          aria-expanded={isNavOpen}
+          aria-controls={navId}
+          onClick={() => setNavOpenAt(isNavOpen ? null : pathname)}
+          data-testid="workspace-nav-toggle"
+        >
+          {isNavOpen ? 'Close' : 'Sections'}
+        </button>
       </nav>
 
-      <aside className="sidebar">
+      <aside className="sidebar" id={navId} data-open={isNavOpen ? 'true' : 'false'}>
         <div className="sidebar__head">
           <Link className="sidebar__back" to="/app">
             All universes
@@ -123,36 +178,18 @@ export default function UniverseWorkspace() {
         </div>
 
         <ul className="sidebar__nav">
-          <li>
-            <NavLink to="." end className="sidebar__link">
-              Overview
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="lore" className="sidebar__link" data-testid="workspace-lore">
-              Lore
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="timeline" className="sidebar__link" data-testid="workspace-timeline">
-              Timeline
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="canon" className="sidebar__link" data-testid="workspace-canon">
-              Canon
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="types" className="sidebar__link" data-testid="workspace-types">
-              Types
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="trash" className="sidebar__link" data-testid="workspace-trash">
-              Trash
-            </NavLink>
-          </li>
+          {SECTIONS.map((section) => (
+            <li key={section.label}>
+              <NavLink
+                to={section.segment === '' ? '.' : section.segment}
+                end={section.segment === ''}
+                className="sidebar__link"
+                data-testid={section.testId}
+              >
+                {section.label}
+              </NavLink>
+            </li>
+          ))}
           {PLANNED.map((label) => (
             <li key={label}>
               <span className="sidebar__link sidebar__link--planned" aria-disabled="true">

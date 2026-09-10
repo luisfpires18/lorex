@@ -76,6 +76,26 @@ function useCloseOnOutside(
   }, [wrapper, isOpen, close])
 }
 
+/**
+ * Keeps an open result list on screen.
+ *
+ * The list drops out of the field it belongs to, and both pickers are used in places
+ * where that field is the last one in a scrolling container - the bottom of the timeline
+ * drawer, the foot of a relation form. On a phone the list then opens below the fold,
+ * behind the drawer's own action bar, and the author sees nothing happen at all. Asking
+ * for the nearest scroll brings it into view without moving anything that already is.
+ */
+function useKeepListInView(
+  list: RefObject<HTMLUListElement | null>,
+  isOpen: boolean,
+  count: number,
+) {
+  useEffect(() => {
+    if (!isOpen) return
+    list.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [list, isOpen, count])
+}
+
 interface ListKeyOptions {
   isOpen: boolean
   open: () => void
@@ -142,6 +162,7 @@ export function EntityPicker({
   const [isOpen, setIsOpen] = useState(false)
 
   const wrapper = useRef<HTMLDivElement>(null)
+  const list = useRef<HTMLUListElement>(null)
   const { results, isSearching, active, setActive } = useEntitySearch(
     universeId,
     query,
@@ -150,6 +171,7 @@ export function EntityPicker({
   )
 
   useCloseOnOutside(wrapper, isOpen, () => setIsOpen(false))
+  useKeepListInView(list, isOpen, results.length)
 
   function choose(item: EntitySummary) {
     onChange({ id: item.id, name: item.name })
@@ -215,7 +237,7 @@ export function EntityPicker({
           />
 
           {isOpen ? (
-            <ul className="picker__list" id={listId} role="listbox" aria-label={label}>
+            <ul className="picker__list" id={listId} role="listbox" aria-label={label} ref={list}>
               {results.map((item, index) => (
                 <li key={item.id}>
                   <button
@@ -281,6 +303,7 @@ export function EntityMultiPicker({
   const [isOpen, setIsOpen] = useState(false)
 
   const wrapper = useRef<HTMLDivElement>(null)
+  const list = useRef<HTMLUListElement>(null)
   const { results, isSearching, active, setActive } = useEntitySearch(
     universeId,
     query,
@@ -289,6 +312,7 @@ export function EntityMultiPicker({
   )
 
   useCloseOnOutside(wrapper, isOpen, () => setIsOpen(false))
+  useKeepListInView(list, isOpen, results.length)
 
   function choose(item: EntitySummary) {
     onChange([...value, { id: item.id, name: item.name }])
@@ -366,7 +390,7 @@ export function EntityMultiPicker({
       </div>
 
       {isOpen ? (
-        <ul className="picker__list" id={listId} role="listbox" aria-label={label}>
+        <ul className="picker__list" id={listId} role="listbox" aria-label={label} ref={list}>
           {results.map((item, index) => (
             <li key={item.id}>
               <button

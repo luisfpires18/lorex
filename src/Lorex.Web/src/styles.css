@@ -342,6 +342,16 @@ a {
   border-color: var(--accent);
 }
 
+/* Three rows is a paragraph on a desktop and a keyhole on a phone, where the same text
+   wraps to eight or nine lines. The box is given a height worth writing in; it is still
+   resizable. */
+@media (max-width: 640px) {
+  .field__input--area,
+  .entry__summaryinput {
+    min-height: 8rem;
+  }
+}
+
 /* ---------- Colour swatches ---------- */
 
 .swatches {
@@ -607,6 +617,19 @@ a {
   height: 0.55rem;
   border-radius: 50%;
   background: var(--universe-accent);
+}
+
+/* The ink accent is nearly invisible against the plate, so anything focusable that sits
+   on it gets a ring in the plate's own ink instead. */
+.rail :focus-visible {
+  outline-color: var(--plate-ink);
+}
+
+/* Both of these belong to the narrow layout only: on a wide screen the sidebar is always
+   there and says where you are, so a second copy in the bar would only repeat it. */
+.rail__where,
+.rail__toggle {
+  display: none;
 }
 
 .sidebar {
@@ -1147,6 +1170,25 @@ a {
   margin-top: 2.5rem;
   padding-top: 1.5rem;
   border-top: 1px solid var(--rule);
+}
+
+/* A dossier is the tallest screen in the product: article, relations and history put
+   Edit and Move to Trash - and, in the editor, Save and Cancel - three thousand pixels
+   below the fold on a phone. Sticking the footer to the bottom edge keeps the one action
+   the screen exists for in reach at any scroll position, and because it is sticky rather
+   than fixed it still sits in the flow and releases at the end of the page. */
+@media (max-width: 860px) {
+  .entry__actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    margin: 2rem -1.25rem 0;
+    padding: 0.8rem 1.25rem;
+    padding-bottom: max(0.8rem, env(safe-area-inset-bottom));
+    /* Paper rather than surface: the bar passes over the article, and the app already
+       separates one plane from another by which of the two it is painted on. */
+    background: var(--paper);
+  }
 }
 
 /* ---------- Tiptap ---------- */
@@ -1746,6 +1788,36 @@ a {
   color: var(--muted);
 }
 
+/* ---------- History on a narrow screen ----------
+
+   Three columns leave the middle one about 11rem wide on a phone, and the middle one is
+   the row: what happened, who it was, which version. Stacked, the same rows keep their
+   order of importance instead of being squeezed into a gutter. Same treatment as the
+   relations list and the Canon findings. */
+
+@media (max-width: 640px) {
+  .version {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0.35rem;
+  }
+
+  .version__when {
+    padding-right: 0;
+    border-right: 0;
+    min-height: 0;
+    text-align: left;
+  }
+
+  .version__tools {
+    justify-content: flex-start;
+    gap: 0.15rem 1.1rem;
+  }
+
+  .version__snapshot {
+    padding: 1rem;
+  }
+}
+
 /* ---------- Entity picker ---------- */
 
 .picker {
@@ -1776,7 +1848,10 @@ a {
   margin: 0;
   padding: 0;
   list-style: none;
-  max-height: 15rem;
+  /* A fixed 15rem is most of a phone in portrait, and the field it drops out of is often
+     the last one in a drawer. Capped against the viewport the list can still be seen
+     whole once it has been scrolled to, which is what the picker does on opening. */
+  max-height: min(15rem, 45dvh);
   overflow-y: auto;
   background: var(--surface);
   border: 1px solid var(--rule-strong);
@@ -1902,39 +1977,153 @@ a {
   }
 }
 
+/* ---------- The workspace on a narrow screen ----------
+
+   The desktop shell is a permanent 19rem of chrome down the left edge. Folded into a
+   single column that chrome becomes a permanent band across the top instead, and on a
+   phone the section list plus the universe head cost around a third of the viewport on
+   every screen before a word of lore appears.
+
+   So below this width the chrome collapses to one sticky bar - the mark, where you are,
+   and a labelled disclosure - and the section list becomes a panel that is closed until
+   asked for and closes itself again on arrival. Nothing above this width changes. */
+
 @media (max-width: 860px) {
   .workspace {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .rail {
+    position: sticky;
+    top: 0;
+    z-index: 30;
     flex-direction: row;
-    justify-content: space-between;
-    padding: 0.75rem 1.25rem;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 1rem;
+    padding-top: max(0.5rem, env(safe-area-inset-top));
+  }
+
+  .rail__mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+  }
+
+  .rail__seal {
+    flex: none;
+  }
+
+  .rail__where {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.3;
+    color: var(--plate-muted);
+    white-space: nowrap;
+  }
+
+  /* The universe name is what gives way when the bar runs out of room: the section is
+     short, and losing it would be losing the answer to "where am I". */
+  .rail__universe {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--plate-ink);
+  }
+
+  .rail__section {
+    flex: none;
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 0.85rem;
+    color: var(--plate-muted);
+  }
+
+  .rail__section::before {
+    content: '·';
+    margin-right: 0.4rem;
+  }
+
+  .rail__archived {
+    flex: none;
+    border: 1px solid var(--plate-muted);
+    padding: 0 0.3rem;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .rail__toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    min-height: 2.25rem;
+    padding: 0.25rem 0.8rem;
+    border: 1px solid var(--plate-muted);
+    border-radius: 2px;
+    background: transparent;
+    color: var(--plate-ink);
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+
+  .rail__toggle[aria-expanded='true'] {
+    background: var(--plate-ink);
+    color: var(--plate);
+    border-color: var(--plate-ink);
   }
 
   .sidebar {
     border-right: 0;
     border-bottom: 1px solid var(--rule);
+    padding: 0.75rem 1rem 1rem;
   }
 
+  .sidebar[data-open='false'] {
+    display: none;
+  }
+
+  /* The bar already carries the name, the archived mark and the way back. */
+  .sidebar__head {
+    display: none;
+  }
+
+  /* Two columns: twelve sections in one column would be taller than the phone they are
+     being read on, and the point of the panel is that it gets out of the way. */
   .sidebar__nav {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 0.25rem 1rem;
-    margin-top: 1.25rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 1.25rem;
+    margin-top: 0;
   }
 
   .sidebar__link {
     margin-left: 0;
-    padding: 0.3rem 0;
+    align-items: center;
+    min-height: 2.75rem;
+    padding: 0.4rem 0;
     border-left: 0;
-    border-bottom: 2px solid transparent;
+    border-bottom: 1px solid var(--rule);
   }
 
   .sidebar__link.active {
     border-left-color: transparent;
     border-bottom-color: var(--universe-accent);
+    color: var(--ink);
+  }
+
+  .sidebar__soon {
+    margin-top: 0.9rem;
   }
 
   .canvas {
@@ -2802,4 +2991,134 @@ a {
   margin: 0.2rem 0 0;
   font-size: 0.78rem;
   color: var(--muted);
+}
+
+/* ---------- Touch ----------
+
+   Lorex leans on quiet controls: an Edit that is text on paper, a remove that is a small
+   cross inside a token, an editor toolbar of one-word buttons. With a mouse that reads as
+   restraint. Under a finger a twenty-pixel target is a miss, and the miss lands on the
+   link next to it.
+
+   So this block raises hit areas where the primary pointer is coarse, and only there -
+   a mouse-driven screen keeps the typography it was designed with. Sizes are grown from
+   padding and a minimum height rather than from font size, so nothing is restyled, and
+   these rules deliberately leave prose links alone: a 44px line box inside a paragraph
+   would break the paragraph. */
+
+@media (pointer: coarse) {
+  .relation__tools .button--quiet,
+  .moment__tools .button--quiet,
+  .version__tools .button--quiet,
+  .finding__tools .button--quiet,
+  .history__head .button--quiet {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding-right: 0.5rem;
+  }
+
+  .button--quiet {
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .token {
+    padding: 0.2rem 0.15rem 0.2rem 0.5rem;
+  }
+
+  /* The cross is small on purpose; the area around it does not have to be. */
+  .token__remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+    padding: 0;
+  }
+
+  .editor__tool,
+  .canon__step,
+  .kinds__step,
+  .segmented__option {
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* This one keeps its underline flush with the text, so the height comes from the box
+     rather than from padding above it. */
+  .segmented__option {
+    min-width: 2.75rem;
+    padding: 0 0 0.35rem;
+  }
+
+  .picker__option {
+    min-height: 2.75rem;
+    align-items: center;
+  }
+
+  .sidebar__link,
+  .rail__toggle {
+    min-height: 2.75rem;
+    display: flex;
+    align-items: center;
+  }
+
+  .rail__mark {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .tokens__input {
+    min-height: 2.5rem;
+  }
+
+  /* Stacked one under another in a list, these are the easiest links in the product to
+     mis-tap: the neighbour is one line away. Padding separates the hit boxes without
+     changing a single type size. */
+  .entry__crumbs a,
+  .relation__name,
+  .finding__subjects a {
+    display: inline-block;
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+  }
+
+  .sidebar__back {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.5rem;
+  }
+
+  /* The label and the dot are the visible swatch; the transparent input already covers
+     the whole of it, so growing the swatch grows the target with it. */
+  .swatch {
+    min-height: 2.75rem;
+  }
+
+  .swatches__row {
+    gap: 0 1.1rem;
+  }
+
+  /* Cast members and relation ends sit in lists rather than in sentences, so they can
+     take the room a finger needs without disturbing a line of prose. */
+  .moment__player,
+  .picker__chosen .button--quiet {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+
+  /* Revealed on hover for a mouse; a finger has no hover, so they are always there.
+     The existing (hover: none) rule does the same for one of them - this covers the
+     rest of the same pattern. */
+  .moment__tools {
+    opacity: 1;
+  }
 }
