@@ -20,7 +20,8 @@ Format:
 ```
 
 - `<type>` is one of `feat`, `fix`, `chore`, `refactor`, `test`, `docs`.
-- `<NNN>` is mandatory, zero-padded, sequential, starting at `001`.
+- `<NNN>` is mandatory for a numbered implementation phase: zero-padded, sequential,
+  starting at `001`.
 - One project-wide sequence shared by every branch type.
 - Numbers are never reused.
 - The description is concise kebab-case.
@@ -36,6 +37,20 @@ refactor/005/entity-model
 test/006/canon-conflicts
 docs/007/architecture-update
 ```
+
+### Stabilization branches
+
+Numbered implementation paused after `022`. A small stabilization fix found during
+manual use - a bug, a polish pass, a doc correction - takes an unnumbered branch:
+
+```
+fix/<short-kebab-description>
+chore/<short-kebab-description>
+```
+
+- The same `<type>` vocabulary, without `<NNN>`, and no entry in the sequence log.
+- They do not consume the next free number: `023` stays reserved for Phase 023.
+- One accepted issue per branch. Unrelated fixes do not travel together.
 
 ## Sequence log
 
@@ -64,7 +79,7 @@ docs/007/architecture-update
 | 021 | `feat/021/pwa-mobile-refinement` | merged into `dev` |
 | 022 | `feat/022/azure-dev-cicd` | merged into `dev` |
 
-Next free number: `023`.
+Next free number: `023`, reserved for Phase 023 and not taken by a stabilization branch.
 
 ## Rules for automation
 

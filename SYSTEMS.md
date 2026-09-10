@@ -106,7 +106,7 @@ Repository index. Paths and one-line responsibilities only.
 | `index.html` | Document shell: manifest link, icons, theme colours, viewport. |
 | `public/manifest.webmanifest` | Web app manifest: name, start URL, display mode, colours, icons. |
 | `public/sw.js` | Service worker: caches build output only, and what it refuses to touch. |
-| `public/icon.svg` + `icon-*.png` + `apple-touch-icon.png` | The install icons: the wordmark on the plate. |
+| `public/icon.svg` + `icon-*.png` + `apple-touch-icon.png` | The install icons: the struck X on the plate. `icon.svg` is the source; the PNGs are rendered from it by `scripts/render-icons.py`. |
 | `src/main.tsx` | React entry point. |
 | `src/pwa.ts` | Registers the service worker, in production builds only. |
 | `src/App.tsx` | Routes and providers. |
@@ -121,7 +121,7 @@ Repository index. Paths and one-line responsibilities only.
 | `src/timeline/` | Timeline API client, DTO types, date formatting and year grouping. |
 | `src/canon/` | Canon Integrity API client, DTO types, and the reader for the promotion gate's 409. |
 | `src/lib/dates.ts` | Timestamp formatting, date-input round trips, and spans. |
-| `src/components/` | `AuthLayout`, `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker` (single and multi, one shared search), `EntityHistory`, `RelationshipSection`, `RelationshipTypeManager`, `TimelineEntryForm`, `ConflictEntry`, `CanonBlockNotice` (the one refused-write presentation, shared by every gated form). |
+| `src/components/` | `AuthLayout`, `Wordmark` (the drawn "Lore X", spoken "Lorex"), `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker` (single and multi, one shared search), `EntityHistory`, `RelationshipSection`, `RelationshipTypeManager`, `TimelineEntryForm`, `ConflictEntry`, `CanonBlockNotice` (the one refused-write presentation, shared by every gated form). |
 | `src/pages/` | Login, Register, Universes browser, and the workspace: Overview, Lore, entry page, Timeline, Canon, Types, Trash and Settings. `UniverseWorkspace` also owns the collapsing narrow-screen navigation. |
 | `vite.config.ts` | Dev server port 5173, proxy to the API, build config. |
 
@@ -165,6 +165,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.Common.ps1` | Shared launcher helpers: ports, process tracking, readiness. |
 | `Start-Lorex.ps1` | Starts API + web, waits, opens the browser. |
 | `Stop-Lorex.ps1` | Stops launcher-owned processes. |
+| `render-icons.py` | Rasterises the install PNGs from `icon.svg`. Standard library only. |
 
 ## `docs`
 
