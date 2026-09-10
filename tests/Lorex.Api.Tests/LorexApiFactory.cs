@@ -5,7 +5,6 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Hosting;
 
 namespace Lorex.Api.Tests;
 
@@ -27,6 +26,7 @@ public sealed class LorexApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<LorexDbContext>();
 
             _connection.Open();
+            Migrate();
             services.AddDbContext<LorexDbContext>(options => options.UseSqlite(_connection));
         });
     }
@@ -34,15 +34,18 @@ public sealed class LorexApiFactory : WebApplicationFactory<Program>
     /// <summary>
     /// Applies the real migrations to the throwaway database, so every test also proves the
     /// migration set builds a usable schema.
+    ///
+    /// Done on a context of its own, while the host is still being built, rather than after it
+    /// is up. Startup work meets a migrated database in every real environment - development
+    /// migrates before <c>app.Run</c>, a deployment migrates before the process starts - and the
+    /// search-index backfill is exactly such a step. A test host that started against an empty
+    /// database would be the one arrangement production never has.
     /// </summary>
-    protected override IHost CreateHost(IHostBuilder builder)
+    private void Migrate()
     {
-        var host = base.CreateHost(builder);
-
-        using var scope = host.Services.CreateScope();
-        scope.ServiceProvider.GetRequiredService<LorexDbContext>().Database.Migrate();
-
-        return host;
+        var options = new DbContextOptionsBuilder<LorexDbContext>().UseSqlite(_connection).Options;
+        using var db = new LorexDbContext(options);
+        db.Database.Migrate();
     }
 
     protected override void Dispose(bool disposing)

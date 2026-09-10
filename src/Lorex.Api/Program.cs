@@ -17,6 +17,7 @@ builder.Services.AddHealthChecks();
 builder.Services.AddLorexDatabase(builder.Configuration, builder.Environment);
 builder.Services.AddLorexAuth(builder.Environment);
 builder.Services.AddCanonIntegrity();
+builder.Services.AddLoreSearch();
 
 var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 if (corsOrigins.Length > 0)
