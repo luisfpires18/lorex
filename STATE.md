@@ -17,17 +17,21 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   `POST .../trash/{entityId}/restore` puts one back under the promotion gate. Entries are the
   only trashable thing. Semantics: ADR 0015. The backup format is at version 2 because a backup
   now carries the Trash - ADR 0014 argues the bump.
-- **Now: Phase 020 - Full-Text Search.** Not started; no branch yet.
+- **Phase 020** (Full-Text Search) on `feat/020/full-text-search`, not merged. Entity search now
+  reads the article an author wrote, not only the name, aliases and summary, and orders hits by
+  relevance instead of recency. `GET /api/universes/{id}/entities` is unchanged apart from what
+  `search` means. Index shape, synchronization and query semantics: ADR 0016.
 
 ## Baseline
 
-- 305 API integration tests, 47 Playwright tests, green. No frontend unit runner exists; the
+- 328 API integration tests, 47 Playwright tests, green. No frontend unit runner exists; the
   web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly when run from `tests/Lorex.E2E`.
-- 11 migrations, latest `AddEntityTrash`; `has-pending-model-changes` reports none. That one
-  adds `Entities.DeletedAt` and swaps the browse index for
-  `(UniverseId, DeletedAt, IsArchived, UpdatedAt)`, verified against a fresh SQLite file.
+- 12 migrations, latest `AddEntitySearchIndex`; `has-pending-model-changes` reports none. That
+  one is raw SQL - an FTS5 virtual table and the trigger that empties it - so no EF Core model
+  describes it and the pending check cannot see it either way. Verified against a fresh SQLite
+  file and against an existing one, where the startup backfill indexes what predates it.
 - Six rules in `src/Lorex.Api/Features/CanonIntegrity/Rules/`: three structural (Medium),
   three chronological (High). Behaviour: ADR 0010, 0011, 0012.
 
@@ -45,8 +49,9 @@ see Deferred. RTK and Graphify judged independently.
 - RTK works in the `Bash` tool. `rtk gain` ~21.8%, drifting down as more work runs through
   chained or piped commands the wrapper bypasses by design. Correctness record still clean;
   the one recorded diagnostic loss remains `rtk npm run dev` swallowing Vite's startup banner.
-  Phase 018 added no new evidence: nearly every command was piped or chained, so the wrapper
-  bypassed it, and no unfiltered rerun was needed.
+  Phase 020 measured 20.1%: `rtk grep`, `git status`, `git diff` and a passing `dotnet build`
+  were rewritten and filtered, everything piped or chained was bypassed by design, and no
+  unfiltered rerun was needed.
 - Graphify unused in every task so far. Targeted `Grep` over `SYSTEMS.md`-named files has
   answered every question.
 
@@ -65,6 +70,7 @@ see Deferred. RTK and Graphify judged independently.
 
 ## Blockers
 
-None. Follow-ups, not blocking: the lore article body is not searched - name, aliases and
-summary are - and full text needs SQLite FTS rather than a LIKE over Tiptap JSON. Production
-needs a persisted Data Protection key ring so cookie sessions survive a restart - ADR 0005.
+None. Follow-ups, not blocking: search matches whole words and prefixes, so the substring hits
+`LIKE` used to give are gone - ADR 0016 argues the trade. Search is SQLite-only and will be
+redesigned when PostgreSQL arrives. Production needs a persisted Data Protection key ring so
+cookie sessions survive a restart - ADR 0005.

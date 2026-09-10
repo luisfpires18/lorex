@@ -57,7 +57,10 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Lore/RevisionEndpoints.cs` | History list, one version, and the restore that replays it through the entity update. |
 | `Features/Lore/RevisionContracts.cs` | Response records for history and one version. |
 | `Features/Lore/LoreContent.cs` | Structural validation of the Tiptap article. |
-| `Features/Lore/LoreValidation.cs` | Shared lore input checks and LIKE escaping. |
+| `Features/Lore/LoreArticleText.cs` | Reduces a Tiptap document to the prose an author wrote. |
+| `Features/Lore/EntitySearchIndex.cs` | The SQLite FTS5 index: reindex, backfill, the scored query, and how typed words become an expression. |
+| `Features/Lore/EntitySearchBackfill.cs` | Indexes entries that have no index row, once, at startup. |
+| `Features/Lore/LoreValidation.cs` | Shared lore input checks. |
 | `Features/Relationships/RelationshipModel.cs` | `RelationshipType` and `LoreRelationship`. |
 | `Features/Relationships/RelationshipConfiguration.cs` | Relationship schema: keys, indexes, delete behaviour. |
 | `Features/Relationships/RelationshipTypeEndpoints.cs` | Relationship-type CRUD; delete refused while in use. |
@@ -126,6 +129,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.Api.Tests/CanonPromotionGateTests.cs` | What the gate refuses, what a refusal leaves behind, and what it must never block. |
 | `Lorex.Api.Tests/UniverseExportTests.cs` | What a backup holds, what it must never hold, its coherence and its determinism. |
 | `Lorex.Api.Tests/TrashEndpointTests.cs` | What trashing hides, what it must not destroy, and what a restore may refuse. |
+| `Lorex.Api.Tests/EntitySearchTests.cs` | What full text finds, what it must never find, and what keeps the index in step. |
 | `Lorex.E2E/playwright.config.ts` | Starts API + web, runs Chromium. |
 | `Lorex.E2E/specs/smoke.spec.ts` | Frontend-loads smoke suite. |
 | `Lorex.E2E/specs/auth.spec.ts` | Register, sign out, guard, sign back in. |

@@ -81,7 +81,7 @@ export default function LorePage() {
             id="lore-search"
             className="field__input"
             type="search"
-            placeholder="Name, alias or summary"
+            placeholder="Name, alias, summary or article"
             value={search}
             onChange={(event) => {
               setSearch(event.target.value)

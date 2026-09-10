@@ -133,12 +133,6 @@ public static partial class LoreValidation
     public static string? NormalizeAccent(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToLowerInvariant();
 
-    /// <summary>Escapes LIKE wildcards so a search for "%" cannot match everything.</summary>
-    public static string EscapeLike(string value) =>
-        value.Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("%", "\\%", StringComparison.Ordinal)
-            .Replace("_", "\\_", StringComparison.Ordinal);
-
     private static void RequireName(Dictionary<string, string[]> errors, string? name, string message)
     {
         var trimmed = name?.Trim();

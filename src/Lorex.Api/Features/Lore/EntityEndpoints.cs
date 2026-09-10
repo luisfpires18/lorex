@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using System.Security.Claims;
 using Lorex.Api.Data;
 using Lorex.Api.Features.CanonIntegrity;
@@ -16,6 +17,26 @@ public static class EntityEndpoints
 {
     private const int DefaultPageSize = 12;
     private const int MaxPageSize = 50;
+
+    /// <summary>
+    /// The one grid-card projection, shared because the listing now has two orderings and only
+    /// one shape: browsing reads it straight off the entity, searching reads it off the entity
+    /// the score was joined to.
+    /// </summary>
+    private static readonly Expression<Func<LoreEntity, EntitySummary>> ToSummary =
+        entity => new EntitySummary(
+            entity.Id,
+            entity.Name,
+            entity.Summary,
+            entity.CanonStatus,
+            entity.IsArchived,
+            entity.EntityTypeId,
+            entity.EntityType!.Name,
+            entity.EntityType.Icon,
+            entity.EntityType.AccentColor,
+            entity.Aliases.OrderBy(alias => alias.Value).Select(alias => alias.Value).ToList(),
+            entity.EntityTags.Select(link => link.Tag!.Name).OrderBy(name => name).ToList(),
+            entity.UpdatedAt);
 
     public static IEndpointRouteBuilder MapEntityEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -86,40 +107,82 @@ public static class EntityEndpoints
             query = query.Where(entity => entity.EntityTags.Any(link => link.Tag!.Slug == slug));
         }
 
+        // Full text, over the name, the aliases, the summary and the article the author wrote -
+        // never over the Tiptap JSON that carries it. The index answers only "which entries hold
+        // these words"; every other question this listing asks - ownership, the Trash, archiving,
+        // the type, the tag - is still answered by the columns below, so the index cannot
+        // disagree with them about what is visible.
+        IQueryable<EntitySearchMatch>? matches = null;
+
         if (!string.IsNullOrWhiteSpace(search))
         {
-            // Name, aliases and summary. The rich article is not searched: SQLite would
-            // need FTS over the Tiptap document, which is follow-up work, not a LIKE over
-            // raw editor JSON.
-            var pattern = $"%{LoreValidation.EscapeLike(search.Trim())}%";
-            query = query.Where(entity =>
-                EF.Functions.Like(entity.Name, pattern, "\\")
-                || (entity.Summary != null && EF.Functions.Like(entity.Summary, pattern, "\\"))
-                || entity.Aliases.Any(alias => EF.Functions.Like(alias.Value, pattern, "\\")));
+            var expression = EntitySearchIndex.BuildMatchExpression(search);
+
+            // Something was typed, but not a single letter or digit in it. Nothing can match a
+            // search for "%" and nothing did before either, so this is an empty page rather
+            // than an unfiltered one - dropping the filter would answer a search with the whole
+            // universe.
+            if (expression is null)
+            {
+                return Results.Ok(new EntityPage([], page, pageSize, 0, 0));
+            }
+
+            matches = EntitySearchIndex.Match(db, expression);
         }
 
-        var totalCount = await query.CountAsync(cancellationToken);
         var skip = (int)Math.Min((long)(page - 1) * pageSize, int.MaxValue);
+        int totalCount;
+        List<EntitySummary> items;
 
-        var items = await query
-            .OrderByDescending(entity => entity.UpdatedAt)
-            .ThenBy(entity => entity.Id)
-            .Skip(skip)
-            .Take(pageSize)
-            .Select(entity => new EntitySummary(
-                entity.Id,
-                entity.Name,
-                entity.Summary,
-                entity.CanonStatus,
-                entity.IsArchived,
-                entity.EntityTypeId,
-                entity.EntityType!.Name,
-                entity.EntityType.Icon,
-                entity.EntityType.AccentColor,
-                entity.Aliases.OrderBy(alias => alias.Value).Select(alias => alias.Value).ToList(),
-                entity.EntityTags.Select(link => link.Tag!.Name).OrderBy(name => name).ToList(),
-                entity.UpdatedAt))
-            .ToListAsync(cancellationToken);
+        if (matches is null)
+        {
+            // Browsing. Most recently authored first, which is the order the grid has always had.
+            totalCount = await query.CountAsync(cancellationToken);
+            items = await query
+                .OrderByDescending(entity => entity.UpdatedAt)
+                .ThenBy(entity => entity.Id)
+                .Skip(skip)
+                .Take(pageSize)
+                .Select(ToSummary)
+                .ToListAsync(cancellationToken);
+        }
+        else
+        {
+            // Searching. Best match first instead, because the article body is indexed now: a
+            // name is worth more than an alias and an alias more than a passing mention, and
+            // recency would otherwise bury the entry actually called what was typed under every
+            // entry that merely mentions it. One index row per entry, so the join cannot
+            // duplicate one. Id breaks a score tie, so a page boundary never lands mid-shuffle.
+            var scored = query.Join(
+                matches,
+                entity => entity.Id,
+                match => match.EntityId,
+                (entity, match) => new { Entity = entity, match.Rank });
+
+            totalCount = await scored.CountAsync(cancellationToken);
+
+            // The scored query answers which entries are on this page and in what order, and
+            // nothing else. A card's aliases and tags are read separately, by id: a correlated
+            // collection cannot be projected through a join to a keyless row, and asking for one
+            // is how you get a query EF Core refuses to translate at all.
+            var ranked = await scored
+                .OrderBy(row => row.Rank)
+                .ThenBy(row => row.Entity.Id)
+                .Skip(skip)
+                .Take(pageSize)
+                .Select(row => row.Entity.Id)
+                .ToListAsync(cancellationToken);
+
+            var cards = await db.Entities.AsNoTracking()
+                .Where(entity => ranked.Contains(entity.Id))
+                .Select(ToSummary)
+                .ToListAsync(cancellationToken);
+
+            // Back into rank order: the second query returned a set, not a sequence. At most one
+            // page of ids, so this is a handful of lookups.
+            var byId = cards.ToDictionary(card => card.Id);
+            items = [.. ranked.Select(id => byId[id])];
+        }
 
         var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize);
 
@@ -217,6 +280,10 @@ public static class EntityEndpoints
         }
 
         await db.SaveChangesAsync(cancellationToken);
+
+        // Also inside the gate's transaction: a refused candidate is not searchable, because it
+        // does not exist.
+        await EntitySearchIndex.ReindexAsync(db, entity.Id, cancellationToken);
 
         // Inside the gate's transaction, so a candidate that is refused takes its first
         // version down with it.
@@ -327,6 +394,12 @@ public static class EntityEndpoints
 
         await db.SaveChangesAsync(cancellationToken);
 
+        // Every edit that can change indexed text arrives here - a rename, a new summary, an
+        // article rewrite, an alias added or dropped, and a revision restore, which is this same
+        // method replaying an old version. So this one call is the whole update side of
+        // synchronization, and it runs inside the transaction the edit itself commits in.
+        await EntitySearchIndex.ReindexAsync(db, entity.Id, cancellationToken);
+
         // Before the commit, and inside the gate's transaction when there is one: the edit and
         // the version it produced land together or neither does. A write that changed nothing
         // records nothing.
@@ -396,6 +469,10 @@ public static class EntityEndpoints
 
         // UpdatedAt is left alone. It says when the lore was last authored, and being thrown
         // away is not an edit to it - the Trash reads DeletedAt for its own ordering.
+        //
+        // The search index is left alone too, and deliberately: it holds text, not lifecycle.
+        // Search reads DeletedAt off this very row, so the entry stops being findable the moment
+        // this column is set, and a restore makes it findable again with nothing to rebuild.
         entity.DeletedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
 

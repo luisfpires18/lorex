@@ -19,11 +19,12 @@ One ADR per durable decision. Rationale lives in the ADR, never here.
 | 0013 | An entry's history is a full snapshot per accepted write | [0013-entity-revision-snapshots.md](0013-entity-revision-snapshots.md) |
 | 0014 | A backup is one versioned JSON file holding a universe's authored data | [0014-universe-backup-format.md](0014-universe-backup-format.md) |
 | 0015 | An entry is trashed by a marker, and nothing that points at it is destroyed | [0015-entity-trash-and-restore.md](0015-entity-trash-and-restore.md) |
+| 0016 | Lore is searched by a SQLite FTS5 index the write path keeps in step | [0016-sqlite-full-text-search.md](0016-sqlite-full-text-search.md) |
 
-All accepted. Next number: `0016`.
+All accepted. Next number: `0017`.
 
 Known limitations are recorded in the ADR that owns them - cross-era ordering in 0009 and
 0011, the `Age` reference year and exclusive-relationship overlap in 0011, what the
 promotion gate does not claim about stored High conflicts in 0012, unbounded history
-growth in 0013, what a backup is not in 0014, and the type that cannot be freed while a
-trashed entry still uses it in 0015.
+growth in 0013, what a backup is not in 0014, the type that cannot be freed while a
+trashed entry still uses it in 0015, and the loss of substring matching in 0016.
