@@ -89,6 +89,7 @@ no background sync. Opening Lorex without a network fails the way it does in a n
   before this phase was a violet bolt from a template - a different palette and a different
   shape from the graphite plate and serif `L` the app has drawn in `styles.css` since the first
   phase. An installed app whose icon is unrelated to the app is a defect, so `icon.svg` draws the
-  mark the product already uses and the document now points at it. `favicon.svg` and the unused
-  `icons.svg` sprite are left in place, unreferenced, rather than deleted in a phase about
-  layout.
+  mark the product already uses and the document now points at it. `favicon.svg` and the
+  `icons.svg` sprite - a sheet of Bluesky, Discord, GitHub and X glyphs from the same template -
+  were both deleted once a search confirmed nothing referenced either: not the document, not the
+  manifest, not the worker, which matches root static files by pattern and names no file at all.
