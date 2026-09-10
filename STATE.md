@@ -5,26 +5,21 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 
 ## Roadmap position
 
-- Phases 001-020 done and merged. Sequence log: `docs/architecture/branching.md`.
-- **Phase 019** (Trash / Recovery) merged into `dev`. `DELETE` on an entry sets `DeletedAt`
-  instead of removing the row, so nothing that pointed at it is destroyed;
-  `GET /api/universes/{id}/trash` lists what was thrown away and
-  `POST .../trash/{entityId}/restore` puts one back under the promotion gate. Entries are the
-  only trashable thing. Semantics: ADR 0015. The backup format is at version 2 because a backup
-  now carries the Trash - ADR 0014 argues the bump.
+- Phases 001-021 done and merged. Sequence log: `docs/architecture/branching.md`.
 - **Phase 020** (Full-Text Search) merged into `dev`. Entity search now reads the article an
   author wrote, not only the name, aliases and summary, and orders hits by relevance instead
   of recency. `GET /api/universes/{id}/entities` is unchanged apart from what
   `search` means. Index shape, synchronization and query semantics: ADR 0016.
-- **Phase 021** (PWA / Mobile Refinement) on `feat/021/pwa-mobile-refinement`, not merged.
-  Lorex installs: a hand-written manifest, four icons drawn from the wordmark, and a service
-  worker that caches build output and refuses `/api`, non-`GET`, navigations and cross-origin
-  outright - ADR 0017 owns the caching, update and privacy policy, and says plainly that
-  nothing works offline. On a narrow screen the workspace chrome folds from ~290px of
-  permanent nav into one 44px-56px sticky bar with a labelled disclosure; the dossier and
-  editor footers stick to the bottom edge so Edit and Save stay in reach; history stacks;
-  hit areas grow only where the pointer is coarse, so the desktop layout is untouched.
-  No backend change.
+- **Phase 021** (PWA / Mobile Refinement) merged into `dev`. Lorex installs: a hand-written
+  manifest, four icons drawn from the wordmark, and a service worker that caches build output
+  and refuses `/api`, non-`GET`, navigations and cross-origin outright - ADR 0017 owns the
+  caching, update and privacy policy, and says plainly that nothing works offline. On a narrow
+  screen the workspace chrome folds from ~290px of permanent nav into one sticky bar with a
+  labelled disclosure; the dossier and editor footers stick to the bottom edge so Edit and Save
+  stay in reach; history stacks; hit areas grow only where the pointer is coarse, so the
+  desktop layout is untouched. No backend change.
+- **Now: Phase 022 - Azure DEV environment and CI/CD.** Not started; no branch yet. The two
+  items under Blockers are the ones it has to answer first.
 
 ## Baseline
 
@@ -82,7 +77,8 @@ None. Follow-ups, not blocking: search matches whole words and prefixes, so the 
 redesigned when PostgreSQL arrives. Production needs a persisted Data Protection key ring so
 cookie sessions survive a restart - ADR 0005.
 
-Two for Phase 022, both found while starting the API by hand in Phase 021:
+Two for Phase 022 to answer, both found while starting the API by hand in Phase 021 and
+neither blocking anything today:
 
 - **The host dies at startup outside Development.** `DatabaseSetup` only migrates in
   Development, so with `ASPNETCORE_ENVIRONMENT` unset `EntitySearchBackfill` runs against a

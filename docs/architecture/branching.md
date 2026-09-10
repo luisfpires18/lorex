@@ -61,8 +61,9 @@ docs/007/architecture-update
 | 018 | `feat/018/export-backup` | merged into `dev` |
 | 019 | `feat/019/trash-recovery` | merged into `dev` |
 | 020 | `feat/020/full-text-search` | merged into `dev` |
+| 021 | `feat/021/pwa-mobile-refinement` | merged into `dev` |
 
-Next free number: `021`.
+Next free number: `022`.
 
 ## Rules for automation
 
