@@ -13,7 +13,9 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Superseding a pull request's run is free. Cancelling the validation a queued deployment is
+  # waiting on is not, so only pull requests cancel.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   DOTNET_VERSION: '10.0.x'
@@ -26,9 +28,9 @@ jobs:
     name: Backend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
@@ -57,9 +59,9 @@ jobs:
       run:
         working-directory: src/Lorex.Web
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -91,13 +93,13 @@ jobs:
     name: End to end
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -117,6 +119,11 @@ jobs:
         run: npx playwright install --with-deps chromium
         working-directory: tests/Lorex.E2E
 
+      # Built ahead of time so the API is already compiled when Playwright's webServer runs
+      # `dotnet run`, which otherwise restores and builds inside that server's start timeout.
+      - name: Build the API
+        run: dotnet build src/Lorex.Api
+
       # Playwright starts the API and the Vite dev server itself; see playwright.config.ts.
       - name: Run Playwright
         run: npx playwright test
@@ -124,7 +131,7 @@ jobs:
 
       - name: Upload report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: tests/Lorex.E2E/playwright-report

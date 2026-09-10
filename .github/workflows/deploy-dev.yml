@@ -1,9 +1,9 @@
 # Deploys the DEV environment. Only from dev, only to the one DEV App Service, and only after
 # the same validation a pull request gets.
 #
-# Nothing here is a credential. Sign-in is OIDC federated identity, so the three Azure
-# identifiers are repository or environment variables and there is no secret to leak or rotate.
-# The exact names an owner has to create are in docs/deployment/azure-dev.md.
+# Nothing here is a credential. Sign-in is OIDC federated identity, so the four Azure values are
+# repository or environment variables - identifiers, not secrets - and there is nothing here to
+# leak or rotate. The exact names an owner has to create are in docs/deployment/azure-dev.md.
 name: Deploy DEV
 
 on:
@@ -41,13 +41,13 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -71,7 +71,7 @@ jobs:
         run: dotnet publish src/Lorex.Api -c Release -o publish
 
       - name: Sign in to Azure
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
