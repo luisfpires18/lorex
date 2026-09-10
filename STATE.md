@@ -5,7 +5,7 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 
 ## Roadmap position
 
-- Phases 001-021 done and merged. Sequence log: `docs/architecture/branching.md`.
+- Phases 001-022 done and merged. Sequence log: `docs/architecture/branching.md`.
 - **Phase 020** (Full-Text Search) merged into `dev`. Entity search reads the article an author
   wrote, not only the name, aliases and summary, and orders hits by relevance. Index shape,
   synchronization and query semantics: ADR 0016.
@@ -13,9 +13,9 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   manifest, four icons, and a service worker that caches build output and refuses `/api`,
   non-`GET`, navigations and cross-origin outright - ADR 0017, which also says plainly that
   nothing works offline. Narrow-screen chrome folds into one sticky bar; desktop untouched.
-- **Phase 022** (Azure DEV + CI/CD) **complete on `feat/022/azure-dev-cicd`, not merged and not
-  pushed.** Two commits. The deployment-blocking startup bug is fixed, and DEV has a topology,
-  workflows and a runbook - but nothing exists in Azure yet, because the owner has to create it.
+- **Phase 022** (Azure DEV + CI/CD) merged into `dev`. The deployment-blocking startup bug is
+  fixed, and DEV has a topology, workflows and a runbook - but nothing exists in Azure yet,
+  because the owner has to create it.
   - The host no longer dies outside Development. `LorexDatabaseInitializer` migrates once per
     process in every environment, and the search-index backfill awaits it, so schema readiness is
     a dependency rather than an accident of registration order. ADR 0018.
@@ -24,15 +24,18 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - `ci.yml` validates every pull request into `dev`; `deploy-dev.yml` calls it and then deploys,
     from `dev` only, over OIDC. No credential is stored in the repository.
   - Runbook, limitations and troubleshooting: `docs/deployment/azure-dev.md`.
-- **Next: no phase.** Lorex enters owner-led manual testing, feature polish and fixes. Phase 023
-  is not started.
+- **Numbered implementation pauses after 022.** Current mode is **owner-led manual testing,
+  stabilization and feature polish**: fixes and small improvements as the owner finds them, on
+  branches numbered from `023` in the ordinary way, but no planned phase driving them.
+  **Phase 023 - Production Hardening / PostgreSQL - remains deferred** and is not started; the
+  next numbered phase resumes only when the owner says so.
 
 ## Baseline
 
-- 335 API integration tests, 54 Playwright tests, green. No frontend unit runner exists; the web
-  checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no format
-  script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and Prettier
-  has to be pointed at that config explicitly. CI runs all of it.
+- **335 API integration tests, 54 Playwright tests**, green. No frontend unit runner exists;
+  the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
+  format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
+  Prettier has to be pointed at that config explicitly. CI runs all of it.
 - The test host no longer migrates itself, so all 335 tests boot through the same startup path a
   deployment uses.
 - 12 migrations, latest `AddEntitySearchIndex`; `has-pending-model-changes` reports none, and
@@ -62,6 +65,9 @@ either way, which is itself the finding.
 
 ## Deferred / owner decisions
 
+- **Phase 023 - Production Hardening / PostgreSQL.** Deferred, not scheduled. It owns the
+  production key store, a real database and backup story, and the search rewrite SQLite-only
+  FTS5 forces (ADR 0016). ADR 0018 lists what the DEV topology deliberately does not solve.
 - **Azure DEV does not exist yet.** Phase 022 wrote the topology, the workflows and the runbook
   but created nothing. Before the first deploy the owner has to: deploy `infra/main.bicep` into a
   resource group; create an Entra app registration with a federated credential for the `dev`
