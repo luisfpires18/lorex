@@ -190,6 +190,13 @@ public sealed class LoreEntity
     public ICollection<EntityFieldValue> FieldValues { get; set; } = [];
 
     public ICollection<EntityTag> EntityTags { get; set; } = [];
+
+    /// <summary>
+    /// The entry's one primary image, or null. A reference rather than a set: an entry has one
+    /// picture and the schema says so - see <see cref="EntityImage"/>. Trashing an entry does
+    /// not touch it, because trashing deletes nothing.
+    /// </summary>
+    public EntityImage? Image { get; set; }
 }
 
 /// <summary>Another name the same thing goes by. Searched alongside the name.</summary>

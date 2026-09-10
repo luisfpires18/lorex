@@ -162,6 +162,11 @@ Accepted deliberately. Each one is a reason this topology is not a production to
 - **Migrations run on the web process.** A long migration delays the first response after a
   deploy, and two instances would race - another reason there is only one.
 - **Nothing works offline.** The service worker caches build output only, by design - ADR 0017.
+- **Entry images need Cloudflare R2, which is a separate owner setup.** Until the bucket, the
+  token and the five `Media__*` app settings exist, every image route answers 503 and nothing
+  else is affected. Steps, config keys and limitations: [cloudflare-r2.md](cloudflare-r2.md).
+- **A backup does not carry image bytes.** The per-universe JSON export above is still exactly
+  what ADR 0014 describes, and media is not in it - an open owner decision, see `STATE.md`.
 
 ## Verifying the PWA
 

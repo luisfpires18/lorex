@@ -54,12 +54,17 @@ function flattenFieldErrors(errors: Record<string, string[]> | undefined) {
  * attaches it and no token is ever held in JavaScript.
  */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  // A FormData body carries its own multipart content type, complete with the boundary the
+  // browser generated. Declaring JSON over it would make the request unparseable, so the
+  // default only applies to the JSON bodies every other call sends.
+  const isForm = init?.body instanceof FormData
+
   const response = await fetch(path, {
     ...init,
     credentials: 'same-origin',
     headers: {
       Accept: 'application/json',
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(init?.body && !isForm ? { 'Content-Type': 'application/json' } : {}),
       ...init?.headers,
     },
   })

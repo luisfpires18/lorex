@@ -959,6 +959,42 @@ a {
   color: var(--surface);
 }
 
+/* The portrait slot. Sized in CSS rather than by the image, so a grid of cards keeps its
+   shape whether or not there is a picture in any of them - and does not reflow line by line
+   as the thumbnails arrive. */
+.portrait {
+  flex: 0 0 auto;
+  width: 3.25rem;
+  height: 3.25rem;
+  object-fit: cover;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+}
+
+.portrait--blank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--display);
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--dossier-accent, var(--muted));
+  border-style: dashed;
+}
+
+.dossier__title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dossier__titletext {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
 .dossier__name {
   font-family: var(--display);
   font-size: 1.2rem;
@@ -1123,6 +1159,83 @@ a {
 .entry__summaryinput:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+/* The full picture, under the title and above the two columns. It is placed here rather than
+   in the rail on purpose: the rail drops below the article on a narrow screen, which would put
+   a character's portrait several thousand pixels beneath their name on a phone.
+
+   A band of fixed height rather than a box that fits the image, for two reasons. It reserves
+   its space before the picture has loaded, so the article never jumps down the page as one
+   arrives - an image sized by its own content cannot do that, because its intrinsic size is
+   zero until the bytes are in. And it gives every entry the same rhythm, so a tall portrait
+   and a wide landscape read as the same kind of plate rather than as two different layouts. */
+.entry__plate {
+  margin: 2rem 0 0;
+  height: 22rem;
+  max-height: 55vh;
+}
+
+.entry__plate img {
+  display: block;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  /* Contain, never crop: the dossier is where the author looks at the whole picture. Anchored
+     left, because the plate sits in a left-aligned column of prose. */
+  object-fit: contain;
+  object-position: left center;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+}
+
+.imagefield__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.imagefield__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+/* The real input is replaced by its own label, which is the only way to style a file picker.
+   It stays in the accessibility tree and reachable from the keyboard rather than hidden with
+   display:none, which would take it out of both. */
+.imagefield__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.imagefield__pick {
+  cursor: pointer;
+}
+
+.imagefield__input:focus-visible + .imagefield__pick,
+.imagefield__pick:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.imagefield__input:disabled + .imagefield__pick {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.imagefield__hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
 }
 
 .entry__layout {
@@ -1968,6 +2081,12 @@ a {
   .entry__layout {
     grid-template-columns: 1fr;
     gap: 2rem;
+  }
+
+  /* Shorter, so the picture introduces the article on a phone instead of filling the screen
+     and pushing every word of it below the fold. */
+  .entry__plate {
+    height: 15rem;
   }
 
   .entry__rail {

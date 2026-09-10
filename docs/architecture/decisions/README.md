@@ -22,8 +22,9 @@ One ADR per durable decision. Rationale lives in the ADR, never here.
 | 0016 | Lore is searched by a SQLite FTS5 index the write path keeps in step | [0016-sqlite-full-text-search.md](0016-sqlite-full-text-search.md) |
 | 0017 | Lorex installs as an app shell and caches build output only | [0017-pwa-shell-and-caching.md](0017-pwa-shell-and-caching.md) |
 | 0018 | DEV is one App Service serving both halves, with state on the site's own share | [0018-azure-dev-single-app-service.md](0018-azure-dev-single-app-service.md) |
+| 0019 | An entry has one image, held in a private bucket and served by Lorex | [0019-entity-primary-image.md](0019-entity-primary-image.md) |
 
-All accepted. Next number: `0019`.
+All accepted. Next number: `0020`.
 
 Known limitations are recorded in the ADR that owns them - cross-era ordering in 0009 and
 0011, the `Age` reference year and exclusive-relationship overlap in 0011, what the
@@ -32,4 +33,4 @@ growth in 0013, what a backup is not in 0014, the type that cannot be freed whil
 trashed entry still uses it in 0015, the loss of substring matching in 0016, what an
 installed Lorex does not do offline in 0017, and what the DEV topology costs - one
 writer, an outage on deploy, keys unencrypted at rest and no rollback for the schema -
-in 0018.
+in 0018, and what an entry's image costs a backup and a revision restore in 0019.

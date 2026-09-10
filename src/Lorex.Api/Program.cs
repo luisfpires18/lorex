@@ -4,6 +4,7 @@ using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Export;
 using Lorex.Api.Features.Health;
 using Lorex.Api.Features.Lore;
+using Lorex.Api.Features.Media;
 using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.Timeline;
 using Lorex.Api.Features.Trash;
@@ -21,6 +22,7 @@ builder.Services.AddLorexDatabase(builder.Configuration, builder.Environment);
 builder.Services.AddLorexAuth(builder.Environment);
 builder.Services.AddCanonIntegrity();
 builder.Services.AddLoreSearch();
+builder.Services.AddLorexMedia(builder.Configuration);
 
 var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 if (corsOrigins.Length > 0)
@@ -61,6 +63,7 @@ app.MapAuthEndpoints();
 app.MapUniverseEndpoints();
 app.MapEntityTypeEndpoints();
 app.MapEntityEndpoints();
+app.MapEntityImageEndpoints();
 app.MapEntityRevisionEndpoints();
 app.MapRelationshipTypeEndpoints();
 app.MapRelationshipEndpoints();

@@ -1,4 +1,5 @@
 using Lorex.Api.Data;
+using Lorex.Api.Features.Media;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -20,6 +21,13 @@ public sealed class LorexApiFactory : WebApplicationFactory<Program>
 {
     private readonly SqliteConnection _connection = new("Data Source=:memory:");
 
+    /// <summary>
+    /// The object store this host writes images to. In-process, so no test reaches Cloudflare,
+    /// and inspectable, so a test can assert on the keys that were written rather than only on
+    /// what the API said about them.
+    /// </summary>
+    public TestMediaObjectStore Media { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -31,6 +39,9 @@ public sealed class LorexApiFactory : WebApplicationFactory<Program>
 
             _connection.Open();
             services.AddDbContext<LorexDbContext>(options => options.UseSqlite(_connection));
+
+            services.RemoveAll<IMediaObjectStore>();
+            services.AddSingleton<IMediaObjectStore>(Media);
         });
     }
 

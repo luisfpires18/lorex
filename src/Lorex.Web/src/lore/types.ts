@@ -136,6 +136,26 @@ export interface FieldValue {
   referencedEntityIsTrashed: boolean
 }
 
+/**
+ * The entry's primary image: identity and shape, never a URL.
+ *
+ * The address is composed from these by `entityImageUrl` - the same derivation the API does on
+ * its side - so nothing stored or sent points at Cloudflare, and moving the route means changing
+ * one function rather than every payload ever written.
+ *
+ * `width` and `height` are the original's, and they are what let a picture reserve its space
+ * before a byte of it has arrived.
+ */
+export interface EntityImageRef {
+  assetId: string
+  width: number
+  height: number
+  contentType: string
+  fileName: string | null
+  byteSize: number
+  uploadedAt: string
+}
+
 export interface EntitySummary {
   id: string
   name: string
@@ -148,6 +168,7 @@ export interface EntitySummary {
   entityTypeAccentColor: string | null
   aliases: string[]
   tags: string[]
+  image: EntityImageRef | null
   updatedAt: string
 }
 

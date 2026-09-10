@@ -1,0 +1,161 @@
+# Cloudflare R2 - owner setup
+
+Entry images live in one private R2 bucket. Nothing in this repository creates it: the bucket,
+the API token and the App Service settings are owner steps, exactly like the Azure resources in
+[azure-dev.md](azure-dev.md).
+
+Until the steps below are done, Lorex still runs. Every image route answers
+`503 Image storage is unavailable.` and no entry can be given a picture. Nothing else is
+affected.
+
+**No secret belongs in this repository.** Not in `appsettings*.json`, not in a workflow file,
+not in this document. Every value below is entered in the Cloudflare dashboard, in
+`dotnet user-secrets`, or in App Service configuration.
+
+## What is stored, and where
+
+Two objects per image, under one prefix per asset:
+
+```
+universes/{universeId}/entities/{entityId}/primary/{assetId}/original.{jpg|png|webp}
+universes/{universeId}/entities/{entityId}/primary/{assetId}/thumbnail.webp
+```
+
+Ids only - no username, no email, no world name, no entry name. R2 has no folders; the slashes
+are a key prefix the console happens to draw as a tree. `{assetId}` is new for every upload, so
+nothing is ever written over an image that is still the live one.
+
+Why the bucket is private and stays private: [ADR 0019](../architecture/decisions/0019-entity-primary-image.md).
+
+## 1. Create the bucket
+
+Cloudflare dashboard -> **R2** -> **Create bucket**.
+
+- **Name**: `lorex-media` (any name works; it goes in `Media__R2__Bucket`).
+- **Location**: automatic, or the hint nearest the App Service region.
+- **Public access**: leave **disabled**. Do not connect a custom domain and do not enable the
+  `r2.dev` development URL. Lorex serves every image through its own authenticated route, so a
+  public URL would only be a way around the ownership check.
+- **CORS**: none. The browser never talks to R2 - the API does.
+
+Note the **Account ID** shown on the R2 overview page. The S3 endpoint is
+`https://{AccountId}.r2.cloudflarestorage.com`.
+
+## 2. Create an API token
+
+R2 -> **Manage R2 API Tokens** -> **Create API token**.
+
+- **Permissions**: **Object Read & Write**.
+- **Specify bucket**: the one bucket created above. Not "all buckets".
+- **TTL**: whatever the owner is willing to rotate on.
+
+Cloudflare shows an **Access Key ID** and a **Secret Access Key** once. They are the two
+secrets. Store them in a password manager; they are never committed.
+
+## 3. Configure the application
+
+Four settings, plus the provider switch.
+
+| Key | Value | Secret |
+| --- | --- | --- |
+| `Media:Provider` | `R2` | no |
+| `Media:R2:AccountId` | Cloudflare account id | no |
+| `Media:R2:Bucket` | bucket name | no |
+| `Media:R2:AccessKeyId` | from step 2 | **yes** |
+| `Media:R2:SecretAccessKey` | from step 2 | **yes** |
+
+`Media:R2:ServiceUrl` is optional and overrides the endpoint built from `AccountId`. It exists
+for a jurisdiction-specific endpoint and is normally left unset.
+
+If `Media:Provider` is `R2` but any of bucket, access key or secret is missing, the host starts
+and every image route answers 503. That is deliberate: a deployment that lost its credentials
+must not quietly fall back to storing images somewhere they will disappear.
+
+### Azure App Service
+
+Configuration -> **Environment variables** -> Application settings. Double underscores, because
+that is how App Service maps a name onto a configuration path:
+
+```
+Media__Provider          = R2
+Media__R2__AccountId     = <account id>
+Media__R2__Bucket        = lorex-media
+Media__R2__AccessKeyId   = <access key id>
+Media__R2__SecretAccessKey = <secret access key>
+```
+
+`appsettings.AzureDev.json` already sets `Media:Provider` to `R2`, so in practice only the four
+below it have to be added. Mark the two credentials as slot-independent only if slots are ever
+introduced; today there is one slot.
+
+The setting is **not** in `infra/main.bicep`, and deliberately: putting a secret in a Bicep
+parameter puts it in a deployment history that is readable to anyone with access to the
+resource group.
+
+### Local development
+
+`appsettings.Development.json` sets `Media:Provider` to `InMemory`, so uploads work out of the
+box with no account, no bucket and no credential. Images are held by the running process and
+are lost when it restarts. That is the right default for writing code and for the Playwright
+suite, and it is not a bug.
+
+To exercise the real thing locally, use user secrets - never the committed settings file:
+
+```bash
+dotnet user-secrets --project src/Lorex.Api set "Media:Provider" "R2"
+```
+
+```bash
+dotnet user-secrets --project src/Lorex.Api set "Media:R2:AccountId" "<account id>"
+```
+
+```bash
+dotnet user-secrets --project src/Lorex.Api set "Media:R2:Bucket" "lorex-media"
+```
+
+```bash
+dotnet user-secrets --project src/Lorex.Api set "Media:R2:AccessKeyId" "<access key id>"
+```
+
+```bash
+dotnet user-secrets --project src/Lorex.Api set "Media:R2:SecretAccessKey" "<secret access key>"
+```
+
+Undo it with `dotnet user-secrets --project src/Lorex.Api clear`.
+
+### Tests
+
+Automated tests never reach Cloudflare and cannot be made to. The API test host registers its
+own in-process store, and the Playwright suite runs against the Development configuration above.
+No credential is needed to run either.
+
+## 4. Check it
+
+With the settings in place, sign in, open any entry, and add an image. Then:
+
+- The R2 bucket shows two objects under
+  `universes/.../entities/.../primary/.../`.
+- Replacing the image adds a new `{assetId}` prefix and removes the previous one.
+- Removing the image empties the entry's prefix.
+
+## Costs and limits
+
+R2 charges for stored bytes and for operations, and **not** for egress. Lorex's read path is
+server-mediated, so every image view is one `GetObject`; at one picture per entry, on a
+single-owner product, the class-B operation count is not a figure worth budgeting for.
+
+Uploads are capped at 8 MB and 24 megapixels by the API, so an entry's two objects are bounded.
+
+## Limitations, stated plainly
+
+- **Orphans are swept best-effort, not guaranteed.** If deleting a superseded object fails after
+  the database has committed, the new image stays the entry's image and the old pair is left in
+  the bucket with a warning logged against its key. Nothing retries it. At this scale the cost of
+  an orphan is a few hundred kilobytes; the cost of a retry queue is a subsystem.
+- **A backup does not contain image bytes.** `GET /api/universes/{id}/export` is still one JSON
+  file of authored data, and media is not in it. See ADR 0019 and `STATE.md`; the format is an
+  open owner decision, not an oversight.
+- **Revision history does not track the image.** Restoring an old version of an entry leaves its
+  current picture alone. Also an open owner decision - ADR 0019.
+- **There is no lifecycle rule on the bucket.** Do not add one that expires objects: the database
+  is the only record of which objects are live, and an expiry would silently break entries.
