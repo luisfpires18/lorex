@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type KeyboardEvent } from 'react'
+import { useId, type KeyboardEvent } from 'react'
 import { LayoutGrid } from 'lucide-react'
 import type { EntityType } from '../lore/types'
 import { TypeIcon } from './TypeIcon'
@@ -12,11 +12,11 @@ import { TypeIcon } from './TypeIcon'
  *
  * Buttons with `aria-pressed`, because each one is a switch the author turns on; pressing the one
  * already on turns it off again, back to every type. All of them are in the tab order, and the
- * arrow keys, Home and End also move along the row, which is quicker once a world has many types.
+ * arrow keys, Home and End also move through them in reading order, which is quicker once a world
+ * has many types.
  *
- * The row never wraps. It scrolls sideways when it runs out of room, on a phone and on a desktop
- * with a long list alike, and it keeps the chosen chip in view so a filter that is on is never
- * one the author cannot see.
+ * The chips wrap onto as many rows as the width needs, so every type - and in particular the one
+ * that is on - is always in view, and nothing has to be scrolled to be reached.
  */
 export function TypeFilterBar({
   types,
@@ -28,31 +28,12 @@ export function TypeFilterBar({
   onSelect: (typeId: string | null) => void
 }) {
   const labelId = useId()
-  const row = useRef<HTMLDivElement>(null)
-
-  // Sideways only. `scrollIntoView` would also scroll the page to reach the row, which is not
-  // what choosing a type should ever do.
-  useEffect(() => {
-    const container = row.current
-    const pressed = container?.querySelector<HTMLElement>('[aria-pressed="true"]')
-    if (!container || !pressed) return
-
-    const start = pressed.offsetLeft
-    const end = start + pressed.offsetWidth
-    const margin = 24
-
-    if (start < container.scrollLeft) {
-      container.scrollTo({ left: Math.max(0, start - margin) })
-    } else if (end > container.scrollLeft + container.clientWidth) {
-      container.scrollTo({ left: end - container.clientWidth + margin })
-    }
-  }, [selected, types])
 
   function move(event: KeyboardEvent<HTMLDivElement>) {
     const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End']
-    if (!keys.includes(event.key) || !row.current) return
+    if (!keys.includes(event.key)) return
 
-    const options = [...row.current.querySelectorAll<HTMLButtonElement>('button')]
+    const options = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button')]
     const current = options.indexOf(document.activeElement as HTMLButtonElement)
     if (current === -1) return
 
@@ -77,7 +58,6 @@ export function TypeFilterBar({
 
       <div
         className="typebar__row"
-        ref={row}
         role="group"
         aria-labelledby={labelId}
         onKeyDown={move}

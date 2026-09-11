@@ -870,10 +870,10 @@ a {
 
 /* ---------- Type filter bar ----------
 
-   The Lore browser's types as a row of round-iconed chips. It takes a line of its own under the
-   search, directly above the grid it filters, and never wraps: a world with many types scrolls
-   the row sideways, which keeps the grid where it was rather than pushing it down a line per
-   handful of types. The chosen chip is inked, the way the committed canon mark is, so it reads in
+   The Lore browser's types as round-iconed chips on a line of their own under the search,
+   directly above the grid they filter. They flow left to right and wrap onto as many rows as the
+   width needs, with one gap across and down, so every type is on screen at once and nothing
+   scrolls or clips. The chosen chip is inked, the way the committed canon mark is, so it reads in
    either scheme and without relying on a type's own accent colour. */
 
 .typebar {
@@ -883,36 +883,21 @@ a {
 
 .typebar__label {
   display: block;
-  margin-bottom: 0.2rem;
+  margin-bottom: 0.45rem;
 }
 
 .typebar__row {
-  position: relative;
   display: flex;
-  gap: 0.45rem;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  /* No scroll snapping, deliberately. The bar scrolls the chosen chip fully into view itself, and
-     proximity snapping re-aimed that scroll at the nearest chip start - which could leave the
-     chosen chip clipped at the edge again. */
-  /* Kept, because a mouse with no sideways wheel needs something to drag, but drawn as a hairline
-     in the rule colour rather than as the platform's own grey track. */
-  scrollbar-width: thin;
-  scrollbar-color: var(--rule-strong) transparent;
-  /* Room inside the scroller for the focus ring, which it would otherwise clip. */
-  padding: 0.3rem 0.25rem 0.5rem;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .typebar__row {
-    scroll-behavior: smooth;
-  }
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .typebar__option {
   --type-accent: var(--rule-strong);
 
   flex: none;
+  /* A name longer than the whole row wraps inside its chip rather than pushing the page wider. */
+  max-width: 100%;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -924,7 +909,7 @@ a {
   font: inherit;
   font-size: 0.88rem;
   line-height: 1.2;
-  white-space: nowrap;
+  text-align: left;
   cursor: pointer;
   transition:
     border-color 120ms ease,
@@ -956,6 +941,11 @@ a {
 .typebar__icon svg {
   width: 1rem;
   height: 1rem;
+}
+
+.typebar__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .typebar__option[aria-pressed='true'] {

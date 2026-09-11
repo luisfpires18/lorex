@@ -48,24 +48,23 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     to restore. Setting, replacing and removing each write a version flagged `Image`, and the
     history screen states the limit. ADR 0013, ADR 0019.
 - **Lore visual polish** (`feat/lore-visual-polish`, merged into `dev`). Two owner requests from
-  live testing. Its phone type-bar E2E failed in CI: proximity scroll snapping moved the row off
-  the test's assumed position, and also re-aimed the bar's own keep-in-view scroll so a chosen chip
-  could stay clipped. Snapping removed and the test rebuilt on known row positions
-  (`fix/type-filter-mobile-e2e`, **not merged, not pushed**).
+  live testing. The type bar's sideways scrolling caused a CI failure (`fix/type-filter-mobile-e2e`,
+  merged) and is now replaced by wrapping rows (`fix/type-filter-wrap`, **not merged, not
+  pushed**): no scroller, no keep-in-view logic, no scrolling tests.
   - **A thumbnail may fit the whole picture.** `EntityImage.Framing` is `Crop` or `Fit`; Fit scales
     the upright original inside a transparent square (320, never enlarged) and stores no crop. The
     dialog offers `Crop` | `Fit full image`; switching either way is a reframe and an `Image`
     revision; the original is never touched. Backup carries `image.framing`, still version 3.
     ADR 0019 amendment, ADR 0014.
   - **The Lore type filter is a row of icon chips.** Data-driven from the universe's types,
-    `aria-pressed`, scrolls sideways rather than wrapping. A type's icon is the existing
+    `aria-pressed`, wrapping onto as many rows as the width needs. A type's icon is the existing
     `EntityType.Icon` column, now a key from a closed set the API enforces, chosen on the Types
     screen and never inferred from a name. Starter types keep their seeded keys. New web
     dependency `lucide-react`. ADR 0020.
 
 ## Baseline
 
-- **428 API integration tests, 69 Playwright tests**, green. No frontend unit runner exists;
+- **428 API integration tests, 70 Playwright tests**, green. No frontend unit runner exists;
   the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
