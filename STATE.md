@@ -60,12 +60,16 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     `EntityType.Icon` column, now a key from a closed set the API enforces, chosen on the Types
     screen and never inferred from a name. Starter types keep their seeded keys. New web
     dependency `lucide-react`. ADR 0020.
-  - **The Lore browser fills the desktop** (`fix/lore-desktop-width` merged, then
-    `fix/lore-full-width-actions`, **not merged, not pushed**). The workspace gives only the exact
-    `lore` route `canvas--full` (`max-width: none` inside the usual padding) instead of the 60rem
-    reading width, so the card grid simply gains columns with the room. Entry pages and every other
-    screen keep 60rem; below ~1256px nothing changes. Common Lore and entry actions carry a
+  - **The Lore browser fills the desktop** (`fix/lore-desktop-width` and
+    `fix/lore-full-width-actions`, both merged). The workspace gives only the exact `lore` route
+    `canvas--full` (`max-width: none` inside the usual padding) instead of the 60rem reading width,
+    so the card grid simply gains columns with the room. Common Lore and entry actions carry a
     decorative Lucide icon beside their unchanged label (`ActionIcon`, `.button--icon`).
+  - **Every other screen is centred in the workspace column** (`fix/center-workspace-canvas`,
+    **not merged, not pushed**). `.canvas` keeps its 60rem reading width and gains
+    `margin-inline: auto`, so a wide display splits the unused room either side instead of leaving
+    it all on the right. Below the cap there is no room to share, so phones and tablets are
+    unchanged.
 
 ## Baseline
 

@@ -757,9 +757,16 @@ a {
   color: var(--muted);
 }
 
+/* Every screen but the Lore browser reads at a fixed width, and sits in the middle of the workspace
+   column rather than against its left edge: the room a reading width does not use is split either
+   side of it instead of all falling on the right of a wide display. `width: 100%` keeps the box the
+   column's width before the cap applies, and the auto margins only have space to share once the
+   column is wider than the cap - so on a phone or a tablet nothing moves. */
 .canvas {
+  width: 100%;
   padding: clamp(2rem, 4vw, 3.25rem);
   max-width: 60rem;
+  margin-inline: auto;
 }
 
 /* The Lore browser only. It is an index to scan rather than prose to read, so it fills the
