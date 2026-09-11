@@ -73,19 +73,6 @@ function thirds(name: string) {
   }
 }
 
-/**
- * Three stacked bands, red at the top to blue at the bottom, three times as tall as wide. A square
- * crop of it can only ever show one band; the whole picture shows all three - which is what makes
- * the difference between cropping and fitting impossible to miss.
- */
-function tower(name: string) {
-  return {
-    name,
-    mimeType: 'image/png',
-    buffer: png(200, 600, (_, y) => (y < 200 ? RED : y < 400 ? GREEN : BLUE)),
-  }
-}
-
 /** On a phone the workspace navigation folds into one bar, so a section has to be opened first. */
 async function openSection(page: Page, testId: string, narrow: boolean) {
   if (narrow) await page.getByTestId('workspace-nav-toggle').click()
@@ -105,15 +92,17 @@ async function addPicture(page: Page, file: ReturnType<typeof plain>) {
  * Drags the picture under the square as far as it will go. The cropper keeps the square inside
  * the picture, so an overlong drag lands exactly on the edge - which is what makes it repeatable.
  */
-async function dragPicture(page: Page, direction: 'left' | 'right') {
+async function dragPicture(page: Page, direction: 'left' | 'right' | 'up' | 'down') {
   const stage = page.getByTestId('image-crop-stage')
   const box = (await stage.boundingBox())!
   const x = box.x + box.width / 2
   const y = box.y + box.height / 2
+  const across = direction === 'right' ? 1 : direction === 'left' ? -1 : 0
+  const down = direction === 'down' ? 1 : direction === 'up' ? -1 : 0
 
   await page.mouse.move(x, y)
   await page.mouse.down()
-  await page.mouse.move(x + (direction === 'right' ? 1 : -1) * box.width, y, {
+  await page.mouse.move(x + across * box.width, y + down * box.height, {
     steps: 12,
   })
   await page.mouse.up()
@@ -153,31 +142,18 @@ async function colours(image: Locator, points: Array<[number, number]>) {
 }
 
 /**
- * A fitted tower: the whole picture standing in the middle of the square - red above green above
- * blue down the centre line - with the square either side of it left clear.
+ * The crop square sits wholly on the picture: every edge of the square is on or inside the drawn
+ * image, so nothing but picture can ever be inside it.
  */
-async function expectFittedTower(image: Locator) {
-  const [top, middle, bottom, left, right] = await colours(image, [
-    [0.5, 0.15],
-    [0.5, 0.5],
-    [0.5, 0.85],
-    [0.1, 0.5],
-    [0.9, 0.5],
-  ])
+async function expectSquareCovered(dialog: Locator) {
+  const square = (await dialog.locator('.reactEasyCrop_CropArea').boundingBox())!
+  const picture = (await dialog.locator('.reactEasyCrop_Image').boundingBox())!
 
-  for (const [pixel, expected] of [
-    [top, RED],
-    [middle, GREEN],
-    [bottom, BLUE],
-  ] as const) {
-    for (let channel = 0; channel < 3; channel++) {
-      expect(Math.abs(pixel[channel] - expected[channel])).toBeLessThan(50)
-    }
-    expect(pixel[3]).toBeGreaterThan(200)
-  }
-
-  expect(left[3]).toBeLessThan(30)
-  expect(right[3]).toBeLessThan(30)
+  expect(Math.abs(square.width - square.height)).toBeLessThanOrEqual(1)
+  expect(square.x).toBeGreaterThanOrEqual(picture.x - 1)
+  expect(square.y).toBeGreaterThanOrEqual(picture.y - 1)
+  expect(square.x + square.width).toBeLessThanOrEqual(picture.x + picture.width + 1)
+  expect(square.y + square.height).toBeLessThanOrEqual(picture.y + picture.height + 1)
 }
 
 /** Every sampled pixel is recognisably `expected` - loose, because a thumbnail is lossy WebP. */
@@ -393,6 +369,104 @@ test.describe('an entry with a picture', () => {
     await expectShows(portrait, BLUE)
   })
 
+  test('a thumbnail is one square crop, and the picture always covers the square', async ({
+    page,
+  }) => {
+    await signUp(page)
+    await createUniverse(page)
+
+    const name = unique('Alenna Vance ')
+    await newEntry(page, name)
+
+    await page.getByTestId('entity-image-input').setInputFiles(thirds('bands.png'))
+
+    const dialog = page.getByTestId('image-crop-dialog')
+    await expect(dialog.getByTestId('image-crop-confirm')).toBeEnabled()
+
+    // ---------- One way to frame it ----------
+
+    // A square to place, and nothing to switch to: no mode choice, and no offer to keep the whole
+    // picture instead.
+    await expect(dialog.getByRole('group', { name: 'Thumbnail square' })).toBeVisible()
+    await expect(dialog.getByRole('radio')).toHaveCount(0)
+    await expect(dialog.getByText(/\bfit\b/i)).toHaveCount(0)
+
+    // The square is a square, and the two previews show it square and round.
+    await expectSquareCovered(dialog)
+    const previews = dialog.locator('.cropper__preview')
+    await expect(previews).toHaveCount(2)
+    for (const preview of await previews.all()) {
+      const box = (await preview.boundingBox())!
+      expect(Math.abs(box.width - box.height)).toBeLessThanOrEqual(1)
+    }
+    expect(
+      await previews.nth(1).evaluate((element) => getComputedStyle(element).borderRadius),
+    ).toBe('50%')
+
+    // ---------- Dragged past every edge ----------
+
+    // The picture stops at the square rather than leaving a gap inside it.
+    for (const direction of ['left', 'right'] as const) {
+      await dragPicture(page, direction)
+      await expectSquareCovered(dialog)
+    }
+
+    // Zoomed right in, it moves both ways, and still covers the square wherever it is pushed.
+    const zoom = dialog.getByTestId('image-crop-zoom')
+    await zoom.fill('4')
+    for (const direction of ['up', 'down', 'left', 'right'] as const) {
+      await dragPicture(page, direction)
+      await expectSquareCovered(dialog)
+    }
+
+    // ---------- Zoomed out as far as it goes ----------
+
+    // Zooming out stops where the picture just covers the square: by the slider...
+    await expect(zoom).toHaveAttribute('min', '1')
+    await zoom.focus()
+    await page.keyboard.press('Home')
+    await page.keyboard.press('ArrowLeft')
+    await expect(zoom).toHaveValue('1')
+    await expectSquareCovered(dialog)
+
+    // ...and by the wheel, however far it is turned.
+    await zoom.fill('2')
+    const stage = (await dialog.getByTestId('image-crop-stage').boundingBox())!
+    await page.mouse.move(stage.x + stage.width / 2, stage.y + stage.height / 2)
+    await page.mouse.wheel(0, 4000)
+    await expect(zoom).toHaveValue('1')
+    await expectSquareCovered(dialog)
+
+    // ---------- What is stored ----------
+
+    await dragPicture(page, 'right')
+    await dialog.getByTestId('image-crop-confirm').click()
+    await expect(dialog).toHaveCount(0)
+
+    await page.getByTestId('save-entity').click()
+    await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
+    await page.getByTestId('workspace-lore').click()
+    await page.waitForURL(/\/lore$/)
+
+    // Picture to its very corners: the red band, and not one clear pixel.
+    const portrait = page
+      .locator(`[data-testid="entity-card"][data-entity-name="${name}"]`)
+      .getByTestId('entity-portrait')
+    const corners = await colours(portrait, [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [1, 1],
+      [0.5, 0.5],
+    ])
+    for (const pixel of corners) {
+      expect(pixel[3]).toBe(255)
+      for (let channel = 0; channel < 3; channel++) {
+        expect(Math.abs(pixel[channel] - RED[channel])).toBeLessThan(60)
+      }
+    }
+  })
+
   test('a sideways photo is framed the way it is shown', async ({ page }) => {
     await signUp(page)
     await createUniverse(page)
@@ -476,164 +550,6 @@ test.describe('an entry with a picture', () => {
         .locator(`[data-testid="entity-card"][data-entity-name="${name}"]`)
         .getByTestId('entity-portrait'),
       BLUE,
-    )
-  })
-
-  test('a tall picture is cropped, then fitted whole, without uploading it again', async ({
-    page,
-  }) => {
-    await signUp(page)
-    await createUniverse(page)
-
-    const name = unique('Tidewatch Spire ')
-    await newEntry(page, name)
-
-    // ---------- Cropped, the way every picture starts ----------
-
-    await page.getByTestId('entity-image-input').setInputFiles(tower('tower.png'))
-
-    const dialog = page.getByTestId('image-crop-dialog')
-    await expect(dialog.getByTestId('image-crop-confirm')).toBeEnabled()
-    await expect(dialog.getByRole('radio', { name: 'Crop' })).toBeChecked()
-    await dialog.getByTestId('image-crop-confirm').click()
-    await expect(dialog).toHaveCount(0)
-
-    await page.getByTestId('save-entity').click()
-    await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
-    const original = await page.getByTestId('entry-image').locator('img').getAttribute('src')
-
-    await page.getByTestId('workspace-lore').click()
-    await page.waitForURL(/\/lore$/)
-
-    // The centred square of a tower is its middle band, and nothing of the other two.
-    const card = page.locator(`[data-testid="entity-card"][data-entity-name="${name}"]`)
-    const portrait = card.getByTestId('entity-portrait')
-    await expectShows(portrait, GREEN)
-    const cropped = await portrait.getAttribute('src')
-
-    // ---------- Fitted, from the stored original ----------
-
-    await card.click()
-    await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
-    await page.getByTestId('edit-entity').click()
-
-    const uploads: string[] = []
-    page.on('request', (request) => {
-      if (request.method() === 'PUT' && /\/image$/.test(new URL(request.url()).pathname)) {
-        uploads.push(request.url())
-      }
-    })
-
-    await page.getByTestId('entity-image-reframe').click()
-    await expect(dialog.getByTestId('image-crop-confirm')).toBeEnabled()
-
-    const preview = dialog.getByTestId('image-crop-preview')
-    await expect(preview).toHaveAttribute('data-framing', 'crop')
-    await expect(preview.locator('img')).toHaveAttribute('style', /top: -100%/)
-
-    await dialog.getByText('Fit full image').click()
-    await expect(dialog.getByRole('radio', { name: 'Fit full image' })).toBeChecked()
-
-    // The square cannot be dragged while fitting, there is nothing to zoom, the stage shows the
-    // whole picture in the square, and both previews - square and round - show it too.
-    await expect(dialog.getByTestId('image-fit-stage')).toBeVisible()
-    await expect(dialog.locator('.cropper__crop')).toHaveAttribute('inert', '')
-    await expect(dialog.getByTestId('image-crop-zoom')).toHaveCount(0)
-    await expect(preview).toHaveAttribute('data-framing', 'fit')
-    await expect(dialog.locator('.cropper__preview--round')).toHaveAttribute('data-framing', 'fit')
-    await expect(dialog).toContainText('The original is kept exactly as it is')
-
-    // Back to cropping puts the square back where it was, and the controls with it.
-    await dialog.getByText('Crop', { exact: true }).click()
-    await expect(dialog.getByTestId('image-crop-zoom')).toBeVisible()
-    await expect(dialog.locator('.cropper__crop')).not.toHaveAttribute('inert', '')
-    await expect(preview.locator('img')).toHaveAttribute('style', /top: -100%/)
-
-    await dialog.getByText('Fit full image').click()
-    await dialog.getByTestId('image-crop-confirm').click()
-    await expect(dialog).toHaveCount(0)
-    await expect(page.getByTestId('entity-image-preview')).not.toHaveAttribute('src', cropped!)
-
-    // A new thumbnail, and not one byte of the picture sent again.
-    expect(uploads).toEqual([])
-
-    await page.getByRole('button', { name: 'Cancel' }).click()
-    await expect(page.getByTestId('entry-image').locator('img')).toHaveAttribute('src', original!)
-
-    // ---------- The card shows the whole tower ----------
-
-    await page.getByTestId('workspace-lore').click()
-    await page.waitForURL(/\/lore$/)
-    await expect(portrait).not.toHaveAttribute('src', cropped!)
-    await expectFittedTower(portrait)
-
-    // ---------- And the dialog reopens on the framing it was left in ----------
-
-    await card.click()
-    await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
-    await page.getByTestId('edit-entity').click()
-    await page.getByTestId('entity-image-reframe').click()
-    await expect(dialog.getByRole('radio', { name: 'Fit full image' })).toBeChecked()
-    await expect(dialog.getByTestId('image-fit-stage')).toBeVisible()
-    await dialog.getByTestId('image-crop-cancel').click()
-  })
-
-  test('fitting a whole picture works on a phone', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 })
-
-    await signUp(page)
-    await createUniverse(page)
-
-    const name = unique('Tidewatch Spire ')
-    await newEntry(page, name, true)
-
-    await page.getByTestId('entity-image-input').setInputFiles(tower('tower.png'))
-
-    const dialog = page.getByTestId('image-crop-dialog')
-    await expect(dialog.getByTestId('image-crop-confirm')).toBeEnabled()
-
-    await dialog.getByText('Fit full image').click()
-    await expect(dialog.getByRole('radio', { name: 'Fit full image' })).toBeChecked()
-
-    // The dialog, the choice and both decisions are all on the screen at once.
-    const box = (await dialog.boundingBox())!
-    expect(box.x).toBeGreaterThanOrEqual(0)
-    expect(box.y).toBeGreaterThanOrEqual(0)
-    expect(box.x + box.width).toBeLessThanOrEqual(390)
-    expect(box.y + box.height).toBeLessThanOrEqual(844)
-    await expect(dialog.getByTestId('image-framing')).toBeInViewport()
-    await expect(dialog.getByTestId('image-crop-confirm')).toBeInViewport()
-    await expect(dialog.getByTestId('image-crop-cancel')).toBeInViewport()
-
-    // The fitted square is a square, and it sits inside the stage rather than spilling out of it.
-    const stage = (await dialog.getByTestId('image-crop-stage').boundingBox())!
-    const square = (await dialog.locator('.cropper__fitsquare').boundingBox())!
-    expect(Math.abs(square.width - square.height)).toBeLessThanOrEqual(1)
-    expect(square.x).toBeGreaterThanOrEqual(stage.x)
-    expect(square.y).toBeGreaterThanOrEqual(stage.y)
-    expect(square.x + square.width).toBeLessThanOrEqual(stage.x + stage.width + 0.5)
-    expect(square.y + square.height).toBeLessThanOrEqual(stage.y + stage.height + 0.5)
-
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      ),
-    ).toBeLessThanOrEqual(0)
-
-    await dialog.getByTestId('image-crop-confirm').click()
-    await expect(dialog).toHaveCount(0)
-
-    // Held for the new entry in the framing chosen, and uploaded that way on save.
-    await expect(page.getByTestId('entity-image-preview')).toHaveAttribute('data-framing', 'fit')
-    await page.getByTestId('save-entity').click()
-    await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
-
-    await openSection(page, 'workspace-lore', true)
-    await page.waitForURL(/\/lore$/)
-    await expectFittedTower(
-      page
-        .locator(`[data-testid="entity-card"][data-entity-name="${name}"]`)
-        .getByTestId('entity-portrait'),
     )
   })
 

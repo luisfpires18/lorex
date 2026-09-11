@@ -47,7 +47,6 @@ public static class EntityEndpoints
                     entity.Image.FileName,
                     entity.Image.ByteSize,
                     entity.Image.UploadedAt,
-                    entity.Image.Framing,
                     entity.Image.CropX == null
                         ? null
                         : new EntityImageCrop(
@@ -889,7 +888,6 @@ public static class EntityEndpoints
                         candidate.Image.FileName,
                         candidate.Image.ByteSize,
                         candidate.Image.UploadedAt,
-                        candidate.Image.Framing,
                         candidate.Image.CropX == null
                             ? null
                             : new EntityImageCrop(

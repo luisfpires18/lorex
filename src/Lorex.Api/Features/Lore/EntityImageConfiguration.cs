@@ -26,10 +26,6 @@ public sealed class EntityImageConfiguration : IEntityTypeConfiguration<EntityIm
         builder.Property(image => image.FileName)
             .HasMaxLength(EntityImageLimits.FileNameMaxLength);
 
-        // An integer like every other enum column. The migration that added it fills existing rows
-        // with zero - Crop - which is what those thumbnails are.
-        builder.Property(image => image.Framing).HasConversion<int>();
-
         builder.HasOne(image => image.Entity)
             .WithOne(entity => entity.Image)
             .HasForeignKey<EntityImage>(image => image.EntityId)

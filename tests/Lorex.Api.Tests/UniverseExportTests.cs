@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
@@ -656,52 +655,22 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
         Assert.Equal(320, image.Width);
         Assert.Equal(200, image.Height);
         Assert.True(image.ByteSize > 0);
-        Assert.Equal(EntityImageFraming.Crop, image.Framing);
         Assert.Equal(new BackupImageCrop(0.1875, 0, 0.625, 1), image.Crop);
+
+        // One framing exists, so the document says nothing about which one.
+        Assert.DoesNotContain("\"framing\"", DocumentText(archive), StringComparison.Ordinal);
     }
 
-    [Fact]
-    public async Task A_fitted_picture_is_carried_as_fit_without_a_crop_and_a_reader_can_fit_the_same_thumbnail_again()
+    [Theory]
+    [InlineData("Crop", """{ "x": 0.5, "y": 0, "width": 0.5, "height": 1 }""")]
+    [InlineData("Fit", "null")]
+    public void A_version_3_image_written_while_a_fit_framing_existed_still_reads(string framing, string crop)
     {
-        var (client, universe) = await SignedInWithUniverse("expfit");
-        var character = await CharacterType(client, universe.Id);
-
-        var warden = await Create(client, universe.Id, character, "Alenna Vance", CanonStatus.Canon);
-        var fitted = await Upload(client, universe.Id, warden.Id, Png(300, 900), "portrait.png", EntityImageFraming.Fit);
-
-        var archive = await RawArchive(client, universe.Id);
-        var document = DocumentText(archive);
-        var backup = JsonSerializer.Deserialize<UniverseBackup>(document, UniverseBackupJson.Options)!;
-        var image = backup.Payload.Entities.Single(entity => entity.Id == warden.Id).Image!;
-
-        // The framing is named, not numbered, like every enum in the file - and a fit carries no
-        // square, because it cut none.
-        Assert.Equal(EntityImageFraming.Fit, image.Framing);
-        Assert.Null(image.Crop);
-        Assert.Contains("\"framing\": \"Fit\"", document, StringComparison.Ordinal);
-
-        // Still no thumbnail in the archive: the original and the framing are enough to make it again,
-        // byte for byte.
-        Assert.DoesNotContain(EntryNames(archive), name => name.Contains("thumbnail", StringComparison.OrdinalIgnoreCase));
-
-        var original = EntryBytes(archive, image.MediaPath);
-        using var stream = new MemoryStream(original, writable: false);
-
-        var (regenerated, rejection) = await EntityImageProcessing.PrepareAsync(
-            stream, original.Length, image.Framing, crop: null, CancellationToken.None);
-
-        Assert.Null(rejection);
-        Assert.Equal(
-            _factory.Media.Bytes(
-                $"universes/{universe.Id:D}/entities/{warden.Id:D}/primary/{fitted.AssetId:D}/thumbnail-{fitted.ThumbnailId:D}.webp"),
-            regenerated!.Thumbnail);
-    }
-
-    [Fact]
-    public void A_backup_written_before_framing_modes_still_reads_as_a_crop()
-    {
-        // A version 3 image exactly as it was written before `framing` existed: no member at all.
-        const string Earlier = """
+        // For a short while a version 3 image also carried `framing`: "Crop", or "Fit" with no crop.
+        // The member is gone from the format, and a file that still has it reads exactly like one
+        // that never did - the crop is kept, and a fit has none, so its thumbnail is regenerated as
+        // the centred square.
+        var written = $$"""
             {
               "assetId": "6f1c1d3e-8f51-4a0e-9e0e-0f7cbd0f0a01",
               "fileName": "portrait.png",
@@ -710,14 +679,15 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
               "height": 200,
               "byteSize": 1234,
               "mediaPath": "media/entities/6f1c1d3e-8f51-4a0e-9e0e-0f7cbd0f0a02/original.png",
-              "crop": { "x": 0.5, "y": 0, "width": 0.5, "height": 1 }
+              "framing": "{{framing}}",
+              "crop": {{crop}}
             }
             """;
 
-        var image = JsonSerializer.Deserialize<BackupEntityImage>(Earlier, UniverseBackupJson.Options)!;
+        var image = JsonSerializer.Deserialize<BackupEntityImage>(written, UniverseBackupJson.Options)!;
 
-        Assert.Equal(EntityImageFraming.Crop, image.Framing);
-        Assert.Equal(new BackupImageCrop(0.5, 0, 0.5, 1), image.Crop);
+        Assert.Equal("media/entities/6f1c1d3e-8f51-4a0e-9e0e-0f7cbd0f0a02/original.png", image.MediaPath);
+        Assert.Equal(framing == "Crop" ? new BackupImageCrop(0.5, 0, 0.5, 1) : null, image.Crop);
     }
 
     [Fact]
@@ -778,7 +748,6 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
         var (regenerated, rejection) = await EntityImageProcessing.PrepareAsync(
             stream,
             original.Length,
-            image.Framing,
             new EntityImageCrop(image.Crop!.X, image.Crop.Y, image.Crop.Width, image.Crop.Height),
             CancellationToken.None);
 
@@ -1059,18 +1028,12 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
         Guid universeId,
         Guid entityId,
         byte[] bytes,
-        string fileName,
-        EntityImageFraming? framing = null)
+        string fileName)
     {
         using var form = new MultipartFormDataContent();
         var file = new ByteArrayContent(bytes);
         file.Headers.ContentType = new MediaTypeHeaderValue("image/png");
         form.Add(file, "file", fileName);
-
-        if (framing is { } chosen)
-        {
-            form.Add(new StringContent(((int)chosen).ToString(CultureInfo.InvariantCulture)), "framing");
-        }
 
         var response = await client.PutAsync($"/api/universes/{universeId}/entities/{entityId}/image", form);
         response.EnsureSuccessStatusCode();

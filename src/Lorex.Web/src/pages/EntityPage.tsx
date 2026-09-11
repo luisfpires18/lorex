@@ -199,7 +199,7 @@ export default function EntityPage() {
       let image = saved.image
       if (isNew && pendingImage) {
         try {
-          image = await setEntityImage(universe.id, saved.id, pendingImage.file, pendingImage)
+          image = await setEntityImage(universe.id, saved.id, pendingImage.file, pendingImage.crop)
           setPendingImage(null)
         } catch (failure: unknown) {
           setMessage(

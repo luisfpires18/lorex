@@ -874,7 +874,6 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         var source = Png(Halves(400, 200));
         var stored = await Uploaded(client, universe.Id, entry.Id, source, "halves.png", RightSquare);
 
-        Assert.Equal(EntityImageFraming.Crop, stored.Framing);
         Assert.Equal(RightSquare, stored.Crop);
         Assert.Equal(400, stored.Width);
         Assert.Equal(200, stored.Height);
@@ -892,6 +891,90 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
 
         // And the choice travels with the entry, so the cropper can reopen where it was left.
         Assert.Equal(RightSquare, (await Detail(client, universe.Id, entry.Id)).Image!.Crop);
+    }
+
+    [Theory]
+    [InlineData(640, 320)]
+    [InlineData(300, 900)]
+    [InlineData(120, 80)]
+    public async Task A_thumbnail_is_picture_edge_to_edge_with_no_empty_space(int width, int height)
+    {
+        var (client, universe, type) = await World($"imgcover{width}x{height}");
+        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
+
+        // An opaque picture in, so any transparent or letterboxed pixel out would be the thumbnail's
+        // own doing. Wide, tall and smaller than the target: the square is cut from inside the
+        // picture every time, never padded out to fill it.
+        var stored = await Uploaded(client, universe.Id, entry.Id, Png(width, height), "shape.png");
+
+        using var thumbnail = Image.Load<Rgba32>(_factory.Media.Bytes(ThumbnailKey(universe.Id, entry.Id, stored)));
+
+        var edge = Math.Min(320, Math.Min(width, height));
+        Assert.Equal(edge, thumbnail.Width);
+        Assert.Equal(edge, thumbnail.Height);
+
+        var clear = 0;
+        thumbnail.ProcessPixelRows(accessor =>
+        {
+            for (var y = 0; y < accessor.Height; y++)
+            {
+                foreach (var pixel in accessor.GetRowSpan(y))
+                {
+                    if (pixel.A != 255)
+                    {
+                        clear++;
+                    }
+                }
+            }
+        });
+
+        Assert.Equal(0, clear);
+    }
+
+    [Fact]
+    public async Task A_framing_mode_sent_by_an_older_client_is_ignored_and_the_thumbnail_is_still_a_square_crop()
+    {
+        var (client, universe, type) = await World("imgstaleclient");
+        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
+
+        // A client from before "Fit full image" was withdrawn still sends `framing` beside the crop,
+        // here asking for the fit. There is only a square crop now: the field is not read, the crop
+        // is, and nothing is refused for carrying it.
+        using var form = new MultipartFormDataContent();
+        var file = new ByteArrayContent(Png(Halves(400, 200)));
+        file.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        form.Add(file, "file", "halves.png");
+        form.Add(new StringContent("1"), "framing");
+        form.Add(new StringContent(CropJson(RightSquare)), "crop");
+
+        var upload = await client.PutAsync(ImageRoute(universe.Id, entry.Id), form);
+        Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
+        var stored = (await upload.Content.ReadFromJsonAsync<EntityImageRef>())!;
+
+        Assert.Equal(RightSquare, stored.Crop);
+        using (var thumbnail = Image.Load<Rgba32>(_factory.Media.Bytes(ThumbnailKey(universe.Id, entry.Id, stored))))
+        {
+            AssertEverywhere(thumbnail, IsBlue);
+        }
+
+        // The same on a reframing: a crop beside the old mode is applied as the crop it is...
+        var reframe = await client.PutAsJsonAsync(
+            $"{ImageRoute(universe.Id, entry.Id)}/thumbnail",
+            new { assetId = stored.AssetId, crop = LeftSquare, framing = 1 });
+        Assert.Equal(HttpStatusCode.OK, reframe.StatusCode);
+        var reframed = (await reframe.Content.ReadFromJsonAsync<EntityImageRef>())!;
+
+        using (var thumbnail = Image.Load<Rgba32>(_factory.Media.Bytes(ThumbnailKey(universe.Id, entry.Id, reframed))))
+        {
+            AssertEverywhere(thumbnail, IsRed);
+        }
+
+        // ...and the old way of asking for a fit - the mode with no crop - is simply a reframing
+        // without a square, refused as one, with the thumbnail left as it was.
+        await AssertCropRefused(await client.PutAsJsonAsync(
+            $"{ImageRoute(universe.Id, entry.Id)}/thumbnail",
+            new { assetId = stored.AssetId, crop = (EntityImageCrop?)null, framing = 1 }));
+        Assert.Equal(reframed.ThumbnailId, (await Detail(client, universe.Id, entry.Id)).Image!.ThumbnailId);
     }
 
     [Fact]
@@ -1187,265 +1270,6 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    // ---------- Fitting the whole picture ----------
-
-    [Fact]
-    public async Task A_fitted_thumbnail_keeps_the_whole_picture_inside_the_square()
-    {
-        var (client, universe, type) = await World("imgfit");
-        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
-
-        // Red left, blue right, twice as wide as tall. Any square cut from it loses one colour or
-        // the edges of both; the whole picture has both, edge to edge.
-        var source = Png(Halves(640, 320));
-        var stored = await Uploaded(client, universe.Id, entry.Id, source, "halves.png", framing: "1");
-
-        Assert.Equal(EntityImageFraming.Fit, stored.Framing);
-        Assert.Null(stored.Crop);
-        Assert.Equal(640, stored.Width);
-        Assert.Equal(320, stored.Height);
-
-        using (var thumbnail = Image.Load<Rgba32>(_factory.Media.Bytes(ThumbnailKey(universe.Id, entry.Id, stored))))
-        {
-            // Still the portrait square.
-            Assert.Equal(320, thumbnail.Width);
-            Assert.Equal(320, thumbnail.Height);
-
-            // Both far edges of the picture made it in.
-            Assert.True(IsRed(At(thumbnail, 0.02, 0.5)));
-            Assert.True(IsBlue(At(thumbnail, 0.98, 0.5)));
-
-            // The picture sits in a band across the middle: 320 by 160, centred, with the square
-            // above and below it left clear rather than painted.
-            Assert.Equal(new Rectangle(0, 80, 320, 160), OpaqueBounds(thumbnail));
-            Assert.True(IsClear(At(thumbnail, 0.5, 0.02)));
-            Assert.True(IsClear(At(thumbnail, 0.5, 0.98)));
-        }
-
-        // The original is the file that was uploaded, exactly.
-        Assert.Equal(source, _factory.Media.Bytes(Key(universe.Id, entry.Id, stored.AssetId, "original.png")));
-
-        // And the choice travels with the entry, on the page and on the card.
-        var detail = await Detail(client, universe.Id, entry.Id);
-        Assert.Equal(EntityImageFraming.Fit, detail.Image!.Framing);
-        Assert.Null(detail.Image.Crop);
-
-        var card = Assert.Single((await Page(client, universe.Id)).Items, item => item.Id == entry.Id);
-        Assert.Equal(EntityImageFraming.Fit, card.Image!.Framing);
-    }
-
-    [Theory]
-    [InlineData(640, 320, 320, 320, 160)]
-    [InlineData(300, 900, 320, 107, 320)]
-    [InlineData(1000, 333, 320, 320, 107)]
-    [InlineData(500, 500, 320, 320, 320)]
-    [InlineData(120, 80, 120, 120, 80)]
-    public async Task A_fitted_thumbnail_is_never_stretched_and_never_enlarged(
-        int width,
-        int height,
-        int edge,
-        int fittedWidth,
-        int fittedHeight)
-    {
-        var (client, universe, type) = await World($"imgfitshape{width}x{height}");
-        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
-
-        var stored = await Uploaded(client, universe.Id, entry.Id, Png(width, height), "shape.png", framing: "Fit");
-
-        using var thumbnail = Image.Load<Rgba32>(_factory.Media.Bytes(ThumbnailKey(universe.Id, entry.Id, stored)));
-
-        // The square is the portrait size, or the picture's own longer side when that is smaller -
-        // a small picture is not blown up to fill it.
-        Assert.Equal(edge, thumbnail.Width);
-        Assert.Equal(edge, thumbnail.Height);
-
-        // The picture inside keeps its proportion to the pixel, and sits in the middle.
-        var bounds = OpaqueBounds(thumbnail);
-        Assert.Equal(fittedWidth, bounds.Width);
-        Assert.Equal(fittedHeight, bounds.Height);
-        Assert.Equal((edge - fittedWidth) / 2, bounds.X);
-        Assert.Equal((edge - fittedHeight) / 2, bounds.Y);
-        // The longer side is the edge exactly; the shorter is the same scale, off by at most the
-        // half pixel rounding can move it.
-        var shorterError = width >= height
-            ? Math.Abs(bounds.Height - ((double)bounds.Width * height / width))
-            : Math.Abs(bounds.Width - ((double)bounds.Height * width / height));
-        Assert.True(shorterError <= 0.5, $"The shorter side is {shorterError} pixels off its proportion.");
-
-        Assert.Equal((fittedWidth, fittedHeight), EntityImageProcessing.FitInside(width, height, edge));
-    }
-
-    [Fact]
-    public async Task A_fitted_thumbnail_ignores_a_crop_sent_beside_it()
-    {
-        var (client, universe, type) = await World("imgfitcrop");
-        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
-
-        // A square that would be all red, and one that is not a square at all. Fit cuts nothing, so
-        // neither is applied, neither is checked, and neither is stored.
-        var stored = await Uploaded(client, universe.Id, entry.Id, Png(Halves(640, 320)), "halves.png", LeftSquare, framing: "fit");
-
-        Assert.Equal(EntityImageFraming.Fit, stored.Framing);
-        Assert.Null(stored.Crop);
-
-        using (var thumbnail = Image.Load<Rgba32>(_factory.Media.Bytes(ThumbnailKey(universe.Id, entry.Id, stored))))
-        {
-            Assert.True(IsRed(At(thumbnail, 0.02, 0.5)));
-            Assert.True(IsBlue(At(thumbnail, 0.98, 0.5)));
-        }
-
-        var reframed = await Reframed(
-            client, universe.Id, entry.Id, stored.AssetId, new EntityImageCrop(0, 0, 0.25, 0.25), EntityImageFraming.Fit);
-
-        Assert.Equal(EntityImageFraming.Fit, reframed.Framing);
-        Assert.Null(reframed.Crop);
-
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<LorexDbContext>();
-        var row = await db.EntityImages.AsNoTracking().SingleAsync(image => image.EntityId == entry.Id);
-
-        Assert.Equal(EntityImageFraming.Fit, row.Framing);
-        Assert.Null(row.CropX);
-        Assert.Null(row.CropY);
-        Assert.Null(row.CropWidth);
-        Assert.Null(row.CropHeight);
-    }
-
-    [Theory]
-    [InlineData("word", "sideways")]
-    [InlineData("number", "2")]
-    [InlineData("negative", "-1")]
-    [InlineData("decimal", "1.0")]
-    [InlineData("pair", "Crop,Fit")]
-    public async Task A_framing_that_is_neither_crop_nor_fit_is_refused_and_nothing_is_stored(string tag, string framing)
-    {
-        var (client, universe, type) = await World($"imgbadframing{tag}");
-        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
-
-        var response = await Upload(client, universe.Id, entry.Id, Png(Halves(400, 200)), "halves.png", framing: framing);
-
-        await AssertRefused(response, "framing");
-        Assert.False(await HasImage(entry.Id));
-        Assert.DoesNotContain(_factory.Media.Keys, key => key.Contains(entry.Id.ToString("D"), StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public async Task A_reframing_with_an_unknown_framing_is_refused_before_anything_is_written()
-    {
-        var (client, universe, type) = await World("imgreframebadframing");
-        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
-        var stored = await Uploaded(client, universe.Id, entry.Id, Png(Halves(400, 200)), "halves.png", LeftSquare);
-
-        await AssertRefused(
-            await Reframe(client, universe.Id, entry.Id, stored.AssetId, LeftSquare, (EntityImageFraming)7),
-            "framing");
-
-        Assert.Equal(stored.ThumbnailId, (await Detail(client, universe.Id, entry.Id)).Image!.ThumbnailId);
-        Assert.Equal(
-            2,
-            _factory.Media.Keys.Count(key => key.Contains(entry.Id.ToString("D"), StringComparison.Ordinal)));
-    }
-
-    [Fact]
-    public async Task Switching_between_crop_and_fit_makes_a_new_thumbnail_each_way_and_never_touches_the_original()
-    {
-        var (client, universe, type) = await World("imgswitch");
-        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
-
-        var source = Png(Halves(640, 320));
-        var cropped = await Uploaded(client, universe.Id, entry.Id, source, "halves.png", LeftSquare);
-        var originalKey = Key(universe.Id, entry.Id, cropped.AssetId, "original.png");
-        var history = await History(client, universe.Id, entry.Id);
-
-        // ---------- Crop to fit ----------
-
-        var fitted = await Reframed(client, universe.Id, entry.Id, cropped.AssetId, crop: null, EntityImageFraming.Fit);
-
-        Assert.Equal(cropped.AssetId, fitted.AssetId);
-        Assert.NotEqual(cropped.ThumbnailId, fitted.ThumbnailId);
-        Assert.Equal(EntityImageFraming.Fit, fitted.Framing);
-        Assert.Null(fitted.Crop);
-
-        using (var thumbnail = Image.Load<Rgba32>(_factory.Media.Bytes(ThumbnailKey(universe.Id, entry.Id, fitted))))
-        {
-            Assert.Equal(new Rectangle(0, 80, 320, 160), OpaqueBounds(thumbnail));
-            Assert.True(IsRed(At(thumbnail, 0.02, 0.5)));
-            Assert.True(IsBlue(At(thumbnail, 0.98, 0.5)));
-        }
-
-        Assert.False(_factory.Media.Contains(ThumbnailKey(universe.Id, entry.Id, cropped)));
-
-        // ---------- Fit back to crop ----------
-
-        var recropped = await Reframed(client, universe.Id, entry.Id, cropped.AssetId, RightSquare, EntityImageFraming.Crop);
-
-        Assert.NotEqual(fitted.ThumbnailId, recropped.ThumbnailId);
-        Assert.Equal(EntityImageFraming.Crop, recropped.Framing);
-        Assert.Equal(RightSquare, recropped.Crop);
-
-        using (var thumbnail = Image.Load<Rgba32>(_factory.Media.Bytes(ThumbnailKey(universe.Id, entry.Id, recropped))))
-        {
-            Assert.Equal(320, thumbnail.Width);
-            AssertEverywhere(thumbnail, IsBlue);
-        }
-
-        Assert.False(_factory.Media.Contains(ThumbnailKey(universe.Id, entry.Id, fitted)));
-        Assert.Equal(
-            HttpStatusCode.NotFound,
-            (await client.GetAsync(ThumbnailUrl(universe.Id, entry.Id, fitted))).StatusCode);
-
-        // The same original all the way through: same key, same bytes, still served, and still only
-        // two objects for the entry.
-        Assert.Equal(source, _factory.Media.Bytes(originalKey));
-        var original = await client.GetAsync(OriginalUrl(universe.Id, entry.Id, cropped.AssetId));
-        Assert.Equal(source, await original.Content.ReadAsByteArrayAsync());
-        Assert.Equal(
-            2,
-            _factory.Media.Keys.Count(key => key.Contains(entry.Id.ToString("D"), StringComparison.Ordinal)));
-
-        using (var scope = _factory.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<LorexDbContext>();
-            Assert.Equal(originalKey, (await db.EntityImages.AsNoTracking().SingleAsync(image => image.EntityId == entry.Id)).OriginalKey);
-        }
-
-        // Each switch changed what the card shows, so each is a version flagged as the image.
-        var after = await History(client, universe.Id, entry.Id);
-        Assert.Equal(history.Count + 2, after.Count);
-        Assert.Equal(EntityRevisionChange.Image, after[0].Changes);
-        Assert.Equal(EntityRevisionChange.Image, after[1].Changes);
-    }
-
-    [Fact]
-    public async Task A_picture_stored_before_framing_modes_is_a_centred_crop_and_can_be_fitted()
-    {
-        var (client, universe, type) = await World("imglegacyframing");
-        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
-        var stored = await Uploaded(client, universe.Id, entry.Id, Png(Halves(640, 320)), "halves.png");
-
-        // What a row written before either framing column looks like after both migrations: the
-        // mode is its zero default and no square was ever recorded.
-        using (var scope = _factory.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<LorexDbContext>();
-            await db.EntityImages
-                .Where(image => image.EntityId == entry.Id)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(image => image.Framing, default(EntityImageFraming))
-                    .SetProperty(image => image.CropX, (double?)null)
-                    .SetProperty(image => image.CropY, (double?)null)
-                    .SetProperty(image => image.CropWidth, (double?)null)
-                    .SetProperty(image => image.CropHeight, (double?)null));
-        }
-
-        var legacy = (await Detail(client, universe.Id, entry.Id)).Image!;
-        Assert.Equal(EntityImageFraming.Crop, legacy.Framing);
-        Assert.Null(legacy.Crop);
-
-        var fitted = await Reframed(client, universe.Id, entry.Id, stored.AssetId, crop: null, EntityImageFraming.Fit);
-        Assert.Equal(EntityImageFraming.Fit, fitted.Framing);
-    }
-
     // ---------- Routes ----------
 
     private static string ImageRoute(Guid universeId, Guid entityId) =>
@@ -1472,18 +1296,12 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         byte[] bytes,
         string fileName,
         string contentType = "image/png",
-        string? crop = null,
-        string? framing = null)
+        string? crop = null)
     {
         using var form = new MultipartFormDataContent();
         var file = new ByteArrayContent(bytes);
         file.Headers.ContentType = new MediaTypeHeaderValue(contentType);
         form.Add(file, "file", fileName);
-
-        if (framing is not null)
-        {
-            form.Add(new StringContent(framing), "framing");
-        }
 
         if (crop is not null)
         {
@@ -1499,8 +1317,7 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         Guid entityId,
         byte[] bytes,
         string fileName,
-        EntityImageCrop? crop = null,
-        string? framing = null)
+        EntityImageCrop? crop = null)
     {
         var contentType = Path.GetExtension(fileName) switch
         {
@@ -1510,7 +1327,7 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         };
 
         var response = await Upload(
-            client, universeId, entityId, bytes, fileName, contentType, crop is null ? null : CropJson(crop), framing);
+            client, universeId, entityId, bytes, fileName, contentType, crop is null ? null : CropJson(crop));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EntityImageRef>())!;
     }
@@ -1520,21 +1337,17 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         Guid universeId,
         Guid entityId,
         Guid assetId,
-        EntityImageCrop? crop,
-        EntityImageFraming? framing = null) =>
-        client.PutAsJsonAsync(
-            $"{ImageRoute(universeId, entityId)}/thumbnail",
-            new EntityThumbnailRequest(assetId, crop, framing));
+        EntityImageCrop? crop) =>
+        client.PutAsJsonAsync($"{ImageRoute(universeId, entityId)}/thumbnail", new EntityThumbnailRequest(assetId, crop));
 
     private static async Task<EntityImageRef> Reframed(
         HttpClient client,
         Guid universeId,
         Guid entityId,
         Guid assetId,
-        EntityImageCrop? crop,
-        EntityImageFraming? framing = null)
+        EntityImageCrop crop)
     {
-        var response = await Reframe(client, universeId, entityId, assetId, crop, framing);
+        var response = await Reframe(client, universeId, entityId, assetId, crop);
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EntityImageRef>())!;
     }
@@ -1567,14 +1380,12 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         Assert.DoesNotContain("universes/", body, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static Task AssertCropRefused(HttpResponseMessage response) => AssertRefused(response, "crop");
-
-    private static async Task AssertRefused(HttpResponseMessage response, string field)
+    private static async Task AssertCropRefused(HttpResponseMessage response)
     {
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        Assert.True(problem.RootElement.GetProperty("errors").TryGetProperty(field, out _));
+        Assert.True(problem.RootElement.GetProperty("errors").TryGetProperty("crop", out _));
     }
 
     private static async Task<string?> ProblemCode(HttpResponseMessage response)
@@ -1737,37 +1548,6 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
     private static bool IsRed(Rgba32 pixel) => pixel.R > 160 && pixel.G < 90 && pixel.B < 90;
 
     private static bool IsBlue(Rgba32 pixel) => pixel.B > 160 && pixel.R < 90 && pixel.G < 90;
-
-    private static bool IsClear(Rgba32 pixel) => pixel.A < 16;
-
-    /// <summary>
-    /// The smallest rectangle holding every pixel that is more opaque than not - in a fitted
-    /// thumbnail, exactly where the picture was drawn.
-    /// </summary>
-    private static Rectangle OpaqueBounds(Image<Rgba32> image)
-    {
-        int left = image.Width, top = image.Height, right = -1, bottom = -1;
-
-        image.ProcessPixelRows(accessor =>
-        {
-            for (var y = 0; y < accessor.Height; y++)
-            {
-                var row = accessor.GetRowSpan(y);
-                for (var x = 0; x < row.Length; x++)
-                {
-                    if (row[x].A > 127)
-                    {
-                        left = Math.Min(left, x);
-                        right = Math.Max(right, x);
-                        top = Math.Min(top, y);
-                        bottom = Math.Max(bottom, y);
-                    }
-                }
-            }
-        });
-
-        return right < 0 ? Rectangle.Empty : new Rectangle(left, top, right - left + 1, bottom - top + 1);
-    }
 
     /// <summary>Corners, edges and middle - a crop that strayed across the seam shows up at one of them.</summary>
     private static void AssertEverywhere(Image<Rgba32> image, Func<Rgba32, bool> expected)
