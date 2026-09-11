@@ -757,25 +757,12 @@ a {
   color: var(--muted);
 }
 
-/* Every screen but the Lore browser reads at a fixed width, and sits in the middle of the workspace
-   column rather than against its left edge: the room a reading width does not use is split either
-   side of it instead of all falling on the right of a wide display. `width: 100%` keeps the box the
-   column's width before the cap applies, and the auto margins only have space to share once the
-   column is wider than the cap - so on a phone or a tablet nothing moves. */
+/* One box for every screen in the workspace, filling the column the rail and the sidebar leave,
+   inside its own padding. Nothing is capped here: a page that wants a reading measure sets one on
+   the thing that needs it - an article, a summary, a settings section - which keeps prose readable
+   without leaving half of a wide display empty. */
 .canvas {
-  width: 100%;
   padding: clamp(2rem, 4vw, 3.25rem);
-  max-width: 60rem;
-  margin-inline: auto;
-}
-
-/* The Lore browser only. It is an index to scan rather than prose to read, so it fills the
-   workspace column, inside the same padding. Its card grid gains a column for every 18rem or so,
-   so cards never grow past what one more column would take back. Heading, search, type chips and
-   grid all live inside this one box and share its edges. Below about 1256px the column is narrower
-   than the reading width anyway, which is why phones and tablets are unaffected. */
-.canvas--full {
-  max-width: none;
 }
 
 /* ---------- Overview ---------- */
@@ -1599,7 +1586,11 @@ a {
 
 /* ---------- Tiptap ---------- */
 
+/* The box hugs the measure its text is set to - the 62ch below, plus the surface's own padding -
+   rather than drawing a metre of empty panel around a narrow column of prose now that the canvas
+   fills the workspace. Below that width there is nothing to cap, so a phone is unaffected. */
 .editor {
+  max-width: calc(62ch + 2.5rem);
   border: 1px solid var(--rule-strong);
   background: var(--surface);
 }
