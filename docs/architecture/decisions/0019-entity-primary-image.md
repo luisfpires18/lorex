@@ -3,7 +3,7 @@
 Status: accepted (2026-09-10). The two decisions it left open were taken the same day; see Consequences.
 Amended 2026-09-11 after live DEV testing: the author chooses the thumbnail's square, and R2 uploads need two
 per-request SDK flags. See "Amendment: owner-framed thumbnails and R2 uploads". Amended again the same day:
-a thumbnail may fit the whole picture instead of cropping it. See "Amendment: fitting the whole picture".
+a "Fit full image" thumbnail mode was added and withdrawn. See the last amendment.
 
 ## Context
 
@@ -247,42 +247,24 @@ adapter as `MediaStorageFailedException`, and every image route and the export a
 same 503 problem the unconfigured store already produced. The provider's message is logged, never
 returned. A write that fails part-way sweeps what it may have written.
 
-## Amendment: fitting the whole picture (2026-09-11)
+## Amendment: Fit full image, tried and withdrawn (2026-09-11)
 
-Live testing showed that a square crop is the wrong thumbnail for a picture whose point is its whole
-shape - a tall banner, a map, a full-length figure. The original decision chose crop over fit to keep
-grey bars off the grid; that still holds as the default, and fit is now the author's alternative.
+For a day a thumbnail could also fit the whole picture inside the square, letterboxed on a transparent
+margin, chosen with a `Crop` | `Fit full image` switch and recorded as `EntityImage.Framing`. On cards
+it only produced empty space around a small picture, so it was withdrawn and the decision above - crop,
+not fit - stands without an alternative. A thumbnail is one square crop, chosen in the cropper, always
+covered by the picture: zoom stops where the picture just covers the square, and the square cannot be
+moved off it. The original is untouched, and "Edit thumbnail" recrops from it exactly as described in
+the previous amendment.
 
-**Two framings, one explicit mode.** `EntityImage.Framing` is `Crop` (0) or `Fit` (1), an integer
-column like every other enum. `Crop` is everything above: the author's square, or the centred square
-when none was recorded. `Fit` keeps the whole picture: the upright original is scaled so its longer
-side meets the square's edge and its shorter side keeps the proportion, rounded to the nearest pixel,
-then drawn centred on a transparent square. Nothing is cut off and nothing is stretched.
+**Nothing was kept for it.** Migration `RemoveEntityImageFramingMode` drops the column, and the mode
+is gone from the contracts, the processing and the client; no code path can make a fitted thumbnail.
+Every row stays valid: a cropped picture keeps its square, and one that was fitted has no crop, which
+means the centred square - what "Edit thumbnail" opens on and what a backup regenerates. The one thing
+a migration cannot reach is the bucket, so a thumbnail that was fitted keeps showing the whole picture
+until its author crops it again.
 
-**Still 320 square, still WebP, still never enlarged.** The square's edge is 320, or the original's
-longer side when that is smaller, by the same rule a crop follows; a fitted picture is then drawn at
-its own resolution. Deterministic in the same way: size and offset come only from the dimensions, and
-the sampler and encoder are fixed.
-
-**Transparent, not painted.** The empty part of the square is an alpha plane in the WebP. A card draws
-the thumbnail on its own surface, so the margin takes that surface's colour in a light or a dark scheme
-alike; a baked-in neutral would be right in at most one. Lossy WebP carries alpha losslessly, so the
-picture's edges are exact.
-
-**A fit carries no crop.** The four crop columns are null for `Fit`, and a crop sent beside `Fit` is
-ignored rather than checked or stored. `Crop` with a null crop keeps meaning the centred square.
-Existing rows needed no backfill: migration `AddEntityImageFramingMode` adds the column with 0, and
-every picture stored before it is a crop - of a recorded square or of the centred one.
-
-**Chosen in the same dialog, sent the same way.** The framing dialog opens with a `Crop` | `Fit full
-image` choice (native radio buttons). Fitting shows the whole picture inside the square and in the
-square and round previews, and makes the cropper inert without unmounting it, so switching back
-restores the square and zoom exactly. The upload form carries a `framing` field beside `crop`;
-`PUT .../image/thumbnail` carries `framing` beside `assetId` and `crop`. Absent means `Crop`, so every
-earlier client still means what it meant. Anything but the two modes is a validation problem on
-`framing`.
-
-**Switching is reframing.** Crop to fit and fit to crop go through the reframe route and its ordering
-unchanged: a new thumbnail id, the conditional move, an `Image` revision in the same transaction, and
-the old thumbnail swept only after the commit. The original's key and bytes are never touched. A
-backup carries `image.framing` by name, and `image.crop` only for `Crop` (ADR 0014).
+**Old requests and old backups still read.** A client from that day that sends `framing` has the field
+ignored and its crop applied; a reframing that asked for a fit had no crop, and is refused as any
+reframing without a square is. A version 3 backup written that day may carry `image.framing`; readers
+ignore the member (ADR 0014), so it needs no version bump.

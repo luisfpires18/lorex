@@ -158,25 +158,25 @@ public sealed record BackupEntity(
 /// two backups of the same world.
 ///
 /// The thumbnail's bytes are deliberately absent. It is derived - the square in
-/// <paramref name="Crop"/> cut from the original, or the whole original fitted inside a square,
-/// scaled to a fixed size in a fixed format - so an importer regenerates it rather than carrying a
-/// second copy of every picture that would have to be trusted to match. What is carried is the one
-/// part that is not derivable: how the author framed it. See ADR 0019.
+/// <paramref name="Crop"/>, cut from the original and scaled to a fixed size in a fixed format -
+/// so an importer regenerates it rather than carrying a second copy of every picture that would
+/// have to be trusted to match. What is carried is the one part that is not derivable: which
+/// square the author chose. See ADR 0019.
 ///
 /// <paramref name="Width"/> and <paramref name="Height"/> are the picture as displayed, the frame
 /// <paramref name="Crop"/>'s fractions are measured against.
 ///
-/// <paramref name="Framing"/> is how the thumbnail is made: <c>Crop</c>, a square of the original,
-/// or <c>Fit</c>, the whole original inside the square. <paramref name="Crop"/> is carried only for
-/// <c>Crop</c>, where it is the square the author chose; it is null for <c>Fit</c>, which cuts
-/// nothing. The two together, with the original, are everything a reader needs to regenerate the
-/// thumbnail - see <see cref="BackupImageCrop"/> for both recipes.
+/// Adding <paramref name="Crop"/> is not a version bump, by the rule on
+/// <see cref="UniverseBackup.CurrentVersion"/>: it is nullable, and a reader that ignores it
+/// still restores every picture whole - it only loses the framing, and falls back to the centred
+/// square every thumbnail had before an author could choose.
 ///
-/// Neither addition is a version bump, by the rule on <see cref="UniverseBackup.CurrentVersion"/>.
-/// A reader that ignores both still restores every picture whole and only loses the framing,
-/// falling back to the centred square every thumbnail had before an author could choose. A file
-/// written before <paramref name="Framing"/> existed has no member at all, which reads as
-/// <c>Crop</c> - exactly what every thumbnail in such a file was.
+/// For a short while (2026-09-11) a thumbnail could also fit the whole picture instead of cropping
+/// it, and version 3 files written then carry a <c>framing</c> member - <c>"Crop"</c>, or
+/// <c>"Fit"</c> with a null crop. That mode was withdrawn and the member is not part of the format:
+/// a reader ignores it, so such a file reads exactly like any other version 3 file, and a fitted
+/// picture's thumbnail is regenerated as the centred square. Nothing it held is lost: the original
+/// is in the archive, and a chosen crop is still in <paramref name="Crop"/>.
 /// </summary>
 public sealed record BackupEntityImage(
     Guid AssetId,
@@ -186,26 +186,16 @@ public sealed record BackupEntityImage(
     int Height,
     long ByteSize,
     string MediaPath,
-    EntityImageFraming Framing,
     BackupImageCrop? Crop);
 
 /// <summary>
 /// The square the entry's thumbnail is cut from, as fractions of the displayed original: X and
 /// Width of its width, Y and Height of its height, from the top-left corner.
 ///
-/// To regenerate a thumbnail, first orient the original as a browser displays it (EXIF orientation
-/// applied for JPEG and PNG, ignored for WebP). Then, by the image's framing:
-///
-/// <list type="bullet">
-/// <item><c>Crop</c>: round each edge of this square to the nearest pixel, cut that square, and
-/// scale it to at most 320 pixels square. A null crop means the picture predates framing and its
-/// thumbnail is the largest centred square.</item>
-/// <item><c>Fit</c>: take a transparent square whose edge is 320 pixels, or the original's longer
-/// side if that is smaller; scale the original so its longer side is that edge and its shorter side
-/// keeps the proportion, rounded to the nearest pixel; and draw it centred, offsets rounded down.</item>
-/// </list>
-///
-/// Either way the result is lossy WebP at quality 80 with no metadata.
+/// To regenerate the thumbnail: orient the original as a browser displays it (EXIF orientation
+/// applied for JPEG and PNG, ignored for WebP), round each edge to the nearest pixel, cut that
+/// square, and scale it to at most 320 pixels square. Null means the picture predates framing
+/// and its thumbnail is the largest centred square.
 /// </summary>
 public sealed record BackupImageCrop(double X, double Y, double Width, double Height);
 

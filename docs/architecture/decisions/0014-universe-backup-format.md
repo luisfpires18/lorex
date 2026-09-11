@@ -1,7 +1,7 @@
 # ADR 0014 - A backup is one versioned archive holding a universe's authored data
 
 Status: accepted (2026-09-09), amended 2026-09-10 (version 3: the file became an archive), and
-2026-09-11 (image framing and type icon keys, both within version 3)
+2026-09-11 (type icon keys, and a short-lived image framing member, both within version 3)
 
 ## Context
 
@@ -45,14 +45,19 @@ machine, and a restore does not need any of them. The download is `application/z
 **Only the original, never the thumbnail.** A thumbnail is derived - a square cut from the
 original, scaled to a fixed size in a fixed format - so a reader regenerates it from the original.
 Carrying one would double the media in every backup and add a second copy that has to be trusted
-to match. What *is* carried is the part of it a person chose: `image.framing`, `Crop` or `Fit`, and
-for `Crop` only, `image.crop`, the square the author framed, as fractions of the displayed original
-(ADR 0019). With them, the original and the recipe give back the same thumbnail byte for byte, and a
-test proves that from the archive alone for both framings. `crop` is null for `Fit`, which cuts
-nothing, and for a `Crop` stored before framing existed, whose thumbnail is the centred square. A
-file written before `framing` existed has no such member, and reads as `Crop` - which is what every
-thumbnail in it was. A reader that ignores both still restores every picture whole and only loses the
-framing, so neither addition is a version bump.
+to match. What *is* carried is the one part of it a person chose: `image.crop`, the square the
+author framed, as fractions of the displayed original (ADR 0019). With it, the original and the
+recipe give back the same thumbnail byte for byte, and a test proves that from the archive alone.
+It is nullable - null means a picture stored before framing existed, whose thumbnail is the
+centred square - and a reader that ignores it still restores every picture whole, so adding it is
+not a version bump.
+
+Version 3 files written on 2026-09-11, while a "Fit full image" thumbnail briefly existed, may also
+carry `image.framing` (`Crop`, or `Fit` with a null crop). The mode was withdrawn and the member is
+not part of the format: readers ignore it, so such a file reads like any other version 3 file and a
+fitted picture regenerates as the centred square. Nothing a person chose is lost - the original is
+in the archive and a chosen crop is still in `image.crop` - so this is not a bump either, and a test
+reads both shapes.
 
 Entity types carry `icon`, now always one of the built-in icon keys or null (ADR 0020). Every value a
 version 3 file could have been given by Lorex itself is still a key, so that is not a bump either.
@@ -102,7 +107,7 @@ Lorex produce it again from what a person wrote?
 | Relationship types and relationships | - |
 | Timeline entries, their signed date components and era labels, participants | Derived date precision |
 | Every entry's revision history (ADR 0013) | - |
-| Each entry's primary image: the original bytes, its asset id, filename, content type, dimensions, framing, chosen crop and archive path | The generated thumbnail and its id, and every R2 object key, bucket name, endpoint and URL |
+| Each entry's primary image: the original bytes, its asset id, filename, content type, dimensions, chosen crop and archive path | The generated thumbnail and its id, and every R2 object key, bucket name, endpoint and URL |
 | Canon conflicts the author **dismissed** | Pending and resolved conflicts, and all conflict wording |
 | | Tag `Slug` |
 | | Identity tables, configuration, connection strings, file paths |

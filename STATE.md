@@ -49,13 +49,12 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     history screen states the limit. ADR 0013, ADR 0019.
 - **Lore visual polish** (`feat/lore-visual-polish`, merged into `dev`). Two owner requests from
   live testing. The type bar's sideways scrolling caused a CI failure (`fix/type-filter-mobile-e2e`,
-  merged) and is now replaced by wrapping rows (`fix/type-filter-wrap`, **not merged, not
-  pushed**): no scroller, no keep-in-view logic, no scrolling tests.
-  - **A thumbnail may fit the whole picture.** `EntityImage.Framing` is `Crop` or `Fit`; Fit scales
-    the upright original inside a transparent square (320, never enlarged) and stores no crop. The
-    dialog offers `Crop` | `Fit full image`; switching either way is a reframe and an `Image`
-    revision; the original is never touched. Backup carries `image.framing`, still version 3.
-    ADR 0019 amendment, ADR 0014.
+  merged) and is now replaced by wrapping rows (`fix/type-filter-wrap`, merged).
+  - **"Fit full image" withdrawn** (`fix/thumbnail-crop-only`, **not merged, not pushed**). A
+    thumbnail is one square crop again, always covered by the picture. Migration
+    `RemoveEntityImageFramingMode` drops the column; a row that was fitted reads as the centred
+    square, but its stored thumbnail stays letterboxed until its author uses "Edit thumbnail".
+    A stale client's `framing` field and a v3 backup's `image.framing` are ignored. ADR 0019, 0014.
   - **The Lore type filter is a row of icon chips.** Data-driven from the universe's types,
     `aria-pressed`, wrapping onto as many rows as the width needs. A type's icon is the existing
     `EntityType.Icon` column, now a key from a closed set the API enforces, chosen on the Types
@@ -64,18 +63,18 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 
 ## Baseline
 
-- **428 API integration tests, 70 Playwright tests**, green. No frontend unit runner exists;
+- **417 API integration tests, 69 Playwright tests**, green. No frontend unit runner exists;
   the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
-- The test host no longer migrates itself, so all 428 tests boot through the same startup path a
+- The test host no longer migrates itself, so all 417 tests boot through the same startup path a
   deployment uses.
 - Under a full parallel Playwright run, `auth.spec.ts` "rejects a wrong password" intermittently
   times out (it navigates to `/login` without awaiting sign-out), and a relationships or canon
   spec can time out once; each passes alone. Known, not fixed.
-- 16 migrations, latest `RestrictEntityTypeIconKeys` - data only: clears any type icon that is not
-  a built-in key. Before it, `AddEntityImageFramingMode` adds one integer column defaulting to
-  Crop; no table rebuild. `has-pending-model-changes` reports none. `AddEntitySearchIndex` is raw SQL - an FTS5 virtual
+- 17 migrations, latest `RemoveEntityImageFramingMode` - drops the image framing column that
+  `AddEntityImageFramingMode` added; EF rebuilds `EntityImages` to do it. `RestrictEntityTypeIconKeys`
+  is data only. `has-pending-model-changes` reports none. `AddEntitySearchIndex` is raw SQL - an FTS5 virtual
   table and the trigger that empties it - so no EF Core model describes it and the pending check
   cannot see it either way.
 - No automated test reaches Cloudflare and none can: the API host registers an in-process object
