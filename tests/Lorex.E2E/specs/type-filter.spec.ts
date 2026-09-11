@@ -365,6 +365,59 @@ test.describe('the type bar', () => {
     await expect(page.getByTestId('entity-card')).toHaveCount(1)
     await expect(card(page, 'The Tide Vigil')).toBeVisible()
   })
+
+  test('uses a wide screen for more card columns, while other screens keep their reading width', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 })
+    await signUp(page)
+    const universeId = await newUniverse(page)
+    const ids = await typeIds(page, universeId)
+    await createEntry(page, universeId, ids.get('Character')!, 'Alenna Vance', 'Warden.')
+
+    const canvasWidth = () =>
+      page.locator('main.canvas').evaluate((element) => element.getBoundingClientRect().width)
+
+    // The width every screen reads at, taken from one that is not the Lore browser.
+    await page.getByTestId('workspace-types').click()
+    await page.waitForURL(/\/types$/)
+    const reading = await canvasWidth()
+
+    // The Lore browser takes more of the screen, and its grid turns that into columns.
+    await page.getByTestId('workspace-lore').click()
+    await page.waitForURL(/\/lore$/)
+    await expect(card(page, 'Alenna Vance')).toBeVisible()
+    expect(await canvasWidth()).toBeGreaterThan(reading)
+
+    const grid = page.getByTestId('entity-grid')
+    const columns = await grid.evaluate(
+      (element) => getComputedStyle(element).gridTemplateColumns.split(' ').length,
+    )
+    expect(columns).toBeGreaterThanOrEqual(3)
+    expect(await pageOverflow(page)).toBeLessThanOrEqual(1)
+
+    // Heading, filters and grid widen together: the type chips and the cards share one edge and
+    // one width, rather than the filters staying behind at the old width.
+    const heading = (await page.getByRole('heading', { name: 'Lore', exact: true }).boundingBox())!
+    const chips = (await page.getByTestId('type-filter').boundingBox())!
+    const cards = (await grid.boundingBox())!
+    expect(Math.abs(chips.x - cards.x)).toBeLessThanOrEqual(1)
+    expect(Math.abs(heading.x - cards.x)).toBeLessThanOrEqual(1)
+    expect(Math.abs(chips.width - cards.width)).toBeLessThanOrEqual(1)
+
+    // An entry's own page is not the browser, and keeps the reading width.
+    await card(page, 'Alenna Vance').click()
+    await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
+    await expect(page.getByTestId('entry-name')).toBeVisible()
+    expect(Math.abs((await canvasWidth()) - reading)).toBeLessThanOrEqual(1)
+
+    // On a tablet the browser has nothing extra to take, and nothing scrolls sideways.
+    await page.getByTestId('workspace-lore').click()
+    await page.waitForURL(/\/lore$/)
+    await page.setViewportSize({ width: 768, height: 1024 })
+    await expect.poll(() => canvasWidth()).toBeLessThanOrEqual(768)
+    expect(await pageOverflow(page)).toBeLessThanOrEqual(1)
+  })
 })
 
 test.describe('the type bar on a phone', () => {

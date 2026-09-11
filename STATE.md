@@ -50,7 +50,7 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 - **Lore visual polish** (`feat/lore-visual-polish`, merged into `dev`). Two owner requests from
   live testing. The type bar's sideways scrolling caused a CI failure (`fix/type-filter-mobile-e2e`,
   merged) and is now replaced by wrapping rows (`fix/type-filter-wrap`, merged).
-  - **"Fit full image" withdrawn** (`fix/thumbnail-crop-only`, **not merged, not pushed**). A
+  - **"Fit full image" withdrawn** (`fix/thumbnail-crop-only`, merged). A
     thumbnail is one square crop again, always covered by the picture. Migration
     `RemoveEntityImageFramingMode` drops the column; a row that was fitted reads as the centred
     square, but its stored thumbnail stays letterboxed until its author uses "Edit thumbnail".
@@ -60,10 +60,14 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     `EntityType.Icon` column, now a key from a closed set the API enforces, chosen on the Types
     screen and never inferred from a name. Starter types keep their seeded keys. New web
     dependency `lucide-react`. ADR 0020.
+  - **The Lore browser uses a wide desktop** (`fix/lore-desktop-width`, **not merged, not
+    pushed**). The workspace gives only the exact `lore` route `canvas--wide` (80rem instead of
+    the 60rem reading width), so the card grid shows 3 columns at 1440px and 4 at 1920px. Entry
+    pages and every other screen keep 60rem; below ~1256px nothing changes.
 
 ## Baseline
 
-- **417 API integration tests, 69 Playwright tests**, green. No frontend unit runner exists;
+- **417 API integration tests, 70 Playwright tests**, green. No frontend unit runner exists;
   the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
