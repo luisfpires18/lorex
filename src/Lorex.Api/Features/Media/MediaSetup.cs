@@ -66,25 +66,33 @@ public static class MediaSetup
 
         services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(
             new BasicAWSCredentials(accessKeyId, secretAccessKey),
-            new AmazonS3Config
-            {
-                ServiceURL = serviceUrl,
-
-                // R2 has no regions and no virtual-host buckets. Both of these are required,
-                // not preferences: the SDK signs with "auto" and addresses the bucket as a path.
-                AuthenticationRegion = "auto",
-                ForcePathStyle = true,
-
-                // The SDK's v4 default adds a CRC32 checksum header to every request and
-                // validates one on every response. R2 is S3-compatible rather than S3, so both
-                // are asked for only where the operation genuinely requires them.
-                RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED,
-                ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED,
-            }));
+            R2ClientConfig(serviceUrl)));
 
         services.AddSingleton<IMediaObjectStore>(serviceProvider =>
             new R2MediaObjectStore(serviceProvider.GetRequiredService<IAmazonS3>(), bucket));
 
         return services;
     }
+
+    /// <summary>
+    /// The client configuration R2 needs. Its own method so the adapter tests build a client
+    /// exactly as a deployment does, rather than a lookalike that could drift from it.
+    /// </summary>
+    internal static AmazonS3Config R2ClientConfig(string serviceUrl) => new()
+    {
+        ServiceURL = serviceUrl,
+
+        // R2 has no regions and no virtual-host buckets. Both of these are required,
+        // not preferences: the SDK signs with "auto" and addresses the bucket as a path.
+        AuthenticationRegion = "auto",
+        ForcePathStyle = true,
+
+        // The SDK's v4 default adds a CRC32 checksum header to every request and
+        // validates one on every response. R2 is S3-compatible rather than S3, so both
+        // are asked for only where the operation genuinely requires them. This alone does
+        // not stop a PutObject streaming a signed, chunked body - that needs the per-request
+        // flags in R2MediaObjectStore.PutAsync.
+        RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED,
+        ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED,
+    };
 }

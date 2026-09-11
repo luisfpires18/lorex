@@ -26,7 +26,7 @@ namespace Lorex.Api.Features.Export;
 ///
 /// This phase exports only. Nothing here reads a file back in.
 /// </summary>
-public static class UniverseExportEndpoints
+public static partial class UniverseExportEndpoints
 {
     /// <summary>
     /// A plain ZIP rather than a vendor type. Every operating system opens one without being
@@ -54,6 +54,7 @@ public static class UniverseExportEndpoints
         ClaimsPrincipal principal,
         LorexDbContext db,
         IMediaObjectStore store,
+        ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
         if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
@@ -94,10 +95,16 @@ public static class UniverseExportEndpoints
                 statusCode: StatusCodes.Status500InternalServerError,
                 extensions: new Dictionary<string, object?> { ["code"] = MediaMissingCode });
         }
-        catch (MediaStorageUnavailableException unavailable)
+        catch (MediaStorageException unavailable)
         {
             // A world with no pictures never reaches the store at all, so this is only ever the
-            // case where there is media to fetch and nowhere configured to fetch it from.
+            // case where there is media to fetch and the store is not configured, refused, or did
+            // not answer. The detail is Lorex's sentence; the provider's stays in the log.
+            if (unavailable is MediaStorageFailedException)
+            {
+                LogStorageFailure(loggerFactory.CreateLogger("Lorex.Export"), universeId, unavailable);
+            }
+
             return Results.Problem(
                 title: "That backup could not be completed.",
                 detail: unavailable.Message,
@@ -142,6 +149,11 @@ public static class UniverseExportEndpoints
         // A name of nothing but punctuation or non-ASCII script leaves nothing usable behind.
         return slug.ToString().Trim('-') is { Length: > 0 } trimmed ? trimmed : "universe";
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Image storage failed while exporting universe {UniverseId}. Nothing was downloaded.")]
+    private static partial void LogStorageFailure(ILogger logger, Guid universeId, Exception exception);
 }
 
 /// <summary>
