@@ -47,8 +47,11 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     objects are still deleted, so nothing historical is retained and an old version has no bytes
     to restore. Setting, replacing and removing each write a version flagged `Image`, and the
     history screen states the limit. ADR 0013, ADR 0019.
-- **Lore visual polish** (`feat/lore-visual-polish`, **not merged, not pushed**). Two owner requests
-  from live testing.
+- **Lore visual polish** (`feat/lore-visual-polish`, merged into `dev`). Two owner requests from
+  live testing. Its phone type-bar E2E failed in CI: proximity scroll snapping moved the row off
+  the test's assumed position, and also re-aimed the bar's own keep-in-view scroll so a chosen chip
+  could stay clipped. Snapping removed and the test rebuilt on known row positions
+  (`fix/type-filter-mobile-e2e`, **not merged, not pushed**).
   - **A thumbnail may fit the whole picture.** `EntityImage.Framing` is `Crop` or `Fit`; Fit scales
     the upright original inside a transparent square (320, never enlarged) and stores no crop. The
     dialog offers `Crop` | `Fit full image`; switching either way is a reframe and an `Image`
