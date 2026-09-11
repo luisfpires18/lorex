@@ -20,6 +20,9 @@ public sealed record StoredMediaObject(Stream Content, string ContentType, long 
 ///
 /// Keys are opaque to this interface. The convention that produces them lives with the feature
 /// that owns the objects, in <c>Features/Lore/EntityImageKeys.cs</c>.
+///
+/// A store that cannot do what it was asked throws a <see cref="MediaStorageException"/>, and
+/// nothing provider-specific: the endpoints answer that with a 503 and never see an SDK type.
 /// </summary>
 public interface IMediaObjectStore
 {
@@ -34,10 +37,27 @@ public interface IMediaObjectStore
 }
 
 /// <summary>
-/// Thrown when a request needs object storage and none is configured. The endpoints turn it
-/// into a 503 that says so, rather than a 500 that says nothing.
+/// The store could not do what it was asked. The message is Lorex's own sentence and is safe to
+/// show; whatever the provider said is only ever the inner exception, and only ever logged.
 /// </summary>
-public sealed class MediaStorageUnavailableException(string message) : InvalidOperationException(message);
+public abstract class MediaStorageException(string message, Exception? innerException = null)
+    : Exception(message, innerException);
+
+/// <summary>
+/// Thrown when a request needs object storage and none is configured. Nothing was attempted, so
+/// nothing can have been written. The endpoints turn it into a 503 that says so, rather than a
+/// 500 that says nothing.
+/// </summary>
+public sealed class MediaStorageUnavailableException(string message) : MediaStorageException(message);
+
+/// <summary>
+/// Thrown when a configured store refused a call or did not answer it - an R2 error response, a
+/// network failure, a timeout. Unlike <see cref="MediaStorageUnavailableException"/>, a write
+/// may have landed before the failure surfaced, so a caller that was writing sweeps what it
+/// tried to write.
+/// </summary>
+public sealed class MediaStorageFailedException(string message, Exception innerException)
+    : MediaStorageException(message, innerException);
 
 /// <summary>
 /// What is registered when no provider is configured. Every call fails the same way, loudly and

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { EntityHistory } from '../components/EntityHistory'
-import { EntityImageField } from '../components/EntityImageField'
+import { EntityImageField, type PendingImage } from '../components/EntityImageField'
 import { FieldInput } from '../components/FieldInputs'
 import { LoreArticle, LoreEditor } from '../components/LoreEditor'
 import { RelationshipSection } from '../components/RelationshipSection'
@@ -90,10 +90,11 @@ export default function EntityPage() {
   const [blocked, setBlocked] = useState<CanonBlockingFinding[] | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
-  // A new entry's picture waits here until the entry exists. Object keys are built from the
-  // entry's id, so there is nowhere to put it before the create call comes back - and inventing
-  // a temporary path would mean writing objects nobody would ever come back to clean up.
-  const [pendingImage, setPendingImage] = useState<File | null>(null)
+  // A new entry's picture, and the square its author framed, wait here until the entry exists.
+  // Object keys are built from the entry's id, so there is nowhere to put it before the create
+  // call comes back - and inventing a temporary path would mean writing objects nobody would ever
+  // come back to clean up.
+  const [pendingImage, setPendingImage] = useState<PendingImage | null>(null)
 
   // Bumped after every accepted write, so the history reloads without either component
   // holding the other's state.
@@ -198,7 +199,7 @@ export default function EntityPage() {
       let image = saved.image
       if (isNew && pendingImage) {
         try {
-          image = await setEntityImage(universe.id, saved.id, pendingImage)
+          image = await setEntityImage(universe.id, saved.id, pendingImage.file, pendingImage.crop)
           setPendingImage(null)
         } catch (failure: unknown) {
           setMessage(

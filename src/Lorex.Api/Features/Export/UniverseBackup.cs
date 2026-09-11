@@ -157,9 +157,19 @@ public sealed record BackupEntity(
 /// the identity the entry itself uses, so a future importer can recognise the same image across
 /// two backups of the same world.
 ///
-/// The thumbnail is deliberately absent. It is derived - a fixed square crop at a fixed size,
-/// in a fixed format - so an importer regenerates it from the original rather than carrying a
-/// second copy of every picture that would have to be trusted to match. See ADR 0019.
+/// The thumbnail's bytes are deliberately absent. It is derived - the square in
+/// <paramref name="Crop"/>, cut from the original and scaled to a fixed size in a fixed format -
+/// so an importer regenerates it rather than carrying a second copy of every picture that would
+/// have to be trusted to match. What is carried is the one part that is not derivable: which
+/// square the author chose. See ADR 0019.
+///
+/// <paramref name="Width"/> and <paramref name="Height"/> are the picture as displayed, the frame
+/// <paramref name="Crop"/>'s fractions are measured against.
+///
+/// Adding <paramref name="Crop"/> is not a version bump, by the rule on
+/// <see cref="UniverseBackup.CurrentVersion"/>: it is nullable, and a reader that ignores it
+/// still restores every picture whole - it only loses the framing, and falls back to the centred
+/// square every thumbnail had before an author could choose.
 /// </summary>
 public sealed record BackupEntityImage(
     Guid AssetId,
@@ -168,7 +178,19 @@ public sealed record BackupEntityImage(
     int Width,
     int Height,
     long ByteSize,
-    string MediaPath);
+    string MediaPath,
+    BackupImageCrop? Crop);
+
+/// <summary>
+/// The square the entry's thumbnail is cut from, as fractions of the displayed original: X and
+/// Width of its width, Y and Height of its height, from the top-left corner.
+///
+/// To regenerate the thumbnail: orient the original as a browser displays it (EXIF orientation
+/// applied for JPEG and PNG, ignored for WebP), round each edge to the nearest pixel, cut that
+/// square, and scale it to at most 320 pixels square. Null means the picture predates framing
+/// and its thumbnail is the largest centred square.
+/// </summary>
+public sealed record BackupImageCrop(double X, double Y, double Width, double Height);
 
 /// <summary>
 /// One stored value, in the same typed members the live row uses so a null stays a null and

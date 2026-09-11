@@ -1,22 +1,32 @@
 import { readFile } from 'node:fs/promises'
 import { deflateSync } from 'node:zlib'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import { entryNames } from './support/zip'
 
 /**
- * One journey, for the parts of an entry's picture only a browser can prove.
+ * The parts of an entry's picture only a browser can prove.
  *
- * What is accepted, where it is stored, who may read it and what a replacement does to the
- * objects underneath are all settled by the API tests, which can reach states this screen
- * cannot. What they cannot show is that an author can actually do it: pick a file before the
- * entry exists, see it on the card and on the page, swap it, and take it away again with the
- * card falling back rather than breaking. That is this file.
+ * What is accepted, where it is stored, who may read it and what a replacement or a reframing
+ * does to the objects underneath are all settled by the API tests, which can reach states this
+ * screen cannot. What they cannot show is that an author can actually do it: pick a file, frame
+ * the square the cards will show, see the whole picture on the page and only that square on the
+ * card, frame it again without uploading anything, and take it away with the card falling back
+ * rather than breaking. That is this file.
+ *
+ * The pictures are made of coloured bands, so "the card shows the part I chose" is checked by
+ * reading pixels back out of the card rather than by trusting an address.
  *
  * Nothing here needs Cloudflare. The dev server the suite already runs is configured with the
  * in-memory object store, so the whole lifecycle is exercised in-process.
  */
 
 const PASSWORD = 'Test-password-123!'
+
+type Rgb = [number, number, number]
+
+const RED: Rgb = [220, 30, 30]
+const GREEN: Rgb = [30, 160, 60]
+const BLUE: Rgb = [30, 30, 220]
 
 function unique(prefix: string) {
   return `${prefix}${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`
@@ -41,14 +51,106 @@ async function createUniverse(page: Page) {
   return page.url().split('/').pop()!
 }
 
-function upload(name: string, width: number, height: number, rgb: [number, number, number]) {
-  return { name, mimeType: 'image/png', buffer: png(width, height, rgb) }
+async function newEntry(page: Page, name: string, narrow = false) {
+  await openSection(page, 'workspace-lore', narrow)
+  await page.waitForURL(/\/lore$/)
+  await page.getByTestId('new-entity').click()
+  await page.waitForURL(/\/lore\/new$/)
+  await page.getByLabel('Name').fill(name)
+}
+
+/** A flat picture of one colour, for the journeys where what it shows does not matter. */
+function plain(name: string, width: number, height: number, rgb: Rgb) {
+  return { name, mimeType: 'image/png', buffer: png(width, height, () => rgb) }
+}
+
+/** Three vertical bands, red to blue. The centred square is the green one, and never the answer. */
+function thirds(name: string) {
+  return {
+    name,
+    mimeType: 'image/png',
+    buffer: png(600, 200, (x) => (x < 200 ? RED : x < 400 ? GREEN : BLUE)),
+  }
 }
 
 /** On a phone the workspace navigation folds into one bar, so a section has to be opened first. */
 async function openSection(page: Page, testId: string, narrow: boolean) {
   if (narrow) await page.getByTestId('workspace-nav-toggle').click()
   await page.getByTestId(testId).click()
+}
+
+/** Picks a file and keeps the cropper's starting square - for journeys that are not about framing. */
+async function addPicture(page: Page, file: ReturnType<typeof plain>) {
+  await page.getByTestId('entity-image-input').setInputFiles(file)
+  const dialog = page.getByTestId('image-crop-dialog')
+  await expect(dialog.getByTestId('image-crop-confirm')).toBeEnabled()
+  await dialog.getByTestId('image-crop-confirm').click()
+  await expect(dialog).toHaveCount(0)
+}
+
+/**
+ * Drags the picture under the square as far as it will go. The cropper keeps the square inside
+ * the picture, so an overlong drag lands exactly on the edge - which is what makes it repeatable.
+ */
+async function dragPicture(page: Page, direction: 'left' | 'right') {
+  const stage = page.getByTestId('image-crop-stage')
+  const box = (await stage.boundingBox())!
+  const x = box.x + box.width / 2
+  const y = box.y + box.height / 2
+
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x + (direction === 'right' ? 1 : -1) * box.width, y, {
+    steps: 12,
+  })
+  await page.mouse.up()
+}
+
+/** Colours read back out of a displayed picture, at fractions of the way across and down. */
+async function colours(image: Locator, points: Array<[number, number]>) {
+  await image.scrollIntoViewIfNeeded()
+  await expect(image).toBeVisible()
+
+  return image.evaluate(async (element, at) => {
+    const picture = element as HTMLImageElement
+    await picture.decode()
+
+    const canvas = document.createElement('canvas')
+    canvas.width = picture.naturalWidth
+    canvas.height = picture.naturalHeight
+    const context = canvas.getContext('2d')!
+    context.drawImage(picture, 0, 0)
+
+    return at.map(([across, down]) =>
+      Array.from(
+        context
+          .getImageData(
+            Math.floor(across * (picture.naturalWidth - 1)),
+            Math.floor(down * (picture.naturalHeight - 1)),
+            1,
+            1,
+          )
+          .data.slice(0, 3),
+      ),
+    )
+  }, points)
+}
+
+/** Every sampled pixel is recognisably `expected` - loose, because a thumbnail is lossy WebP. */
+async function expectShows(image: Locator, expected: Rgb) {
+  const sampled = await colours(image, [
+    [0.15, 0.15],
+    [0.5, 0.5],
+    [0.85, 0.85],
+    [0.15, 0.85],
+    [0.85, 0.15],
+  ])
+
+  for (const pixel of sampled) {
+    for (let channel = 0; channel < 3; channel++) {
+      expect(Math.abs(pixel[channel] - expected[channel])).toBeLessThan(50)
+    }
+  }
 }
 
 test.describe('an entry with a picture', () => {
@@ -60,18 +162,12 @@ test.describe('an entry with a picture', () => {
 
     // ---------- Added while the entry is still being written ----------
 
-    await page.getByTestId('workspace-lore').click()
-    await page.waitForURL(/\/lore$/)
-    await page.getByTestId('new-entity').click()
-    await page.waitForURL(/\/lore\/new$/)
-
-    await page.getByLabel('Name').fill(name)
+    await newEntry(page, name)
     await page.getByLabel('Summary').fill('Warden of the drowned coast.')
 
-    // Held locally: there is no entry yet, so there is nowhere in the bucket for it to go.
-    await page
-      .getByTestId('entity-image-input')
-      .setInputFiles(upload('first.png', 480, 320, [30, 90, 170]))
+    // Held locally: there is no entry yet, so there is nowhere in the bucket for it to go. It is
+    // framed first all the same, and the framing is held with it.
+    await addPicture(page, plain('first.png', 480, 320, BLUE))
     await expect(page.getByTestId('entity-image-preview')).toBeVisible()
     await expect(page.getByTestId('entity-image-field')).toContainText(
       'Added when this entry is created',
@@ -100,26 +196,37 @@ test.describe('an entry with a picture', () => {
     await expect(card.getByTestId('entity-portrait')).toBeVisible()
     await expect(card.getByTestId('entity-portrait')).toHaveAttribute(
       'src',
-      /\/image\/[0-9a-f-]+\/thumbnail$/,
+      /\/image\/[0-9a-f-]+\/thumbnail\/[0-9a-f-]+$/,
     )
 
-    // ---------- Replaced ----------
+    // ---------- A replacement that is cancelled changes nothing ----------
 
     await card.click()
     await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
     await page.getByTestId('edit-entity').click()
+
+    const preview = page.getByTestId('entity-image-preview')
+    const before = await preview.getAttribute('src')
+
+    await page
+      .getByTestId('entity-image-input')
+      .setInputFiles(plain('second.png', 300, 600, [200, 60, 40]))
+    await expect(page.getByTestId('image-crop-dialog')).toBeVisible()
+    await page.getByTestId('image-crop-cancel').click()
+    await expect(page.getByTestId('image-crop-dialog')).toHaveCount(0)
+    await expect(preview).toHaveAttribute('src', before!)
+
+    // ---------- Replaced ----------
 
     // The id of the asset being replaced. Every assertion below is written against it, because
     // "a new picture" means a new asset - the old address must stop being the answer, rather
     // than the same address quietly starting to serve different bytes.
     const firstAsset = new RegExp(first!.split('/').at(-2)!)
 
-    await page
-      .getByTestId('entity-image-input')
-      .setInputFiles(upload('second.png', 300, 600, [200, 60, 40]))
+    await addPicture(page, plain('second.png', 300, 600, [200, 60, 40]))
 
-    // The upload is its own request, so this waits for it rather than for the click.
-    await expect(page.getByTestId('entity-image-preview')).not.toHaveAttribute('src', firstAsset)
+    // The upload is its own request, made on confirm, so this waits for it rather than the click.
+    await expect(preview).not.toHaveAttribute('src', firstAsset)
 
     await page.getByRole('button', { name: 'Cancel' }).click()
     await expect(plate).toBeVisible()
@@ -142,6 +249,192 @@ test.describe('an entry with a picture', () => {
     await expect(card.getByTestId('entity-portrait-blank')).toBeVisible()
   })
 
+  test('an author chooses what the card shows, and chooses again without uploading', async ({
+    page,
+  }) => {
+    await signUp(page)
+    await createUniverse(page)
+
+    const name = unique('Alenna Vance ')
+    await newEntry(page, name)
+
+    // ---------- Framed before the entry exists ----------
+
+    await page.getByTestId('entity-image-input').setInputFiles(thirds('bands.png'))
+
+    const dialog = page.getByTestId('image-crop-dialog')
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByTestId('image-crop-confirm')).toBeEnabled()
+
+    // The cropper opens on the centred square, which is the green band. Pulling the picture right
+    // puts the square over its left edge - the red band a centre crop would never have chosen.
+    const previewImage = dialog.getByTestId('image-crop-preview').locator('img')
+    await expect(previewImage).toHaveAttribute('style', /left: -100%/)
+    await dragPicture(page, 'right')
+    await expect(previewImage).toHaveAttribute('style', /left: 0%/)
+    await dialog.getByTestId('image-crop-confirm').click()
+    await expect(dialog).toHaveCount(0)
+
+    await page.getByTestId('save-entity').click()
+    await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
+
+    // ---------- The page keeps the whole picture ----------
+
+    const plate = page.getByTestId('entry-image').locator('img')
+    await expect(plate).toBeVisible()
+    const original = await plate.getAttribute('src')
+
+    const shape = await plate.evaluate(async (element) => {
+      const picture = element as HTMLImageElement
+      await picture.decode()
+      return [picture.naturalWidth, picture.naturalHeight]
+    })
+    expect(shape).toEqual([600, 200])
+
+    // ---------- The card shows the chosen square ----------
+
+    await page.getByTestId('workspace-lore').click()
+    await page.waitForURL(/\/lore$/)
+
+    const card = page.locator(`[data-testid="entity-card"][data-entity-name="${name}"]`)
+    const portrait = card.getByTestId('entity-portrait')
+    await expectShows(portrait, RED)
+    const firstThumbnail = await portrait.getAttribute('src')
+
+    // ---------- Framed again, from the stored original ----------
+
+    await card.click()
+    await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
+    await page.getByTestId('edit-entity').click()
+
+    // Nothing is chosen from the disk this time: the cropper is handed the original the entry
+    // already has, and starts where the author left the square.
+    const uploads: string[] = []
+    page.on('request', (request) => {
+      if (request.method() === 'PUT' && /\/image$/.test(new URL(request.url()).pathname)) {
+        uploads.push(request.url())
+      }
+    })
+
+    await page.getByTestId('entity-image-reframe').click()
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByTestId('image-crop-confirm')).toBeEnabled()
+    await expect(previewImage).toHaveAttribute('src', original!)
+    await expect(previewImage).toHaveAttribute('style', /left: 0%/)
+
+    // By keyboard this time: the square is focusable, and the arrow keys move the picture under
+    // it. Far enough left and the square sits over the blue band.
+    await dialog.getByRole('group', { name: 'Thumbnail square' }).focus()
+    for (let press = 0; press < 70; press++) await page.keyboard.press('ArrowLeft')
+    await expect(previewImage).toHaveAttribute('style', /left: -200%/)
+
+    await dialog.getByTestId('image-crop-confirm').click()
+    await expect(dialog).toHaveCount(0)
+    await expect(page.getByTestId('entity-image-preview')).not.toHaveAttribute(
+      'src',
+      firstThumbnail!,
+    )
+
+    // A new thumbnail, and not one byte of the picture sent again.
+    expect(uploads).toEqual([])
+
+    await page.getByRole('button', { name: 'Cancel' }).click()
+
+    // The whole picture is still the page's, at the same address - the original was not touched.
+    await expect(plate).toHaveAttribute('src', original!)
+
+    await page.getByTestId('workspace-lore').click()
+    await page.waitForURL(/\/lore$/)
+    await expect(portrait).not.toHaveAttribute('src', firstThumbnail!)
+    await expectShows(portrait, BLUE)
+  })
+
+  test('a sideways photo is framed the way it is shown', async ({ page }) => {
+    await signUp(page)
+    await createUniverse(page)
+
+    const name = unique('Alenna Vance ')
+    await newEntry(page, name)
+
+    // Stored 200 wide and 600 tall in bands of red, green and blue from the top, with an EXIF tag
+    // saying to turn it a quarter clockwise. The browser draws it 600 wide with blue on the left.
+    // If the server measured the crop against the stored pixels instead, the square the author
+    // pulled to the left would come back red or green.
+    await page.getByTestId('entity-image-input').setInputFiles({
+      name: 'sideways.png',
+      mimeType: 'image/png',
+      buffer: png(200, 600, (_, y) => (y < 200 ? RED : y < 400 ? GREEN : BLUE), 6),
+    })
+
+    const dialog = page.getByTestId('image-crop-dialog')
+    await expect(dialog.getByTestId('image-crop-confirm')).toBeEnabled()
+    await dragPicture(page, 'right')
+    await dialog.getByTestId('image-crop-confirm').click()
+    await expect(dialog).toHaveCount(0)
+
+    await page.getByTestId('save-entity').click()
+    await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
+
+    await page.getByTestId('workspace-lore').click()
+    await page.waitForURL(/\/lore$/)
+
+    await expectShows(
+      page
+        .locator(`[data-testid="entity-card"][data-entity-name="${name}"]`)
+        .getByTestId('entity-portrait'),
+      BLUE,
+    )
+  })
+
+  test('the cropper fits a phone and can be used on one', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+
+    await signUp(page)
+    await createUniverse(page)
+
+    const name = unique('Alenna Vance ')
+    await newEntry(page, name, true)
+
+    await page.getByTestId('entity-image-input').setInputFiles(thirds('bands.png'))
+
+    const dialog = page.getByTestId('image-crop-dialog')
+    await expect(dialog.getByTestId('image-crop-confirm')).toBeEnabled()
+
+    // Inside the screen in both directions, with both decisions reachable without scrolling the
+    // page behind it.
+    const box = (await dialog.boundingBox())!
+    expect(box.x).toBeGreaterThanOrEqual(0)
+    expect(box.y).toBeGreaterThanOrEqual(0)
+    expect(box.x + box.width).toBeLessThanOrEqual(390)
+    expect(box.y + box.height).toBeLessThanOrEqual(844)
+    await expect(dialog.getByTestId('image-crop-confirm')).toBeInViewport()
+    await expect(dialog.getByTestId('image-crop-cancel')).toBeInViewport()
+
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      ),
+    ).toBeLessThanOrEqual(0)
+
+    // Zoomed, then pulled to the far right edge: the blue band, however far in it went.
+    await dialog.getByTestId('image-crop-zoom').fill('1.5')
+    await dragPicture(page, 'left')
+    await dialog.getByTestId('image-crop-confirm').click()
+    await expect(dialog).toHaveCount(0)
+
+    await page.getByTestId('save-entity').click()
+    await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
+
+    await openSection(page, 'workspace-lore', true)
+    await page.waitForURL(/\/lore$/)
+    await expectShows(
+      page
+        .locator(`[data-testid="entity-card"][data-entity-name="${name}"]`)
+        .getByTestId('entity-portrait'),
+      BLUE,
+    )
+  })
+
   test('a picture fits a phone without pushing the page sideways', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
 
@@ -149,17 +442,11 @@ test.describe('an entry with a picture', () => {
     await createUniverse(page)
 
     const name = unique('Alenna Vance ')
-    await openSection(page, 'workspace-lore', true)
-    await page.waitForURL(/\/lore$/)
-    await page.getByTestId('new-entity').click()
-    await page.waitForURL(/\/lore\/new$/)
-    await page.getByLabel('Name').fill(name)
+    await newEntry(page, name, true)
 
     // Taller than the phone and wider than the column: the shape that would break the layout
     // if the plate were sized by the image rather than by the page.
-    await page
-      .getByTestId('entity-image-input')
-      .setInputFiles(upload('tall.png', 1400, 2100, [30, 90, 170]))
+    await addPicture(page, plain('tall.png', 1400, 2100, BLUE))
     await page.getByTestId('save-entity').click()
     await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
 
@@ -196,11 +483,7 @@ test.describe('an entry with a picture', () => {
     await signUp(page)
     await createUniverse(page)
 
-    await page.getByTestId('workspace-lore').click()
-    await page.waitForURL(/\/lore$/)
-    await page.getByTestId('new-entity').click()
-    await page.waitForURL(/\/lore\/new$/)
-    await page.getByLabel('Name').fill(unique('Alenna Vance '))
+    await newEntry(page, unique('Alenna Vance '))
     await page.getByTestId('save-entity').click()
     await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
 
@@ -208,9 +491,7 @@ test.describe('an entry with a picture', () => {
     await expect(page.getByTestId('history-image-note')).toHaveCount(0)
 
     await page.getByTestId('edit-entity').click()
-    await page
-      .getByTestId('entity-image-input')
-      .setInputFiles(upload('first.png', 300, 300, [30, 90, 170]))
+    await addPicture(page, plain('first.png', 300, 300, BLUE))
     await expect(page.getByTestId('entity-image-preview')).toBeVisible()
     await page.getByRole('button', { name: 'Cancel' }).click()
 
@@ -227,14 +508,8 @@ test.describe('an entry with a picture', () => {
     await signUp(page)
     await createUniverse(page)
 
-    await page.getByTestId('workspace-lore').click()
-    await page.waitForURL(/\/lore$/)
-    await page.getByTestId('new-entity').click()
-    await page.waitForURL(/\/lore\/new$/)
-    await page.getByLabel('Name').fill(unique('Alenna Vance '))
-    await page
-      .getByTestId('entity-image-input')
-      .setInputFiles(upload('first.png', 480, 320, [30, 90, 170]))
+    await newEntry(page, unique('Alenna Vance '))
+    await addPicture(page, plain('first.png', 480, 320, BLUE))
     await page.getByTestId('save-entity').click()
     await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
     const entityId = page.url().split('/').pop()!
@@ -260,14 +535,8 @@ test.describe('an entry with a picture', () => {
     await signUp(page)
     await createUniverse(page)
 
-    await page.getByTestId('workspace-lore').click()
-    await page.waitForURL(/\/lore$/)
-    await page.getByTestId('new-entity').click()
-    await page.waitForURL(/\/lore\/new$/)
-    await page.getByLabel('Name').fill(unique('Alenna Vance '))
-    await page
-      .getByTestId('entity-image-input')
-      .setInputFiles(upload('first.png', 480, 320, [30, 90, 170]))
+    await newEntry(page, unique('Alenna Vance '))
+    await addPicture(page, plain('first.png', 480, 320, BLUE))
     await page.getByTestId('save-entity').click()
     await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
 
@@ -317,13 +586,19 @@ test.describe('an entry with a picture', () => {
 // ---------- A picture, made here ----------
 
 /**
- * A real PNG, built from bytes.
+ * A real PNG, built from bytes, coloured pixel by pixel.
  *
  * Written out rather than checked in: a binary fixture in the repository is one more thing to
- * keep, and this way the test can ask for whatever size and colour the case actually needs -
- * which is what lets "replaced" be visibly a different picture rather than the same one twice.
+ * keep, and this way the test can ask for whatever size, colours and orientation the case needs.
+ * `orientation`, when given, is written as an EXIF tag in an `eXIf` chunk - the same tag a phone
+ * writes - so the picture is stored one way and displayed another.
  */
-function png(width: number, height: number, [red, green, blue]: [number, number, number]) {
+function png(
+  width: number,
+  height: number,
+  colour: (x: number, y: number) => Rgb,
+  orientation?: number,
+) {
   const raw = Buffer.alloc(height * (1 + width * 3))
   for (let y = 0; y < height; y++) {
     const start = y * (1 + width * 3)
@@ -331,6 +606,7 @@ function png(width: number, height: number, [red, green, blue]: [number, number,
     raw[start] = 0
     for (let x = 0; x < width; x++) {
       const at = start + 1 + x * 3
+      const [red, green, blue] = colour(x, y)
       raw[at] = red
       raw[at + 1] = green
       raw[at + 2] = blue
@@ -346,9 +622,25 @@ function png(width: number, height: number, [red, green, blue]: [number, number,
   return Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     chunk('IHDR', header),
+    ...(orientation ? [chunk('eXIf', exifOrientation(orientation))] : []),
     chunk('IDAT', deflateSync(raw)),
     chunk('IEND', Buffer.alloc(0)),
   ])
+}
+
+/** A big-endian TIFF block holding one IFD entry: Orientation (0x0112), a SHORT, one value. */
+function exifOrientation(orientation: number) {
+  const tiff = Buffer.alloc(26)
+  tiff.write('MM', 0, 'ascii')
+  tiff.writeUInt16BE(42, 2)
+  tiff.writeUInt32BE(8, 4) // The first IFD follows the header.
+  tiff.writeUInt16BE(1, 8) // One entry.
+  tiff.writeUInt16BE(0x0112, 10)
+  tiff.writeUInt16BE(3, 12)
+  tiff.writeUInt32BE(1, 14)
+  tiff.writeUInt16BE(orientation, 18)
+  tiff.writeUInt32BE(0, 22) // No further IFD.
+  return tiff
 }
 
 function chunk(type: string, data: Buffer) {

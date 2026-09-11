@@ -40,12 +40,20 @@ public static class EntityEndpoints
                 ? null
                 : new EntityImageRef(
                     entity.Image.AssetId,
+                    entity.Image.ThumbnailId,
                     entity.Image.Width,
                     entity.Image.Height,
                     entity.Image.ContentType,
                     entity.Image.FileName,
                     entity.Image.ByteSize,
-                    entity.Image.UploadedAt),
+                    entity.Image.UploadedAt,
+                    entity.Image.CropX == null
+                        ? null
+                        : new EntityImageCrop(
+                            entity.Image.CropX.Value,
+                            entity.Image.CropY!.Value,
+                            entity.Image.CropWidth!.Value,
+                            entity.Image.CropHeight!.Value)),
             entity.UpdatedAt);
 
     public static IEndpointRouteBuilder MapEntityEndpoints(this IEndpointRouteBuilder endpoints)
@@ -873,12 +881,20 @@ public static class EntityEndpoints
                     ? null
                     : new EntityImageRef(
                         candidate.Image.AssetId,
+                        candidate.Image.ThumbnailId,
                         candidate.Image.Width,
                         candidate.Image.Height,
                         candidate.Image.ContentType,
                         candidate.Image.FileName,
                         candidate.Image.ByteSize,
-                        candidate.Image.UploadedAt),
+                        candidate.Image.UploadedAt,
+                        candidate.Image.CropX == null
+                            ? null
+                            : new EntityImageCrop(
+                                candidate.Image.CropX.Value,
+                                candidate.Image.CropY!.Value,
+                                candidate.Image.CropWidth!.Value,
+                                candidate.Image.CropHeight!.Value)),
                 candidate.CreatedAt,
                 candidate.UpdatedAt,
             })

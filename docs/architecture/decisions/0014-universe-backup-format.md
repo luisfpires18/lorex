@@ -41,9 +41,15 @@ URL: those are how *this installation* reaches the file today, they mean nothing
 machine, and a restore does not need any of them. The download is `application/zip`, named
 `lorex-<slug>-<date>.zip`.
 
-**Only the original, never the thumbnail.** A thumbnail is derived - a fixed square crop at a
-fixed size in a fixed format - so a reader regenerates it from the original. Carrying one would
-double the media in every backup and add a second copy that has to be trusted to match.
+**Only the original, never the thumbnail.** A thumbnail is derived - a square cut from the
+original, scaled to a fixed size in a fixed format - so a reader regenerates it from the original.
+Carrying one would double the media in every backup and add a second copy that has to be trusted
+to match. What *is* carried is the one part of it a person chose: `image.crop`, the square the
+author framed, as fractions of the displayed original (ADR 0019). With it, the original and the
+recipe give back the same thumbnail byte for byte, and a test proves that from the archive alone.
+It is nullable - null means a picture stored before framing existed, whose thumbnail is the
+centred square - and a reader that ignores it still restores every picture whole, so adding it is
+not a version bump.
 
 **A picture that cannot be read fails the backup.** The archive is assembled whole in memory
 before a single byte is sent, so a missing object is a 500 carrying the code
@@ -90,7 +96,7 @@ Lorex produce it again from what a person wrote?
 | Relationship types and relationships | - |
 | Timeline entries, their signed date components and era labels, participants | Derived date precision |
 | Every entry's revision history (ADR 0013) | - |
-| Each entry's primary image: the original bytes, its asset id, filename, content type, dimensions and archive path | The generated thumbnail, and every R2 object key, bucket name, endpoint and URL |
+| Each entry's primary image: the original bytes, its asset id, filename, content type, dimensions, chosen crop and archive path | The generated thumbnail and its id, and every R2 object key, bucket name, endpoint and URL |
 | Canon conflicts the author **dismissed** | Pending and resolved conflicts, and all conflict wording |
 | | Tag `Slug` |
 | | Identity tables, configuration, connection strings, file paths |

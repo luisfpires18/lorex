@@ -32,11 +32,36 @@ public sealed class EntityImage
     /// </summary>
     public Guid AssetId { get; set; }
 
-    /// <summary>Object key of the original, exactly as uploaded.</summary>
+    /// <summary>Object key of the original, exactly as uploaded. Never rewritten while the asset lives.</summary>
     public required string OriginalKey { get; set; }
+
+    /// <summary>
+    /// Identity of the thumbnail currently cut from the original. New every time a thumbnail is
+    /// made - on upload, and on every change of framing - for the same two reasons
+    /// <see cref="AssetId"/> is: the working thumbnail is never written over while it is live,
+    /// and a served thumbnail URL always names the same bytes.
+    /// </summary>
+    public Guid ThumbnailId { get; set; }
 
     /// <summary>Object key of the generated square thumbnail. Always WebP.</summary>
     public required string ThumbnailKey { get; set; }
+
+    /// <summary>
+    /// The square the thumbnail was cut from, as fractions of the displayed original - see
+    /// <see cref="EntityImageCrop"/>. All four are set or none is. None only for a picture stored
+    /// before framing was recorded, whose thumbnail is the centred square.
+    ///
+    /// Kept because it is the one thing about the thumbnail that is not derivable: with it the
+    /// cropper reopens where the author left it, a backup preserves their choice, and a thumbnail
+    /// can be regenerated from the original alone. Fractions, never screen pixels.
+    /// </summary>
+    public double? CropX { get; set; }
+
+    public double? CropY { get; set; }
+
+    public double? CropWidth { get; set; }
+
+    public double? CropHeight { get; set; }
 
     /// <summary>The original's content type, decided by decoding the bytes and never by the filename.</summary>
     public required string ContentType { get; set; }
@@ -44,10 +69,13 @@ public sealed class EntityImage
     /// <summary>What the author called the file. Shown in the editor so a replacement is recognisable.</summary>
     public string? FileName { get; set; }
 
-    /// <summary>Original pixel width. Sent to the client so an image reserves its space before it loads.</summary>
+    /// <summary>
+    /// Original pixel width as the picture is displayed, so after its EXIF orientation where a
+    /// browser applies one. Sent to the client so an image reserves its space before it loads.
+    /// </summary>
     public int Width { get; set; }
 
-    /// <summary>Original pixel height.</summary>
+    /// <summary>Original pixel height, as displayed.</summary>
     public int Height { get; set; }
 
     /// <summary>Size of the original in bytes.</summary>

@@ -100,15 +100,66 @@ public sealed record FieldValueResponse(
 ///
 /// <paramref name="Width"/> and <paramref name="Height"/> are the original's, sent so the client
 /// can reserve the right space before a byte of the image has arrived.
+///
+/// <paramref name="ThumbnailId"/> names the thumbnail currently cut from that original. It is in
+/// the thumbnail's route for the same reason the asset id is in both: choosing a new framing makes
+/// a new thumbnail with a new address, so a cached one can never be served for the wrong crop.
+///
+/// <paramref name="Crop"/> is the square the thumbnail was cut from. Null only for a picture
+/// stored before the author chose one, whose thumbnail is the centred square.
 /// </summary>
 public sealed record EntityImageRef(
     Guid AssetId,
+    Guid ThumbnailId,
     int Width,
     int Height,
     string ContentType,
     string? FileName,
     long ByteSize,
-    DateTime UploadedAt);
+    DateTime UploadedAt,
+    EntityImageCrop? Crop)
+{
+    public static EntityImageRef Of(EntityImage image) => new(
+        image.AssetId,
+        image.ThumbnailId,
+        image.Width,
+        image.Height,
+        image.ContentType,
+        image.FileName,
+        image.ByteSize,
+        image.UploadedAt,
+        EntityImageCrop.Of(image));
+}
+
+/// <summary>
+/// The square a thumbnail is cut from, as fractions of the original rather than pixels of any
+/// screen: <paramref name="X"/> and <paramref name="Width"/> of its width, <paramref name="Y"/> and
+/// <paramref name="Height"/> of its height, from the top-left corner.
+///
+/// Fractions are what make the crop the picture's rather than the browser's. The same four
+/// numbers select the same pixels however large the cropper was drawn, and whether the server
+/// is rendering the thumbnail now or an importer is regenerating it from a backup years later.
+///
+/// "The original" means the picture as it is displayed: after its EXIF orientation for a JPEG or
+/// a PNG, and as stored for a WebP - which is how browsers draw each one, so the square an author
+/// frames is the square that gets cut. <see cref="EntityImageProcessing"/> owns that rule.
+/// </summary>
+public sealed record EntityImageCrop(double X, double Y, double Width, double Height)
+{
+    internal static EntityImageCrop? Of(EntityImage image) =>
+        image is { CropX: { } x, CropY: { } y, CropWidth: { } width, CropHeight: { } height }
+            ? new EntityImageCrop(x, y, width, height)
+            : null;
+}
+
+/// <summary>
+/// A new framing for the picture an entry already has.
+///
+/// <paramref name="AssetId"/> is the picture the author was looking at when they chose it. If the
+/// image has been replaced since, the fractions describe a different picture, and the request is
+/// refused rather than applied to it.
+/// </summary>
+public sealed record EntityThumbnailRequest(Guid AssetId, EntityImageCrop? Crop);
 
 /// <summary>Card row. Carries enough to render a type-aware card, and no universe or owner id.</summary>
 public sealed record EntitySummary(

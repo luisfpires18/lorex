@@ -143,17 +143,35 @@ export interface FieldValue {
  * its side - so nothing stored or sent points at Cloudflare, and moving the route means changing
  * one function rather than every payload ever written.
  *
- * `width` and `height` are the original's, and they are what let a picture reserve its space
- * before a byte of it has arrived.
+ * `width` and `height` are the original's, as displayed, and they are what let a picture reserve
+ * its space before a byte of it has arrived.
+ *
+ * `thumbnailId` names the thumbnail currently cut from it; a new framing is a new id, and so a new
+ * address. `crop` is the square that thumbnail shows - null only for a picture stored before an
+ * author could choose, whose thumbnail is the centred square.
  */
 export interface EntityImageRef {
   assetId: string
+  thumbnailId: string
   width: number
   height: number
   contentType: string
   fileName: string | null
   byteSize: number
   uploadedAt: string
+  crop: EntityImageCrop | null
+}
+
+/**
+ * The square a thumbnail is cut from, as fractions of the picture rather than pixels of any
+ * screen: `x` and `width` of its width, `y` and `height` of its height, from the top-left corner.
+ * The same four numbers select the same pixels however large the cropper happened to be drawn.
+ */
+export interface EntityImageCrop {
+  x: number
+  y: number
+  width: number
+  height: number
 }
 
 export interface EntitySummary {

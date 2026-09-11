@@ -655,6 +655,50 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
         Assert.Equal(320, image.Width);
         Assert.Equal(200, image.Height);
         Assert.True(image.ByteSize > 0);
+        Assert.Equal(new BackupImageCrop(0.1875, 0, 0.625, 1), image.Crop);
+    }
+
+    [Fact]
+    public async Task A_backup_carries_the_chosen_framing_so_a_reader_can_cut_the_same_thumbnail_again()
+    {
+        var (client, universe) = await SignedInWithUniverse("expframe");
+        var character = await CharacterType(client, universe.Id);
+
+        var warden = await Create(client, universe.Id, character, "Alenna Vance", CanonStatus.Canon);
+        var uploaded = await Upload(client, universe.Id, warden.Id, Png(400, 200), "portrait.png");
+
+        // Framed after the upload, off-centre, so the backup has to carry a choice rather than
+        // the default a reader could have guessed.
+        var reframe = await client.PutAsJsonAsync(
+            $"/api/universes/{universe.Id}/entities/{warden.Id}/image/thumbnail",
+            new EntityThumbnailRequest(uploaded.AssetId, new EntityImageCrop(0.5, 0, 0.5, 1)));
+        reframe.EnsureSuccessStatusCode();
+        var framed = (await reframe.Content.ReadFromJsonAsync<EntityImageRef>())!;
+
+        var archive = await RawArchive(client, universe.Id);
+        var backup = JsonSerializer.Deserialize<UniverseBackup>(DocumentText(archive), UniverseBackupJson.Options)!;
+        var image = backup.Payload.Entities.Single(entity => entity.Id == warden.Id).Image!;
+
+        Assert.Equal(new BackupImageCrop(0.5, 0, 0.5, 1), image.Crop);
+
+        // What an importer would do: the original from the archive, the framing from the
+        // document, and nothing from the bucket. It has to come out as the very thumbnail the
+        // author approved - byte for byte, because the recipe is deterministic - which is why the
+        // archive can leave thumbnails out.
+        var original = EntryBytes(archive, image.MediaPath);
+        using var stream = new MemoryStream(original, writable: false);
+
+        var (regenerated, rejection) = await EntityImageProcessing.PrepareAsync(
+            stream,
+            original.Length,
+            new EntityImageCrop(image.Crop!.X, image.Crop.Y, image.Crop.Width, image.Crop.Height),
+            CancellationToken.None);
+
+        Assert.Null(rejection);
+        Assert.Equal(
+            _factory.Media.Bytes(
+                $"universes/{universe.Id:D}/entities/{warden.Id:D}/primary/{framed.AssetId:D}/thumbnail-{framed.ThumbnailId:D}.webp"),
+            regenerated!.Thumbnail);
     }
 
     [Fact]

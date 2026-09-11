@@ -60,11 +60,11 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Lore/EntityTypeDefaults.cs` | Idempotent seeding of the starter types. |
 | `Features/Lore/EntityImageModel.cs` | `EntityImage`: the one primary image an entry may have. |
 | `Features/Lore/EntityImageConfiguration.cs` | Image schema: the entry's id as both key and foreign key. |
-| `Features/Lore/EntityImageKeys.cs` | The object-key convention, and the lengths the columns allow. |
-| `Features/Lore/EntityImageProcessing.cs` | What is accepted as an image, and the thumbnail made from it. |
-| `Features/Lore/EntityImageEndpoints.cs` | Set, read and remove the image; the replace and cleanup ordering. |
-| `Features/Media/MediaObjectStore.cs` | `IMediaObjectStore`, and what is registered when nothing is configured. |
-| `Features/Media/R2MediaObjectStore.cs` | Cloudflare R2 over its S3-compatible API. |
+| `Features/Lore/EntityImageKeys.cs` | The object-key convention (a thumbnail id per framing), and the lengths the columns allow. |
+| `Features/Lore/EntityImageProcessing.cs` | What is accepted as an image; the orientation rule; placing a crop on pixels; cutting the thumbnail. |
+| `Features/Lore/EntityImageEndpoints.cs` | Set, reframe, read and remove the image; the replace, reframe and cleanup ordering; storage failures as 503. |
+| `Features/Media/MediaObjectStore.cs` | `IMediaObjectStore`, its two failure exceptions, and what is registered when nothing is configured. |
+| `Features/Media/R2MediaObjectStore.cs` | Cloudflare R2 over its S3-compatible API: the two upload flags R2 needs, and SDK failures kept inside. |
 | `Features/Media/InMemoryMediaObjectStore.cs` | Objects in a dictionary, for local development and Playwright. |
 | `Features/Media/MediaSetup.cs` | Which store this host runs against, from `Media:Provider`. |
 | `Features/Lore/RevisionModel.cs` | `EntityRevision` and its alias, tag and value snapshot rows. |
@@ -131,7 +131,7 @@ Repository index. Paths and one-line responsibilities only.
 | `src/timeline/` | Timeline API client, DTO types, date formatting and year grouping. |
 | `src/canon/` | Canon Integrity API client, DTO types, and the reader for the promotion gate's 409. |
 | `src/lib/dates.ts` | Timestamp formatting, date-input round trips, and spans. |
-| `src/components/` | `AuthLayout`, `Wordmark` (the drawn "Lore X", spoken "Lorex"), `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `EntityPortrait` (the card's picture, or its monogram), `EntityImageField` (pick, replace, remove), `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker` (single and multi, one shared search), `EntityHistory`, `RelationshipSection`, `RelationshipTypeManager`, `TimelineEntryForm`, `ConflictEntry`, `CanonBlockNotice` (the one refused-write presentation, shared by every gated form). |
+| `src/components/` | `AuthLayout`, `Wordmark` (the drawn "Lore X", spoken "Lorex"), `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `EntityPortrait` (the card's picture, or its monogram), `EntityImageField` (pick, frame, replace, edit thumbnail, remove), `ImageCropDialog` (the cropper, and `CroppedPicture` for unsaved previews), `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker` (single and multi, one shared search), `EntityHistory`, `RelationshipSection`, `RelationshipTypeManager`, `TimelineEntryForm`, `ConflictEntry`, `CanonBlockNotice` (the one refused-write presentation, shared by every gated form). |
 | `src/pages/` | Login, Register, Universes browser, and the workspace: Overview, Lore, entry page, Timeline, Canon, Types, Trash and Settings. `UniverseWorkspace` also owns the collapsing narrow-screen navigation. |
 | `vite.config.ts` | Dev server port 5173, proxy to the API, build config. |
 
@@ -153,8 +153,9 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.Api.Tests/CanonPromotionGateTests.cs` | What the gate refuses, what a refusal leaves behind, and what it must never block. |
 | `Lorex.Api.Tests/UniverseExportTests.cs` | What a backup holds, what it must never hold, its coherence and its determinism. |
 | `Lorex.Api.Tests/TrashEndpointTests.cs` | What trashing hides, what it must not destroy, and what a restore may refuse. |
-| `Lorex.Api.Tests/TestMediaObjectStore.cs` | The object store the test host runs against, and its two failure hooks. |
-| `Lorex.Api.Tests/EntityImageTests.cs` | What is stored, who may touch it, and what a replace or a remove leaves behind. |
+| `Lorex.Api.Tests/TestMediaObjectStore.cs` | The object store the test host runs against, and its three failure hooks. |
+| `Lorex.Api.Tests/R2MediaObjectStoreTests.cs` | The R2 adapter alone: the upload flags on the request and on the wire, and SDK failures kept inside. |
+| `Lorex.Api.Tests/EntityImageTests.cs` | What is stored, how a thumbnail is framed and reframed, who may touch it, and what a replace, reframe or remove leaves behind. |
 | `Lorex.Api.Tests/EntitySearchTests.cs` | What full text finds, what it must never find, and what keeps the index in step. |
 | `Lorex.E2E/playwright.config.ts` | Starts API + web, runs Chromium. |
 | `Lorex.E2E/specs/smoke.spec.ts` | Frontend-loads smoke suite. |
@@ -169,7 +170,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.E2E/specs/trash.spec.ts` | One journey: an entry and its connection leave together and one restore returns both. |
 | `Lorex.E2E/specs/canon.spec.ts` | The review screen, conflict identity across runs, the promotion gate's refusals, reconciliation on write, and the universe and owner boundaries. |
 | `Lorex.E2E/specs/mobile.spec.ts` | One journey at 390px: navigation, authoring, a reachable action, the drawer picker, and no sideways scroll. |
-| `Lorex.E2E/specs/entity-image.spec.ts` | Add, replace and remove a picture; the phone layout; what history says; what a backup carries; what the worker may not keep. |
+| `Lorex.E2E/specs/entity-image.spec.ts` | Add, replace and remove a picture; framing and reframing read back from the card; a sideways photo; the cropper and layout on a phone; history; backup; the worker. |
 | `Lorex.E2E/specs/pwa.spec.ts` | Manifest, icons and metadata, and what the service worker is never allowed to cache. |
 
 ## `scripts`
@@ -187,6 +188,6 @@ Repository index. Paths and one-line responsibilities only.
 | --- | --- |
 | `architecture/branching.md` | Branch naming and merge rules. |
 | `deployment/azure-dev.md` | The DEV runbook: topology, setup, deploy, limitations, troubleshooting. |
-| `deployment/cloudflare-r2.md` | The R2 runbook: bucket, token, config keys, and what a backup does not hold. |
+| `deployment/cloudflare-r2.md` | The R2 runbook: bucket, token, config keys, the SDK upload flags R2 needs, and what a backup does not hold. |
 | `architecture/decisions/README.md` | One-line index of every ADR. |
 | `architecture/decisions/` | ADRs; one small file per durable decision. |

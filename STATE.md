@@ -14,8 +14,7 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   non-`GET`, navigations and cross-origin outright - ADR 0017, which also says plainly that
   nothing works offline. Narrow-screen chrome folds into one sticky bar; desktop untouched.
 - **Phase 022** (Azure DEV + CI/CD) merged into `dev`. The deployment-blocking startup bug is
-  fixed, and DEV has a topology, workflows and a runbook - but nothing exists in Azure yet,
-  because the owner has to create it.
+  fixed, and DEV has a topology, workflows and a runbook. The owner has since created it.
   - The host no longer dies outside Development. `LorexDatabaseInitializer` migrates once per
     process in every environment, and the search-index backfill awaits it, so schema readiness is
     a dependency rather than an accident of registration order. ADR 0018.
@@ -28,10 +27,17 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   stabilization and feature polish**, on unnumbered `<type>/<description>` branches.
   **Phase 023 - Production Hardening / PostgreSQL - remains deferred** and is not started; the
   next numbered phase resumes only when the owner says so.
-- **Entry images** (`feat/entity-images-r2`, unnumbered, **not merged, not pushed**). An entry
-  may carry one picture: uploaded through the API, decoded and thumbnailed server-side, stored
-  as two objects in one private Cloudflare R2 bucket, and served back only through an
-  authenticated owner-scoped Lorex route. ADR 0019.
+- **Entry images** (`feat/entity-images-r2`, merged into `dev`). An entry may carry one picture:
+  uploaded through the API, decoded and thumbnailed server-side, stored as two objects in one
+  private Cloudflare R2 bucket, and served back only through an authenticated owner-scoped Lorex
+  route. ADR 0019.
+  - **Live-DEV fixes** (`fix/entity-image-r2-cropper`, **not merged, not pushed**). R2 refused every
+    upload (`STREAMING-AWS4-HMAC-SHA256-PAYLOAD not implemented`): PutObject now sets
+    `DisablePayloadSigning` and `DisableDefaultChecksumValidation`, pinned on the request and the
+    wire by `R2MediaObjectStoreTests`; SDK failures are a 503 problem, never a raw exception. The
+    thumbnail is now the square the author frames in a cropper (`react-easy-crop`); the browser
+    sends fractions, the server cuts. "Edit thumbnail" reframes from the stored original and never
+    touches it. The crop is persisted and exported as `image.crop`. ADR 0019 amendment, ADR 0014.
   - **Backup is an archive.** Format version 3: the download is `lorex-<slug>-<date>.zip`
     holding `backup.json` plus `media/entities/{entityId}/original.{ext}`. Originals only -
     thumbnails are derived and regenerated. No object key, bucket, endpoint or URL is in the
@@ -41,22 +47,26 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     objects are still deleted, so nothing historical is retained and an old version has no bytes
     to restore. Setting, replacing and removing each write a version flagged `Image`, and the
     history screen states the limit. ADR 0013, ADR 0019.
-  - **No Cloudflare resource exists yet**, and none was created. See Deferred.
 
 ## Baseline
 
-- **374 API integration tests, 62 Playwright tests**, green. No frontend unit runner exists;
+- **403 API integration tests, 65 Playwright tests**, green. No frontend unit runner exists;
   the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
-- The test host no longer migrates itself, so all 374 tests boot through the same startup path a
+- The test host no longer migrates itself, so all 403 tests boot through the same startup path a
   deployment uses.
-- 13 migrations, latest `AddEntityImages` - one `CREATE TABLE`, no table rebuild.
+- Under a full parallel Playwright run, `auth.spec.ts` "rejects a wrong password" intermittently
+  times out (it navigates to `/login` without awaiting sign-out), and a relationships or canon
+  spec can time out once; each passes alone. Known, not fixed.
+- 14 migrations, latest `AddEntityImageFraming` - five added columns and one backfill `UPDATE`
+  (thumbnail id = asset id for pre-existing pictures), no table rebuild.
   `has-pending-model-changes` reports none. `AddEntitySearchIndex` is raw SQL - an FTS5 virtual
   table and the trigger that empties it - so no EF Core model describes it and the pending check
   cannot see it either way.
 - No automated test reaches Cloudflare and none can: the API host registers an in-process object
-  store, and Playwright runs against `Media:Provider=InMemory`.
+  store, Playwright runs against `Media:Provider=InMemory`, and the R2 adapter tests answer the SDK
+  from an in-process HTTP handler.
 - Six rules in `src/Lorex.Api/Features/CanonIntegrity/Rules/`: three structural (Medium), three
   chronological (High). Behaviour: ADR 0010, 0011, 0012.
 
@@ -85,21 +95,15 @@ tool has changed the picture.
 - **Phase 023 - Production Hardening / PostgreSQL.** Deferred, not scheduled. It owns the
   production key store, a real database and backup story, and the search rewrite SQLite-only
   FTS5 forces (ADR 0016). ADR 0018 lists what the DEV topology deliberately does not solve.
-- **Azure DEV does not exist yet.** Phase 022 wrote the topology, the workflows and the runbook
-  but created nothing. Before the first deploy the owner has to: deploy `infra/main.bicep` into a
-  resource group; create an Entra app registration with a federated credential for the `dev`
-  GitHub environment and Contributor on that group; create the `dev` GitHub environment and the
-  four variables `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`,
-  `AZURE_WEBAPP_NAME`. Exact steps: `docs/deployment/azure-dev.md`.
+- **Azure DEV and R2 are owner-created and live** - live DEV testing is what found the R2 upload
+  bug. Nothing in this repository creates or changes either. Steps:
+  `docs/deployment/azure-dev.md`, `docs/deployment/cloudflare-r2.md`.
 - **Full security audit.** Relationships, timeline and Canon Integrity each had a focused check
   backed by tests. Outstanding: rate limiting, header/cookie hardening, dependency review, auth.
 - **Cross-era ordering** unsolved, and it bounds the chronology rules. ADR 0009, ADR 0011.
 - **`Age`** is declarable but read by nothing until a structured reference year exists. ADR 0011.
 - **Tooling trial verdict.** `docs/tooling/agent-tooling-trial.md` holds the evidence. Keep /
   conditional / remove is the owner's call, per tool.
-- **Cloudflare R2 does not exist yet.** No bucket, no token, no App Service setting, and nothing
-  in this repository creates any of them. Until the owner does it, every image route answers 503
-  and nothing else is affected. Exact steps: `docs/deployment/cloudflare-r2.md`.
 - **ImageSharp's licence.** `SixLabors.ImageSharp` is under the Six Labors Split License - free
   for personal use and for organisations under $1M revenue, which is true of Lorex today. Worth
   revisiting if that ever stops being true. ADR 0019.
