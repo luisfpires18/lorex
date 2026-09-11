@@ -383,6 +383,20 @@ test.describe('the type bar', () => {
     await page.waitForURL(/\/types$/)
     const reading = await canvasWidth()
 
+    // The free space either side of the canvas, inside the workspace column - which starts where
+    // the sidebar ends and runs to the edge of the window.
+    const freeSpace = () =>
+      page.locator('main.canvas').evaluate((element) => {
+        const box = element.getBoundingClientRect()
+        const column = document.querySelector('.sidebar')!.getBoundingClientRect().right
+        return { left: box.left - column, right: document.documentElement.clientWidth - box.right }
+      })
+
+    // A constrained page sits in the middle of that column, not against its left edge.
+    const types = await freeSpace()
+    expect(types.left).toBeGreaterThan(0)
+    expect(Math.abs(types.left - types.right)).toBeLessThanOrEqual(2)
+
     // The Lore browser takes more of the screen, and its grid turns that into columns.
     await page.getByTestId('workspace-lore').click()
     await page.waitForURL(/\/lore$/)
@@ -396,6 +410,11 @@ test.describe('the type bar', () => {
       window: document.documentElement.clientWidth,
     }))
     expect(Math.abs(edges.right - edges.window)).toBeLessThanOrEqual(1)
+
+    // It starts where the column starts too, so it takes the whole of it and is not centred in it.
+    const lore = await freeSpace()
+    expect(Math.abs(lore.left)).toBeLessThanOrEqual(1)
+    expect(Math.abs(lore.right)).toBeLessThanOrEqual(1)
 
     const grid = page.getByTestId('entity-grid')
     const columns = await grid.evaluate(
@@ -434,11 +453,23 @@ test.describe('the type bar', () => {
     await expect(page.getByTestId('entry-name')).toBeVisible()
     expect(Math.abs((await canvasWidth()) - reading)).toBeLessThanOrEqual(1)
 
+    const entry = await freeSpace()
+    expect(entry.left).toBeGreaterThan(0)
+    expect(Math.abs(entry.left - entry.right)).toBeLessThanOrEqual(2)
+
     // On a tablet the browser has nothing extra to take, and nothing scrolls sideways.
     await page.getByTestId('workspace-lore').click()
     await page.waitForURL(/\/lore$/)
     await page.setViewportSize({ width: 768, height: 1024 })
     await expect.poll(() => canvasWidth()).toBeLessThanOrEqual(768)
+    expect(await pageOverflow(page)).toBeLessThanOrEqual(1)
+
+    // And a constrained page on a tablet is what it always was: the column is narrower than the
+    // reading width, so there is no room to share and nothing to centre.
+    await page.getByTestId('workspace-nav-toggle').click()
+    await page.getByTestId('workspace-types').click()
+    await page.waitForURL(/\/types$/)
+    await expect.poll(() => canvasWidth()).toBeGreaterThan(700)
     expect(await pageOverflow(page)).toBeLessThanOrEqual(1)
   })
 })
