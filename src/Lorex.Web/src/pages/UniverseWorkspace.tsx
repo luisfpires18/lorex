@@ -34,13 +34,27 @@ export interface WorkspaceContext {
   refresh: (next?: UniverseDetail) => void
 }
 
-/** Which section the current URL is in. `lore/:entityId` is still Lore. */
-function currentSection(pathname: string, id: string | undefined) {
+/** The part of the URL below this universe, without its surrounding slashes. */
+function pathWithin(pathname: string, id: string | undefined) {
   const base = `/app/universes/${id ?? ''}`
   const rest = pathname.startsWith(base) ? pathname.slice(base.length) : ''
-  const segment = rest.replace(/^\/+/, '').split('/')[0] ?? ''
+  return rest.replace(/^\/+|\/+$/g, '')
+}
+
+/** Which section the current URL is in. `lore/:entityId` is still Lore. */
+function currentSection(pathname: string, id: string | undefined) {
+  const segment = pathWithin(pathname, id).split('/')[0] ?? ''
   if (segment === 'settings') return 'Settings'
   return SECTIONS.find((section) => section.segment === segment)?.label ?? 'Overview'
+}
+
+/**
+ * Whether this screen may use a wide canvas. Only the Lore browser: it is a grid of cards, which
+ * simply gains columns with the room, where every other screen is prose, forms or a list that reads
+ * best at the normal width. An entry's own page is `lore/:entityId` and keeps that width.
+ */
+function isWideScreen(pathname: string, id: string | undefined) {
+  return pathWithin(pathname, id) === 'lore'
 }
 
 export default function UniverseWorkspace() {
@@ -207,7 +221,7 @@ export default function UniverseWorkspace() {
         <p className="sidebar__soon">Greyed sections are not built yet.</p>
       </aside>
 
-      <main className="canvas">
+      <main className={isWideScreen(pathname, id) ? 'canvas canvas--wide' : 'canvas'}>
         <Outlet context={{ universe, refresh } satisfies WorkspaceContext} />
       </main>
     </div>

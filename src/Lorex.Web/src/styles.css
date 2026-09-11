@@ -746,6 +746,15 @@ a {
   max-width: 60rem;
 }
 
+/* The Lore browser only. Its cards sit in a grid that gains a column for every 18rem or so it is
+   given, so on a wide screen the reading-width cap above would leave it at two columns beside an
+   empty half of the display. Everything on the screen - heading, search, type chips, grid - lives
+   inside this one box, so it all widens together. Below about 1256px the workspace column is
+   narrower than either cap, which is why phones and tablets are unaffected. */
+.canvas--wide {
+  max-width: 80rem;
+}
+
 /* ---------- Overview ---------- */
 
 .overview__title {
