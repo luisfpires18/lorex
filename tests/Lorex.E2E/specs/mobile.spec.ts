@@ -112,6 +112,15 @@ test.describe('on a phone', () => {
     expect(box.y, 'Edit is below the fold at the top of a dossier').toBeLessThan(viewport.height)
     expect(box.y + box.height).toBeGreaterThan(0)
 
+    // Each action still answers to its own name, is a target a thumb can hit, and keeps its icon
+    // beside its label rather than pushing the label onto a second line.
+    for (const name of ['Edit', 'Move to Trash']) {
+      const action = actions.getByRole('button', { name, exact: true })
+      const target = (await action.boundingBox())!
+      expect(target.height, `${name} is smaller than a thumb`).toBeGreaterThanOrEqual(44)
+      expect(target.height, `${name} wrapped onto a second line`).toBeLessThan(60)
+    }
+
     // And it works from there, without scrolling to find it.
     await page.getByTestId('edit-entity').click()
     await page.getByLabel('Name').fill('Veyra of Ironvale')

@@ -1,8 +1,10 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import Cropper, { type Area } from 'react-easy-crop'
 import 'react-easy-crop/react-easy-crop.css'
+import { Check, X } from 'lucide-react'
 import { ApiError } from '../lib/api'
 import type { EntityImageCrop } from '../lore/types'
+import { ActionIcon } from './ActionIcon'
 
 /**
  * How far the author may zoom out: to the picture exactly covering the square, and no further. With
@@ -215,21 +217,23 @@ export function ImageCropDialog({
 
         <footer className="cropper__actions">
           <button
-            className="button"
+            className="button button--icon"
             type="button"
             disabled={!crop || saving}
             onClick={() => void confirm()}
             data-testid="image-crop-confirm"
           >
+            <ActionIcon icon={Check} />
             {saving ? 'Saving' : confirmLabel}
           </button>
           <button
-            className="button button--quiet"
+            className="button button--quiet button--icon"
             type="button"
             disabled={saving}
             onClick={cancel}
             data-testid="image-crop-cancel"
           >
+            <ActionIcon icon={X} />
             Cancel
           </button>
         </footer>

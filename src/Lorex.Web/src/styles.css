@@ -282,6 +282,22 @@ a {
   color: var(--ink);
 }
 
+/* A button that shows its action as well as naming it. The label stays and carries the name; the
+   icon only helps an eye scanning for it, so it is decorative, sized to the label, drawn in the
+   label's colour and centred on it, before or after the text as the markup puts it. */
+.button--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+}
+
+.button__icon {
+  flex: none;
+  width: 1.1em;
+  height: 1.1em;
+}
+
 /* ---------- Universe home ---------- */
 
 .home {
@@ -746,13 +762,13 @@ a {
   max-width: 60rem;
 }
 
-/* The Lore browser only. Its cards sit in a grid that gains a column for every 18rem or so it is
-   given, so on a wide screen the reading-width cap above would leave it at two columns beside an
-   empty half of the display. Everything on the screen - heading, search, type chips, grid - lives
-   inside this one box, so it all widens together. Below about 1256px the workspace column is
-   narrower than either cap, which is why phones and tablets are unaffected. */
-.canvas--wide {
-  max-width: 80rem;
+/* The Lore browser only. It is an index to scan rather than prose to read, so it fills the
+   workspace column, inside the same padding. Its card grid gains a column for every 18rem or so,
+   so cards never grow past what one more column would take back. Heading, search, type chips and
+   grid all live inside this one box and share its edges. Below about 1256px the column is narrower
+   than the reading width anyway, which is why phones and tablets are unaffected. */
+.canvas--full {
+  max-width: none;
 }
 
 /* ---------- Overview ---------- */
