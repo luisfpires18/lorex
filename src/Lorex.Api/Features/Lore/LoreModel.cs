@@ -72,7 +72,10 @@ public sealed class EntityType
 
     public string? Description { get; set; }
 
-    /// <summary>Icon identifier chosen by the client. Never rendered as markup.</summary>
+    /// <summary>
+    /// The type's icon key, or null for the neutral fallback. One of <see cref="EntityTypeIcons.Keys"/>,
+    /// chosen by the author and never inferred from <see cref="Name"/>. A key, not markup and not a URL.
+    /// </summary>
     public string? Icon { get; set; }
 
     public string? AccentColor { get; set; }

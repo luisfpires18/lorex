@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { EntityCard } from '../components/EntityCard'
+import { TypeFilterBar } from '../components/TypeFilterBar'
 import { listEntities, listEntityTypes } from '../lore/api'
 import {
   CANON_LABELS,
@@ -92,28 +93,6 @@ export default function LorePage() {
 
         <div className="controls__filters">
           <div className="field">
-            <label className="field__label" htmlFor="lore-type">
-              Type
-            </label>
-            <select
-              id="lore-type"
-              className="field__input field__input--select"
-              value={entityTypeId ?? ''}
-              onChange={(event) => {
-                setEntityTypeId(event.target.value || null)
-                setPage(1)
-              }}
-            >
-              <option value="">Every type</option>
-              {types.map((type) => (
-                <option key={type.id} value={type.id}>
-                  {type.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="field">
             <label className="field__label" htmlFor="lore-canon">
               Status
             </label>
@@ -139,6 +118,15 @@ export default function LorePage() {
             </select>
           </div>
         </div>
+
+        <TypeFilterBar
+          types={types}
+          selected={entityTypeId}
+          onSelect={(typeId) => {
+            setEntityTypeId(typeId)
+            setPage(1)
+          }}
+        />
       </div>
 
       {state.kind === 'loading' ? (

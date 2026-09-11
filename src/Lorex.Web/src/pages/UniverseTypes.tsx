@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { Field } from '../components/Field'
 import { RelationshipTypeManager } from '../components/RelationshipTypeManager'
+import { TypeIcon } from '../components/TypeIcon'
+import { TypeIconPicker } from '../components/TypeIconPicker'
 import { ApiError } from '../lib/api'
 import {
   addField,
@@ -9,6 +11,7 @@ import {
   deleteEntityType,
   deleteField,
   listEntityTypes,
+  updateEntityType,
   updateField,
 } from '../lore/api'
 import {
@@ -40,7 +43,10 @@ export default function UniverseTypes() {
   const [types, setTypes] = useState<EntityType[] | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [newType, setNewType] = useState('')
+  const [newTypeIcon, setNewTypeIcon] = useState<string | null>(null)
   const [openTypeId, setOpenTypeId] = useState<string | null>(null)
+  const [iconTypeId, setIconTypeId] = useState<string | null>(null)
+  const [busyTypeId, setBusyTypeId] = useState<string | null>(null)
 
   const [fieldName, setFieldName] = useState('')
   const [fieldKind, setFieldKind] = useState<FieldKindValue>(FieldKind.ShortText)
@@ -74,14 +80,38 @@ export default function UniverseTypes() {
       await createEntityType(universe.id, {
         name: newType.trim(),
         description: null,
-        icon: null,
+        icon: newTypeIcon,
         accentColor: null,
         displayOrder: null,
       })
       setNewType('')
+      setNewTypeIcon(null)
       await refresh()
     } catch (error: unknown) {
       report(error, 'That type could not be created.')
+    }
+  }
+
+  /**
+   * Changes one type's icon, and nothing else: the rest of the type is sent back as it stands,
+   * because the route replaces the whole type. Saved on choosing, like a field's meaning.
+   */
+  async function changeIcon(type: EntityType, icon: string | null) {
+    setMessage(null)
+    setBusyTypeId(type.id)
+    try {
+      await updateEntityType(universe.id, type.id, {
+        name: type.name,
+        description: type.description,
+        icon,
+        accentColor: type.accentColor,
+        displayOrder: type.displayOrder,
+      })
+      await refresh()
+    } catch (error: unknown) {
+      report(error, 'That icon could not be changed.')
+    } finally {
+      setBusyTypeId(null)
     }
   }
 
@@ -193,10 +223,22 @@ export default function UniverseTypes() {
         {types.map((type) => (
           <li className="types__row" key={type.id} data-type-name={type.name}>
             <div className="types__head">
+              <span className="types__icon" data-testid={`type-icon-${type.name}`}>
+                <TypeIcon iconKey={type.icon} />
+              </span>
               <span className="types__name">{type.name}</span>
               <span className="types__count">
                 {type.entityCount === 1 ? '1 entry' : `${type.entityCount} entries`}
               </span>
+              <button
+                className="button button--quiet"
+                type="button"
+                aria-expanded={iconTypeId === type.id}
+                onClick={() => setIconTypeId(iconTypeId === type.id ? null : type.id)}
+                data-testid={`icon-${type.name}`}
+              >
+                Icon
+              </button>
               <button
                 className="button button--quiet"
                 type="button"
@@ -217,6 +259,17 @@ export default function UniverseTypes() {
             </div>
 
             {type.description ? <p className="types__description">{type.description}</p> : null}
+
+            {iconTypeId === type.id ? (
+              <div className="types__iconpanel">
+                <TypeIconPicker
+                  value={type.icon}
+                  disabled={busyTypeId === type.id}
+                  onChange={(icon) => void changeIcon(type, icon)}
+                  testId={`icon-picker-${type.name}`}
+                />
+              </div>
+            ) : null}
 
             {openTypeId === type.id ? (
               <div className="types__fields">
@@ -376,6 +429,11 @@ export default function UniverseTypes() {
           value={newType}
           onChange={(event) => setNewType(event.target.value)}
         />
+        <TypeIconPicker value={newTypeIcon} onChange={setNewTypeIcon} testId="new-type-icon" />
+        <p className="field__hint types__iconhint">
+          Optional, and only a picture: it marks the type on the Lore filter. Nothing is chosen for
+          you from the name.
+        </p>
         <button className="button" type="button" onClick={submitType} data-testid="add-type">
           Add type
         </button>

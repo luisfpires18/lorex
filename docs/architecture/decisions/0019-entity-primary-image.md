@@ -2,7 +2,8 @@
 
 Status: accepted (2026-09-10). The two decisions it left open were taken the same day; see Consequences.
 Amended 2026-09-11 after live DEV testing: the author chooses the thumbnail's square, and R2 uploads need two
-per-request SDK flags. See "Amendment: owner-framed thumbnails and R2 uploads".
+per-request SDK flags. See "Amendment: owner-framed thumbnails and R2 uploads". Amended again the same day:
+a thumbnail may fit the whole picture instead of cropping it. See "Amendment: fitting the whole picture".
 
 ## Context
 
@@ -245,3 +246,43 @@ with the live error's own header value if either flag is removed.
 adapter as `MediaStorageFailedException`, and every image route and the export answer it with the
 same 503 problem the unconfigured store already produced. The provider's message is logged, never
 returned. A write that fails part-way sweeps what it may have written.
+
+## Amendment: fitting the whole picture (2026-09-11)
+
+Live testing showed that a square crop is the wrong thumbnail for a picture whose point is its whole
+shape - a tall banner, a map, a full-length figure. The original decision chose crop over fit to keep
+grey bars off the grid; that still holds as the default, and fit is now the author's alternative.
+
+**Two framings, one explicit mode.** `EntityImage.Framing` is `Crop` (0) or `Fit` (1), an integer
+column like every other enum. `Crop` is everything above: the author's square, or the centred square
+when none was recorded. `Fit` keeps the whole picture: the upright original is scaled so its longer
+side meets the square's edge and its shorter side keeps the proportion, rounded to the nearest pixel,
+then drawn centred on a transparent square. Nothing is cut off and nothing is stretched.
+
+**Still 320 square, still WebP, still never enlarged.** The square's edge is 320, or the original's
+longer side when that is smaller, by the same rule a crop follows; a fitted picture is then drawn at
+its own resolution. Deterministic in the same way: size and offset come only from the dimensions, and
+the sampler and encoder are fixed.
+
+**Transparent, not painted.** The empty part of the square is an alpha plane in the WebP. A card draws
+the thumbnail on its own surface, so the margin takes that surface's colour in a light or a dark scheme
+alike; a baked-in neutral would be right in at most one. Lossy WebP carries alpha losslessly, so the
+picture's edges are exact.
+
+**A fit carries no crop.** The four crop columns are null for `Fit`, and a crop sent beside `Fit` is
+ignored rather than checked or stored. `Crop` with a null crop keeps meaning the centred square.
+Existing rows needed no backfill: migration `AddEntityImageFramingMode` adds the column with 0, and
+every picture stored before it is a crop - of a recorded square or of the centred one.
+
+**Chosen in the same dialog, sent the same way.** The framing dialog opens with a `Crop` | `Fit full
+image` choice (native radio buttons). Fitting shows the whole picture inside the square and in the
+square and round previews, and makes the cropper inert without unmounting it, so switching back
+restores the square and zoom exactly. The upload form carries a `framing` field beside `crop`;
+`PUT .../image/thumbnail` carries `framing` beside `assetId` and `crop`. Absent means `Crop`, so every
+earlier client still means what it meant. Anything but the two modes is a validation problem on
+`framing`.
+
+**Switching is reframing.** Crop to fit and fit to crop go through the reframe route and its ordering
+unchanged: a new thumbnail id, the conditional move, an `Image` revision in the same transaction, and
+the old thumbnail swept only after the commit. The original's key and bytes are never touched. A
+backup carries `image.framing` by name, and `image.crop` only for `Crop` (ADR 0014).

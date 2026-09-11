@@ -3,6 +3,7 @@ using System;
 using Lorex.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Lorex.Api.Data.Migrations
 {
     [DbContext(typeof(LorexDbContext))]
-    partial class LorexDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260911092644_AddEntityImageFramingMode")]
+    partial class AddEntityImageFramingMode
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.11");

@@ -1,8 +1,10 @@
+using System.Globalization;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.Formats.Webp;
+using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 
 namespace Lorex.Api.Features.Lore;
@@ -10,13 +12,18 @@ namespace Lorex.Api.Features.Lore;
 /// <summary>What passed validation, and everything the write path needs from the bytes.</summary>
 /// <param name="Width">Displayed width - after orientation, see <see cref="EntityImageProcessing"/>.</param>
 /// <param name="Height">Displayed height.</param>
-/// <param name="Crop">The square actually cut, as fractions. Always set, even when none was asked for.</param>
+/// <param name="Framing">How the thumbnail was made.</param>
+/// <param name="Crop">
+/// The square actually cut, as fractions. Always set for a cropped thumbnail, even when none was
+/// asked for; never set for a fitted one, which cuts nothing.
+/// </param>
 internal sealed record PreparedEntityImage(
     string ContentType,
     string Extension,
     int Width,
     int Height,
-    EntityImageCrop Crop,
+    EntityImageFraming Framing,
+    EntityImageCrop? Crop,
     byte[] Thumbnail);
 
 /// <summary>Why an image was not accepted, and which part of the request to blame.</summary>
@@ -51,6 +58,12 @@ internal static class EntityImageProcessing
     public const string FileField = "file";
 
     public const string CropField = "crop";
+
+    public const string FramingField = "framing";
+
+    /// <summary>The refusal for a framing that is neither of the two there are.</summary>
+    public const string UnknownFraming =
+        "Choose how the thumbnail is framed: crop a square, or fit the whole picture.";
 
     /// <summary>Largest upload accepted. One picture on one entry does not need more.</summary>
     public const long MaxUploadBytes = 8L * 1024 * 1024;
@@ -89,8 +102,9 @@ internal static class EntityImageProcessing
 
     /// <summary>
     /// Deterministic by construction: a fixed sampler, a fixed encoder and a size derived only
-    /// from the square being cut, so the same original and the same crop always produce the same
-    /// thumbnail bytes - which is what lets an importer regenerate one rather than carry it.
+    /// from the square being cut, or the picture being fitted, so the same original and the same
+    /// framing always produce the same thumbnail bytes - which is what lets an importer regenerate
+    /// one rather than carry it. A fitted thumbnail's transparent margin is kept as an alpha plane.
     /// </summary>
     private static readonly WebpEncoder ThumbnailEncoder = new()
     {
@@ -128,16 +142,54 @@ internal static class EntityImageProcessing
     }
 
     /// <summary>
+    /// Reads the framing a request names: its number, as the JSON contract writes it, or its name.
+    /// Nothing at all means <see cref="EntityImageFraming.Crop"/>, which is what every request
+    /// meant before there was a choice.
+    /// </summary>
+    public static bool TryReadFraming(string? value, out EntityImageFraming framing)
+    {
+        framing = EntityImageFraming.Crop;
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        var text = value.Trim();
+
+        if (int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var number))
+        {
+            framing = (EntityImageFraming)number;
+            return Enum.IsDefined(framing);
+        }
+
+        foreach (var candidate in Enum.GetValues<EntityImageFraming>())
+        {
+            if (string.Equals(candidate.ToString(), text, StringComparison.OrdinalIgnoreCase))
+            {
+                framing = candidate;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Validates the upload and produces its thumbnail, or says in one sentence why it will not
     /// be stored. The sentence is shown to the author, so it says what to do about it.
     ///
-    /// <paramref name="crop"/> is the square the author chose. Without one the thumbnail is the
-    /// centred square, and the crop that describes it is returned anyway, so every picture
-    /// stored from here on records its framing.
+    /// <paramref name="framing"/> decides what the thumbnail is. For
+    /// <see cref="EntityImageFraming.Crop"/>, <paramref name="crop"/> is the square the author chose;
+    /// without one the thumbnail is the centred square, and the crop that describes it is returned
+    /// anyway, so every cropped picture stored from here on records its framing. For
+    /// <see cref="EntityImageFraming.Fit"/> the whole picture is kept, so there is no square to
+    /// choose and <paramref name="crop"/> is not read at all.
     /// </summary>
     public static async Task<(PreparedEntityImage? Image, EntityImageRejection? Rejection)> PrepareAsync(
         Stream upload,
         long byteLength,
+        EntityImageFraming framing,
         EntityImageCrop? crop,
         CancellationToken cancellationToken)
     {
@@ -149,6 +201,16 @@ internal static class EntityImageProcessing
         if (byteLength > MaxUploadBytes)
         {
             return Refuse(FileField, $"Images must be {MaxUploadBytes / (1024 * 1024)} MB or smaller.");
+        }
+
+        if (!Enum.IsDefined(framing))
+        {
+            return Refuse(FramingField, UnknownFraming);
+        }
+
+        if (framing == EntityImageFraming.Fit)
+        {
+            crop = null;
         }
 
         if (crop is not null && CheckCrop(crop) is { } badCrop)
@@ -225,6 +287,22 @@ internal static class EntityImageProcessing
             var width = decoded.Width;
             var height = decoded.Height;
 
+            if (framing == EntityImageFraming.Fit)
+            {
+                var fitted = await RenderFittedThumbnailAsync(decoded, cancellationToken);
+
+                return (
+                    new PreparedEntityImage(
+                        format.DefaultMimeType,
+                        extension,
+                        width,
+                        height,
+                        EntityImageFraming.Fit,
+                        null,
+                        fitted),
+                    null);
+            }
+
             var (square, rejection) = Place(crop, width, height);
 
             if (rejection is not null)
@@ -240,6 +318,7 @@ internal static class EntityImageProcessing
                     extension,
                     width,
                     height,
+                    EntityImageFraming.Crop,
                     Describe(square, width, height),
                     thumbnail),
                 null);
@@ -343,6 +422,60 @@ internal static class EntityImageProcessing
             }
         });
 
+        return await EncodeAsync(image, cancellationToken);
+    }
+
+    /// <summary>
+    /// The whole upright original, scaled to fit inside the portrait square and centred on it.
+    ///
+    /// The longer side meets the square's edge and the shorter one keeps the picture's own
+    /// proportion, rounded to the nearest pixel - so nothing is cut off and nothing is stretched.
+    /// The rest of the square is left transparent rather than painted: a card draws the thumbnail
+    /// on its own surface, so the empty part takes whatever colour that surface is, in a light or a
+    /// dark scheme alike, where a baked-in colour would be right in at most one of them.
+    ///
+    /// It never enlarges, by the same rule as a cropped thumbnail. The square is the target size, or
+    /// the picture's longer side when that is smaller, and the picture is then drawn at its own
+    /// resolution.
+    ///
+    /// Deterministic for the same reason the cropped one is: the size and the offset are derived only
+    /// from the picture's dimensions, and the sampler and encoder are fixed.
+    /// </summary>
+    private static async Task<byte[]> RenderFittedThumbnailAsync(Image image, CancellationToken cancellationToken)
+    {
+        var edge = Math.Min(ThumbnailSize, Math.Max(image.Width, image.Height));
+        var (width, height) = FitInside(image.Width, image.Height, edge);
+
+        if (width != image.Width || height != image.Height)
+        {
+            image.Mutate(context => context.Resize(new ResizeOptions
+            {
+                // Stretch only in name: the size was worked out to keep the proportion already.
+                Size = new Size(width, height),
+                Mode = ResizeMode.Stretch,
+                Sampler = KnownResamplers.Lanczos3,
+            }));
+        }
+
+        // A new image starts fully transparent, and it has never had metadata to strip.
+        using var square = new Image<Rgba32>(edge, edge);
+        square.Mutate(context => context.DrawImage(image, new Point((edge - width) / 2, (edge - height) / 2), 1f));
+
+        return await EncodeAsync(square, cancellationToken);
+    }
+
+    /// <summary>
+    /// The size a <paramref name="width"/> by <paramref name="height"/> picture is drawn at to fit a
+    /// square of <paramref name="edge"/>: the longer side becomes the edge, the shorter one is
+    /// scaled by the same factor and rounded, and neither is ever less than a pixel.
+    /// </summary>
+    internal static (int Width, int Height) FitInside(int width, int height, int edge) =>
+        width >= height
+            ? (edge, Math.Max(1, Pixel((double)height * edge / width)))
+            : (Math.Max(1, Pixel((double)width * edge / height)), edge);
+
+    private static async Task<byte[]> EncodeAsync(Image image, CancellationToken cancellationToken)
+    {
         // The thumbnail is a derived preview, so it carries nothing the original said about
         // itself - no EXIF, no camera, and in particular no GPS coordinates.
         image.Metadata.ExifProfile = null;

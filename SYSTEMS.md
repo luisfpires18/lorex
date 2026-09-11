@@ -57,11 +57,12 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Lore/LoreAccess.cs` | The universe-ownership gate every lore route passes. |
 | `Features/Lore/EntityEndpoints.cs` | Entity CRUD, search, filters, paging, tags. |
 | `Features/Lore/EntityTypeEndpoints.cs` | Entity types and their field definitions. |
-| `Features/Lore/EntityTypeDefaults.cs` | Idempotent seeding of the starter types. |
-| `Features/Lore/EntityImageModel.cs` | `EntityImage`: the one primary image an entry may have. |
+| `Features/Lore/EntityTypeDefaults.cs` | Idempotent seeding of the starter types, each with its icon key as data. |
+| `Features/Lore/EntityTypeIcons.cs` | The closed set of icon keys a type may carry; mirrored by the web client. |
+| `Features/Lore/EntityImageModel.cs` | `EntityImage`, the one primary image an entry may have, and `EntityImageFraming` (crop or fit). |
 | `Features/Lore/EntityImageConfiguration.cs` | Image schema: the entry's id as both key and foreign key. |
 | `Features/Lore/EntityImageKeys.cs` | The object-key convention (a thumbnail id per framing), and the lengths the columns allow. |
-| `Features/Lore/EntityImageProcessing.cs` | What is accepted as an image; the orientation rule; placing a crop on pixels; cutting the thumbnail. |
+| `Features/Lore/EntityImageProcessing.cs` | What is accepted as an image; the orientation rule; reading a framing; placing a crop on pixels; cutting or fitting the thumbnail. |
 | `Features/Lore/EntityImageEndpoints.cs` | Set, reframe, read and remove the image; the replace, reframe and cleanup ordering; storage failures as 503. |
 | `Features/Media/MediaObjectStore.cs` | `IMediaObjectStore`, its two failure exceptions, and what is registered when nothing is configured. |
 | `Features/Media/R2MediaObjectStore.cs` | Cloudflare R2 over its S3-compatible API: the two upload flags R2 needs, and SDK failures kept inside. |
@@ -124,14 +125,14 @@ Repository index. Paths and one-line responsibilities only.
 | `src/lib/api.ts` | Same-origin fetch wrapper and `ApiError`. |
 | `src/auth/` | Session context, `useAuth`, and the route guards. |
 | `src/universes/` | Universe API client and types. |
-| `src/lore/` | Lore API client, shared types, document and field helpers, the revision client, and the image client that composes an asset's URL. |
+| `src/lore/` | Lore API client, shared types, document and field helpers, the revision client, the image client that composes an asset's URL, and `typeIcons.ts` (the built-in type icon keys and their glyphs). |
 | `src/export/` | Backup download: the request, the server's filename, and handing the archive to the browser. |
 | `src/trash/` | Trash API client and DTO types. |
 | `src/relationships/` | Relationship API client, DTO types, and both-readings helper. |
 | `src/timeline/` | Timeline API client, DTO types, date formatting and year grouping. |
 | `src/canon/` | Canon Integrity API client, DTO types, and the reader for the promotion gate's 409. |
 | `src/lib/dates.ts` | Timestamp formatting, date-input round trips, and spans. |
-| `src/components/` | `AuthLayout`, `Wordmark` (the drawn "Lore X", spoken "Lorex"), `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `EntityPortrait` (the card's picture, or its monogram), `EntityImageField` (pick, frame, replace, edit thumbnail, remove), `ImageCropDialog` (the cropper, and `CroppedPicture` for unsaved previews), `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker` (single and multi, one shared search), `EntityHistory`, `RelationshipSection`, `RelationshipTypeManager`, `TimelineEntryForm`, `ConflictEntry`, `CanonBlockNotice` (the one refused-write presentation, shared by every gated form). |
+| `src/components/` | `AuthLayout`, `Wordmark` (the drawn "Lore X", spoken "Lorex"), `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `EntityPortrait` (the card's picture, or its monogram), `EntityImageField` (pick, frame, replace, edit thumbnail, remove), `ImageCropDialog` (the Crop / Fit full image dialog, and `FramedPicture` for unsaved previews), `TypeIcon`, `TypeIconPicker`, `TypeFilterBar` (the Lore browser's type chips), `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker` (single and multi, one shared search), `EntityHistory`, `RelationshipSection`, `RelationshipTypeManager`, `TimelineEntryForm`, `ConflictEntry`, `CanonBlockNotice` (the one refused-write presentation, shared by every gated form). |
 | `src/pages/` | Login, Register, Universes browser, and the workspace: Overview, Lore, entry page, Timeline, Canon, Types, Trash and Settings. `UniverseWorkspace` also owns the collapsing narrow-screen navigation. |
 | `vite.config.ts` | Dev server port 5173, proxy to the API, build config. |
 
@@ -170,7 +171,8 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.E2E/specs/trash.spec.ts` | One journey: an entry and its connection leave together and one restore returns both. |
 | `Lorex.E2E/specs/canon.spec.ts` | The review screen, conflict identity across runs, the promotion gate's refusals, reconciliation on write, and the universe and owner boundaries. |
 | `Lorex.E2E/specs/mobile.spec.ts` | One journey at 390px: navigation, authoring, a reachable action, the drawer picker, and no sideways scroll. |
-| `Lorex.E2E/specs/entity-image.spec.ts` | Add, replace and remove a picture; framing and reframing read back from the card; a sideways photo; the cropper and layout on a phone; history; backup; the worker. |
+| `Lorex.E2E/specs/entity-image.spec.ts` | Add, replace and remove a picture; framing and reframing read back from the card; crop to fit on a tall picture; a sideways photo; the dialog and layout on a phone; history; backup; the worker. |
+| `Lorex.E2E/specs/type-filter.spec.ts` | Type icons chosen and removed on the Types screen; the Lore type bar with search, Trash and keyboard; the bar on a phone. |
 | `Lorex.E2E/specs/pwa.spec.ts` | Manifest, icons and metadata, and what the service worker is never allowed to cache. |
 
 ## `scripts`

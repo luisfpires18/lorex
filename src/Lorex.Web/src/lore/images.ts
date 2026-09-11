@@ -1,5 +1,5 @@
 import { apiFetch } from '../lib/api'
-import type { EntityImageCrop, EntityImageRef } from './types'
+import { ImageFraming, type EntityImageRef, type ThumbnailFraming } from './types'
 
 /** What an author may pick in the file dialog. The API decides again by decoding the bytes. */
 export const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp'
@@ -39,7 +39,8 @@ export function entityImageUrl(
  * Sets the entry's primary image, replacing whatever it had, framed the way the author chose.
  *
  * The file and its framing travel in one request, so nothing is uploaded until the author has
- * confirmed the crop. The crop is only a request: the server cuts the thumbnail itself.
+ * confirmed the framing. The framing is only a request: the server makes the thumbnail itself. A
+ * crop is sent only for a cropped thumbnail; a fitted one has no square to send.
  *
  * PUT, not POST: the session cookie is `SameSite=Strict` and a scripted cross-site PUT is forced
  * through a CORS preflight, so neither an HTML form nor a fetch from another site can reach this.
@@ -48,29 +49,37 @@ export function setEntityImage(
   universeId: string,
   entityId: string,
   file: File,
-  crop: EntityImageCrop,
+  choice: ThumbnailFraming,
 ) {
   const body = new FormData()
   body.append('file', file)
-  body.append('crop', JSON.stringify(crop))
+  body.append('framing', String(choice.framing))
+  if (choice.framing === ImageFraming.Crop && choice.crop) {
+    body.append('crop', JSON.stringify(choice.crop))
+  }
 
   return apiFetch<EntityImageRef>(base(universeId, entityId), { method: 'PUT', body })
 }
 
 /**
- * Cuts a new thumbnail from the picture the entry already has. Nothing is uploaded and the
- * original is not touched. `assetId` is the picture the author framed, so a framing chosen for a
- * picture that has since been replaced is refused rather than applied to the new one.
+ * Makes a new thumbnail from the picture the entry already has - a different square, or a switch
+ * between a square and the whole picture. Nothing is uploaded and the original is not touched.
+ * `assetId` is the picture the author framed, so a framing chosen for a picture that has since been
+ * replaced is refused rather than applied to the new one.
  */
 export function setEntityThumbnail(
   universeId: string,
   entityId: string,
   assetId: string,
-  crop: EntityImageCrop,
+  choice: ThumbnailFraming,
 ) {
   return apiFetch<EntityImageRef>(`${base(universeId, entityId)}/thumbnail`, {
     method: 'PUT',
-    body: JSON.stringify({ assetId, crop }),
+    body: JSON.stringify({
+      assetId,
+      framing: choice.framing,
+      crop: choice.framing === ImageFraming.Crop ? choice.crop : null,
+    }),
   })
 }
 

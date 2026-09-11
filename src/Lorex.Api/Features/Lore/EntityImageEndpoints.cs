@@ -103,15 +103,18 @@ public static partial class EntityImageEndpoints
     /// image with two objects to sweep up. What cannot happen is the database naming objects
     /// that are gone.
     ///
-    /// <paramref name="crop"/> is the square the author framed, as JSON in its own form field
-    /// beside the file. It is optional - without one the thumbnail is the centred square - and it
-    /// travels with the file, so a replacement is one request: nothing is uploaded until the
-    /// author has confirmed how the new picture should be framed.
+    /// <paramref name="framing"/> and <paramref name="crop"/> are how the author framed it, each in
+    /// its own form field beside the file. Framing is optional and means a crop when absent; a crop
+    /// is the square as JSON, optional too - without one the thumbnail is the centred square - and
+    /// not read at all when the framing is a fit. Both travel with the file, so a replacement is one
+    /// request: nothing is uploaded until the author has confirmed how the new picture should be
+    /// framed.
     /// </summary>
     private static async Task<IResult> UploadAsync(
         Guid universeId,
         Guid entityId,
         IFormFile? file,
+        [FromForm(Name = "framing")] string? framing,
         [FromForm(Name = "crop")] string? crop,
         ClaimsPrincipal principal,
         LorexDbContext db,
@@ -141,8 +144,14 @@ public static partial class EntityImageEndpoints
             return Invalid(EntityImageProcessing.FileField, "Choose an image to upload.");
         }
 
+        if (!EntityImageProcessing.TryReadFraming(framing, out var requestedFraming))
+        {
+            return Invalid(EntityImageProcessing.FramingField, EntityImageProcessing.UnknownFraming);
+        }
+
+        // A fitted thumbnail keeps the whole picture, so a square sent beside it selects nothing.
         EntityImageCrop? requestedCrop = null;
-        if (!string.IsNullOrWhiteSpace(crop))
+        if (requestedFraming == EntityImageFraming.Crop && !string.IsNullOrWhiteSpace(crop))
         {
             requestedCrop = ReadCrop(crop);
 
@@ -162,7 +171,7 @@ public static partial class EntityImageEndpoints
         bytes.Position = 0;
 
         var (prepared, rejection) = await EntityImageProcessing.PrepareAsync(
-            bytes, bytes.Length, requestedCrop, cancellationToken);
+            bytes, bytes.Length, requestedFraming, requestedCrop, cancellationToken);
 
         if (prepared is null)
         {
@@ -231,7 +240,7 @@ public static partial class EntityImageEndpoints
         stored.Height = prepared.Height;
         stored.ByteSize = bytes.Length;
         stored.UploadedAt = now;
-        SetCrop(stored, prepared.Crop);
+        SetFraming(stored, prepared);
 
         try
         {
@@ -295,6 +304,9 @@ public static partial class EntityImageEndpoints
     /// replacement or another framing that landed in between wins, this one answers 409, and its
     /// thumbnail is swept - so an entry can never end up showing a square of a picture it no
     /// longer has.
+    ///
+    /// Switching between a cropped and a fitted thumbnail is this same route and this same
+    /// ordering: only the thumbnail and the framing that describes it change.
     /// </summary>
     private static async Task<IResult> ReframeAsync(
         Guid universeId,
@@ -323,14 +335,27 @@ public static partial class EntityImageEndpoints
             return Results.NotFound();
         }
 
-        if (request.Crop is null)
+        var framing = request.Framing ?? EntityImageFraming.Crop;
+
+        if (!Enum.IsDefined(framing))
         {
-            return Invalid(EntityImageProcessing.CropField, "Choose the part of the image the thumbnail shows.");
+            return Invalid(EntityImageProcessing.FramingField, EntityImageProcessing.UnknownFraming);
         }
 
-        if (EntityImageProcessing.CheckCrop(request.Crop) is { } badCrop)
+        // Only a crop has a square to check. A fit keeps the whole picture and ignores one.
+        var crop = framing == EntityImageFraming.Crop ? request.Crop : null;
+
+        if (framing == EntityImageFraming.Crop)
         {
-            return Invalid(EntityImageProcessing.CropField, badCrop);
+            if (crop is null)
+            {
+                return Invalid(EntityImageProcessing.CropField, "Choose the part of the image the thumbnail shows.");
+            }
+
+            if (EntityImageProcessing.CheckCrop(crop) is { } badCrop)
+            {
+                return Invalid(EntityImageProcessing.CropField, badCrop);
+            }
         }
 
         if (request.AssetId != image.AssetId)
@@ -377,7 +402,7 @@ public static partial class EntityImageEndpoints
         bytes.Position = 0;
 
         var (prepared, rejection) = await EntityImageProcessing.PrepareAsync(
-            bytes, bytes.Length, request.Crop, cancellationToken);
+            bytes, bytes.Length, framing, crop, cancellationToken);
 
         if (prepared is null)
         {
@@ -387,6 +412,12 @@ public static partial class EntityImageEndpoints
                 ? Invalid(EntityImageProcessing.CropField, rejection.Message)
                 : OriginalUnavailable();
         }
+
+        // Read out here, because a statement the database runs cannot follow a null crop itself.
+        double? cropX = prepared.Crop?.X;
+        double? cropY = prepared.Crop?.Y;
+        double? cropWidth = prepared.Crop?.Width;
+        double? cropHeight = prepared.Crop?.Height;
 
         var thumbnailId = Guid.NewGuid();
         var thumbnailKey = EntityImageKeys.Thumbnail(universeId, entityId, image.AssetId, thumbnailId);
@@ -429,17 +460,19 @@ public static partial class EntityImageEndpoints
                     setters => setters
                         .SetProperty(candidate => candidate.ThumbnailId, thumbnailId)
                         .SetProperty(candidate => candidate.ThumbnailKey, thumbnailKey)
-                        .SetProperty(candidate => candidate.CropX, (double?)prepared.Crop.X)
-                        .SetProperty(candidate => candidate.CropY, (double?)prepared.Crop.Y)
-                        .SetProperty(candidate => candidate.CropWidth, (double?)prepared.Crop.Width)
-                        .SetProperty(candidate => candidate.CropHeight, (double?)prepared.Crop.Height)
+                        .SetProperty(candidate => candidate.Framing, prepared.Framing)
+                        .SetProperty(candidate => candidate.CropX, cropX)
+                        .SetProperty(candidate => candidate.CropY, cropY)
+                        .SetProperty(candidate => candidate.CropWidth, cropWidth)
+                        .SetProperty(candidate => candidate.CropHeight, cropHeight)
                         .SetProperty(candidate => candidate.Width, prepared.Width)
                         .SetProperty(candidate => candidate.Height, prepared.Height),
                     cancellationToken);
 
             if (moved == 1)
             {
-                // A new framing is a new picture on the card, so it is an image change like any
+                // A new framing is a new picture on the card - a different square, or the switch
+                // between a square and the whole picture - so it is an image change like any
                 // other. Only the fact is recorded; the thumbnail it replaced is not kept.
                 await EntityRevisions.CaptureAsync(
                     db,
@@ -472,7 +505,7 @@ public static partial class EntityImageEndpoints
         image.ThumbnailKey = thumbnailKey;
         image.Width = prepared.Width;
         image.Height = prepared.Height;
-        SetCrop(image, prepared.Crop);
+        SetFraming(image, prepared);
 
         return Results.Ok(EntityImageRef.Of(image));
     }
@@ -693,12 +726,14 @@ public static partial class EntityImageEndpoints
         Message = "Image storage failed during {Operation} for entry {EntityId}. Nothing was changed.")]
     private static partial void LogStorageFailure(ILogger logger, string operation, Guid entityId, Exception exception);
 
-    private static void SetCrop(EntityImage image, EntityImageCrop crop)
+    /// <summary>The framing and its crop move together: a fitted thumbnail clears all four fractions.</summary>
+    private static void SetFraming(EntityImage image, PreparedEntityImage prepared)
     {
-        image.CropX = crop.X;
-        image.CropY = crop.Y;
-        image.CropWidth = crop.Width;
-        image.CropHeight = crop.Height;
+        image.Framing = prepared.Framing;
+        image.CropX = prepared.Crop?.X;
+        image.CropY = prepared.Crop?.Y;
+        image.CropWidth = prepared.Crop?.Width;
+        image.CropHeight = prepared.Crop?.Height;
     }
 
     /// <summary>The crop form field, or null when it is not the four numbers a crop is.</summary>

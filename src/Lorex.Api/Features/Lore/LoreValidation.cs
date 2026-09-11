@@ -16,9 +16,11 @@ public static partial class LoreValidation
             errors["description"] = ["That description is too long."];
         }
 
-        if (request.Icon is { Length: > LoreLimits.IconMaxLength })
+        // Optional, and only ever one of the built-in keys. Anything else - a name, a URL, markup -
+        // is refused rather than stored for a screen that could not draw it.
+        if (Normalize(request.Icon) is { } icon && !EntityTypeIcons.IsKnown(icon))
         {
-            errors["icon"] = ["That icon name is too long."];
+            errors["icon"] = ["That is not one of the icons Lorex has. Choose one from the list, or none."];
         }
 
         ValidateAccent(errors, request.AccentColor);

@@ -31,7 +31,7 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   uploaded through the API, decoded and thumbnailed server-side, stored as two objects in one
   private Cloudflare R2 bucket, and served back only through an authenticated owner-scoped Lorex
   route. ADR 0019.
-  - **Live-DEV fixes** (`fix/entity-image-r2-cropper`, **not merged, not pushed**). R2 refused every
+  - **Live-DEV fixes** (`fix/entity-image-r2-cropper`, merged into `dev`). R2 refused every
     upload (`STREAMING-AWS4-HMAC-SHA256-PAYLOAD not implemented`): PutObject now sets
     `DisablePayloadSigning` and `DisableDefaultChecksumValidation`, pinned on the request and the
     wire by `R2MediaObjectStoreTests`; SDK failures are a 503 problem, never a raw exception. The
@@ -47,21 +47,33 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     objects are still deleted, so nothing historical is retained and an old version has no bytes
     to restore. Setting, replacing and removing each write a version flagged `Image`, and the
     history screen states the limit. ADR 0013, ADR 0019.
+- **Lore visual polish** (`feat/lore-visual-polish`, **not merged, not pushed**). Two owner requests
+  from live testing.
+  - **A thumbnail may fit the whole picture.** `EntityImage.Framing` is `Crop` or `Fit`; Fit scales
+    the upright original inside a transparent square (320, never enlarged) and stores no crop. The
+    dialog offers `Crop` | `Fit full image`; switching either way is a reframe and an `Image`
+    revision; the original is never touched. Backup carries `image.framing`, still version 3.
+    ADR 0019 amendment, ADR 0014.
+  - **The Lore type filter is a row of icon chips.** Data-driven from the universe's types,
+    `aria-pressed`, scrolls sideways rather than wrapping. A type's icon is the existing
+    `EntityType.Icon` column, now a key from a closed set the API enforces, chosen on the Types
+    screen and never inferred from a name. Starter types keep their seeded keys. New web
+    dependency `lucide-react`. ADR 0020.
 
 ## Baseline
 
-- **403 API integration tests, 65 Playwright tests**, green. No frontend unit runner exists;
+- **428 API integration tests, 69 Playwright tests**, green. No frontend unit runner exists;
   the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
-- The test host no longer migrates itself, so all 403 tests boot through the same startup path a
+- The test host no longer migrates itself, so all 428 tests boot through the same startup path a
   deployment uses.
 - Under a full parallel Playwright run, `auth.spec.ts` "rejects a wrong password" intermittently
   times out (it navigates to `/login` without awaiting sign-out), and a relationships or canon
   spec can time out once; each passes alone. Known, not fixed.
-- 14 migrations, latest `AddEntityImageFraming` - five added columns and one backfill `UPDATE`
-  (thumbnail id = asset id for pre-existing pictures), no table rebuild.
-  `has-pending-model-changes` reports none. `AddEntitySearchIndex` is raw SQL - an FTS5 virtual
+- 16 migrations, latest `RestrictEntityTypeIconKeys` - data only: clears any type icon that is not
+  a built-in key. Before it, `AddEntityImageFramingMode` adds one integer column defaulting to
+  Crop; no table rebuild. `has-pending-model-changes` reports none. `AddEntitySearchIndex` is raw SQL - an FTS5 virtual
   table and the trigger that empties it - so no EF Core model describes it and the pending check
   cannot see it either way.
 - No automated test reaches Cloudflare and none can: the API host registers an in-process object

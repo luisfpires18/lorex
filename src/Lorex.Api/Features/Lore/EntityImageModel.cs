@@ -1,6 +1,26 @@
 namespace Lorex.Api.Features.Lore;
 
 /// <summary>
+/// How the thumbnail is made from the original. The original is the same either way; this only
+/// decides what the square the cards show is.
+/// </summary>
+public enum EntityImageFraming
+{
+    /// <summary>
+    /// A square the author chose, cut from the original. With no crop recorded it is the largest
+    /// centred square, which is what every thumbnail was before an author could choose - so a
+    /// picture stored before framing modes existed is exactly this.
+    /// </summary>
+    Crop = 0,
+
+    /// <summary>
+    /// The whole picture, scaled to fit inside the square and centred, with the rest of the square
+    /// left transparent. Nothing is cut off and nothing is stretched. Carries no crop.
+    /// </summary>
+    Fit = 1,
+}
+
+/// <summary>
 /// The one primary image an entry may have.
 ///
 /// A separate table keyed by <see cref="EntityId"/>, not a handful of nullable columns on
@@ -47,8 +67,16 @@ public sealed class EntityImage
     public required string ThumbnailKey { get; set; }
 
     /// <summary>
+    /// Whether the thumbnail is a square cut from the original or the whole original fitted inside
+    /// one. Every picture stored before this was recorded is <see cref="EntityImageFraming.Crop"/>,
+    /// because that is what its thumbnail is.
+    /// </summary>
+    public EntityImageFraming Framing { get; set; }
+
+    /// <summary>
     /// The square the thumbnail was cut from, as fractions of the displayed original - see
-    /// <see cref="EntityImageCrop"/>. All four are set or none is. None only for a picture stored
+    /// <see cref="EntityImageCrop"/>. All four are set or none is. None for a
+    /// <see cref="EntityImageFraming.Fit"/> thumbnail, which cuts nothing, and for a picture stored
     /// before framing was recorded, whose thumbnail is the centred square.
     ///
     /// Kept because it is the one thing about the thumbnail that is not derivable: with it the

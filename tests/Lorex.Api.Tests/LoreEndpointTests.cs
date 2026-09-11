@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Lorex.Api.Features.Auth;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Universes;
@@ -103,6 +104,87 @@ public sealed class LoreEndpointTests(LorexApiFactory factory) : IClassFixture<L
                 + "Move them to another type first.",
             await response.Content.ReadAsStringAsync(),
             StringComparison.Ordinal);
+    }
+
+    // ---------- Type icons ----------
+
+    [Fact]
+    public async Task Every_starter_type_carries_one_of_the_built_in_icons()
+    {
+        var (client, universe) = await SignedInWithUniverse("typeicondefaults");
+
+        var types = await ListTypes(client, universe.Id);
+
+        // Written by the seed as data, so a new world's types are recognisable at a glance - and
+        // every one of them is a key the client can actually draw.
+        Assert.All(types, type => Assert.True(EntityTypeIcons.IsKnown(type.Icon!), $"{type.Name} has icon '{type.Icon}'."));
+        Assert.All(EntityTypeDefaults.Defaults, seeded => Assert.True(EntityTypeIcons.IsKnown(seeded.Icon)));
+    }
+
+    [Fact]
+    public async Task A_custom_type_has_no_icon_until_its_author_chooses_one()
+    {
+        var (client, universe) = await SignedInWithUniverse("typeiconnone");
+
+        // Named like a starter type, and still given nothing: an icon is never guessed from a name.
+        var kingdom = await CreateType(client, universe.Id, "Kingdom");
+        Assert.Null(kingdom.Icon);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/universes/{universe.Id}/entity-types",
+            new EntityTypeRequest("Dynasty", null, "crown", null, null));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal("crown", (await response.Content.ReadFromJsonAsync<EntityTypeResponse>())!.Icon);
+    }
+
+    [Fact]
+    public async Task An_icon_can_be_changed_and_taken_away_later_and_travels_with_the_types_entries()
+    {
+        var (client, universe) = await SignedInWithUniverse("typeiconedit");
+        var type = await CreateType(client, universe.Id, "Starship");
+        var entry = await CreateEntity(client, universe.Id, type.Id, "The Kestrel");
+
+        // Trimmed like every other text input, and then it is an exact key.
+        var changed = await UpdateType(client, universe.Id, type.Id, new EntityTypeRequest("Starship", null, " ship ", null, null));
+        Assert.Equal("ship", changed.Icon);
+
+        // The card and the page read the icon off the type, so they follow the change.
+        Assert.Equal("ship", (await GetEntity(client, universe.Id, entry.Id)).EntityTypeIcon);
+        Assert.Equal(
+            "ship",
+            Assert.Single((await ListEntities(client, universe.Id, "pageSize=50")).Items).EntityTypeIcon);
+
+        // Blank is none, the same as null.
+        var cleared = await UpdateType(client, universe.Id, type.Id, new EntityTypeRequest("Starship", null, "  ", null, null));
+        Assert.Null(cleared.Icon);
+        Assert.Null((await ListTypes(client, universe.Id)).Single(candidate => candidate.Id == type.Id).Icon);
+    }
+
+    [Theory]
+    [InlineData("name", "dragon")]
+    [InlineData("case", "Character")]
+    [InlineData("markup", "<svg onload=alert(1)>")]
+    [InlineData("url", "https://example.test/icon.png")]
+    public async Task An_icon_that_is_not_a_built_in_key_is_refused_on_create_and_on_update(string tag, string icon)
+    {
+        var (client, universe) = await SignedInWithUniverse($"typeiconbad{tag}");
+        var type = await CreateType(client, universe.Id, "Starship");
+
+        var created = await client.PostAsJsonAsync(
+            $"/api/universes/{universe.Id}/entity-types",
+            new EntityTypeRequest("Relic", null, icon, null, null));
+        var updated = await client.PutAsJsonAsync(
+            $"/api/universes/{universe.Id}/entity-types/{type.Id}",
+            new EntityTypeRequest("Starship", null, icon, null, null));
+
+        await AssertIconRefused(created);
+        await AssertIconRefused(updated);
+
+        // Nothing was written by either refusal.
+        var types = await ListTypes(client, universe.Id);
+        Assert.DoesNotContain(types, candidate => candidate.Name == "Relic");
+        Assert.Null(types.Single(candidate => candidate.Id == type.Id).Icon);
     }
 
     // ---------- Custom fields ----------
@@ -716,6 +798,25 @@ public sealed class LoreEndpointTests(LorexApiFactory factory) : IClassFixture<L
             new EntityTypeRequest(name, description, null, null, null));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EntityTypeResponse>())!;
+    }
+
+    private static async Task<EntityTypeResponse> UpdateType(
+        HttpClient client,
+        Guid universeId,
+        Guid typeId,
+        EntityTypeRequest request)
+    {
+        var response = await client.PutAsJsonAsync($"/api/universes/{universeId}/entity-types/{typeId}", request);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<EntityTypeResponse>())!;
+    }
+
+    private static async Task AssertIconRefused(HttpResponseMessage response)
+    {
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.True(problem.RootElement.GetProperty("errors").TryGetProperty("icon", out _));
     }
 
     private static async Task<FieldDefinitionResponse> AddField(

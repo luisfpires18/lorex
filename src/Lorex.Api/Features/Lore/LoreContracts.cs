@@ -2,6 +2,10 @@ namespace Lorex.Api.Features.Lore;
 
 // ---------- Entity types ----------
 
+/// <summary>
+/// <paramref name="Icon"/> is the type's icon key: null or blank for none, otherwise one of
+/// <see cref="EntityTypeIcons.Keys"/>. Any other value is refused.
+/// </summary>
 public sealed record EntityTypeRequest(
     string? Name,
     string? Description,
@@ -105,8 +109,10 @@ public sealed record FieldValueResponse(
 /// the thumbnail's route for the same reason the asset id is in both: choosing a new framing makes
 /// a new thumbnail with a new address, so a cached one can never be served for the wrong crop.
 ///
-/// <paramref name="Crop"/> is the square the thumbnail was cut from. Null only for a picture
-/// stored before the author chose one, whose thumbnail is the centred square.
+/// <paramref name="Framing"/> says whether the thumbnail is a square cut from the original or the
+/// whole original fitted inside one. <paramref name="Crop"/> is the square it was cut from: null for
+/// a fitted thumbnail, which cuts nothing, and for a picture stored before the author chose one,
+/// whose thumbnail is the centred square.
 /// </summary>
 public sealed record EntityImageRef(
     Guid AssetId,
@@ -117,6 +123,7 @@ public sealed record EntityImageRef(
     string? FileName,
     long ByteSize,
     DateTime UploadedAt,
+    EntityImageFraming Framing,
     EntityImageCrop? Crop)
 {
     public static EntityImageRef Of(EntityImage image) => new(
@@ -128,6 +135,7 @@ public sealed record EntityImageRef(
         image.FileName,
         image.ByteSize,
         image.UploadedAt,
+        image.Framing,
         EntityImageCrop.Of(image));
 }
 
@@ -158,8 +166,15 @@ public sealed record EntityImageCrop(double X, double Y, double Width, double He
 /// <paramref name="AssetId"/> is the picture the author was looking at when they chose it. If the
 /// image has been replaced since, the fractions describe a different picture, and the request is
 /// refused rather than applied to it.
+///
+/// <paramref name="Framing"/> defaults to <see cref="EntityImageFraming.Crop"/>, which needs
+/// <paramref name="Crop"/>. <see cref="EntityImageFraming.Fit"/> keeps the whole picture, so a crop
+/// sent with it selects nothing and is ignored.
 /// </summary>
-public sealed record EntityThumbnailRequest(Guid AssetId, EntityImageCrop? Crop);
+public sealed record EntityThumbnailRequest(
+    Guid AssetId,
+    EntityImageCrop? Crop,
+    EntityImageFraming? Framing = null);
 
 /// <summary>Card row. Carries enough to render a type-aware card, and no universe or owner id.</summary>
 public sealed record EntitySummary(

@@ -7,6 +7,9 @@ namespace Lorex.Api.Features.Lore;
 /// The starter set of entity types. Seeding is idempotent: it inserts only the names a
 /// universe is missing, so it is safe to run on a new universe and on one created before
 /// this feature existed.
+///
+/// Each carries an icon key from <see cref="EntityTypeIcons"/>, written here as data. That is the
+/// only way a type gets an icon it was not given by its author: nothing maps a name to one.
 /// </summary>
 public static class EntityTypeDefaults
 {
