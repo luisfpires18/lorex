@@ -91,50 +91,70 @@ function rowIcon(page: Page, typeName: string) {
   return page.getByTestId(`type-icon-${typeName}`).locator('svg')
 }
 
-/** Waits until the row has stopped moving: a smooth scroll the bar itself started may still run. */
-async function rowAtRest(row: Locator) {
-  await expect
-    .poll(() =>
-      row.evaluate(async (element) => {
-        const before = element.scrollLeft
-        await new Promise((resolve) => setTimeout(resolve, 150))
-        return element.scrollLeft === before
-      }),
-    )
-    .toBe(true)
+/** Types beyond the seven starters, so the chips need several rows even on a desktop. */
+const MANY_TYPES = [
+  'Kingdom',
+  'Starship',
+  'Dynasty',
+  'Artifact',
+  'Ritual Circle',
+  'Rumour of the Tide',
+]
+
+/** How far the document scrolls sideways. One pixel of rounding is not a defect. */
+function pageOverflow(page: Page) {
+  return page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  )
 }
 
 /**
- * Leaves the row where a swipe that stopped there would: at a scroll position worked out from one
- * chip, set directly, and confirmed to have landed there before anything is measured against it.
+ * How the chips sit in the row: how many rows they make, whether any chip reaches outside the row
+ * or any label is cut short, whether the row itself has anything to scroll, each chip's height, and
+ * the vertical gap between one row and the next.
  */
-async function scrollRow(row: Locator, name: string, where: 'start' | 'cut-left' | 'cut-right') {
-  await rowAtRest(row)
+function chipLayout(row: Locator) {
+  return row.evaluate((element) => {
+    const bounds = element.getBoundingClientRect()
+    const chips = [...element.querySelectorAll('button')].map((chip) =>
+      chip.getBoundingClientRect(),
+    )
+    const tops = [...new Set(chips.map((chip) => Math.round(chip.top)))].sort((a, b) => a - b)
 
-  const target = await row.evaluate(
-    (element, { name, where }) => {
-      const chip = [...element.querySelectorAll('button')].find(
-        (candidate) => candidate.textContent?.trim() === name,
-      )!
-      const left =
-        where === 'start'
-          ? 0
-          : where === 'cut-left'
-            ? chip.offsetLeft + chip.offsetWidth / 2
-            : chip.offsetLeft + chip.offsetWidth / 2 - element.clientWidth
-      const clamped = Math.round(
-        Math.min(Math.max(0, left), element.scrollWidth - element.clientWidth),
-      )
-      element.scrollTo({ left: clamped, behavior: 'instant' })
-      return clamped
-    },
-    { name, where },
-  )
+    return {
+      rows: tops.length,
+      outside: chips.filter(
+        (chip) => chip.left < bounds.left - 0.5 || chip.right > bounds.right + 0.5,
+      ).length,
+      clippedLabels: [...element.querySelectorAll<HTMLElement>('.typebar__name')].filter(
+        (label) => label.scrollWidth > label.clientWidth + 1,
+      ).length,
+      rowOverflows: element.scrollWidth > element.clientWidth + 1,
+      heights: chips.map((chip) => chip.height),
+      rowGaps: tops
+        .slice(1)
+        .map(
+          (top, index) =>
+            top -
+            Math.max(
+              ...chips.filter((chip) => Math.round(chip.top) === tops[index]).map((c) => c.bottom),
+            ),
+        ),
+    }
+  })
+}
 
-  await expect
-    .poll(() => row.evaluate((element, target) => Math.abs(element.scrollLeft - target), target))
-    .toBeLessThanOrEqual(1)
-  await rowAtRest(row)
+/** Every chip inside the row, every label whole, nothing to scroll, and rows close together. */
+async function expectTidyRows(row: Locator) {
+  const layout = await chipLayout(row)
+  expect(layout.outside).toBe(0)
+  expect(layout.clippedLabels).toBe(0)
+  expect(layout.rowOverflows).toBe(false)
+  for (const gap of layout.rowGaps) {
+    expect(gap).toBeGreaterThanOrEqual(4)
+    expect(gap).toBeLessThanOrEqual(12)
+  }
+  return layout
 }
 
 test.describe('the type bar', () => {
@@ -307,40 +327,57 @@ test.describe('the type bar', () => {
     await expect(chip(page, 'All')).toHaveAttribute('aria-pressed', 'true')
     await expect(page.getByTestId('entity-card')).toHaveCount(4)
   })
+
+  test('wraps onto more rows as the width runs out, and never spills sideways', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await signUp(page)
+    const universeId = await newUniverse(page)
+
+    for (const name of MANY_TYPES) await createType(page, universeId, name)
+    const ids = await typeIds(page, universeId)
+    await createEntry(page, universeId, ids.get('Character')!, 'Alenna Vance', 'Warden.')
+    await createEntry(page, universeId, ids.get('Ritual Circle')!, 'The Tide Vigil', 'At dusk.')
+
+    await page.getByTestId('workspace-lore').click()
+    await page.waitForURL(/\/lore$/)
+    await expect(page.getByTestId('entity-card')).toHaveCount(2)
+
+    // All, the seven starters and every added type.
+    const row = page.getByTestId('type-filter')
+    await expect(row.getByRole('button')).toHaveCount(1 + 7 + MANY_TYPES.length)
+
+    // Already more than one row at a desktop width, every chip whole and inside the row.
+    const wide = await expectTidyRows(row)
+    expect(wide.rows).toBeGreaterThan(1)
+    expect(await pageOverflow(page)).toBeLessThanOrEqual(1)
+
+    // Less room: the same chips take more rows, still whole, still nothing to scroll.
+    await page.setViewportSize({ width: 900, height: 900 })
+    await expect.poll(async () => (await chipLayout(row)).rows).toBeGreaterThan(wide.rows)
+    await expectTidyRows(row)
+    expect(await pageOverflow(page)).toBeLessThanOrEqual(1)
+
+    // A chip on a later row filters like any other.
+    await chip(page, 'Ritual Circle').click()
+    await expect(chip(page, 'Ritual Circle')).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByTestId('entity-card')).toHaveCount(1)
+    await expect(card(page, 'The Tide Vigil')).toBeVisible()
+  })
 })
 
 test.describe('the type bar on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
 
-  /*
-   * What this does not claim: that a finger drag scrolls the row. Headless Chromium does not turn
-   * synthetic touches into native scrolling, so no test here can prove that, and none pretends to.
-   * What it proves instead, separately: the row is a sideways scroller a finger is allowed to pan,
-   * the page itself never scrolls sideways, every chip is a thumb-sized target, and - with the row
-   * left at a known position - choosing a chip that is off screen or cut by an edge selects it,
-   * filters the grid, and brings the whole chip into view.
-   *
-   * Chips that are not fully visible are chosen with a dispatched click rather than a tap: a tap
-   * scrolls its target into view first, which would do the bar's job for it and hide whether the
-   * bar does it. A real tap is used on a chip that is fully in view.
-   */
-  test('scrolls sideways under a thumb and keeps the chosen type in view', async ({ page }) => {
+  test('wraps into rows of thumb-sized chips that fit the screen', async ({ page }) => {
     await signUp(page)
     const universeId = await newUniverse(page)
 
-    // Enough types that the row cannot fit a phone.
-    await createType(page, universeId, 'Starship')
-    await createType(page, universeId, 'Dynasty')
-    await createType(page, universeId, 'Ritual Circle')
+    for (const name of MANY_TYPES) await createType(page, universeId, name)
     const ids = await typeIds(page, universeId)
     await createEntry(page, universeId, ids.get('Character')!, 'Alenna Vance', 'Warden.')
-    await createEntry(
-      page,
-      universeId,
-      ids.get('Ritual Circle')!,
-      'The Tide Vigil',
-      'Held at dusk.',
-    )
+    await createEntry(page, universeId, ids.get('Ritual Circle')!, 'The Tide Vigil', 'At dusk.')
 
     await page.getByTestId('workspace-nav-toggle').click()
     await page.getByTestId('workspace-lore').click()
@@ -348,76 +385,31 @@ test.describe('the type bar on a phone', () => {
     await expect(page.getByTestId('entity-card')).toHaveCount(2)
 
     const row = page.getByTestId('type-filter')
+    await expect(row.getByRole('button')).toHaveCount(1 + 7 + MANY_TYPES.length)
 
-    // The row scrolls; the page does not.
-    const widths = await row.evaluate((element) => [element.scrollWidth, element.clientWidth])
-    expect(widths[0]).toBeGreaterThan(widths[1])
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      ),
-    ).toBeLessThanOrEqual(1)
+    // Several rows, every chip and label whole, and nothing - the row or the page - to scroll.
+    const layout = await expectTidyRows(row)
+    expect(layout.rows).toBeGreaterThan(2)
+    expect(await pageOverflow(page)).toBeLessThanOrEqual(1)
 
     // Every chip is a target a thumb can hit.
-    for (const height of await row
-      .getByRole('button')
-      .evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().height))) {
-      expect(height).toBeGreaterThanOrEqual(44)
-    }
+    for (const height of layout.heights) expect(height).toBeGreaterThanOrEqual(44)
 
-    // A finger is allowed to pan it: it scrolls on its own axis, and nothing turns panning off.
-    expect(
-      await row.evaluate((element) => {
-        const style = getComputedStyle(element)
-        return [style.overflowX, style.touchAction]
-      }),
-    ).toEqual(['auto', 'auto'])
-
-    // ---------- A type off the far end of the row ----------
-
-    await scrollRow(row, 'All', 'start')
-    const last = chip(page, 'Ritual Circle')
-    await expect(last).not.toBeInViewport()
-
-    await last.dispatchEvent('click')
-    await expect(last).toHaveAttribute('aria-pressed', 'true')
-    await expect(last).toBeInViewport({ ratio: 1 })
+    // A chip on the last rows is chosen with an ordinary tap, and filters.
+    const ritual = chip(page, 'Ritual Circle')
+    await ritual.tap()
+    await expect(ritual).toHaveAttribute('aria-pressed', 'true')
     await expect(page.getByTestId('entity-card')).toHaveCount(1)
     await expect(card(page, 'The Tide Vigil')).toBeVisible()
 
-    // ---------- A type cut in half by the right edge ----------
+    // Chosen looks chosen.
+    const background = (name: string) =>
+      chip(page, name).evaluate((element) => getComputedStyle(element).backgroundColor)
+    expect(await background('Ritual Circle')).not.toEqual(await background('Character'))
 
-    const species = chip(page, 'Species')
-    await scrollRow(row, 'Species', 'cut-right')
-    await expect(species).toBeInViewport()
-    await expect(species).not.toBeInViewport({ ratio: 1 })
-
-    await species.dispatchEvent('click')
-    await expect(species).toHaveAttribute('aria-pressed', 'true')
-    await expect(last).toHaveAttribute('aria-pressed', 'false')
-    await expect(species).toBeInViewport({ ratio: 1 })
-    await expect(page.getByTestId('entity-empty')).toBeVisible()
-
-    // ---------- A type cut in half by the left edge ----------
-
-    const character = chip(page, 'Character')
-    await scrollRow(row, 'Character', 'cut-left')
-    await expect(character).toBeInViewport()
-    await expect(character).not.toBeInViewport({ ratio: 1 })
-
-    await character.dispatchEvent('click')
-    await expect(character).toHaveAttribute('aria-pressed', 'true')
-    await expect(character).toBeInViewport({ ratio: 1 })
-    await expect(page.getByTestId('entity-card')).toHaveCount(1)
-    await expect(card(page, 'Alenna Vance')).toBeVisible()
-
-    // ---------- A real tap on a chip in view ----------
-
-    await scrollRow(row, 'All', 'start')
-    const all = chip(page, 'All')
-    await expect(all).toBeInViewport({ ratio: 1 })
-    await all.tap()
-    await expect(all).toHaveAttribute('aria-pressed', 'true')
+    // Tapping it again lets go of it.
+    await ritual.tap()
+    await expect(chip(page, 'All')).toHaveAttribute('aria-pressed', 'true')
     await expect(page.getByTestId('entity-card')).toHaveCount(2)
   })
 })
