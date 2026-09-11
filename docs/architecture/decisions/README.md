@@ -23,8 +23,9 @@ One ADR per durable decision. Rationale lives in the ADR, never here.
 | 0017 | Lorex installs as an app shell and caches build output only | [0017-pwa-shell-and-caching.md](0017-pwa-shell-and-caching.md) |
 | 0018 | DEV is one App Service serving both halves, with state on the site's own share | [0018-azure-dev-single-app-service.md](0018-azure-dev-single-app-service.md) |
 | 0019 | An entry has one image, held in a private bucket and served by Lorex | [0019-entity-primary-image.md](0019-entity-primary-image.md) |
+| 0020 | An entity type's icon is a key from a closed, built-in set | [0020-entity-type-icon-keys.md](0020-entity-type-icon-keys.md) |
 
-All accepted. Next number: `0020`.
+All accepted. Next number: `0021`.
 
 Known limitations are recorded in the ADR that owns them - cross-era ordering in 0009 and
 0011, the `Age` reference year and exclusive-relationship overlap in 0011, what the

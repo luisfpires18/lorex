@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
@@ -655,7 +656,93 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
         Assert.Equal(320, image.Width);
         Assert.Equal(200, image.Height);
         Assert.True(image.ByteSize > 0);
+        Assert.Equal(EntityImageFraming.Crop, image.Framing);
         Assert.Equal(new BackupImageCrop(0.1875, 0, 0.625, 1), image.Crop);
+    }
+
+    [Fact]
+    public async Task A_fitted_picture_is_carried_as_fit_without_a_crop_and_a_reader_can_fit_the_same_thumbnail_again()
+    {
+        var (client, universe) = await SignedInWithUniverse("expfit");
+        var character = await CharacterType(client, universe.Id);
+
+        var warden = await Create(client, universe.Id, character, "Alenna Vance", CanonStatus.Canon);
+        var fitted = await Upload(client, universe.Id, warden.Id, Png(300, 900), "portrait.png", EntityImageFraming.Fit);
+
+        var archive = await RawArchive(client, universe.Id);
+        var document = DocumentText(archive);
+        var backup = JsonSerializer.Deserialize<UniverseBackup>(document, UniverseBackupJson.Options)!;
+        var image = backup.Payload.Entities.Single(entity => entity.Id == warden.Id).Image!;
+
+        // The framing is named, not numbered, like every enum in the file - and a fit carries no
+        // square, because it cut none.
+        Assert.Equal(EntityImageFraming.Fit, image.Framing);
+        Assert.Null(image.Crop);
+        Assert.Contains("\"framing\": \"Fit\"", document, StringComparison.Ordinal);
+
+        // Still no thumbnail in the archive: the original and the framing are enough to make it again,
+        // byte for byte.
+        Assert.DoesNotContain(EntryNames(archive), name => name.Contains("thumbnail", StringComparison.OrdinalIgnoreCase));
+
+        var original = EntryBytes(archive, image.MediaPath);
+        using var stream = new MemoryStream(original, writable: false);
+
+        var (regenerated, rejection) = await EntityImageProcessing.PrepareAsync(
+            stream, original.Length, image.Framing, crop: null, CancellationToken.None);
+
+        Assert.Null(rejection);
+        Assert.Equal(
+            _factory.Media.Bytes(
+                $"universes/{universe.Id:D}/entities/{warden.Id:D}/primary/{fitted.AssetId:D}/thumbnail-{fitted.ThumbnailId:D}.webp"),
+            regenerated!.Thumbnail);
+    }
+
+    [Fact]
+    public void A_backup_written_before_framing_modes_still_reads_as_a_crop()
+    {
+        // A version 3 image exactly as it was written before `framing` existed: no member at all.
+        const string Earlier = """
+            {
+              "assetId": "6f1c1d3e-8f51-4a0e-9e0e-0f7cbd0f0a01",
+              "fileName": "portrait.png",
+              "contentType": "image/png",
+              "width": 400,
+              "height": 200,
+              "byteSize": 1234,
+              "mediaPath": "media/entities/6f1c1d3e-8f51-4a0e-9e0e-0f7cbd0f0a02/original.png",
+              "crop": { "x": 0.5, "y": 0, "width": 0.5, "height": 1 }
+            }
+            """;
+
+        var image = JsonSerializer.Deserialize<BackupEntityImage>(Earlier, UniverseBackupJson.Options)!;
+
+        Assert.Equal(EntityImageFraming.Crop, image.Framing);
+        Assert.Equal(new BackupImageCrop(0.5, 0, 0.5, 1), image.Crop);
+    }
+
+    [Fact]
+    public async Task A_backup_carries_each_types_icon_key()
+    {
+        var (client, universe) = await SignedInWithUniverse("expicon");
+
+        var created = await client.PostAsJsonAsync(
+            $"/api/universes/{universe.Id}/entity-types",
+            new EntityTypeRequest("Dynasty", null, "crown", null, null));
+        created.EnsureSuccessStatusCode();
+        var dynasty = (await created.Content.ReadFromJsonAsync<EntityTypeResponse>())!;
+
+        var bare = await client.PostAsJsonAsync(
+            $"/api/universes/{universe.Id}/entity-types",
+            new EntityTypeRequest("Rumour", null, null, null, null));
+        bare.EnsureSuccessStatusCode();
+        var rumour = (await bare.Content.ReadFromJsonAsync<EntityTypeResponse>())!;
+
+        var types = (await Backup(client, universe.Id)).Payload.EntityTypes;
+
+        // Chosen, and chosen as none - both are the author's, so both survive.
+        Assert.Equal("crown", types.Single(type => type.Id == dynasty.Id).Icon);
+        Assert.Null(types.Single(type => type.Id == rumour.Id).Icon);
+        Assert.Equal("character", types.Single(type => type.Name == "Character").Icon);
     }
 
     [Fact]
@@ -691,6 +778,7 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
         var (regenerated, rejection) = await EntityImageProcessing.PrepareAsync(
             stream,
             original.Length,
+            image.Framing,
             new EntityImageCrop(image.Crop!.X, image.Crop.Y, image.Crop.Width, image.Crop.Height),
             CancellationToken.None);
 
@@ -971,12 +1059,18 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
         Guid universeId,
         Guid entityId,
         byte[] bytes,
-        string fileName)
+        string fileName,
+        EntityImageFraming? framing = null)
     {
         using var form = new MultipartFormDataContent();
         var file = new ByteArrayContent(bytes);
         file.Headers.ContentType = new MediaTypeHeaderValue("image/png");
         form.Add(file, "file", fileName);
+
+        if (framing is { } chosen)
+        {
+            form.Add(new StringContent(((int)chosen).ToString(CultureInfo.InvariantCulture)), "framing");
+        }
 
         var response = await client.PutAsync($"/api/universes/{universeId}/entities/{entityId}/image", form);
         response.EnsureSuccessStatusCode();

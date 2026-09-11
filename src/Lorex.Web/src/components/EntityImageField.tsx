@@ -7,17 +7,16 @@ import {
   setEntityImage,
   setEntityThumbnail,
 } from '../lore/images'
-import type { EntityImageCrop, EntityImageRef } from '../lore/types'
-import { CroppedPicture, ImageCropDialog } from './ImageCropDialog'
+import { ImageFraming, type EntityImageRef, type ThumbnailFraming } from '../lore/types'
+import { FramedPicture, ImageCropDialog } from './ImageCropDialog'
 
-/** A picture chosen for an entry that does not exist yet, with the square the author framed. */
-export interface PendingImage {
+/** A picture chosen for an entry that does not exist yet, with the framing the author chose. */
+export interface PendingImage extends ThumbnailFraming {
   file: File
-  crop: EntityImageCrop
 }
 
 /**
- * What the cropper is open on. A file just picked is framed before anything is uploaded; a
+ * What the framing dialog is open on. A file just picked is framed before anything is uploaded; a
  * picture already stored is reframed from its own original, which is never sent again.
  */
 type Framing =
@@ -25,17 +24,18 @@ type Framing =
       kind: 'file'
       file: File
       source: string
-      /** Whether `source` was made for this cropper and is released with it. */
+      /** Whether `source` was made for this dialog and is released with it. */
       ownsSource: boolean
-      initial: EntityImageCrop | null
+      initial: ThumbnailFraming
     }
   | { kind: 'stored'; image: EntityImageRef; source: string }
 
 /**
  * The editor's image control: pick one and frame it, reframe it, replace it, take it away.
  *
- * Every picture goes through the cropper before it goes anywhere. The whole picture is always
- * kept and shown on the entry's page; the square the author chooses is only what cards show.
+ * Every picture goes through the framing dialog before it goes anywhere. The whole picture is
+ * always kept and shown on the entry's page; the framing - a square of it, or all of it fitted
+ * inside the square - is only what cards show.
  *
  * It behaves differently either side of the entry existing, because the object keys are built
  * from the entry's id and there is no id until the entry is saved.
@@ -114,12 +114,14 @@ export function EntityImageField({
       return
     }
 
+    // A replacement starts in the framing the picture it replaces had - an author who fitted one
+    // portrait most likely wants the next fitted too - and on the centred square either way.
     setFraming({
       kind: 'file',
       file,
       source: URL.createObjectURL(file),
       ownsSource: true,
-      initial: null,
+      initial: { framing: pending?.framing ?? image?.framing ?? ImageFraming.Crop, crop: null },
     })
   }
 
@@ -132,7 +134,7 @@ export function EntityImageField({
         file: pending.file,
         source: preview,
         ownsSource: false,
-        initial: pending.crop,
+        initial: { framing: pending.framing, crop: pending.crop },
       })
       return
     }
@@ -146,16 +148,16 @@ export function EntityImageField({
     }
   }
 
-  async function keep(crop: EntityImageCrop) {
+  async function keep(choice: ThumbnailFraming) {
     if (!framing) return
 
     if (framing.kind === 'stored') {
-      // Only the square is sent. The original stays exactly where it is.
-      onChanged(await setEntityThumbnail(universeId, entityId!, framing.image.assetId, crop))
+      // Only the framing is sent. The original stays exactly where it is.
+      onChanged(await setEntityThumbnail(universeId, entityId!, framing.image.assetId, choice))
     } else if (!entityId) {
-      onPending({ file: framing.file, crop })
+      onPending({ file: framing.file, ...choice })
     } else {
-      onChanged(await setEntityImage(universeId, entityId, framing.file, crop))
+      onChanged(await setEntityImage(universeId, entityId, framing.file, choice))
     }
 
     setFraming(null)
@@ -188,10 +190,10 @@ export function EntityImageField({
 
       <div className="imagefield__row">
         {pending && preview ? (
-          <CroppedPicture
+          <FramedPicture
             className="portrait"
             source={preview}
-            crop={pending.crop}
+            choice={pending}
             testId="entity-image-preview"
           />
         ) : image && entityId ? (
@@ -267,7 +269,11 @@ export function EntityImageField({
           // A new picture is a new cropper, never the last one's state carried over.
           key={framing.source}
           source={framing.source}
-          initialCrop={framing.kind === 'stored' ? framing.image.crop : framing.initial}
+          initial={
+            framing.kind === 'stored'
+              ? { framing: framing.image.framing, crop: framing.image.crop }
+              : framing.initial
+          }
           title={framing.kind === 'stored' ? 'Edit thumbnail' : 'Frame the thumbnail'}
           confirmLabel={
             framing.kind === 'stored' ? 'Save thumbnail' : entityId ? 'Upload' : 'Use this picture'

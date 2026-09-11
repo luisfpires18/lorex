@@ -868,6 +868,107 @@ a {
   min-width: 9rem;
 }
 
+/* ---------- Type filter bar ----------
+
+   The Lore browser's types as a row of round-iconed chips. It takes a line of its own under the
+   search, directly above the grid it filters, and never wraps: a world with many types scrolls
+   the row sideways, which keeps the grid where it was rather than pushing it down a line per
+   handful of types. The chosen chip is inked, the way the committed canon mark is, so it reads in
+   either scheme and without relying on a type's own accent colour. */
+
+.typebar {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.typebar__label {
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.typebar__row {
+  position: relative;
+  display: flex;
+  gap: 0.45rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 0.25rem;
+  /* Kept, because a mouse with no sideways wheel needs something to drag, but drawn as a hairline
+     in the rule colour rather than as the platform's own grey track. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule-strong) transparent;
+  /* Room inside the scroller for the focus ring, which it would otherwise clip. */
+  padding: 0.3rem 0.25rem 0.5rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .typebar__row {
+    scroll-behavior: smooth;
+  }
+}
+
+.typebar__option {
+  --type-accent: var(--rule-strong);
+
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.9rem 0.25rem 0.25rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.88rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.typebar__option:hover {
+  border-color: var(--rule-strong);
+  color: var(--ink);
+}
+
+.typebar__option:focus-visible {
+  outline-offset: 2px;
+}
+
+.typebar__icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--type-accent);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.typebar__icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.typebar__option[aria-pressed='true'] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.typebar__option[aria-pressed='true'] .typebar__icon {
+  background: var(--surface);
+  color: var(--ink);
+}
+
 .field__input--select {
   border: 1px solid var(--rule-strong);
   padding: 0.45rem 0.5rem;
@@ -1253,6 +1354,81 @@ a {
   max-width: none;
 }
 
+/* The whole picture inside a square window, as a fitted thumbnail is. The window's own background
+   shows through the empty part, exactly as a card's surface shows through the stored one. */
+.fitted {
+  position: relative;
+  display: block;
+  overflow: hidden;
+}
+
+.fitted__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: contain;
+}
+
+/* Two choices, one of them always on: a segmented pair of radio buttons. The real inputs stay in
+   the accessibility tree and the tab order; only their drawing is replaced. */
+.framing {
+  display: inline-flex;
+  min-inline-size: 0;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  border: 1px solid var(--rule-strong);
+}
+
+.framing__option {
+  position: relative;
+  display: flex;
+}
+
+.framing__label {
+  padding: 0.35rem 0.9rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.framing__option + .framing__option .framing__label {
+  border-left: 1px solid var(--rule-strong);
+}
+
+.framing__input:checked + .framing__label {
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.framing__input:focus-visible + .framing__label {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.framing:disabled .framing__label {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.framing__legend,
+.framing__input,
+.iconpicker__input,
+.iconpicker__name {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Centred and bounded by the viewport in both directions, so a phone never has to scroll the
    page to reach Confirm - the panel scrolls inside itself first. */
 .cropper {
@@ -1302,6 +1478,32 @@ a {
   aspect-ratio: 1;
   max-height: min(58dvh, 30rem);
   background: var(--plate);
+}
+
+/* The cropper's own container positions itself against the stage, so its wrapper has to fill it. */
+.cropper__crop {
+  position: absolute;
+  inset: 0;
+}
+
+/* Laid over the cropper while fitting. The square is the largest that fits the stage, whatever
+   shape the stage has been squeezed to on a short screen, and it is drawn on the card surface so
+   the empty part of the thumbnail looks the way it will on a card. */
+.cropper__fit {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: var(--plate);
+  container-type: size;
+}
+
+.cropper__fitsquare {
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
+  background: var(--surface);
+  outline: 2px solid rgb(255 255 255 / 0.85);
 }
 
 .cropper__stage .reactEasyCrop_CropArea {
@@ -1661,6 +1863,97 @@ a {
   font-family: var(--display);
   font-size: 1.1rem;
   flex: 1;
+}
+
+.types__icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.types__icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.types__iconpanel {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem 0.9rem;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.types__new .types__iconhint {
+  margin: -0.5rem 0 0;
+}
+
+/* ---------- Type icon picker ---------- */
+
+.iconpicker {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.iconpicker__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+
+.iconpicker__choice {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.iconpicker__swatch {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--muted);
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.iconpicker__swatch svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.iconpicker__choice:hover .iconpicker__swatch {
+  border-color: var(--rule-strong);
+  color: var(--ink);
+}
+
+.iconpicker__input:checked + .iconpicker__swatch {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.iconpicker__input:focus-visible + .iconpicker__swatch {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.iconpicker:disabled .iconpicker__choice {
+  cursor: default;
+  opacity: 0.6;
 }
 
 .types__count {
@@ -3348,6 +3641,21 @@ a {
   .picker__option {
     min-height: 2.75rem;
     align-items: center;
+  }
+
+  .typebar__option {
+    min-height: 2.75rem;
+  }
+
+  .framing__label {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+  }
+
+  .iconpicker__swatch {
+    width: 2.75rem;
+    height: 2.75rem;
   }
 
   .sidebar__link,

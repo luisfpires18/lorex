@@ -187,11 +187,12 @@ test.describe('lore', () => {
     await page.waitForURL(/\/lore$/)
     await expect(page.getByTestId('entity-card')).toHaveCount(2)
 
-    await page.getByLabel('Type', { exact: true }).selectOption({ label: 'Location' })
+    const types = page.getByRole('group', { name: 'Type' })
+    await types.getByRole('button', { name: 'Location', exact: true }).click()
     await expect(card(page, 'A Place')).toBeVisible()
     await expect(card(page, 'A Person')).toBeHidden()
 
-    await page.getByLabel('Type', { exact: true }).selectOption({ label: 'Every type' })
+    await types.getByRole('button', { name: 'All', exact: true }).click()
     await page.getByLabel('Status').selectOption({ label: 'Canon' })
     await expect(card(page, 'A Person')).toBeVisible()
     await expect(card(page, 'A Place')).toBeHidden()

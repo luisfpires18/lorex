@@ -107,6 +107,7 @@ export interface EntityType {
   id: string
   name: string
   description: string | null
+  /** The type's icon key - one of `TYPE_ICONS` - or null for the neutral fallback. */
   icon: string | null
   accentColor: string | null
   displayOrder: number
@@ -137,6 +138,26 @@ export interface FieldValue {
 }
 
 /**
+ * Mirrors the backend enum. How a thumbnail is made from the original: a square cut from it, or the
+ * whole picture fitted inside the square. The original is the same either way.
+ */
+export const ImageFraming = {
+  Crop: 0,
+  Fit: 1,
+} as const
+
+export type ImageFramingValue = (typeof ImageFraming)[keyof typeof ImageFraming]
+
+/**
+ * A framing as the author chose it: `crop` is the square for `Crop` - null starts on the centred
+ * square - and always null for `Fit`, which cuts nothing.
+ */
+export interface ThumbnailFraming {
+  framing: ImageFramingValue
+  crop: EntityImageCrop | null
+}
+
+/**
  * The entry's primary image: identity and shape, never a URL.
  *
  * The address is composed from these by `entityImageUrl` - the same derivation the API does on
@@ -146,9 +167,10 @@ export interface FieldValue {
  * `width` and `height` are the original's, as displayed, and they are what let a picture reserve
  * its space before a byte of it has arrived.
  *
- * `thumbnailId` names the thumbnail currently cut from it; a new framing is a new id, and so a new
- * address. `crop` is the square that thumbnail shows - null only for a picture stored before an
- * author could choose, whose thumbnail is the centred square.
+ * `thumbnailId` names the thumbnail currently made from it; a new framing is a new id, and so a new
+ * address. `framing` says whether that thumbnail is a square cut from the picture or the whole
+ * picture fitted inside one. `crop` is the square it shows - null for a fitted thumbnail, and for a
+ * picture stored before an author could choose, whose thumbnail is the centred square.
  */
 export interface EntityImageRef {
   assetId: string
@@ -159,6 +181,7 @@ export interface EntityImageRef {
   fileName: string | null
   byteSize: number
   uploadedAt: string
+  framing: ImageFramingValue
   crop: EntityImageCrop | null
 }
 

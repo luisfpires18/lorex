@@ -302,6 +302,7 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                 image.Height,
                 image.ByteSize,
                 BackupArchive.MediaPathFor(entityId, image.ContentType),
+                image.Framing,
                 EntityImageCrop.Of(image) is { } crop
                     ? new BackupImageCrop(crop.X, crop.Y, crop.Width, crop.Height)
                     : null)
