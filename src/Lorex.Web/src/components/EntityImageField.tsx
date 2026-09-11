@@ -1,25 +1,51 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { ApiError } from '../lib/api'
 import {
   IMAGE_ACCEPT,
   IMAGE_MAX_BYTES,
   entityImageUrl,
   removeEntityImage,
   setEntityImage,
+  setEntityThumbnail,
 } from '../lore/images'
-import type { EntityImageRef } from '../lore/types'
+import type { EntityImageCrop, EntityImageRef } from '../lore/types'
+import { CroppedPicture, ImageCropDialog } from './ImageCropDialog'
+
+/** A picture chosen for an entry that does not exist yet, with the square the author framed. */
+export interface PendingImage {
+  file: File
+  crop: EntityImageCrop
+}
 
 /**
- * The editor's image control: pick one, replace it, take it away.
+ * What the cropper is open on. A file just picked is framed before anything is uploaded; a
+ * picture already stored is reframed from its own original, which is never sent again.
+ */
+type Framing =
+  | {
+      kind: 'file'
+      file: File
+      source: string
+      /** Whether `source` was made for this cropper and is released with it. */
+      ownsSource: boolean
+      initial: EntityImageCrop | null
+    }
+  | { kind: 'stored'; image: EntityImageRef; source: string }
+
+/**
+ * The editor's image control: pick one and frame it, reframe it, replace it, take it away.
+ *
+ * Every picture goes through the cropper before it goes anywhere. The whole picture is always
+ * kept and shown on the entry's page; the square the author chooses is only what cards show.
  *
  * It behaves differently either side of the entry existing, because the object keys are built
  * from the entry's id and there is no id until the entry is saved.
  *
- * - An entry that exists uploads on the spot. The write is its own request, so the picture is
- *   stored whether or not the author goes on to save the rest of the form.
- * - A new entry only *holds* the file, and shows it from a local object URL. `EntityPage`
- *   uploads it once the create call has come back with an id. Nothing is written to the bucket
- *   before there is an entry for it to belong to, so an abandoned form leaves nothing behind.
+ * - An entry that exists uploads on confirm. The write is its own request, so the picture is
+ *   stored whether or not the author goes on to save the rest of the form - and nothing is
+ *   uploaded before the framing is confirmed, so a cancelled crop costs nothing.
+ * - A new entry only *holds* the file and its framing, and previews them from a local object URL.
+ *   `EntityPage` uploads both once the create call has come back with an id. Nothing is written to
+ *   the bucket before there is an entry for it to belong to, so an abandoned form leaves nothing.
  */
 export function EntityImageField({
   universeId,
@@ -33,8 +59,8 @@ export function EntityImageField({
   universeId: string
   entityId: string | null
   image: EntityImageRef | null
-  pending: File | null
-  onPending: (file: File | null) => void
+  pending: PendingImage | null
+  onPending: (pending: PendingImage | null) => void
   onChanged: (image: EntityImageRef | null) => void
   disabled: boolean
 }) {
@@ -42,11 +68,17 @@ export function EntityImageField({
   const input = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [framing, setFraming] = useState<Framing | null>(null)
 
   // A held file is shown from the browser's own copy of it, so nothing is uploaded to preview
   // it. The URL is derived from the file rather than stored in state - it is a value, not an
   // event - and it holds memory until it is revoked, which is what the effect below is for.
-  const preview = useMemo(() => (pending ? URL.createObjectURL(pending) : null), [pending])
+  // Keyed on the file rather than the pending pair, so reframing a held file keeps its URL.
+  const pendingFile = pending?.file ?? null
+  const preview = useMemo(
+    () => (pendingFile ? URL.createObjectURL(pendingFile) : null),
+    [pendingFile],
+  )
 
   useEffect(() => {
     if (!preview) return
@@ -56,11 +88,20 @@ export function EntityImageField({
     }
   }, [preview])
 
-  const shown =
-    preview ?? (image ? entityImageUrl(universeId, entityId!, image, 'thumbnail') : null)
+  // A file picked for framing has a URL of its own, released when the cropper closes either way.
+  useEffect(() => {
+    if (framing?.kind !== 'file' || !framing.ownsSource) return
+
+    const source = framing.source
+    return () => {
+      URL.revokeObjectURL(source)
+    }
+  }, [framing])
+
+  const hasPicture = Boolean(pending || image)
   const busyOrDisabled = busy || disabled
 
-  async function choose(file: File | undefined) {
+  function choose(file: File | undefined) {
     // The picker is reset either way, so choosing the same file twice after a failure still
     // fires a change event.
     if (input.current) input.current.value = ''
@@ -73,24 +114,51 @@ export function EntityImageField({
       return
     }
 
-    if (!entityId) {
-      onPending(file)
+    setFraming({
+      kind: 'file',
+      file,
+      source: URL.createObjectURL(file),
+      ownsSource: true,
+      initial: null,
+    })
+  }
+
+  function reframe() {
+    setError(null)
+
+    if (pending && preview) {
+      setFraming({
+        kind: 'file',
+        file: pending.file,
+        source: preview,
+        ownsSource: false,
+        initial: pending.crop,
+      })
       return
     }
 
-    setBusy(true)
-    try {
-      onChanged(await setEntityImage(universeId, entityId, file))
-    } catch (failure: unknown) {
-      // The API's own sentence, because it is the one that says which rule the file broke.
-      setError(
-        failure instanceof ApiError
-          ? (failure.fieldErrors.file ?? failure.message)
-          : 'That image could not be uploaded.',
-      )
-    } finally {
-      setBusy(false)
+    if (entityId && image) {
+      setFraming({
+        kind: 'stored',
+        image,
+        source: entityImageUrl(universeId, entityId, image, 'original'),
+      })
     }
+  }
+
+  async function keep(crop: EntityImageCrop) {
+    if (!framing) return
+
+    if (framing.kind === 'stored') {
+      // Only the square is sent. The original stays exactly where it is.
+      onChanged(await setEntityThumbnail(universeId, entityId!, framing.image.assetId, crop))
+    } else if (!entityId) {
+      onPending({ file: framing.file, crop })
+    } else {
+      onChanged(await setEntityImage(universeId, entityId, framing.file, crop))
+    }
+
+    setFraming(null)
   }
 
   async function remove() {
@@ -119,8 +187,20 @@ export function EntityImageField({
       <h3 className="rail__heading">Image</h3>
 
       <div className="imagefield__row">
-        {shown ? (
-          <img className="portrait" src={shown} alt="" data-testid="entity-image-preview" />
+        {pending && preview ? (
+          <CroppedPicture
+            className="portrait"
+            source={preview}
+            crop={pending.crop}
+            testId="entity-image-preview"
+          />
+        ) : image && entityId ? (
+          <img
+            className="portrait"
+            src={entityImageUrl(universeId, entityId, image, 'thumbnail')}
+            alt=""
+            data-testid="entity-image-preview"
+          />
         ) : (
           <span className="portrait portrait--blank" aria-hidden="true">
             —
@@ -137,24 +217,35 @@ export function EntityImageField({
             type="file"
             accept={IMAGE_ACCEPT}
             disabled={busyOrDisabled}
-            onChange={(event) => void choose(event.target.files?.[0])}
+            onChange={(event) => choose(event.target.files?.[0])}
             data-testid="entity-image-input"
           />
 
           <label className="button button--quiet imagefield__pick" htmlFor={inputId}>
-            {busy ? 'Uploading' : shown ? 'Replace' : 'Add image'}
+            {hasPicture ? 'Replace' : 'Add image'}
           </label>
 
-          {shown ? (
-            <button
-              className="button button--quiet"
-              type="button"
-              disabled={busyOrDisabled}
-              onClick={() => void remove()}
-              data-testid="entity-image-remove"
-            >
-              Remove
-            </button>
+          {hasPicture ? (
+            <>
+              <button
+                className="button button--quiet"
+                type="button"
+                disabled={busyOrDisabled}
+                onClick={reframe}
+                data-testid="entity-image-reframe"
+              >
+                Edit thumbnail
+              </button>
+              <button
+                className="button button--quiet"
+                type="button"
+                disabled={busyOrDisabled}
+                onClick={() => void remove()}
+                data-testid="entity-image-remove"
+              >
+                {busy ? 'Removing' : 'Remove'}
+              </button>
+            </>
           ) : null}
         </div>
       </div>
@@ -169,6 +260,21 @@ export function EntityImageField({
         <p className="field__error" role="alert" data-testid="entity-image-error">
           {error}
         </p>
+      ) : null}
+
+      {framing ? (
+        <ImageCropDialog
+          // A new picture is a new cropper, never the last one's state carried over.
+          key={framing.source}
+          source={framing.source}
+          initialCrop={framing.kind === 'stored' ? framing.image.crop : framing.initial}
+          title={framing.kind === 'stored' ? 'Edit thumbnail' : 'Frame the thumbnail'}
+          confirmLabel={
+            framing.kind === 'stored' ? 'Save thumbnail' : entityId ? 'Upload' : 'Use this picture'
+          }
+          onConfirm={keep}
+          onCancel={() => setFraming(null)}
+        />
       ) : null}
     </div>
   )

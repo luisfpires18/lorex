@@ -286,9 +286,11 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
     }
 
     /// <summary>
-    /// One entry's image as the document describes it: identity, shape, and where the bytes sit
-    /// in this archive. The object key it was read from is not here and never is - it names a
-    /// place in this installation's bucket, which is not what the picture *is*.
+    /// One entry's image as the document describes it: identity, shape, the framing its thumbnail
+    /// was cut with, and where the bytes sit in this archive. The object keys it was read from are
+    /// not here and never are - they name places in this installation's bucket, which is not what
+    /// the picture *is*. Neither is the thumbnail's id: it names one rendering, and an importer
+    /// makes its own.
     /// </summary>
     private static BackupEntityImage? Image(Dictionary<Guid, EntityImage> images, Guid entityId) =>
         images.TryGetValue(entityId, out var image)
@@ -299,7 +301,10 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                 image.Width,
                 image.Height,
                 image.ByteSize,
-                BackupArchive.MediaPathFor(entityId, image.ContentType))
+                BackupArchive.MediaPathFor(entityId, image.ContentType),
+                EntityImageCrop.Of(image) is { } crop
+                    ? new BackupImageCrop(crop.X, crop.Y, crop.Width, crop.Height)
+                    : null)
             : null;
 
     /// <summary>

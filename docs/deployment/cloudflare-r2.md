@@ -18,12 +18,18 @@ Two objects per image, under one prefix per asset:
 
 ```
 universes/{universeId}/entities/{entityId}/primary/{assetId}/original.{jpg|png|webp}
-universes/{universeId}/entities/{entityId}/primary/{assetId}/thumbnail.webp
+universes/{universeId}/entities/{entityId}/primary/{assetId}/thumbnail-{thumbnailId}.webp
 ```
 
 Ids only - no username, no email, no world name, no entry name. R2 has no folders; the slashes
-are a key prefix the console happens to draw as a tree. `{assetId}` is new for every upload, so
-nothing is ever written over an image that is still the live one.
+are a key prefix the console happens to draw as a tree. `{assetId}` is new for every upload and
+`{thumbnailId}` for every thumbnail, so nothing is ever written over an object that is still live.
+A picture stored before thumbnails had their own id keeps `thumbnail.webp`.
+
+The original is the author's file, untouched, and is what the entry's page shows. The thumbnail
+is the square the author chose in the cropper, cut from the original by the API. Choosing a new
+square ("Edit thumbnail") writes a new `thumbnail-{thumbnailId}.webp` and then deletes the old one;
+it never uploads, rewrites or deletes the original.
 
 Why the bucket is private and stays private: [ADR 0019](../architecture/decisions/0019-entity-primary-image.md).
 
@@ -135,8 +141,28 @@ With the settings in place, sign in, open any entry, and add an image. Then:
 
 - The R2 bucket shows two objects under
   `universes/.../entities/.../primary/.../`.
+- Editing the thumbnail swaps the `thumbnail-*.webp` object for a new one and leaves
+  `original.*` exactly as it was.
 - Replacing the image adds a new `{assetId}` prefix and removes the previous one.
 - Removing the image empties the entry's prefix.
+
+If an upload answers `503 Image storage is unavailable.` with the provider configured, the API log
+has an `Image storage failed during upload` error carrying R2's own message. The provider's
+wording never reaches the browser.
+
+### R2 and AWSSDK.S3: two upload flags that must stay
+
+R2 does not implement S3's streaming payload signatures. Without two per-request flags, AWSSDK.S3
+sends a PutObject body as `aws-chunked` and R2 refuses every upload with
+`STREAMING-AWS4-HMAC-SHA256-PAYLOAD not implemented` - the error the first live DEV upload hit.
+`R2MediaObjectStore.PutAsync` sets, as Cloudflare's .NET guide does:
+
+- `DisablePayloadSigning = true` (still SigV4-signed; body sent as `UNSIGNED-PAYLOAD`, HTTPS only)
+- `DisableDefaultChecksumValidation = true` (no trailing checksum)
+
+The client-level `RequestChecksumCalculation = WHEN_REQUIRED` in `MediaSetup` is not a substitute.
+`R2MediaObjectStoreTests` fails if either flag disappears, including after an SDK upgrade. Nothing
+about credentials, the bucket or App Service settings changes for this.
 
 ## Costs and limits
 
@@ -161,8 +187,9 @@ Uploads are capped at 8 MB and 24 megapixels by the API, so an entry's two objec
 
 **It is not where a backup lives.** `GET /api/universes/{id}/export` hands the owner a ZIP
 holding `backup.json` and every entry's original image beside it, so a backup keeps working if
-this bucket is emptied, misconfigured or deleted. Thumbnails are not in it: they are derived and
-an importer regenerates them. Nothing in the file names the bucket, the endpoint, an object key
+this bucket is emptied, misconfigured or deleted. Thumbnails are not in it: they are derived, and
+`backup.json` carries each picture's chosen square (`image.crop`) so an importer regenerates the
+same thumbnail from the original. Nothing in the file names the bucket, the endpoint, an object key
 or a URL. ADR 0014.
 
 If an object a backup needs cannot be read, the export fails with `backup_media_missing` and

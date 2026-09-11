@@ -1,6 +1,8 @@
 # ADR 0019 - An entry has one image, held in a private bucket and served by Lorex
 
 Status: accepted (2026-09-10). The two decisions it left open were taken the same day; see Consequences.
+Amended 2026-09-11 after live DEV testing: the author chooses the thumbnail's square, and R2 uploads need two
+per-request SDK flags. See "Amendment: owner-framed thumbnails and R2 uploads".
 
 ## Context
 
@@ -35,8 +37,11 @@ the convention later cannot orphan objects that already exist.
 
 ```
 universes/{universeId}/entities/{entityId}/primary/{assetId}/original.{ext}
-universes/{universeId}/entities/{entityId}/primary/{assetId}/thumbnail.webp
+universes/{universeId}/entities/{entityId}/primary/{assetId}/thumbnail-{thumbnailId}.webp
 ```
+
+(`thumbnail-{thumbnailId}` since the amendment; a picture stored before it keeps `thumbnail.webp`,
+because the row stores the key it was written under.)
 
 No username, no email, no world name, no entry name. A bucket listing is a disclosure surface
 even on a private bucket, and names are authored content. It also means renaming a world or a
@@ -56,7 +61,8 @@ mean opening CORS on the bucket.
 bucket. A presigned URL turns the URL itself into the credential: it survives in history and in
 anything the author pastes it into, it cannot be withdrawn before it expires, and it has to be
 reissued and threaded back into every `img` tag as it does.
-`GET /api/universes/{u}/entities/{e}/image/{assetId}/{variant}` instead proves ownership through
+`GET /api/universes/{u}/entities/{e}/image/{assetId}/original` (and `.../thumbnail/{thumbnailId}`
+since the amendment) instead proves ownership through
 the same `LoreAccess` check as every other lore read (ADR 0006), streams the object, and points
 at nothing outside Lorex. The cost is bandwidth the product already pays for everything else it
 serves. For a single-owner world with one picture per entry, that is not a trade worth making
@@ -95,7 +101,8 @@ picture, and making one safe means writing and maintaining a sanitiser - a proje
 with a long history of bypasses. It also has no pixels to resample, so the thumbnail path could
 not treat it like the others. Refusing it is one line; sanitising it would be a phase.
 
-**The thumbnail is generated server-side, 320px square, centre-cropped, WebP.** The lore grid
+**The thumbnail is generated server-side, 320px square, WebP.** Originally centre-cropped; the
+author now chooses the square - see the amendment below. The lore grid
 lays cards out at a 17.5rem minimum and draws the portrait at well under half that, so 320
 leaves room for a high-density screen without storing a second near-full-size copy. Crop rather
 than fit, because the card slot is a fixed square and letterboxing every non-square image would
@@ -162,3 +169,79 @@ behind - and no temporary path is invented that nobody would come back to clean 
 - **Permanent deletion is still deferred** (ADR 0015), so no route hard-deletes an entry and
   nothing needs to clean up a hard-deleted entry's objects. When one arrives it will have to,
   and the cascade on `EntityImages` covers the row but not the bucket.
+
+## Amendment: owner-framed thumbnails and R2 uploads (2026-09-11)
+
+Live testing on Azure DEV found two things the original decision got wrong.
+
+### The author chooses the thumbnail's square
+
+A centred square is the right answer for almost no portrait. The original stays exactly as
+uploaded and is what the entry's page shows, whole; the thumbnail is a square of it that the
+author picks in a cropper (`react-easy-crop`, MIT, one small dependency - drag, pinch or wheel
+zoom, and a focusable square that moves with the arrow keys).
+
+**The browser chooses, the server cuts.** The client sends four fractions - `x`, `y`, `width`,
+`height` of the original - worked out from whole pixels of the picture's own size, never a
+position on the screen and never a rendered thumbnail. The server decodes the original, puts each
+edge on the nearest pixel, and cuts and scales the square itself. A crop off the picture, empty,
+unreadable or more than a pixel (or 1%) from square is refused with a validation problem, never
+stretched. No crop at all still means the centred square.
+
+**Fractions of the picture as displayed.** Orientation is decided by what browsers draw, because
+that is the picture the author frames: EXIF orientation is applied for JPEG and PNG, and ignored
+for WebP. That split was checked against Chromium rather than assumed - it rotates a tagged JPEG
+and PNG and draws a tagged WebP as stored, while ImageSharp would rotate all three. Stored `Width`
+and `Height` are the displayed dimensions for the same reason.
+
+**The crop is persisted.** `CropX`, `CropY`, `CropWidth`, `CropHeight` - fractions, all set or all
+null. It is the one part of the thumbnail that cannot be derived: with it the cropper reopens where
+the author left it, a backup preserves the choice, and a thumbnail can be regenerated from the
+original alone. Null only for a picture stored before this amendment, whose thumbnail is the
+centred square. A backup carries it as `image.crop` (ADR 0014); the thumbnail's bytes still never
+travel.
+
+**Replacing is one request.** Pick a file, frame it, confirm: the file and its crop go up together,
+so nothing is uploaded until the framing is confirmed, and Cancel costs nothing. The replacement
+ordering above is unchanged.
+
+**Reframing never touches the original.** `PUT .../image/thumbnail` carries the asset id the
+author framed and the crop. The server reads the original back from the store - it is not
+uploaded again - and:
+
+1. Mints a new thumbnail id and writes the new thumbnail under it.
+2. Moves the row in one conditional statement that only matches if the asset *and* the thumbnail
+   are still the ones that were read, recording an `Image` version in the same transaction.
+3. Only after that commit deletes the old thumbnail.
+
+The original's key, bytes and object are never written, moved or deleted. A failure before the
+commit leaves the working thumbnail live and sweeps the new one; a replacement or another framing
+that landed first wins, and this one answers 409 `image_changed` rather than putting a square of
+one picture on another. A missing original answers 409 `image_original_unavailable`. The thumbnail
+id is in the thumbnail's route, so a reframed thumbnail is a new URL and the immutable cache
+header stays honest. Nothing historical is kept: the superseded thumbnail is deleted, and a
+revision restore still leaves the current picture - framing included - alone.
+
+### R2 needs two per-request flags on every upload
+
+The first live upload failed with `STREAMING-AWS4-HMAC-SHA256-PAYLOAD not implemented`. AWSSDK.S3
+streams a PutObject body as a signed `aws-chunked` payload (or trails a checksum after it); S3
+accepts that and R2 does not. The client-level `RequestChecksumCalculation = WHEN_REQUIRED` does
+not prevent it. Cloudflare's .NET guide sets both of these on every PutObject, and so does
+`R2MediaObjectStore`:
+
+- `DisablePayloadSigning = true` - the request is still SigV4-signed, the body is declared
+  `UNSIGNED-PAYLOAD`. The SDK only allows this over HTTPS, which the R2 endpoint always is, so
+  body integrity rests on TLS.
+- `DisableDefaultChecksumValidation = true` - no trailing checksum turning the body back into a
+  chunked stream.
+
+The SDK was kept: nothing else about it was wrong. The requirement is pinned by adapter tests that
+assert both flags on the request and, through a real SDK client configured exactly as a deployment
+is, that the wire carries `UNSIGNED-PAYLOAD` and no streaming or chunked marker - a test that fails
+with the live error's own header value if either flag is removed.
+
+**Storage failures are a 503 in Lorex's words.** Every SDK, network or timeout failure leaves the
+adapter as `MediaStorageFailedException`, and every image route and the export answer it with the
+same 503 problem the unconfigured store already produced. The provider's message is logged, never
+returned. A write that fails part-way sweeps what it may have written.

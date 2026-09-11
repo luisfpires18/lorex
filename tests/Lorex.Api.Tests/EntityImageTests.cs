@@ -2,13 +2,17 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
 using Lorex.Api.Data;
 using Lorex.Api.Features.Auth;
 using Lorex.Api.Features.Lore;
+using Lorex.Api.Features.Media;
 using Lorex.Api.Features.Universes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Webp;
+using SixLabors.ImageSharp.Metadata.Profiles.Exif;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 
@@ -18,13 +22,15 @@ namespace Lorex.Api.Tests;
 /// An entry's one primary image: what Lorex will store, who may touch it, and what the two
 /// stores are allowed to disagree about.
 ///
-/// Six claims carry this file. An owner - and only an owner - can set, read and remove the
-/// image on their own entry. What is stored is an image, proved by decoding it and not by what
-/// the request called it. The object keys say what they are supposed to say, in ids and nothing
-/// else. A replacement never destroys the working image before the new one is the entry's
-/// image, and it never leaves the database naming objects that were deliberately deleted. The
-/// Trash keeps an image and a restore brings it back. And nothing about Cloudflare - a bucket,
-/// an endpoint, a key - reaches a response.
+/// Seven claims carry this file. An owner - and only an owner - can set, frame, read and remove
+/// the image on their own entry. What is stored is an image, proved by decoding it and not by
+/// what the request called it. The thumbnail is the square the author chose, cut on the server
+/// from the picture as it is displayed, and choosing again never touches the original. The
+/// object keys say what they are supposed to say, in ids and nothing else. A replacement or a
+/// reframing never destroys the working image before the new one is the entry's image, and never
+/// leaves the database naming objects that were deliberately deleted. The Trash keeps an image
+/// and a restore brings it back. And nothing about Cloudflare - a bucket, an endpoint, a key, a
+/// provider's error - reaches a response.
 ///
 /// No test here touches Cloudflare. The host runs against <see cref="TestMediaObjectStore"/>,
 /// which is a real implementation of the same contract, so the ordering being asserted is the
@@ -76,7 +82,7 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         var stored = await Uploaded(client, universe.Id, entry.Id, Png(900, 600), "portrait.png");
 
         var originalKey = Key(universe.Id, entry.Id, stored.AssetId, "original.png");
-        var thumbnailKey = Key(universe.Id, entry.Id, stored.AssetId, "thumbnail.webp");
+        var thumbnailKey = ThumbnailKey(universe.Id, entry.Id, stored);
 
         Assert.True(_factory.Media.Contains(originalKey));
         Assert.True(_factory.Media.Contains(thumbnailKey));
@@ -119,7 +125,7 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
 
         var prefix = $"universes/{universe.Id:D}/entities/{entry.Id:D}/primary/{stored.AssetId:D}";
         Assert.Contains($"{prefix}/original.png", keys);
-        Assert.Contains($"{prefix}/thumbnail.webp", keys);
+        Assert.Contains($"{prefix}/thumbnail-{stored.ThumbnailId:D}.webp", keys);
 
         // Not the world's name, not the entry's, not the author's, and not the filename.
         foreach (var key in keys)
@@ -140,7 +146,7 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         var stored = await Uploaded(client, universe.Id, entry.Id, Png(120, 80), "sigil.png");
 
         using var thumbnail = Image.Load<Rgba32>(
-            _factory.Media.Bytes(Key(universe.Id, entry.Id, stored.AssetId, "thumbnail.webp")));
+            _factory.Media.Bytes(ThumbnailKey(universe.Id, entry.Id, stored)));
 
         // The shorter side, not the 320 target: storing more bytes to show the same detail
         // blurrier is not an improvement.
@@ -290,38 +296,51 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         var entry = await Entry(client, universe.Id, type, "Alenna Vance");
         var stored = await Uploaded(client, universe.Id, entry.Id, Png(900, 600), "portrait.png");
 
-        var original = await client.GetAsync(ImageUrl(universe.Id, entry.Id, stored.AssetId, "original"));
+        var original = await client.GetAsync(OriginalUrl(universe.Id, entry.Id, stored.AssetId));
         Assert.Equal(HttpStatusCode.OK, original.StatusCode);
         Assert.Equal("image/png", original.Content.Headers.ContentType!.MediaType);
         Assert.NotEmpty(await original.Content.ReadAsByteArrayAsync());
 
-        var thumbnail = await client.GetAsync(ImageUrl(universe.Id, entry.Id, stored.AssetId, "thumbnail"));
+        var thumbnail = await client.GetAsync(ThumbnailUrl(universe.Id, entry.Id, stored));
         Assert.Equal(HttpStatusCode.OK, thumbnail.StatusCode);
         Assert.Equal("image/webp", thumbnail.Content.Headers.ContentType!.MediaType);
 
         // Private, never shared, and never public: a proxy or a shared cache must not keep one
         // author's picture. The service worker refuses everything under /api by construction
         // (ADR 0017), and this route is under /api, so it is out of the app-shell cache too.
-        var cache = original.Headers.CacheControl!;
-        Assert.True(cache.Private);
-        Assert.False(cache.Public);
-        Assert.StartsWith("/api/", ImageUrl(universe.Id, entry.Id, stored.AssetId, "original"), StringComparison.Ordinal);
+        foreach (var response in new[] { original, thumbnail })
+        {
+            var cache = response.Headers.CacheControl!;
+            Assert.True(cache.Private);
+            Assert.False(cache.Public);
+        }
+
+        Assert.StartsWith("/api/", OriginalUrl(universe.Id, entry.Id, stored.AssetId), StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task An_unknown_variant_or_asset_is_not_found()
+    public async Task An_unknown_variant_asset_or_thumbnail_is_not_found()
     {
         var (client, universe, type) = await World("imgvar");
         var entry = await Entry(client, universe.Id, type, "Alenna Vance");
         var stored = await Uploaded(client, universe.Id, entry.Id, Png(400, 400), "portrait.png");
 
-        Assert.Equal(
-            HttpStatusCode.NotFound,
-            (await client.GetAsync(ImageUrl(universe.Id, entry.Id, stored.AssetId, "full"))).StatusCode);
+        string[] misses =
+        [
+            $"{ImageRoute(universe.Id, entry.Id)}/{stored.AssetId}/full",
+            OriginalUrl(universe.Id, entry.Id, Guid.NewGuid()),
 
-        Assert.Equal(
-            HttpStatusCode.NotFound,
-            (await client.GetAsync(ImageUrl(universe.Id, entry.Id, Guid.NewGuid(), "original"))).StatusCode);
+            // A thumbnail is addressed by its own id as well as the asset's, so neither the bare
+            // variant nor an id that is not the current one resolves.
+            $"{ImageRoute(universe.Id, entry.Id)}/{stored.AssetId}/thumbnail",
+            $"{ImageRoute(universe.Id, entry.Id)}/{stored.AssetId}/thumbnail/{Guid.NewGuid()}",
+            $"{ImageRoute(universe.Id, entry.Id)}/{Guid.NewGuid()}/thumbnail/{stored.ThumbnailId}",
+        ];
+
+        foreach (var url in misses)
+        {
+            Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(url)).StatusCode);
+        }
     }
 
     [Fact]
@@ -335,14 +354,37 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         // fault, and it must not become a 500.
         _factory.Media.Evict(Key(universe.Id, entry.Id, stored.AssetId, "original.png"));
 
-        var response = await client.GetAsync(ImageUrl(universe.Id, entry.Id, stored.AssetId, "original"));
+        var response = await client.GetAsync(OriginalUrl(universe.Id, entry.Id, stored.AssetId));
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 
         // The thumbnail is a separate object and is still there.
         Assert.Equal(
             HttpStatusCode.OK,
-            (await client.GetAsync(ImageUrl(universe.Id, entry.Id, stored.AssetId, "thumbnail"))).StatusCode);
+            (await client.GetAsync(ThumbnailUrl(universe.Id, entry.Id, stored))).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_store_that_fails_a_read_answers_503_in_Lorexs_words()
+    {
+        var (client, universe, type) = await World("imgreadfail");
+        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
+        var stored = await Uploaded(client, universe.Id, entry.Id, Png(400, 400), "portrait.png");
+
+        var brokenUrl = OriginalUrl(universe.Id, entry.Id, stored.AssetId);
+
+        HttpResponseMessage response;
+        _factory.Media.FailGet = _ => StorageFailure();
+        try
+        {
+            response = await client.GetAsync(brokenUrl);
+        }
+        finally
+        {
+            _factory.Media.FailGet = null;
+        }
+
+        await AssertStorageProblem(response);
     }
 
     // ---------- Replacing ----------
@@ -368,16 +410,19 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         var db = scope.ServiceProvider.GetRequiredService<LorexDbContext>();
         var row = await db.EntityImages.AsNoTracking().SingleAsync(image => image.EntityId == entry.Id);
         Assert.Equal(Key(universe.Id, entry.Id, second.AssetId, "original.jpg"), row.OriginalKey);
-        Assert.Equal(Key(universe.Id, entry.Id, second.AssetId, "thumbnail.webp"), row.ThumbnailKey);
+        Assert.Equal(ThumbnailKey(universe.Id, entry.Id, second), row.ThumbnailKey);
 
         // And the pair it replaced is gone from the bucket.
         Assert.False(_factory.Media.Contains(Key(universe.Id, entry.Id, first.AssetId, "original.png")));
-        Assert.False(_factory.Media.Contains(Key(universe.Id, entry.Id, first.AssetId, "thumbnail.webp")));
+        Assert.False(_factory.Media.Contains(ThumbnailKey(universe.Id, entry.Id, first)));
 
         // A URL for the replaced asset stops resolving, so nothing can serve the old picture.
         Assert.Equal(
             HttpStatusCode.NotFound,
-            (await client.GetAsync(ImageUrl(universe.Id, entry.Id, first.AssetId, "original"))).StatusCode);
+            (await client.GetAsync(OriginalUrl(universe.Id, entry.Id, first.AssetId))).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.NotFound,
+            (await client.GetAsync(ThumbnailUrl(universe.Id, entry.Id, first))).StatusCode);
     }
 
     [Fact]
@@ -390,7 +435,7 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         // The original lands and the thumbnail does not: the half-finished upload, which is the
         // case the whole ordering exists for.
         _factory.Media.FailPut = key =>
-            key.EndsWith("thumbnail.webp", StringComparison.Ordinal) && !key.Contains(first.AssetId.ToString("D"), StringComparison.Ordinal)
+            key.Contains("/thumbnail-", StringComparison.Ordinal) && !key.Contains(first.AssetId.ToString("D"), StringComparison.Ordinal)
                 ? new InvalidOperationException("The bucket refused the thumbnail.")
                 : null;
 
@@ -408,10 +453,10 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         var detail = await Detail(client, universe.Id, entry.Id);
         Assert.Equal(first.AssetId, detail.Image!.AssetId);
         Assert.True(_factory.Media.Contains(Key(universe.Id, entry.Id, first.AssetId, "original.png")));
-        Assert.True(_factory.Media.Contains(Key(universe.Id, entry.Id, first.AssetId, "thumbnail.webp")));
+        Assert.True(_factory.Media.Contains(ThumbnailKey(universe.Id, entry.Id, first)));
         Assert.Equal(
             HttpStatusCode.OK,
-            (await client.GetAsync(ImageUrl(universe.Id, entry.Id, first.AssetId, "original"))).StatusCode);
+            (await client.GetAsync(OriginalUrl(universe.Id, entry.Id, first.AssetId))).StatusCode);
 
         // And the half of the new asset that did land was taken back out. Exactly two objects
         // belong to this entry, and both are the first asset's.
@@ -448,7 +493,49 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         Assert.Equal(second.AssetId, detail.Image!.AssetId);
         Assert.Equal(
             HttpStatusCode.OK,
-            (await client.GetAsync(ImageUrl(universe.Id, entry.Id, second.AssetId, "thumbnail"))).StatusCode);
+            (await client.GetAsync(ThumbnailUrl(universe.Id, entry.Id, second))).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_store_that_fails_mid_upload_answers_503_keeps_the_working_image_and_sweeps_what_landed()
+    {
+        var (client, universe, type) = await World("imgr2fail");
+        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
+        var first = await Uploaded(client, universe.Id, entry.Id, Png(400, 400), "first.png");
+
+        // The original is accepted and the thumbnail is refused, the way R2 refused the live
+        // upload: a controlled storage failure rather than a bug in Lorex.
+        _factory.Media.FailPut = key =>
+            key.Contains("/thumbnail-", StringComparison.Ordinal) && !key.Contains(first.AssetId.ToString("D"), StringComparison.Ordinal)
+                ? StorageFailure()
+                : null;
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await Upload(client, universe.Id, entry.Id, Jpeg(500, 500), "second.jpg", "image/jpeg");
+        }
+        finally
+        {
+            _factory.Media.FailPut = null;
+        }
+
+        await AssertStorageProblem(response);
+
+        // The entry still has its first picture, whole and readable.
+        var detail = await Detail(client, universe.Id, entry.Id);
+        Assert.Equal(first.AssetId, detail.Image!.AssetId);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await client.GetAsync(ThumbnailUrl(universe.Id, entry.Id, first))).StatusCode);
+
+        // And the new original that did land was taken back out.
+        var mine = _factory.Media.Keys
+            .Where(key => key.Contains(entry.Id.ToString("D"), StringComparison.Ordinal))
+            .ToList();
+
+        Assert.Equal(2, mine.Count);
+        Assert.All(mine, key => Assert.Contains(first.AssetId.ToString("D"), key, StringComparison.Ordinal));
     }
 
     // ---------- Removing ----------
@@ -469,11 +556,11 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         Assert.False(await HasImage(entry.Id));
 
         Assert.False(_factory.Media.Contains(Key(universe.Id, entry.Id, stored.AssetId, "original.png")));
-        Assert.False(_factory.Media.Contains(Key(universe.Id, entry.Id, stored.AssetId, "thumbnail.webp")));
+        Assert.False(_factory.Media.Contains(ThumbnailKey(universe.Id, entry.Id, stored)));
 
         Assert.Equal(
             HttpStatusCode.NotFound,
-            (await client.GetAsync(ImageUrl(universe.Id, entry.Id, stored.AssetId, "original"))).StatusCode);
+            (await client.GetAsync(OriginalUrl(universe.Id, entry.Id, stored.AssetId))).StatusCode);
     }
 
     [Fact]
@@ -503,14 +590,18 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         // the Trash, because trashing marks an entry rather than deleting it.
         Assert.True(await HasImage(entry.Id));
         Assert.True(_factory.Media.Contains(Key(universe.Id, entry.Id, stored.AssetId, "original.png")));
-        Assert.True(_factory.Media.Contains(Key(universe.Id, entry.Id, stored.AssetId, "thumbnail.webp")));
+        Assert.True(_factory.Media.Contains(ThumbnailKey(universe.Id, entry.Id, stored)));
         Assert.Equal(
             HttpStatusCode.OK,
-            (await client.GetAsync(ImageUrl(universe.Id, entry.Id, stored.AssetId, "thumbnail"))).StatusCode);
+            (await client.GetAsync(ThumbnailUrl(universe.Id, entry.Id, stored))).StatusCode);
 
-        // A trashed entry is not editable, and its image is part of what may not be edited.
+        // A trashed entry is not editable, and its image - thumbnail included - is part of what
+        // may not be edited.
         var upload = await Upload(client, universe.Id, entry.Id, Png(300, 300), "other.png");
         Assert.Equal(HttpStatusCode.NotFound, upload.StatusCode);
+        Assert.Equal(
+            HttpStatusCode.NotFound,
+            (await Reframe(client, universe.Id, entry.Id, stored.AssetId, new EntityImageCrop(0, 0, 1, 1))).StatusCode);
 
         var restore = await client.PostAsync($"/api/universes/{universe.Id}/trash/{entry.Id}/restore", null);
         restore.EnsureSuccessStatusCode();
@@ -519,7 +610,7 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         Assert.Equal(stored.AssetId, restored.Image!.AssetId);
         Assert.Equal(
             HttpStatusCode.OK,
-            (await client.GetAsync(ImageUrl(universe.Id, entry.Id, stored.AssetId, "original"))).StatusCode);
+            (await client.GetAsync(OriginalUrl(universe.Id, entry.Id, stored.AssetId))).StatusCode);
     }
 
     // ---------- Ownership ----------
@@ -537,13 +628,16 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         // "not yours" from "not there" - including whether the entry has an image at all.
         Assert.Equal(
             HttpStatusCode.NotFound,
-            (await theirs.GetAsync(ImageUrl(universe.Id, entry.Id, stored.AssetId, "original"))).StatusCode);
+            (await theirs.GetAsync(OriginalUrl(universe.Id, entry.Id, stored.AssetId))).StatusCode);
         Assert.Equal(
             HttpStatusCode.NotFound,
-            (await theirs.GetAsync(ImageUrl(universe.Id, entry.Id, stored.AssetId, "thumbnail"))).StatusCode);
+            (await theirs.GetAsync(ThumbnailUrl(universe.Id, entry.Id, stored))).StatusCode);
         Assert.Equal(
             HttpStatusCode.NotFound,
             (await Upload(theirs, universe.Id, entry.Id, Png(300, 300), "theirs.png")).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.NotFound,
+            (await Reframe(theirs, universe.Id, entry.Id, stored.AssetId, new EntityImageCrop(0, 0, 0.5, 0.5))).StatusCode);
         Assert.Equal(
             HttpStatusCode.NotFound,
             (await theirs.DeleteAsync(ImageRoute(universe.Id, entry.Id))).StatusCode);
@@ -551,7 +645,8 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         // And the owner's image is untouched by any of it.
         Assert.Equal(
             HttpStatusCode.OK,
-            (await mine.GetAsync(ImageUrl(universe.Id, entry.Id, stored.AssetId, "original"))).StatusCode);
+            (await mine.GetAsync(OriginalUrl(universe.Id, entry.Id, stored.AssetId))).StatusCode);
+        Assert.Equal(stored.ThumbnailId, (await Detail(mine, universe.Id, entry.Id)).Image!.ThumbnailId);
     }
 
     [Fact]
@@ -565,7 +660,7 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         // still refuses it, because the universe in the path is the one that grants access.
         var other = await CreateUniverse(client, "World imgcross-two");
 
-        var response = await client.GetAsync(ImageUrl(other.Id, entry.Id, stored.AssetId, "original"));
+        var response = await client.GetAsync(OriginalUrl(other.Id, entry.Id, stored.AssetId));
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -581,10 +676,16 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
 
         Assert.Equal(
             HttpStatusCode.Unauthorized,
-            (await anonymous.GetAsync(ImageUrl(universe.Id, entry.Id, stored.AssetId, "original"))).StatusCode);
+            (await anonymous.GetAsync(OriginalUrl(universe.Id, entry.Id, stored.AssetId))).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            (await anonymous.GetAsync(ThumbnailUrl(universe.Id, entry.Id, stored))).StatusCode);
         Assert.Equal(
             HttpStatusCode.Unauthorized,
             (await Upload(anonymous, universe.Id, entry.Id, Png(300, 300), "anon.png")).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            (await Reframe(anonymous, universe.Id, entry.Id, stored.AssetId, new EntityImageCrop(0, 0, 1, 1))).StatusCode);
     }
 
     // ---------- Disclosure ----------
@@ -685,7 +786,10 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         var beforeAnyPicture = (await History(client, universe.Id, entry.Id))
             .Single(version => version.Number == 1);
 
-        var stored = await Uploaded(client, universe.Id, entry.Id, Png(400, 400), "portrait.png");
+        var uploaded = await Uploaded(client, universe.Id, entry.Id, Png(Halves(400, 200)), "portrait.png", LeftSquare);
+
+        // And framed again after that, so there is a thumbnail history could be tempted to rewind.
+        var stored = await Reframed(client, universe.Id, entry.Id, uploaded.AssetId, RightSquare);
 
         var restore = await client.PostAsync(
             $"/api/universes/{universe.Id}/entities/{entry.Id}/revisions/{beforeAnyPicture.Id}/restore",
@@ -697,11 +801,17 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         // The lore went back; the picture did not move. Restoring cannot put back an image whose
         // objects were deleted when it was superseded, so it does not pretend to - it leaves the
         // entry's current picture exactly where it is, which is what the history screen says.
+        // The framing is part of the picture, so it stays too.
         Assert.Equal("Alenna Vance", restored.Name);
         Assert.Equal(stored.AssetId, restored.Image!.AssetId);
+        Assert.Equal(stored.ThumbnailId, restored.Image.ThumbnailId);
+        Assert.Equal(RightSquare, restored.Image.Crop);
         Assert.Equal(
             HttpStatusCode.OK,
-            (await client.GetAsync(ImageUrl(universe.Id, entry.Id, stored.AssetId, "original"))).StatusCode);
+            (await client.GetAsync(OriginalUrl(universe.Id, entry.Id, stored.AssetId))).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await client.GetAsync(ThumbnailUrl(universe.Id, entry.Id, stored))).StatusCode);
     }
 
     [Fact]
@@ -725,16 +835,373 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         Assert.Equal(before.Count, (await History(client, universe.Id, entry.Id)).Count);
     }
 
+    [Fact]
+    public async Task A_new_framing_is_recorded_as_an_image_change()
+    {
+        var (client, universe, type) = await World("imghistframe");
+        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
+        var stored = await Uploaded(client, universe.Id, entry.Id, Png(Halves(400, 200)), "halves.png", LeftSquare);
+
+        var before = await History(client, universe.Id, entry.Id);
+
+        await Reframed(client, universe.Id, entry.Id, stored.AssetId, RightSquare);
+
+        var after = await History(client, universe.Id, entry.Id);
+
+        // The card shows a different picture now, so it is a version - flagged exactly as a
+        // replacement is, with nothing else claimed to have moved.
+        Assert.Equal(before.Count + 1, after.Count);
+        Assert.Equal(EntityRevisionChange.Image, after[0].Changes);
+        Assert.Equal(EntityRevisionKind.Edited, after[0].Kind);
+    }
+
+    // ---------- Framing ----------
+
+    /// <summary>Left half of a picture wide enough to have two squares.</summary>
+    private static readonly EntityImageCrop LeftSquare = new(0, 0, 0.5, 1);
+
+    /// <summary>Right half. Neither this nor the left is anywhere near the centred square.</summary>
+    private static readonly EntityImageCrop RightSquare = new(0.5, 0, 0.5, 1);
+
+    [Fact]
+    public async Task The_thumbnail_is_the_square_the_author_chose_and_the_original_is_stored_untouched()
+    {
+        var (client, universe, type) = await World("imgframe");
+        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
+
+        // Red on the left, blue on the right. The centred square would be half of each, so a
+        // thumbnail that ignored the choice - or quietly centre-cropped - cannot pass below.
+        var source = Png(Halves(400, 200));
+        var stored = await Uploaded(client, universe.Id, entry.Id, source, "halves.png", RightSquare);
+
+        Assert.Equal(RightSquare, stored.Crop);
+        Assert.Equal(400, stored.Width);
+        Assert.Equal(200, stored.Height);
+
+        using var thumbnail = Image.Load<Rgba32>(_factory.Media.Bytes(ThumbnailKey(universe.Id, entry.Id, stored)));
+
+        // Square, at the chosen square's own size because it is under the 320 target, and blue
+        // edge to edge.
+        Assert.Equal(200, thumbnail.Width);
+        Assert.Equal(200, thumbnail.Height);
+        AssertEverywhere(thumbnail, IsBlue);
+
+        // The original is the file that was uploaded: not cropped, not re-encoded, not resized.
+        Assert.Equal(source, _factory.Media.Bytes(Key(universe.Id, entry.Id, stored.AssetId, "original.png")));
+
+        // And the choice travels with the entry, so the cropper can reopen where it was left.
+        Assert.Equal(RightSquare, (await Detail(client, universe.Id, entry.Id)).Image!.Crop);
+    }
+
+    [Fact]
+    public async Task Without_a_choice_the_thumbnail_is_the_centred_square_and_that_framing_is_recorded()
+    {
+        var (client, universe, type) = await World("imgcentre");
+        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
+
+        var stored = await Uploaded(client, universe.Id, entry.Id, Png(Halves(400, 200)), "halves.png");
+
+        // Recorded rather than left null, so every picture stored from now on says how it was cut.
+        Assert.Equal(new EntityImageCrop(0.25, 0, 0.5, 1), stored.Crop);
+
+        using var thumbnail = Image.Load<Rgba32>(_factory.Media.Bytes(ThumbnailKey(universe.Id, entry.Id, stored)));
+        Assert.True(IsRed(At(thumbnail, 0.1, 0.5)));
+        Assert.True(IsBlue(At(thumbnail, 0.9, 0.5)));
+    }
+
+    [Theory]
+    [InlineData("left", """{"x":-0.1,"y":0,"width":0.5,"height":1}""")]
+    [InlineData("right", """{"x":0.6,"y":0,"width":0.5,"height":1}""")]
+    [InlineData("below", """{"x":0,"y":0.5,"width":0.25,"height":0.75}""")]
+    [InlineData("empty", """{"x":0,"y":0,"width":0,"height":0}""")]
+    [InlineData("prose", "the left bit, please")]
+    public async Task A_crop_off_the_picture_or_unreadable_is_refused_and_nothing_is_stored(string tag, string crop)
+    {
+        var (client, universe, type) = await World($"imgbadcrop{tag}");
+        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
+
+        var response = await Upload(client, universe.Id, entry.Id, Png(Halves(400, 200)), "halves.png", crop: crop);
+
+        await AssertCropRefused(response);
+        Assert.False(await HasImage(entry.Id));
+        Assert.DoesNotContain(_factory.Media.Keys, key => key.Contains(entry.Id.ToString("D"), StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_crop_that_is_not_square_on_the_picture_is_refused_rather_than_stretched()
+    {
+        var (client, universe, type) = await World("imgoblong");
+        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
+
+        // A quarter of each side of a 2:1 picture is 100 by 50 pixels: inside the picture, and
+        // not a square. Squashing it into one would be exactly the distortion a card must not show.
+        var response = await Upload(
+            client, universe.Id, entry.Id, Png(Halves(400, 200)), "halves.png", crop: CropJson(new EntityImageCrop(0, 0, 0.25, 0.25)));
+
+        await AssertCropRefused(response);
+        Assert.False(await HasImage(entry.Id));
+    }
+
+    [Theory]
+    [InlineData(1001, 333, 17, 0, 333)]
+    [InlineData(333, 1001, 0, 668, 333)]
+    [InlineData(4000, 3000, 1234, 567, 1789)]
+    [InlineData(7, 5, 2, 0, 5)]
+    public void A_crop_made_from_whole_pixels_lands_back_on_exactly_those_pixels(
+        int width,
+        int height,
+        int left,
+        int top,
+        int side)
+    {
+        // The cropper sends whole pixels divided by the picture's size, and a backup stores the
+        // same fractions. Either way the server has to recover the exact square, or a thumbnail
+        // regenerated from a backup would drift from the one the author approved.
+        var crop = new EntityImageCrop((double)left / width, (double)top / height, (double)side / width, (double)side / height);
+
+        var (square, rejection) = EntityImageProcessing.Place(crop, width, height);
+
+        Assert.Null(rejection);
+        Assert.Equal(new CropSquare(left, top, side), square);
+    }
+
+    [Fact]
+    public async Task A_crop_is_measured_on_the_picture_as_it_is_displayed()
+    {
+        var (client, universe, type) = await World("imgorient");
+        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
+
+        // A JPEG stored sideways: 200 by 100 pixels, red left and blue right, with an EXIF tag
+        // saying to turn it a quarter clockwise. A browser draws it 100 wide by 200 tall, red above
+        // blue, and that upright picture is the one the author frames - so the lower square has
+        // to be blue.
+        var sideways = await Uploaded(
+            client, universe.Id, entry.Id, Jpeg(Halves(200, 100), orientation: 6), "sideways.jpg", new EntityImageCrop(0, 0.5, 1, 0.5));
+
+        Assert.Equal(100, sideways.Width);
+        Assert.Equal(200, sideways.Height);
+
+        using (var thumbnail = Image.Load<Rgba32>(_factory.Media.Bytes(ThumbnailKey(universe.Id, entry.Id, sideways))))
+        {
+            Assert.Equal(100, thumbnail.Width);
+            Assert.Equal(100, thumbnail.Height);
+            AssertEverywhere(thumbnail, IsBlue);
+
+            // Rotated into its pixels, and the tag that said so stripped with everything else.
+            Assert.Null(thumbnail.Metadata.ExifProfile);
+        }
+
+        // A WebP carrying the same tag is drawn by browsers exactly as its pixels are stored, so
+        // the frame is 200 by 100 and its right-hand square is the blue one.
+        var webp = await Uploaded(
+            client, universe.Id, entry.Id, Webp(Halves(200, 100), orientation: 6), "sideways.webp", RightSquare);
+
+        Assert.Equal(200, webp.Width);
+        Assert.Equal(100, webp.Height);
+
+        using (var thumbnail = Image.Load<Rgba32>(_factory.Media.Bytes(ThumbnailKey(universe.Id, entry.Id, webp))))
+        {
+            AssertEverywhere(thumbnail, IsBlue);
+        }
+    }
+
+    // ---------- Reframing ----------
+
+    [Fact]
+    public async Task Reframing_cuts_a_new_thumbnail_from_the_stored_original_and_never_touches_the_original()
+    {
+        var (client, universe, type) = await World("imgreframe");
+        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
+
+        var source = Png(Halves(400, 200));
+        var first = await Uploaded(client, universe.Id, entry.Id, source, "halves.png", LeftSquare);
+        var originalKey = Key(universe.Id, entry.Id, first.AssetId, "original.png");
+
+        var reframed = await Reframed(client, universe.Id, entry.Id, first.AssetId, RightSquare);
+
+        // The same picture. Same asset, same key, same bytes: nothing was uploaded, and the
+        // original object was not written, moved or deleted to make the new thumbnail.
+        Assert.Equal(first.AssetId, reframed.AssetId);
+        Assert.Equal(source, _factory.Media.Bytes(originalKey));
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<LorexDbContext>();
+            var row = await db.EntityImages.AsNoTracking().SingleAsync(image => image.EntityId == entry.Id);
+
+            Assert.Equal(originalKey, row.OriginalKey);
+            Assert.Equal(ThumbnailKey(universe.Id, entry.Id, reframed), row.ThumbnailKey);
+        }
+
+        // A new thumbnail under a new id, showing the new square.
+        Assert.NotEqual(first.ThumbnailId, reframed.ThumbnailId);
+        Assert.Equal(RightSquare, reframed.Crop);
+
+        using (var thumbnail = Image.Load<Rgba32>(_factory.Media.Bytes(ThumbnailKey(universe.Id, entry.Id, reframed))))
+        {
+            AssertEverywhere(thumbnail, IsBlue);
+        }
+
+        // The thumbnail it replaced is gone, and its address stops resolving rather than starting
+        // to serve different bytes - which is what keeps a cached one from surviving.
+        Assert.False(_factory.Media.Contains(ThumbnailKey(universe.Id, entry.Id, first)));
+        Assert.Equal(
+            HttpStatusCode.NotFound,
+            (await client.GetAsync(ThumbnailUrl(universe.Id, entry.Id, first))).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await client.GetAsync(ThumbnailUrl(universe.Id, entry.Id, reframed))).StatusCode);
+
+        // The original's address is the one it always had, and it still answers.
+        var original = await client.GetAsync(OriginalUrl(universe.Id, entry.Id, first.AssetId));
+        Assert.Equal(HttpStatusCode.OK, original.StatusCode);
+        Assert.Equal(source, await original.Content.ReadAsByteArrayAsync());
+
+        // Two objects, as ever: the original and the one live thumbnail.
+        Assert.Equal(
+            2,
+            _factory.Media.Keys.Count(key => key.Contains(entry.Id.ToString("D"), StringComparison.Ordinal)));
+
+        var detail = await Detail(client, universe.Id, entry.Id);
+        Assert.Equal(reframed.ThumbnailId, detail.Image!.ThumbnailId);
+        Assert.Equal(RightSquare, detail.Image.Crop);
+    }
+
+    [Fact]
+    public async Task A_reframing_whose_thumbnail_will_not_store_leaves_the_working_thumbnail()
+    {
+        var (client, universe, type) = await World("imgreframefail");
+        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
+        var first = await Uploaded(client, universe.Id, entry.Id, Png(Halves(400, 200)), "halves.png", LeftSquare);
+        var workingKey = ThumbnailKey(universe.Id, entry.Id, first);
+        var history = await History(client, universe.Id, entry.Id);
+
+        _factory.Media.FailPut = key => key != workingKey ? StorageFailure() : null;
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await Reframe(client, universe.Id, entry.Id, first.AssetId, RightSquare);
+        }
+        finally
+        {
+            _factory.Media.FailPut = null;
+        }
+
+        await AssertStorageProblem(response);
+
+        // Nothing moved: the entry names the thumbnail it had, that thumbnail still exists and is
+        // still the left square, and no version claims a change that did not happen.
+        var detail = await Detail(client, universe.Id, entry.Id);
+        Assert.Equal(first.ThumbnailId, detail.Image!.ThumbnailId);
+        Assert.Equal(LeftSquare, detail.Image.Crop);
+
+        using (var thumbnail = Image.Load<Rgba32>(_factory.Media.Bytes(workingKey)))
+        {
+            AssertEverywhere(thumbnail, IsRed);
+        }
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await client.GetAsync(ThumbnailUrl(universe.Id, entry.Id, first))).StatusCode);
+        Assert.Equal(
+            2,
+            _factory.Media.Keys.Count(key => key.Contains(entry.Id.ToString("D"), StringComparison.Ordinal)));
+        Assert.Equal(history.Count, (await History(client, universe.Id, entry.Id)).Count);
+    }
+
+    [Fact]
+    public async Task A_framing_chosen_for_a_picture_that_has_since_been_replaced_is_refused()
+    {
+        var (client, universe, type) = await World("imgreframestale");
+        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
+
+        var first = await Uploaded(client, universe.Id, entry.Id, Png(Halves(400, 200)), "first.png", LeftSquare);
+        var second = await Uploaded(client, universe.Id, entry.Id, Jpeg(500, 500), "second.jpg");
+
+        // The author framed the first picture in one tab; the second landed from another. The
+        // fractions describe a picture the entry no longer has, so they are not applied to this one.
+        var response = await Reframe(client, universe.Id, entry.Id, first.AssetId, RightSquare);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(EntityImageEndpoints.ImageChangedCode, await ProblemCode(response));
+
+        var detail = await Detail(client, universe.Id, entry.Id);
+        Assert.Equal(second.ThumbnailId, detail.Image!.ThumbnailId);
+        Assert.Equal(
+            2,
+            _factory.Media.Keys.Count(key => key.Contains(entry.Id.ToString("D"), StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public async Task A_reframing_checks_its_crop_before_anything_is_written()
+    {
+        var (client, universe, type) = await World("imgreframecrop");
+        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
+        var stored = await Uploaded(client, universe.Id, entry.Id, Png(Halves(400, 200)), "halves.png", LeftSquare);
+
+        EntityImageCrop?[] refused =
+        [
+            null,
+            new EntityImageCrop(0.75, 0, 0.5, 1),
+            new EntityImageCrop(0, 0, 0.25, 0.25),
+        ];
+
+        foreach (var crop in refused)
+        {
+            await AssertCropRefused(await Reframe(client, universe.Id, entry.Id, stored.AssetId, crop));
+        }
+
+        Assert.Equal(stored.ThumbnailId, (await Detail(client, universe.Id, entry.Id)).Image!.ThumbnailId);
+        Assert.Equal(
+            2,
+            _factory.Media.Keys.Count(key => key.Contains(entry.Id.ToString("D"), StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public async Task A_reframing_with_no_original_to_cut_from_says_so_and_changes_nothing()
+    {
+        var (client, universe, type) = await World("imgreframegone");
+        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
+        var stored = await Uploaded(client, universe.Id, entry.Id, Png(Halves(400, 200)), "halves.png", LeftSquare);
+
+        _factory.Media.Evict(Key(universe.Id, entry.Id, stored.AssetId, "original.png"));
+
+        var response = await Reframe(client, universe.Id, entry.Id, stored.AssetId, RightSquare);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(EntityImageEndpoints.OriginalUnavailableCode, await ProblemCode(response));
+        Assert.Equal(stored.ThumbnailId, (await Detail(client, universe.Id, entry.Id)).Image!.ThumbnailId);
+        Assert.True(_factory.Media.Contains(ThumbnailKey(universe.Id, entry.Id, stored)));
+    }
+
+    [Fact]
+    public async Task Reframing_an_entry_with_no_picture_is_not_found()
+    {
+        var (client, universe, type) = await World("imgreframenone");
+        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
+
+        var response = await Reframe(client, universe.Id, entry.Id, Guid.NewGuid(), LeftSquare);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     // ---------- Routes ----------
 
     private static string ImageRoute(Guid universeId, Guid entityId) =>
         $"/api/universes/{universeId}/entities/{entityId}/image";
 
-    private static string ImageUrl(Guid universeId, Guid entityId, Guid assetId, string variant) =>
-        $"{ImageRoute(universeId, entityId)}/{assetId}/{variant}";
+    private static string OriginalUrl(Guid universeId, Guid entityId, Guid assetId) =>
+        $"{ImageRoute(universeId, entityId)}/{assetId}/original";
+
+    private static string ThumbnailUrl(Guid universeId, Guid entityId, EntityImageRef image) =>
+        $"{ImageRoute(universeId, entityId)}/{image.AssetId}/thumbnail/{image.ThumbnailId}";
 
     private static string Key(Guid universeId, Guid entityId, Guid assetId, string leaf) =>
         $"universes/{universeId:D}/entities/{entityId:D}/primary/{assetId:D}/{leaf}";
+
+    private static string ThumbnailKey(Guid universeId, Guid entityId, EntityImageRef image) =>
+        Key(universeId, entityId, image.AssetId, $"thumbnail-{image.ThumbnailId:D}.webp");
 
     // ---------- Calling ----------
 
@@ -744,12 +1211,18 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         Guid entityId,
         byte[] bytes,
         string fileName,
-        string contentType = "image/png")
+        string contentType = "image/png",
+        string? crop = null)
     {
         using var form = new MultipartFormDataContent();
         var file = new ByteArrayContent(bytes);
         file.Headers.ContentType = new MediaTypeHeaderValue(contentType);
         form.Add(file, "file", fileName);
+
+        if (crop is not null)
+        {
+            form.Add(new StringContent(crop), "crop");
+        }
 
         return await client.PutAsync(ImageRoute(universeId, entityId), form);
     }
@@ -759,12 +1232,82 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         Guid universeId,
         Guid entityId,
         byte[] bytes,
-        string fileName)
+        string fileName,
+        EntityImageCrop? crop = null)
     {
-        var contentType = fileName.EndsWith(".jpg", StringComparison.Ordinal) ? "image/jpeg" : "image/png";
-        var response = await Upload(client, universeId, entityId, bytes, fileName, contentType);
+        var contentType = Path.GetExtension(fileName) switch
+        {
+            ".jpg" => "image/jpeg",
+            ".webp" => "image/webp",
+            _ => "image/png",
+        };
+
+        var response = await Upload(
+            client, universeId, entityId, bytes, fileName, contentType, crop is null ? null : CropJson(crop));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EntityImageRef>())!;
+    }
+
+    private static Task<HttpResponseMessage> Reframe(
+        HttpClient client,
+        Guid universeId,
+        Guid entityId,
+        Guid assetId,
+        EntityImageCrop? crop) =>
+        client.PutAsJsonAsync($"{ImageRoute(universeId, entityId)}/thumbnail", new EntityThumbnailRequest(assetId, crop));
+
+    private static async Task<EntityImageRef> Reframed(
+        HttpClient client,
+        Guid universeId,
+        Guid entityId,
+        Guid assetId,
+        EntityImageCrop crop)
+    {
+        var response = await Reframe(client, universeId, entityId, assetId, crop);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<EntityImageRef>())!;
+    }
+
+    private static string CropJson(EntityImageCrop crop) => JsonSerializer.Serialize(crop, JsonSerializerOptions.Web);
+
+    /// <summary>
+    /// A storage failure as R2 would produce one through the adapter: Lorex's sentence outside,
+    /// and a provider message inside that names things no response may carry.
+    /// </summary>
+    private static MediaStorageFailedException StorageFailure() =>
+        new(
+            "Image storage could not complete the request.",
+            new InvalidOperationException("synthetic-bucket: STREAMING-AWS4-HMAC-SHA256-PAYLOAD not implemented"));
+
+    /// <summary>
+    /// The one answer a failing store gets: a 503 problem in Lorex's words, with nothing the
+    /// provider said and nothing that names the bucket.
+    /// </summary>
+    private static async Task AssertStorageProblem(HttpResponseMessage response)
+    {
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+
+        var body = await response.Content.ReadAsStringAsync();
+        using var problem = JsonDocument.Parse(body);
+
+        Assert.Equal("Image storage is unavailable.", problem.RootElement.GetProperty("title").GetString());
+        Assert.DoesNotContain("synthetic-bucket", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("STREAMING", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("universes/", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static async Task AssertCropRefused(HttpResponseMessage response)
+    {
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.True(problem.RootElement.GetProperty("errors").TryGetProperty("crop", out _));
+    }
+
+    private static async Task<string?> ProblemCode(HttpResponseMessage response)
+    {
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return problem.RootElement.TryGetProperty("code", out var code) ? code.GetString() : null;
     }
 
     private static async Task<EntityDetail> Detail(HttpClient client, Guid universeId, Guid entityId) =>
@@ -849,6 +1392,90 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         using var buffer = new MemoryStream();
         image.SaveAsJpeg(buffer);
         return buffer.ToArray();
+    }
+
+    /// <summary>Encodes and disposes <paramref name="image"/>.</summary>
+    private static byte[] Png(Image<Rgba32> image)
+    {
+        using (image)
+        {
+            using var buffer = new MemoryStream();
+            image.SaveAsPng(buffer);
+            return buffer.ToArray();
+        }
+    }
+
+    /// <summary>Encodes and disposes <paramref name="image"/>, tagged with an EXIF orientation.</summary>
+    private static byte[] Jpeg(Image<Rgba32> image, ushort orientation)
+    {
+        using (image)
+        {
+            Orient(image, orientation);
+            using var buffer = new MemoryStream();
+            image.SaveAsJpeg(buffer);
+            return buffer.ToArray();
+        }
+    }
+
+    /// <summary>Encodes and disposes <paramref name="image"/>, tagged with an EXIF orientation.</summary>
+    private static byte[] Webp(Image<Rgba32> image, ushort orientation)
+    {
+        using (image)
+        {
+            Orient(image, orientation);
+            using var buffer = new MemoryStream();
+            image.SaveAsWebp(buffer, new WebpEncoder { FileFormat = WebpFileFormatType.Lossless });
+            return buffer.ToArray();
+        }
+    }
+
+    private static void Orient(Image image, ushort orientation)
+    {
+        image.Metadata.ExifProfile = new ExifProfile();
+        image.Metadata.ExifProfile.SetValue(ExifTag.Orientation, orientation);
+    }
+
+    /// <summary>
+    /// Red on the left half, blue on the right. The picture that makes a crop checkable by eye and
+    /// by assertion: every square on one side is one colour, and the centred square is both.
+    /// </summary>
+    private static Image<Rgba32> Halves(int width, int height)
+    {
+        var image = new Image<Rgba32>(width, height);
+        image.ProcessPixelRows(accessor =>
+        {
+            for (var y = 0; y < accessor.Height; y++)
+            {
+                var row = accessor.GetRowSpan(y);
+                for (var x = 0; x < row.Length; x++)
+                {
+                    row[x] = x < width / 2 ? new Rgba32(220, 30, 30) : new Rgba32(30, 30, 220);
+                }
+            }
+        });
+        return image;
+    }
+
+    /// <summary>The pixel at a fraction of the way across and down.</summary>
+    private static Rgba32 At(Image<Rgba32> image, double across, double down) =>
+        image[(int)(across * (image.Width - 1)), (int)(down * (image.Height - 1))];
+
+    // Loose on purpose: the thumbnail is lossy WebP, so a colour is recognised, not matched.
+    private static bool IsRed(Rgba32 pixel) => pixel.R > 160 && pixel.G < 90 && pixel.B < 90;
+
+    private static bool IsBlue(Rgba32 pixel) => pixel.B > 160 && pixel.R < 90 && pixel.G < 90;
+
+    /// <summary>Corners, edges and middle - a crop that strayed across the seam shows up at one of them.</summary>
+    private static void AssertEverywhere(Image<Rgba32> image, Func<Rgba32, bool> expected)
+    {
+        foreach (var across in new[] { 0.02, 0.5, 0.98 })
+        {
+            foreach (var down in new[] { 0.02, 0.5, 0.98 })
+            {
+                var pixel = At(image, across, down);
+                Assert.True(expected(pixel), $"Pixel at ({across}, {down}) was {pixel}.");
+            }
+        }
     }
 
     /// <summary>Not a flat colour: a resampler given one has nothing to prove it worked on.</summary>

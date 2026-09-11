@@ -11,9 +11,10 @@ namespace Lorex.Api.Tests;
 /// keys it holds are exactly the keys the endpoint wrote, which is what lets a test assert the
 /// naming convention rather than trust it.
 ///
-/// <see cref="FailPut"/> and <see cref="FailDelete"/> are how the failure paths become testable.
-/// An upload that dies halfway and a cleanup that will not run are the two cases the whole
-/// two-store design exists for, and neither can be provoked from outside.
+/// <see cref="FailPut"/>, <see cref="FailGet"/> and <see cref="FailDelete"/> are how the failure
+/// paths become testable. An upload that dies halfway, a store that stops answering and a
+/// cleanup that will not run are the cases the whole two-store design exists for, and none of
+/// them can be provoked from outside.
 /// </summary>
 public sealed class TestMediaObjectStore : IMediaObjectStore
 {
@@ -21,6 +22,9 @@ public sealed class TestMediaObjectStore : IMediaObjectStore
 
     /// <summary>Returns an exception to throw instead of storing the key, or null to store it.</summary>
     public Func<string, Exception?>? FailPut { get; set; }
+
+    /// <summary>Returns an exception to throw instead of reading the key, or null to read it.</summary>
+    public Func<string, Exception?>? FailGet { get; set; }
 
     /// <summary>Returns an exception to throw instead of deleting the key, or null to delete it.</summary>
     public Func<string, Exception?>? FailDelete { get; set; }
@@ -51,6 +55,11 @@ public sealed class TestMediaObjectStore : IMediaObjectStore
 
     public Task<StoredMediaObject?> GetAsync(string key, CancellationToken cancellationToken)
     {
+        if (FailGet?.Invoke(key) is { } failure)
+        {
+            throw failure;
+        }
+
         if (!_objects.TryGetValue(key, out var entry))
         {
             return Task.FromResult<StoredMediaObject?>(null);
