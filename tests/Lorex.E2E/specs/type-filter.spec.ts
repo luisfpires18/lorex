@@ -366,7 +366,7 @@ test.describe('the type bar', () => {
     await expect(card(page, 'The Tide Vigil')).toBeVisible()
   })
 
-  test('uses a wide screen for more card columns, while other screens keep their reading width', async ({
+  test('fills the workspace column with card columns, while other screens keep their reading width', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1920, height: 1080 })
@@ -389,21 +389,44 @@ test.describe('the type bar', () => {
     await expect(card(page, 'Alenna Vance')).toBeVisible()
     expect(await canvasWidth()).toBeGreaterThan(reading)
 
+    // Not a wider cap of its own: it runs to the right-hand edge of the window, which is the end of
+    // the workspace column.
+    const edges = await page.locator('main.canvas').evaluate((element) => ({
+      right: element.getBoundingClientRect().right,
+      window: document.documentElement.clientWidth,
+    }))
+    expect(Math.abs(edges.right - edges.window)).toBeLessThanOrEqual(1)
+
     const grid = page.getByTestId('entity-grid')
     const columns = await grid.evaluate(
       (element) => getComputedStyle(element).gridTemplateColumns.split(' ').length,
     )
-    expect(columns).toBeGreaterThanOrEqual(3)
+    expect(columns).toBeGreaterThanOrEqual(4)
     expect(await pageOverflow(page)).toBeLessThanOrEqual(1)
 
-    // Heading, filters and grid widen together: the type chips and the cards share one edge and
-    // one width, rather than the filters staying behind at the old width.
+    // More columns rather than wider cards: none is as wide as two of the grid's narrowest.
+    const first = (await card(page, 'Alenna Vance').boundingBox())!
+    const narrowest = await grid.evaluate(
+      (element) => parseFloat(getComputedStyle(element).fontSize) * 17.5,
+    )
+    expect(first.width).toBeLessThan(narrowest * 2)
+
+    // Heading, search, status, type chips and grid share one content area: the same left edge,
+    // and the chips, the status filter and the cards end at the same right edge.
     const heading = (await page.getByRole('heading', { name: 'Lore', exact: true }).boundingBox())!
+    const search = (await page.getByLabel('Search').boundingBox())!
+    const status = (await page.getByLabel('Status').boundingBox())!
     const chips = (await page.getByTestId('type-filter').boundingBox())!
     const cards = (await grid.boundingBox())!
-    expect(Math.abs(chips.x - cards.x)).toBeLessThanOrEqual(1)
-    expect(Math.abs(heading.x - cards.x)).toBeLessThanOrEqual(1)
-    expect(Math.abs(chips.width - cards.width)).toBeLessThanOrEqual(1)
+    for (const left of [heading.x, search.x, chips.x]) {
+      expect(Math.abs(left - cards.x)).toBeLessThanOrEqual(1)
+    }
+    for (const right of [chips.x + chips.width, status.x + status.width]) {
+      expect(Math.abs(right - (cards.x + cards.width))).toBeLessThanOrEqual(1)
+    }
+
+    // The primary action still answers to its name with an icon beside it.
+    await expect(page.getByRole('link', { name: 'New entry', exact: true })).toBeVisible()
 
     // An entry's own page is not the browser, and keeps the reading width.
     await card(page, 'Alenna Vance').click()

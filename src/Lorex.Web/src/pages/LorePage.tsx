@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
+import { ArrowLeft, ArrowRight, Plus } from 'lucide-react'
+import { ActionIcon } from '../components/ActionIcon'
 import { EntityCard } from '../components/EntityCard'
 import { TypeFilterBar } from '../components/TypeFilterBar'
 import { listEntities, listEntityTypes } from '../lore/api'
@@ -68,7 +70,8 @@ export default function LorePage() {
     <article className="lore">
       <header className="lore__head">
         <h2 className="lore__title">Lore</h2>
-        <Link className="button" to="new" data-testid="new-entity">
+        <Link className="button button--icon" to="new" data-testid="new-entity">
+          <ActionIcon icon={Plus} />
           New entry
         </Link>
       </header>
@@ -167,23 +170,25 @@ export default function LorePage() {
       {result && result.totalPages > 1 ? (
         <nav className="pager" aria-label="Pagination">
           <button
-            className="button button--quiet"
+            className="button button--quiet button--icon"
             type="button"
             disabled={result.page <= 1}
             onClick={() => setPage((current) => current - 1)}
           >
+            <ActionIcon icon={ArrowLeft} />
             Previous
           </button>
           <span className="pager__position">
             Page {result.page} of {result.totalPages}
           </span>
           <button
-            className="button button--quiet"
+            className="button button--quiet button--icon"
             type="button"
             disabled={result.page >= result.totalPages}
             onClick={() => setPage((current) => current + 1)}
           >
             Next
+            <ActionIcon icon={ArrowRight} />
           </button>
         </nav>
       ) : null}

@@ -49,11 +49,12 @@ function currentSection(pathname: string, id: string | undefined) {
 }
 
 /**
- * Whether this screen may use a wide canvas. Only the Lore browser: it is a grid of cards, which
- * simply gains columns with the room, where every other screen is prose, forms or a list that reads
- * best at the normal width. An entry's own page is `lore/:entityId` and keeps that width.
+ * Whether this screen fills the workspace column instead of stopping at the reading width. Only the
+ * Lore browser: it is a grid of cards to scan, which simply gains columns with the room, where every
+ * other screen is prose, forms or a list that reads best at the normal width. An entry's own page is
+ * `lore/:entityId` and keeps that width.
  */
-function isWideScreen(pathname: string, id: string | undefined) {
+function fillsColumn(pathname: string, id: string | undefined) {
   return pathWithin(pathname, id) === 'lore'
 }
 
@@ -221,7 +222,7 @@ export default function UniverseWorkspace() {
         <p className="sidebar__soon">Greyed sections are not built yet.</p>
       </aside>
 
-      <main className={isWideScreen(pathname, id) ? 'canvas canvas--wide' : 'canvas'}>
+      <main className={fillsColumn(pathname, id) ? 'canvas canvas--full' : 'canvas'}>
         <Outlet context={{ universe, refresh } satisfies WorkspaceContext} />
       </main>
     </div>

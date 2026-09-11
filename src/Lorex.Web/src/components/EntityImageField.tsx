@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { Crop, ImageMinus, ImagePlus, ImageUp } from 'lucide-react'
 import {
   IMAGE_ACCEPT,
   IMAGE_MAX_BYTES,
@@ -8,6 +9,7 @@ import {
   setEntityThumbnail,
 } from '../lore/images'
 import type { EntityImageCrop, EntityImageRef } from '../lore/types'
+import { ActionIcon } from './ActionIcon'
 import { CroppedPicture, ImageCropDialog } from './ImageCropDialog'
 
 /** A picture chosen for an entry that does not exist yet, with the square the author framed. */
@@ -221,28 +223,31 @@ export function EntityImageField({
             data-testid="entity-image-input"
           />
 
-          <label className="button button--quiet imagefield__pick" htmlFor={inputId}>
+          <label className="button button--quiet button--icon imagefield__pick" htmlFor={inputId}>
+            <ActionIcon icon={hasPicture ? ImageUp : ImagePlus} />
             {hasPicture ? 'Replace' : 'Add image'}
           </label>
 
           {hasPicture ? (
             <>
               <button
-                className="button button--quiet"
+                className="button button--quiet button--icon"
                 type="button"
                 disabled={busyOrDisabled}
                 onClick={reframe}
                 data-testid="entity-image-reframe"
               >
+                <ActionIcon icon={Crop} />
                 Edit thumbnail
               </button>
               <button
-                className="button button--quiet"
+                className="button button--quiet button--icon"
                 type="button"
                 disabled={busyOrDisabled}
                 onClick={() => void remove()}
                 data-testid="entity-image-remove"
               >
+                <ActionIcon icon={ImageMinus} />
                 {busy ? 'Removing' : 'Remove'}
               </button>
             </>

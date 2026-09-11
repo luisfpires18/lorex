@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import { Check, Pencil, Trash, X } from 'lucide-react'
+import { ActionIcon } from '../components/ActionIcon'
 import { EntityHistory } from '../components/EntityHistory'
 import { EntityImageField, type PendingImage } from '../components/EntityImageField'
 import { FieldInput } from '../components/FieldInputs'
@@ -591,17 +593,18 @@ export default function EntityPage() {
         {isEditing ? (
           <>
             <button
-              className="button"
+              className="button button--icon"
               type="button"
               onClick={save}
               disabled={isSaving}
               data-testid="save-entity"
             >
+              <ActionIcon icon={Check} />
               {isSaving ? 'Saving' : isNew ? 'Create entry' : 'Save changes'}
             </button>
             {!isNew ? (
               <button
-                className="button button--quiet"
+                className="button button--quiet button--icon"
                 type="button"
                 onClick={() => {
                   if (detail) setDraft(draftFromDetail(detail))
@@ -611,6 +614,7 @@ export default function EntityPage() {
                   setBlocked(null)
                 }}
               >
+                <ActionIcon icon={X} />
                 Cancel
               </button>
             ) : null}
@@ -618,21 +622,23 @@ export default function EntityPage() {
         ) : (
           <>
             <button
-              className="button"
+              className="button button--icon"
               type="button"
               onClick={() => setIsEditing(true)}
               disabled={isSaving}
               data-testid="edit-entity"
             >
+              <ActionIcon icon={Pencil} />
               Edit
             </button>
             <button
-              className="button button--quiet"
+              className="button button--quiet button--icon"
               type="button"
               onClick={moveToTrash}
               disabled={isSaving}
               data-testid="trash-entity"
             >
+              <ActionIcon icon={Trash} />
               Move to Trash
             </button>
           </>
