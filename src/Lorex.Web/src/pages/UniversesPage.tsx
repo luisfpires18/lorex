@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { UniverseCard } from '../components/UniverseCard'
 import { UniverseForm } from '../components/UniverseForm'
@@ -65,9 +65,9 @@ export default function UniversesPage() {
       <header className="home__bar">
         <Wordmark />
         <div className="home__session">
-          <span className="home__user" data-testid="signed-in-user">
+          <Link className="home__user" to="/app/profile" data-testid="signed-in-user">
             {user?.username}
-          </span>
+          </Link>
           <button className="button button--quiet" type="button" onClick={handleLogOut}>
             Sign out
           </button>

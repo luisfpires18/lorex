@@ -1,3 +1,4 @@
+import { UserRound } from 'lucide-react'
 import { useCallback, useEffect, useId, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router-dom'
 import { getUniverse } from '../universes/api'
@@ -205,6 +206,19 @@ export default function UniverseWorkspace() {
           <li>
             <NavLink to="settings" className="sidebar__link" data-testid="workspace-settings">
               Settings
+            </NavLink>
+          </li>
+          {/* Not a section of this universe but of the account that owns it, which is why it
+              carries a picture none of the others do and an absolute path out of the world. */}
+          <li>
+            <NavLink to="/app/profile" className="sidebar__link" data-testid="workspace-profile">
+              Profile
+              <UserRound
+                className="sidebar__icon"
+                aria-hidden="true"
+                focusable="false"
+                strokeWidth={1.75}
+              />
             </NavLink>
           </li>
         </ul>

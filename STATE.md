@@ -68,18 +68,26 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     matters - the article and editor surface at 62ch, a summary at 58ch, a settings section at
     34rem - so prose stays readable without a page-level wall. Common Lore and entry actions carry
     a decorative Lucide icon beside their unchanged label (`ActionIcon`, `.button--icon`).
+- **Profile screen** (`feat/profile-page`, **not merged, not pushed**). The signed-in account has a
+  screen of its own at `/app/profile` - a user-level route beside the universe browser, not a
+  section of a world - wearing the same bar. A centred circle carries the account's initial,
+  because the auth model stores no picture and this branch deliberately does not add one; under it
+  are the username, the email, how many universes the account owns and the account id, and a line
+  saying that is all Lorex keeps. The workspace sidebar links to it as the one entry that leaves
+  the universe, marked by a Lucide `UserRound`, and the signed-in name in the home bar is now a
+  link to it.
 
 ## Baseline
 
-- **417 API integration tests, 70 Playwright tests**, green. No frontend unit runner exists;
+- **417 API integration tests, 73 Playwright tests**, green. No frontend unit runner exists;
   the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
 - The test host no longer migrates itself, so all 417 tests boot through the same startup path a
   deployment uses.
 - Under a full parallel Playwright run, `auth.spec.ts` "rejects a wrong password" intermittently
-  times out (it navigates to `/login` without awaiting sign-out), and a relationships or canon
-  spec can time out once; each passes alone. Known, not fixed.
+  times out (it navigates to `/login` without awaiting sign-out), and a relationships, canon or
+  universes spec can time out once; each passes alone. Known, not fixed.
 - 17 migrations, latest `RemoveEntityImageFramingMode` - drops the image framing column that
   `AddEntityImageFramingMode` added; EF rebuilds `EntityImages` to do it. `RestrictEntityTypeIconKeys`
   is data only. `has-pending-model-changes` reports none. `AddEntitySearchIndex` is raw SQL - an FTS5 virtual

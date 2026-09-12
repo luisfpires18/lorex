@@ -322,9 +322,23 @@ a {
   gap: 1rem;
 }
 
-.home__user {
+/* Both read as quiet text rather than as links until they are pointed at: the bar is chrome,
+   and two accent-blue words beside the wordmark would outweigh the screen under them. */
+.home__user,
+.home__back {
   font-size: 0.925rem;
   color: var(--muted);
+  text-decoration: none;
+}
+
+.home__user:hover,
+.home__back:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.home__back {
+  font-size: 0.875rem;
 }
 
 .home__body {
@@ -348,6 +362,97 @@ a {
   font-weight: 400;
   font-size: clamp(1.9rem, 3vw, 2.4rem);
   margin: 0;
+}
+
+/* ---------- Profile ---------- */
+
+/* The one centred column in Lorex. Every other screen reads from the left, but an account is
+   a single small thing about one person, and a portrait with its facts beneath it is the shape
+   that says so. Capped at a narrow measure so the facts stay under the circle on a wide
+   display instead of stretching away from it. */
+.profile {
+  max-width: 26rem;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.profile__title {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(1.7rem, 2.6vw, 2.1rem);
+  margin: 0 0 2rem;
+}
+
+/* The circle is drawn by CSS and always occupies the same space, so it will not move when
+   there is a real picture to put in it. Ruled and papered like an input rather than filled
+   with the accent: it is a placeholder, and it should not be the loudest thing here. */
+.profile__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 7.5rem;
+  height: 7.5rem;
+  margin: 0 auto;
+  border: 1px solid var(--rule-strong);
+  border-radius: 50%;
+  background: var(--paper);
+  font-family: var(--display);
+  font-size: 3rem;
+  line-height: 1;
+  color: var(--muted);
+}
+
+.profile__name {
+  font-family: var(--display);
+  font-size: 1.5rem;
+  line-height: 1.25;
+  margin: 1.25rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.profile__facts {
+  margin: 2rem 0 0;
+  border-top: 1px solid var(--rule);
+}
+
+/* Ruled rows, label left and value right, which is how every other list of facts in Lorex
+   reads. Left-aligned inside a centred column: a right-ragged column of emails would be
+   harder to read than the centring is worth. */
+.profile__fact {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid var(--rule);
+  text-align: left;
+}
+
+.profile__label {
+  flex: none;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.profile__value {
+  min-width: 0;
+  margin: 0;
+  font-size: 0.925rem;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.profile__value--id {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.profile__note {
+  margin: 1.5rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--muted);
+  text-align: left;
 }
 
 /* ---------- Create composer ---------- */
@@ -747,6 +852,17 @@ a {
 }
 
 .sidebar__link--planned:hover {
+  color: var(--muted);
+}
+
+/* The picture on the one link in the list that leaves this universe. Decorative - the label
+   beside it is what is read out - and sat in the space the link's own layout already leaves at
+   its end. Centred rather than on the baseline, which is where a drawing belongs next to text. */
+.sidebar__icon {
+  flex: none;
+  align-self: center;
+  width: 1.05em;
+  height: 1.05em;
   color: var(--muted);
 }
 
