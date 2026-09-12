@@ -1,0 +1,28 @@
+/**
+ * The Lorex symbol: three interlocking rings around a star, the owner's own artwork.
+ *
+ * Always decorative, and always beside the `Wordmark`, which is what carries the name. A screen
+ * reader that announced both would say "Lorex Lorex" - so this is hidden and the text is the
+ * identity. If the mark ever stands alone somewhere, that place gives it its own accessible name
+ * rather than this component guessing one.
+ *
+ * A raster, not an inline SVG: the artwork is a shaded render and tracing it to vectors would be
+ * redrawing it. The same master produces every install icon - see `scripts/render-icons.py`.
+ *
+ * Transparent, so it sits on the graphite plate and on paper without a tile behind it. It is not
+ * used in the workspace rail: at the ~24px the rail allows, the dark two-thirds of the artwork
+ * disappear into the plate and what is left is not a symbol. The rail keeps its drawn `L`.
+ */
+export function BrandMark({ className = 'brandmark' }: { className?: string }) {
+  return (
+    <img
+      className={className}
+      src="/brand-mark.png"
+      alt=""
+      width={384}
+      height={384}
+      decoding="async"
+      data-testid="brand-mark"
+    />
+  )
+}

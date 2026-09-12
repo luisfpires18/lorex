@@ -73,6 +73,32 @@ a {
   outline-offset: 3px;
 }
 
+/* The Lorex symbol. One size rule per place it appears, and nothing else: no tile, no border,
+   no recolouring. The artwork is transparent, so whatever surface it sits on shows through. */
+.brandmark {
+  flex: none;
+  width: 2.15rem;
+  height: 2.15rem;
+  object-fit: contain;
+}
+
+/* Large, above the wordmark on the auth plate. Bounded by vw as well as rem so it does not
+   crowd the pitch text when the plate narrows. */
+.brandmark--plate {
+  display: block;
+  width: clamp(3.5rem, 7vw, 5.5rem);
+  height: auto;
+  margin: 0 0 1.5rem;
+}
+
+/* Mark and wordmark as one lockup in the paper bars, so they move together and the bar's own
+   space-between still puts the account menu opposite them. */
+.home__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
 .wordmark {
   font-family: var(--display);
   font-size: 1.25rem;
@@ -2981,6 +3007,13 @@ a {
      thing that pushed it sideways. The panel carries it, where there is room. */
   .accountmenu__name {
     display: none;
+  }
+
+  /* The plate is a band across the top here, and the mark sits in the row rather than above
+     a column of text, so it comes down to the wordmark's own size. */
+  .brandmark--plate {
+    width: 2.5rem;
+    margin-bottom: 0;
   }
 
   .sidebar {

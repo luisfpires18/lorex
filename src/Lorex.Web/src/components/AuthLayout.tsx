@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 
+import { BrandMark } from './BrandMark'
 import { Wordmark } from './Wordmark'
 
 interface AuthLayoutProps {
@@ -18,6 +19,10 @@ export function AuthLayout({ heading, intro, children, footer }: AuthLayoutProps
     <div className="auth">
       <aside className="auth__plate">
         <div className="auth__mark">
+          {/* The one place the symbol is shown large. On the plate and unbacked: at this size
+              the artwork's dark shading reads as modelling rather than as absence, which it
+              does not at the size the workspace rail would draw it. */}
+          <BrandMark className="brandmark brandmark--plate" />
           <Wordmark large />
           <span className="auth__rule" aria-hidden="true" />
           <p className="auth__pitch">
