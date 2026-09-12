@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AccountMenu } from '../components/AccountMenu'
+import { BrandMark } from '../components/BrandMark'
 import { UniverseCard } from '../components/UniverseCard'
 import { UniverseForm } from '../components/UniverseForm'
 import { Wordmark } from '../components/Wordmark'
@@ -57,7 +58,10 @@ export default function UniversesPage() {
   return (
     <div className="home">
       <header className="home__bar">
-        <Wordmark />
+        <span className="home__brand">
+          <BrandMark />
+          <Wordmark />
+        </span>
         <AccountMenu variant="bar" />
       </header>
 

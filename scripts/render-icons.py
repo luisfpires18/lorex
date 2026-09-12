@@ -1,131 +1,286 @@
 """
-Redraws the install PNGs from `src/Lorex.Web/public/icon.svg`, which is the only source
-of the mark.
-
-The PNGs were hand-cut binaries with no way to redraw them, so editing the SVG left them
-behind silently. This reads the geometry back out of the SVG and rasterises it with the
-standard library alone: the mark is a plate and two strokes, which does not justify an
-imaging dependency.
+Renders every install and favicon asset from `assets/brand/lorex-icon.png`, which is the
+only source of the mark.
 
     python scripts/render-icons.py
+
+The mark is the owner's artwork and is never redrawn here. All this does is trim it to its
+own edges, place it on a square canvas with the padding each use needs, resample it down,
+and write a PNG. Nothing recolours it and nothing traces it.
+
+Standard library only, still. Downscaling a 1299x1211 master by four to eighty times is an
+area average - each output pixel is the mean of the source rectangle it covers - which is
+the correct filter for a reduction this large and is about thirty lines. Alpha is
+premultiplied before averaging and divided out afterwards, so the transparent margin cannot
+bleed dark fringes into the mark's edges.
+
+Two grounds, and the reason for each:
+
+  transparent  What the master is. Correct where the surface underneath is known.
+  paper        `--paper`, #f6f2ea, which is also the manifest's background_color.
+
+The mark is mostly very dark red - 62% of its opaque pixels sit below luminance 40 - so on
+a graphite or black surface most of it disappears. Every asset a platform may draw on a
+background of its own choosing therefore carries the paper ground rather than transparency:
+it is the light surface Lorex itself paints, and it is the one thing that keeps the whole
+symbol visible on a dark launcher, a dark tab strip or iOS's own plate.
 """
 
-import re
 import struct
-import xml.etree.ElementTree as ElementTree
 import zlib
 from pathlib import Path
 
-SVG = Path(__file__).resolve().parent.parent / "src" / "Lorex.Web" / "public" / "icon.svg"
-NS = "{http://www.w3.org/2000/svg}"
+SOURCE = Path(__file__).resolve().parent.parent / "assets" / "brand" / "lorex-icon.png"
+PUBLIC = Path(__file__).resolve().parent.parent / "src" / "Lorex.Web" / "public"
 
-# The maskable icon holds the same art at 72%, so the platform can crop to its own shape
-# without touching the mark. It is the padding the previous maskable icon already used.
+#: `--paper`. The same value as the manifest's background_color, so an installed icon and
+#: the window that opens behind it are the same surface.
+PAPER = (0xF6, 0xF2, 0xEA)
+
+#: Alpha at or below this is margin rather than mark, when measuring the artwork's own edges.
+EDGE = 8
+
+# name, pixels, padding as a fraction of the canvas on every side, ground.
+#
+# The paddings are not taste. A maskable icon must survive the platform cropping it to a
+# circle of 80% of the canvas, so the mark is kept inside the middle 62%. Apple redraws the
+# corners itself and looks wrong when art runs to the edge, so 12%. The favicons are the
+# opposite problem - at 16px every pixel of margin is a pixel not spent on the rings - so
+# they are cropped tight.
 TARGETS = [
-    ("icon-192.png", 192, 1.0),
-    ("icon-512.png", 512, 1.0),
-    ("icon-maskable-512.png", 512, 0.72),
-    ("apple-touch-icon.png", 180, 1.0),
+    ("icon-192.png", 192, 0.08, PAPER),
+    ("icon-512.png", 512, 0.08, PAPER),
+    ("icon-maskable-512.png", 512, 0.19, PAPER),
+    ("apple-touch-icon.png", 180, 0.12, PAPER),
+    ("favicon-48.png", 48, 0.04, PAPER),
+    ("favicon-32.png", 32, 0.03, PAPER),
+    ("favicon-16.png", 16, 0.02, PAPER),
+    # The in-app symbol. Transparent and untrimmed of padding, because here the surface
+    # underneath is Lorex's own and the stylesheet decides the spacing.
+    ("brand-mark.png", 384, 0.0, None),
 ]
 
-SAMPLES = 4  # 4x4 supersampling, and only along the edge of a stroke.
+
+# ---------- reading the master ----------
 
 
-def hex_rgb(value):
-    value = value.lstrip("#")
-    return tuple(int(value[i : i + 2], 16) for i in (0, 2, 4))
+def read_png(path):
+    """The master as (width, height, rows of RGBA bytes). Narrow on purpose: it reads the
+    one shape the master is, and says so rather than guessing if that ever changes."""
+    data = path.read_bytes()
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        raise SystemExit(f"{path.name} is not a PNG")
+
+    header = None
+    body = bytearray()
+    at = 8
+    while at < len(data):
+        length = struct.unpack(">I", data[at : at + 4])[0]
+        kind = data[at + 4 : at + 8]
+        payload = data[at + 8 : at + 8 + length]
+        if kind == b"IHDR":
+            header = struct.unpack(">IIBBBBB", payload)
+        elif kind == b"IDAT":
+            body += payload
+        at += 12 + length
+
+    if header is None:
+        raise SystemExit(f"{path.name} has no header")
+
+    width, height, depth, colour, compression, filtering, interlace = header
+    if (depth, colour, compression, filtering, interlace) != (8, 6, 0, 0, 0):
+        raise SystemExit(
+            f"{path.name} must be 8-bit RGBA, uncompressed-filter, non-interlaced "
+            f"(got depth {depth}, colour type {colour}, interlace {interlace})"
+        )
+
+    return width, height, unfilter(zlib.decompress(bytes(body)), width, height)
 
 
-def read_mark():
-    """The plate colour, the stroke, and the segments the path draws.
+def unfilter(raw, width, height):
+    """Undoes the five PNG scanline filters. Four bytes per pixel, so the left neighbour
+    is four bytes back."""
+    stride = width * 4
+    rows = []
+    previous = bytearray(stride)
+    at = 0
+    for _ in range(height):
+        kind = raw[at]
+        row = bytearray(raw[at + 1 : at + 1 + stride])
+        at += 1 + stride
 
-    Deliberately narrow: it understands the one shape this icon is, and raises rather
-    than guessing if the SVG grows a construct it cannot rasterise.
+        if kind == 1:
+            for i in range(4, stride):
+                row[i] = (row[i] + row[i - 4]) & 0xFF
+        elif kind == 2:
+            for i in range(stride):
+                row[i] = (row[i] + previous[i]) & 0xFF
+        elif kind == 3:
+            for i in range(stride):
+                left = row[i - 4] if i >= 4 else 0
+                row[i] = (row[i] + ((left + previous[i]) >> 1)) & 0xFF
+        elif kind == 4:
+            for i in range(stride):
+                left = row[i - 4] if i >= 4 else 0
+                up = previous[i]
+                corner = previous[i - 4] if i >= 4 else 0
+                estimate = left + up - corner
+                pa, pb, pc = abs(estimate - left), abs(estimate - up), abs(estimate - corner)
+                nearest = left if (pa <= pb and pa <= pc) else (up if pb <= pc else corner)
+                row[i] = (row[i] + nearest) & 0xFF
+        elif kind != 0:
+            raise SystemExit(f"unsupported PNG filter {kind}")
+
+        rows.append(bytes(row))
+        previous = row
+
+    return rows
+
+
+# ---------- placing and resampling ----------
+
+
+def mark_bounds(width, height, rows):
+    """The artwork's own edges, so the padding below is padding around the mark rather than
+    around whatever canvas it happened to be saved on."""
+    left, top, right, bottom = width, height, -1, -1
+    for y, row in enumerate(rows):
+        for x in range(width):
+            if row[x * 4 + 3] > EDGE:
+                if x < left:
+                    left = x
+                if x > right:
+                    right = x
+                if y < top:
+                    top = y
+                if y > bottom:
+                    bottom = y
+    if right < 0:
+        raise SystemExit("the master is entirely transparent")
+    return left, top, right + 1, bottom + 1
+
+
+def premultiplied(width, height, rows, box):
+    """The mark, cropped to `box`, as rows of (r*a, g*a, b*a, a) floats.
+
+    Premultiplied because averaging straight colour across the mark's soft edge would pull
+    the transparent margin's black into it and leave a dark halo.
     """
-    root = ElementTree.parse(SVG).getroot()
-    view = [float(n) for n in root.get("viewBox").split()]
-    if view[:2] != [0.0, 0.0] or view[2] != view[3]:
-        raise SystemExit("icon.svg must use a square viewBox anchored at the origin")
-
-    plate = root.find(f"{NS}rect")
-    path = root.find(f"{NS}path")
-    if plate is None or path is None:
-        raise SystemExit("icon.svg must be one <rect> plate and one stroked <path>")
-    if path.get("fill", "none") != "none":
-        raise SystemExit("icon.svg's path must be stroked, not filled")
-    # The rasteriser measures distance to the segment, which is a round cap by definition.
-    if path.get("stroke-linecap") != "round":
-        raise SystemExit("icon.svg's path must set stroke-linecap=\"round\"")
-
-    numbers = r"(-?[\d.]+)"
-    segments = [
-        tuple(float(n) for n in match)
-        for match in re.findall(rf"M\s*{numbers}\s+{numbers}\s+L\s*{numbers}\s+{numbers}", path.get("d"))
-    ]
-    if not segments:
-        raise SystemExit("icon.svg's path must be move/line segments only")
-
-    return {
-        "view": view[2],
-        "plate": hex_rgb(plate.get("fill")),
-        "ink": hex_rgb(path.get("stroke")),
-        "half": float(path.get("stroke-width")) / 2,
-        "segments": segments,
-    }
+    left, top, right, bottom = box
+    out = []
+    for y in range(top, bottom):
+        row = rows[y]
+        line = []
+        for x in range(left, right):
+            r, g, b, a = row[x * 4 : x * 4 + 4]
+            weight = a / 255.0
+            line.append((r * weight, g * weight, b * weight, weight))
+        out.append(line)
+    return out
 
 
-def distance(px, py, segments):
-    """Shortest distance from a point to any of the drawn segments."""
-    best = float("inf")
-    for x1, y1, x2, y2 in segments:
-        dx, dy = x2 - x1, y2 - y1
-        span = dx * dx + dy * dy
-        along = ((px - x1) * dx + (py - y1) * dy) / span if span else 0.0
-        along = min(1.0, max(0.0, along))
-        ox, oy = px - (x1 + along * dx), py - (y1 + along * dy)
-        best = min(best, (ox * ox + oy * oy) ** 0.5)
-    return best
+def resample(source, width, height, out_width, out_height):
+    """Area average, in two separable passes. Each output pixel is the mean of the source
+    rectangle it covers, with fractional weights at the edges."""
+
+    def pass_over(rows, in_size, out_size, horizontal):
+        scale = in_size / out_size
+        spans = []
+        for i in range(out_size):
+            start, end = i * scale, (i + 1) * scale
+            first, last = int(start), min(in_size, int(end) + (end > int(end)))
+            weights = []
+            for j in range(first, last):
+                weights.append((j, min(end, j + 1) - max(start, j)))
+            total = sum(w for _, w in weights) or 1.0
+            spans.append([(j, w / total) for j, w in weights])
+
+        if horizontal:
+            return [
+                [
+                    tuple(sum(row[j][c] * w for j, w in span) for c in range(4))
+                    for span in spans
+                ]
+                for row in rows
+            ]
+
+        return [
+            [
+                tuple(sum(rows[j][x][c] * w for j, w in span) for c in range(4))
+                for x in range(len(rows[0]))
+            ]
+            for span in spans
+        ]
+
+    return pass_over(pass_over(source, width, out_width, True), height, out_height, False)
 
 
-def render(mark, size, scale):
-    """One icon, as PNG scanlines. Coverage is sampled only where a stroke has an edge."""
-    view, half, segments = mark["view"], mark["half"], mark["segments"]
-    plate, ink = mark["plate"], mark["ink"]
-    centre = view / 2
-    unit = view / size / scale  # One output pixel, in the SVG's own units.
-    margin = unit * 0.708  # Half a pixel diagonal: the widest a pixel can straddle an edge.
-    step = unit / SAMPLES
-    weight = 1.0 / (SAMPLES * SAMPLES)
+def compose(mark, size, padding, ground):
+    """One square icon: the mark fitted inside its padding, centred, over `ground`.
 
-    def to_svg(coordinate):
-        return (coordinate * view / size - centre) / scale + centre
+    The mark keeps its aspect ratio - it is 1088 x 1044, not square - so it is fitted to
+    the longer side and centred on the other.
+    """
+    inner = max(1, round(size * (1 - 2 * padding)))
+    source_height = len(mark)
+    source_width = len(mark[0])
+
+    if source_width >= source_height:
+        out_width = inner
+        out_height = max(1, round(inner * source_height / source_width))
+    else:
+        out_height = inner
+        out_width = max(1, round(inner * source_width / source_height))
+
+    scaled = resample(mark, source_width, source_height, out_width, out_height)
+
+    offset_x = (size - out_width) // 2
+    offset_y = (size - out_height) // 2
 
     rows = []
     for y in range(size):
         row = bytearray()
-        sy = to_svg(y + 0.5)
         for x in range(size):
-            sx = to_svg(x + 0.5)
-            gap = distance(sx, sy, segments) - half
-            if gap <= -margin:
-                coverage = 1.0
-            elif gap >= margin:
-                coverage = 0.0
+            inside_x = offset_x <= x < offset_x + out_width
+            inside_y = offset_y <= y < offset_y + out_height
+            if ground is None:
+                if inside_x and inside_y:
+                    r, g, b, a = scaled[y - offset_y][x - offset_x]
+                    alpha = min(1.0, max(0.0, a))
+                    # Back to straight alpha for storage.
+                    row += bytes(
+                        (
+                            channel_byte(r / alpha) if alpha else 0,
+                            channel_byte(g / alpha) if alpha else 0,
+                            channel_byte(b / alpha) if alpha else 0,
+                            # Coverage is a fraction; the channel is a byte.
+                            channel_byte(alpha * 255),
+                        )
+                    )
+                else:
+                    row += b"\x00\x00\x00\x00"
+            elif inside_x and inside_y:
+                r, g, b, a = scaled[y - offset_y][x - offset_x]
+                alpha = min(1.0, max(0.0, a))
+                # Premultiplied mark over an opaque ground is one multiply and one add.
+                row += bytes(
+                    channel_byte(channel + base * (1 - alpha))
+                    for channel, base in zip((r, g, b), ground)
+                )
             else:
-                hits = 0
-                top = sy - unit / 2 + step / 2
-                left = sx - unit / 2 + step / 2
-                for j in range(SAMPLES):
-                    for i in range(SAMPLES):
-                        if distance(left + i * step, top + j * step, segments) <= half:
-                            hits += 1
-                coverage = hits * weight
-            row += bytes(round(p + (k - p) * coverage) for p, k in zip(plate, ink))
+                row += bytes(ground)
         rows.append(bytes(row))
     return rows
 
 
-def write_png(path, size, rows):
+def channel_byte(value):
+    return min(255, max(0, round(value)))
+
+
+# ---------- writing ----------
+
+
+def write_png(path, size, rows, with_alpha):
     def chunk(kind, payload):
         return (
             struct.pack(">I", len(payload))
@@ -134,7 +289,7 @@ def write_png(path, size, rows):
             + struct.pack(">I", zlib.crc32(kind + payload) & 0xFFFFFFFF)
         )
 
-    header = struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0)  # 8-bit RGB, no alpha.
+    header = struct.pack(">IIBBBBB", size, size, 8, 6 if with_alpha else 2, 0, 0, 0)
     body = zlib.compress(b"".join(b"\x00" + row for row in rows), 9)
     path.write_bytes(
         b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", body) + chunk(b"IEND", b"")
@@ -142,11 +297,16 @@ def write_png(path, size, rows):
 
 
 def main():
-    mark = read_mark()
-    for name, size, scale in TARGETS:
-        target = SVG.parent / name
-        write_png(target, size, render(mark, size, scale))
-        print(f"{name} {size}x{size} at {scale:g} -> {target.stat().st_size} bytes")
+    width, height, rows = read_png(SOURCE)
+    box = mark_bounds(width, height, rows)
+    mark = premultiplied(width, height, rows, box)
+    print(f"{SOURCE.name} {width}x{height}, mark {box[2] - box[0]}x{box[3] - box[1]} at {box[:2]}")
+
+    for name, size, padding, ground in TARGETS:
+        target = PUBLIC / name
+        write_png(target, size, compose(mark, size, padding, ground), ground is None)
+        kind = "transparent" if ground is None else "#%02x%02x%02x" % ground
+        print(f"{name} {size}x{size} pad {padding:.0%} on {kind} -> {target.stat().st_size} bytes")
 
 
 if __name__ == "__main__":

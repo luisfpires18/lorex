@@ -84,7 +84,7 @@ no background sync. Opening Lorex without a network fails the way it does in a n
 - **iOS installs are shallower than Android ones** - no install prompt, `display: standalone`
   honoured through `apple-mobile-web-app-capable`, and the home-screen icon taken from
   `apple-touch-icon.png` rather than from the manifest. That is why a PNG apple touch icon
-  exists alongside the SVG.
+  exists at all.
 - **The mark on the icons is the wordmark, not the old `favicon.svg`.** The favicon shipped
   before this phase was a violet bolt from a template - a different palette and a different
   shape from the graphite plate and serif `L` the app has drawn in `styles.css` since the first
@@ -93,3 +93,53 @@ no background sync. Opening Lorex without a network fails the way it does in a n
   `icons.svg` sprite - a sheet of Bluesky, Discord, GitHub and X glyphs from the same template -
   were both deleted once a search confirmed nothing referenced either: not the document, not the
   manifest, not the worker, which matches root static files by pattern and names no file at all.
+
+## Amendment: the icon is the owner's artwork (2026-09-12)
+
+Status: accepted
+
+The decision above shipped a drawn stand-in: `icon.svg`, a graphite plate with a struck `X`,
+chosen because it was the mark the product already drew and an installed app whose icon is
+unrelated to it is a defect. The owner has since supplied the real thing - three interlocking
+red rings around a four-point star - so the stand-in is gone and the supplied artwork is the
+canonical mark. Nothing about the caching policy changes.
+
+**One source, in one place.** `assets/brand/lorex-icon.png`, the owner's file unaltered: 1299 x
+1211, 8-bit RGBA, with genuine transparency - every edge pixel is `(0,0,0,0)`, and the
+checkerboard a viewer draws behind it is the viewer's. `scripts/render-icons.py` derives every
+shipped asset from it and nothing else does. `public/icon.svg` is deleted: the artwork is a
+shaded raster, and tracing it into vectors would be redrawing it, which is not this task's to do.
+That also ends the SVG favicon - the document now declares PNG favicons at 48, 32 and 16.
+
+**The generator resamples rather than draws.** It no longer reads geometry out of an SVG; it
+trims the master to its own alpha bounds, fits it into each canvas at that use's padding,
+area-averages it down and writes a PNG. Alpha is premultiplied before averaging, so the
+transparent margin cannot bleed a dark fringe into the mark's edges. Still standard library
+only: an area average is the right filter for a reduction of four to eighty times, and it is
+thirty lines.
+
+**Every platform-facing asset carries the paper ground, and that is measured rather than
+tasteful.** 62% of the artwork's opaque pixels sit below luminance 40 - it is mostly very dark
+red - so on a black launcher, a dark tab strip or iOS's own plate most of the symbol disappears.
+So the icons are composited onto `--paper`, `#f6f2ea`, which is already the manifest's
+`background_color`: invisible on a light surface, a legible plate on a dark one. Only the in-app
+`brand-mark.png` keeps its transparency, because there the surface underneath is Lorex's own.
+
+**Paddings are what each platform needs.** The maskable icon keeps the mark inside the middle
+62% of the canvas, so Android cropping to a circle of 80% cannot clip it; Apple gets 12%,
+because iOS redraws the corners itself; the favicons are cropped to 2-4%, because at 16px a
+pixel of margin is a pixel not spent on the rings. The manifest still declares one maskable
+icon and two `any` icons, and the maskable claim is now backed by real safe-zone padding.
+
+**`CACHE_VERSION` is bumped to `v2`.** The icon filenames did not change but their bytes did,
+and root static files are cached by path, so without a bump an installed or merely long-lived
+browser would keep serving the old struck `X` out of `lorex-static-v1`. The policy is untouched;
+only the version moved.
+
+**Where the symbol appears in the product, and where it deliberately does not.** Large on the
+auth plate above the `Lore X` wordmark, and small beside that wordmark in the two paper bars.
+It is decorative in both - `alt=""` - because the wordmark beside it is the accessible name, and
+a screen reader should not say "Lorex Lorex". The workspace rail keeps its drawn `L`: the symbol
+was tried there and at the ~30px a 3.5rem rail allows it reads as a red tangle, and it puts the
+only saturated colour in the chrome directly above the universe accent seal, which is the one
+thing in the rail that carries meaning.

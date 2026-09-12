@@ -29,7 +29,10 @@
   needed.
 */
 
-const CACHE_VERSION = 'v1'
+// v2: the app icons changed artwork without changing filename, and root static files are
+// cached by path. Without a bump, an installed or merely long-lived browser would keep
+// serving the old mark from `lorex-static-v1` forever. The policy itself is unchanged.
+const CACHE_VERSION = 'v2'
 const STATIC_CACHE = `lorex-static-${CACHE_VERSION}`
 
 /** Build output, plus the handful of static files that live at the web root. */

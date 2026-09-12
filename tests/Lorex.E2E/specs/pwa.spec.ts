@@ -107,22 +107,31 @@ test.describe('installability', () => {
     }
   })
 
-  test('every install icon carries the struck X', async ({ page, request }) => {
-    // The SVG is the source; `python scripts/render-icons.py` rasterises the rest from it.
-    const svg = await (await request.get('/icon.svg')).text()
-    expect(svg).toContain('M150 150 L362 362 M362 150 L150 362')
-    expect(svg).toContain('aria-label="Lorex"')
+  test('every install and favicon asset is the Lorex mark, on the paper ground', async ({
+    page,
+    request,
+  }) => {
+    // `python scripts/render-icons.py` derives all of these from assets/brand/lorex-icon.png.
+    // Nothing is asserted about the artwork's shape - it is the owner's, and a pixel-matched
+    // expectation would fail on the next time they change it. What is asserted is everything a
+    // wrong build would get wrong: the size, the ground, and that the mark is actually on it.
+    const expected: Record<string, number> = {
+      '/icon-192.png': 192,
+      '/icon-512.png': 512,
+      '/icon-maskable-512.png': 512,
+      '/apple-touch-icon.png': 180,
+      '/favicon-48.png': 48,
+      '/favicon-32.png': 32,
+      '/favicon-16.png': 16,
+    }
 
     await page.goto('/login')
 
-    for (const src of [
-      '/icon-512.png',
-      '/icon-maskable-512.png',
-      '/icon-192.png',
-      '/apple-touch-icon.png',
-    ]) {
-      // Probe the raster rather than trust the filename: ink where the two strokes cross,
-      // and plate where the old upright used to stand.
+    for (const [src, size] of Object.entries(expected)) {
+      const response = await request.get(src)
+      expect(response.ok(), `${src} did not resolve`).toBeTruthy()
+      expect(response.headers()['content-type'], `${src} is not a PNG`).toContain('png')
+
       const probe = await page.evaluate(async (url) => {
         const image = new Image()
         image.src = url
@@ -130,27 +139,66 @@ test.describe('installability', () => {
         const canvas = document.createElement('canvas')
         canvas.width = image.width
         canvas.height = image.height
-        const context = canvas.getContext('2d')!
+        const context = canvas.getContext('2d', { willReadFrequently: true })!
         context.drawImage(image, 0, 0)
-        const brightnessAt = (fx: number, fy: number) => {
-          const [r, g, b] = context.getImageData(
-            Math.round(image.width * fx),
-            Math.round(image.height * fy),
-            1,
-            1,
-          ).data
-          return r + g + b
+        const { data } = context.getImageData(0, 0, image.width, image.height)
+
+        let red = 0
+        let opaque = 0
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i + 3] > 250) opaque += 1
+          // The mark is the only red in the artwork; the ground is neutral and warm.
+          if (data[i] - data[i + 2] > 40 && data[i + 1] < 140) red += 1
         }
-        const plate = brightnessAt(0.02, 0.02)
+
+        const corner = [data[0], data[1], data[2], data[3]]
         return {
-          crossing: brightnessAt(0.5, 0.5) > plate + 200,
-          upright: brightnessAt(0.34, 0.5) > plate + 200,
+          width: image.width,
+          height: image.height,
+          corner,
+          opaqueFraction: opaque / (image.width * image.height),
+          redFraction: red / (image.width * image.height),
         }
       }, src)
 
-      expect(probe.crossing, `${src} has no ink where the strokes cross`).toBeTruthy()
-      expect(probe.upright, `${src} still carries the old upright`).toBeFalsy()
+      expect(probe.width, `${src} is the wrong width`).toBe(size)
+      expect(probe.height, `${src} is not square`).toBe(size)
+
+      // Paper, #f6f2ea, which is also the manifest's background_color. A checkerboard baked
+      // into the source, or a transparent icon a platform would draw its own ground behind,
+      // would both fail here.
+      expect(probe.corner, `${src} does not sit on the paper ground`).toEqual([246, 242, 234, 255])
+      expect(probe.opaqueFraction, `${src} has transparent pixels`).toBe(1)
+
+      // And the mark is on it. Loose on purpose: enough red to prove the artwork was drawn,
+      // not so much that a change to the artwork breaks the test.
+      expect(probe.redFraction, `${src} carries no mark`).toBeGreaterThan(0.02)
     }
+
+    // The in-app symbol is the same mark and is the one asset that keeps its transparency,
+    // because the surfaces it sits on are Lorex's own.
+    const inApp = await page.evaluate(async () => {
+      const image = new Image()
+      image.src = '/brand-mark.png'
+      await image.decode()
+      const canvas = document.createElement('canvas')
+      canvas.width = image.width
+      canvas.height = image.height
+      const context = canvas.getContext('2d', { willReadFrequently: true })!
+      context.drawImage(image, 0, 0)
+      const { data } = context.getImageData(0, 0, image.width, image.height)
+      let transparent = 0
+      let visible = 0
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i] === 0) transparent += 1
+        if (data[i] > 200) visible += 1
+      }
+      return { size: image.width, transparent, visible }
+    })
+
+    expect(inApp.size).toBe(384)
+    expect(inApp.transparent, 'the in-app mark lost its transparency').toBeGreaterThan(0)
+    expect(inApp.visible, 'the in-app mark is entirely transparent').toBeGreaterThan(1000)
   })
 
   test('the document carries the metadata an install and a phone need', async ({ page }) => {
@@ -164,6 +212,17 @@ test.describe('installability', () => {
       'href',
       '/apple-touch-icon.png',
     )
+
+    // PNG favicons, at the three sizes a browser picks between. There is no SVG favicon: the
+    // mark is raster artwork and tracing it would be redrawing it.
+    const favicons = await page.locator('link[rel=icon]').all()
+    const hrefs = await Promise.all(favicons.map((link) => link.getAttribute('href')))
+    expect(hrefs).toEqual(
+      expect.arrayContaining(['/favicon-48.png', '/favicon-32.png', '/favicon-16.png']),
+    )
+    for (const link of favicons) {
+      await expect(link).toHaveAttribute('type', 'image/png')
+    }
 
     // viewport-fit=cover is what makes env(safe-area-inset-*) resolve to anything, and the
     // bottom action bar on a narrow screen pads itself with it.
@@ -255,7 +314,7 @@ test.describe('what the worker is allowed to keep', () => {
 
     // And a static asset, which the worker is meant to keep.
     await page.evaluate(async () => {
-      await fetch('/icon.svg')
+      await fetch('/favicon-32.png')
       await fetch('/manifest.webmanifest')
     })
 
@@ -272,7 +331,7 @@ test.describe('what the worker is allowed to keep', () => {
     expect(urls.filter((url) => new URL(url).pathname === '/')).toEqual([])
 
     // What it does keep, so the handler is doing real work rather than nothing at all.
-    expect(urls.some((url) => url.endsWith('/icon.svg'))).toBeTruthy()
+    expect(urls.some((url) => url.endsWith('/favicon-32.png'))).toBeTruthy()
     expect(urls.some((url) => url.endsWith('/manifest.webmanifest'))).toBeTruthy()
   })
 

@@ -147,6 +147,11 @@ export default function UniverseWorkspace() {
       style={accent ? { ['--universe-accent' as string]: accent } : undefined}
     >
       <nav className="rail" aria-label="Lorex">
+        {/* The drawn L, deliberately, and not the Lorex symbol. The symbol was tried here: at
+            the ~30px this rail allows it reads as a red tangle rather than a sphere, and it
+            puts the only saturated colour in the chrome directly above the universe's accent
+            seal - which is the one thing in the rail that carries meaning. The mark is shown
+            large on the auth plate and small in the paper bars instead. */}
         <Link className="rail__mark" to="/app" title="Back to your universes">
           L
         </Link>

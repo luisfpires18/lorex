@@ -15,6 +15,7 @@ Repository index. Paths and one-line responsibilities only.
 | `STATE.md` | Operational state only: roadmap position, blockers, deferred decisions. |
 | `graphify-out/` | Generated knowledge graph. Gitignored, manual-only; rebuild with `python -m graphify update .`. |
 | `docs/tooling/` | Agent tooling trial notes (RTK and Graphify evaluation). |
+| `assets/brand/lorex-icon.png` | The Lorex mark, as the owner supplied it. The one source every icon is derived from; not shipped. |
 | `.github/workflows/` | CI on pull requests, and the DEV deployment from `dev`. |
 | `infra/main.bicep` | The two DEV Azure resources: the Linux App Service plan and the site. |
 | `infra/main.parameters.json` | Deployment parameters. Placeholder name; no secret. |
@@ -121,10 +122,11 @@ Repository index. Paths and one-line responsibilities only.
 
 | Path | Responsibility |
 | --- | --- |
-| `index.html` | Document shell: manifest link, icons, theme colours, viewport. |
+| `index.html` | Document shell: manifest link, PNG favicons and the apple touch icon, theme colours, viewport. |
 | `public/manifest.webmanifest` | Web app manifest: name, start URL, display mode, colours, icons. |
 | `public/sw.js` | Service worker: caches build output only, and what it refuses to touch. |
-| `public/icon.svg` + `icon-*.png` + `apple-touch-icon.png` | The install icons: the struck X on the plate. `icon.svg` is the source; the PNGs are rendered from it by `scripts/render-icons.py`. |
+| `public/icon-*.png` + `apple-touch-icon.png` + `favicon-*.png` | The install and tab icons: the Lorex mark on the paper ground, at the padding each platform needs. All rendered from `assets/brand/lorex-icon.png` by `scripts/render-icons.py`. |
+| `public/brand-mark.png` | The same mark, transparent, for use inside the product. |
 | `src/main.tsx` | React entry point. |
 | `src/pwa.ts` | Registers the service worker, in production builds only. |
 | `src/App.tsx` | Routes and providers. |
@@ -142,7 +144,7 @@ Repository index. Paths and one-line responsibilities only.
 | `src/timeline/` | Timeline API client, DTO types, date formatting and year grouping. |
 | `src/canon/` | Canon Integrity API client, DTO types, and the reader for the promotion gate's 409. |
 | `src/lib/dates.ts` | Timestamp formatting, date-input round trips, and spans. |
-| `src/components/` | `AuthLayout`, `Wordmark` (the drawn "Lore X", spoken "Lorex"), `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `EntityPortrait` (the card's picture, or its monogram), `EntityImageField` (pick, frame, replace, edit thumbnail, remove), `ImageCropDialog` (the cropper, and `CroppedPicture` for unsaved previews), `Avatar` (the account's photo or its monogram, wherever one is drawn), `AccountMenu` (the one account dropdown: the rail's and the header's), `ProfileAvatar` (the Profile screen's circle, and upload, reframe, replace and remove), `TypeIcon`, `TypeIconPicker`, `TypeFilterBar` (the Lore browser's type chips), `ActionIcon` (the decorative icon beside an action's label), `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker` (single and multi, one shared search), `EntityHistory`, `RelationshipSection`, `RelationshipTypeManager`, `TimelineEntryForm`, `ConflictEntry`, `CanonBlockNotice` (the one refused-write presentation, shared by every gated form). |
+| `src/components/` | `AuthLayout`, `Wordmark` (the drawn "Lore X", spoken "Lorex"), `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `EntityPortrait` (the card's picture, or its monogram), `EntityImageField` (pick, frame, replace, edit thumbnail, remove), `ImageCropDialog` (the cropper, and `CroppedPicture` for unsaved previews), `BrandMark` (the Lorex symbol, decorative, beside the wordmark), `Avatar` (the account's photo or its monogram, wherever one is drawn), `AccountMenu` (the one account dropdown: the rail's and the header's), `ProfileAvatar` (the Profile screen's circle, and upload, reframe, replace and remove), `TypeIcon`, `TypeIconPicker`, `TypeFilterBar` (the Lore browser's type chips), `ActionIcon` (the decorative icon beside an action's label), `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker` (single and multi, one shared search), `EntityHistory`, `RelationshipSection`, `RelationshipTypeManager`, `TimelineEntryForm`, `ConflictEntry`, `CanonBlockNotice` (the one refused-write presentation, shared by every gated form). |
 | `src/pages/` | Login, Register, Universes browser, Profile, and the workspace: Overview, Lore, entry page, Timeline, Canon, Types, Trash and Settings. `UniverseWorkspace` also owns the collapsing narrow-screen navigation, and lets the Lore browser alone fill the workspace column. |
 | `vite.config.ts` | Dev server port 5173, proxy to the API, build config. |
 
@@ -198,7 +200,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.Common.ps1` | Shared launcher helpers: ports, process tracking, readiness. |
 | `Start-Lorex.ps1` | Starts API + web, waits, opens the browser. |
 | `Stop-Lorex.ps1` | Stops launcher-owned processes. |
-| `render-icons.py` | Rasterises the install PNGs from `icon.svg`. Standard library only. |
+| `render-icons.py` | Renders every icon and favicon from `assets/brand/lorex-icon.png`: trim, pad, area-average, write. Standard library only. |
 
 ## `docs`
 

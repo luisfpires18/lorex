@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { AccountMenu } from '../components/AccountMenu'
+import { BrandMark } from '../components/BrandMark'
 import { ProfileAvatar } from '../components/ProfileAvatar'
 import { Wordmark } from '../components/Wordmark'
 import { listUniverses } from '../universes/api'
@@ -42,7 +43,10 @@ export default function ProfilePage() {
   return (
     <div className="home">
       <header className="home__bar">
-        <Wordmark />
+        <span className="home__brand">
+          <BrandMark />
+          <Wordmark />
+        </span>
         <div className="home__session">
           <Link className="home__back" to="/app">
             All universes
