@@ -16,14 +16,21 @@ bleed dark fringes into the mark's edges.
 
 Two grounds, and the reason for each:
 
-  transparent  What the master is. Correct where the surface underneath is known.
-  paper        `--paper`, #f6f2ea, which is also the manifest's background_color.
+  transparent  What the master is, and the default. The mark's lit red rings carry its shape
+               on a light or a dark surface alike; its dark side simply merges into a dark
+               one, which reads as a lit sphere rather than as a defect. Checked at 16px on
+               a browser's own dark and light tab greys.
+  paper        `--paper`, #f6f2ea, which is also the manifest's background_color. Used only
+               where transparency is not an option:
 
-The mark is mostly very dark red - 62% of its opaque pixels sit below luminance 40 - so on
-a graphite or black surface most of it disappears. Every asset a platform may draw on a
-background of its own choosing therefore carries the paper ground rather than transparency:
-it is the light surface Lorex itself paints, and it is the one thing that keeps the whole
-symbol visible on a dark launcher, a dark tab strip or iOS's own plate.
+               - the maskable icon, which a platform crops to its own shape and fills, and
+                 where a transparent region is a defect rather than a choice;
+               - the Apple touch icon, because iOS composites transparency onto black, and
+                 the mark is mostly very dark red - 62% of its opaque pixels sit below
+                 luminance 40 - so on black most of it would not be there at all.
+
+A paper tile behind the favicon was tried first, for that same 62%. It is legible but it is
+a pale box sitting in a dark tab strip, which is worse than the thing it was solving.
 """
 
 import struct
@@ -48,15 +55,15 @@ EDGE = 8
 # opposite problem - at 16px every pixel of margin is a pixel not spent on the rings - so
 # they are cropped tight.
 TARGETS = [
-    ("icon-192.png", 192, 0.08, PAPER),
-    ("icon-512.png", 512, 0.08, PAPER),
+    ("icon-192.png", 192, 0.08, None),
+    ("icon-512.png", 512, 0.08, None),
     ("icon-maskable-512.png", 512, 0.19, PAPER),
     ("apple-touch-icon.png", 180, 0.12, PAPER),
-    ("favicon-48.png", 48, 0.04, PAPER),
-    ("favicon-32.png", 32, 0.03, PAPER),
-    ("favicon-16.png", 16, 0.02, PAPER),
-    # The in-app symbol. Transparent and untrimmed of padding, because here the surface
-    # underneath is Lorex's own and the stylesheet decides the spacing.
+    ("favicon-48.png", 48, 0.04, None),
+    ("favicon-32.png", 32, 0.03, None),
+    ("favicon-16.png", 16, 0.02, None),
+    # The in-app symbol. Untrimmed of padding, because here the surface underneath is
+    # Lorex's own and the stylesheet decides the spacing.
     ("brand-mark.png", 384, 0.0, None),
 ]
 

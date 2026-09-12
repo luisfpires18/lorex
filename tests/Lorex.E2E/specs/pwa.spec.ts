@@ -107,34 +107,42 @@ test.describe('installability', () => {
     }
   })
 
-  test('every install and favicon asset is the Lorex mark, on the paper ground', async ({
+  test('every install and favicon asset is the Lorex mark, on the ground that use needs', async ({
     page,
     request,
   }) => {
     // `python scripts/render-icons.py` derives all of these from assets/brand/lorex-icon.png.
     // Nothing is asserted about the artwork's shape - it is the owner's, and a pixel-matched
-    // expectation would fail on the next time they change it. What is asserted is everything a
+    // expectation would fail the next time they change it. What is asserted is everything a
     // wrong build would get wrong: the size, the ground, and that the mark is actually on it.
-    const expected: Record<string, number> = {
+    //
+    // `transparent` is the default, so the icon sits in whatever tab strip or launcher is
+    // behind it rather than as a pale tile in a dark one. The two exceptions are the ones
+    // where transparency is not an option: a maskable icon is cropped to a platform shape and
+    // filled, and iOS composites a touch icon onto black.
+    const transparent: Record<string, number> = {
       '/icon-192.png': 192,
       '/icon-512.png': 512,
-      '/icon-maskable-512.png': 512,
-      '/apple-touch-icon.png': 180,
       '/favicon-48.png': 48,
       '/favicon-32.png': 32,
       '/favicon-16.png': 16,
+      '/brand-mark.png': 384,
+    }
+    const opaque: Record<string, number> = {
+      '/icon-maskable-512.png': 512,
+      '/apple-touch-icon.png': 180,
     }
 
     await page.goto('/login')
 
-    for (const [src, size] of Object.entries(expected)) {
-      const response = await request.get(src)
-      expect(response.ok(), `${src} did not resolve`).toBeTruthy()
-      expect(response.headers()['content-type'], `${src} is not a PNG`).toContain('png')
+    async function probe(url: string) {
+      const response = await request.get(url)
+      expect(response.ok(), `${url} did not resolve`).toBeTruthy()
+      expect(response.headers()['content-type'], `${url} is not a PNG`).toContain('png')
 
-      const probe = await page.evaluate(async (url) => {
+      return page.evaluate(async (src) => {
         const image = new Image()
-        image.src = url
+        image.src = src
         await image.decode()
         const canvas = document.createElement('canvas')
         canvas.width = image.width
@@ -143,62 +151,55 @@ test.describe('installability', () => {
         context.drawImage(image, 0, 0)
         const { data } = context.getImageData(0, 0, image.width, image.height)
 
+        let clear = 0
+        let solid = 0
         let red = 0
-        let opaque = 0
         for (let i = 0; i < data.length; i += 4) {
-          if (data[i + 3] > 250) opaque += 1
-          // The mark is the only red in the artwork; the ground is neutral and warm.
-          if (data[i] - data[i + 2] > 40 && data[i + 1] < 140) red += 1
+          if (data[i + 3] === 0) clear += 1
+          if (data[i + 3] > 250) solid += 1
+          // The mark is the only red in the artwork; any ground is neutral and warm.
+          if (data[i + 3] > 200 && data[i] - data[i + 2] > 40 && data[i + 1] < 140) red += 1
         }
 
-        const corner = [data[0], data[1], data[2], data[3]]
+        const pixels = image.width * image.height
         return {
           width: image.width,
           height: image.height,
-          corner,
-          opaqueFraction: opaque / (image.width * image.height),
-          redFraction: red / (image.width * image.height),
+          corner: [data[0], data[1], data[2], data[3]],
+          clearFraction: clear / pixels,
+          solidFraction: solid / pixels,
+          redFraction: red / pixels,
         }
-      }, src)
-
-      expect(probe.width, `${src} is the wrong width`).toBe(size)
-      expect(probe.height, `${src} is not square`).toBe(size)
-
-      // Paper, #f6f2ea, which is also the manifest's background_color. A checkerboard baked
-      // into the source, or a transparent icon a platform would draw its own ground behind,
-      // would both fail here.
-      expect(probe.corner, `${src} does not sit on the paper ground`).toEqual([246, 242, 234, 255])
-      expect(probe.opaqueFraction, `${src} has transparent pixels`).toBe(1)
-
-      // And the mark is on it. Loose on purpose: enough red to prove the artwork was drawn,
-      // not so much that a change to the artwork breaks the test.
-      expect(probe.redFraction, `${src} carries no mark`).toBeGreaterThan(0.02)
+      }, url)
     }
 
-    // The in-app symbol is the same mark and is the one asset that keeps its transparency,
-    // because the surfaces it sits on are Lorex's own.
-    const inApp = await page.evaluate(async () => {
-      const image = new Image()
-      image.src = '/brand-mark.png'
-      await image.decode()
-      const canvas = document.createElement('canvas')
-      canvas.width = image.width
-      canvas.height = image.height
-      const context = canvas.getContext('2d', { willReadFrequently: true })!
-      context.drawImage(image, 0, 0)
-      const { data } = context.getImageData(0, 0, image.width, image.height)
-      let transparent = 0
-      let visible = 0
-      for (let i = 3; i < data.length; i += 4) {
-        if (data[i] === 0) transparent += 1
-        if (data[i] > 200) visible += 1
-      }
-      return { size: image.width, transparent, visible }
-    })
+    for (const [src, size] of Object.entries(transparent)) {
+      const shape = await probe(src)
 
-    expect(inApp.size).toBe(384)
-    expect(inApp.transparent, 'the in-app mark lost its transparency').toBeGreaterThan(0)
-    expect(inApp.visible, 'the in-app mark is entirely transparent').toBeGreaterThan(1000)
+      expect(shape.width, `${src} is the wrong width`).toBe(size)
+      expect(shape.height, `${src} is not square`).toBe(size)
+
+      // The corner is nothing at all: no paper tile, and no checkerboard baked into the source.
+      expect(shape.corner[3], `${src} has a ground behind the mark`).toBe(0)
+      expect(shape.clearFraction, `${src} is not transparent around the mark`).toBeGreaterThan(0.3)
+
+      // And the mark is there. Loose on purpose: enough red to prove the artwork was drawn,
+      // not so much that changing the artwork breaks the test.
+      expect(shape.redFraction, `${src} carries no mark`).toBeGreaterThan(0.005)
+    }
+
+    for (const [src, size] of Object.entries(opaque)) {
+      const shape = await probe(src)
+
+      expect(shape.width, `${src} is the wrong width`).toBe(size)
+      expect(shape.height, `${src} is not square`).toBe(size)
+
+      // Paper, #f6f2ea, which is also the manifest's background_color. Fully opaque, because
+      // a platform mask fills a transparent region and iOS fills it with black.
+      expect(shape.corner, `${src} does not sit on the paper ground`).toEqual([246, 242, 234, 255])
+      expect(shape.solidFraction, `${src} has transparent pixels`).toBe(1)
+      expect(shape.redFraction, `${src} carries no mark`).toBeGreaterThan(0.02)
+    }
   })
 
   test('the document carries the metadata an install and a phone need', async ({ page }) => {

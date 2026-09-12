@@ -125,7 +125,7 @@ Repository index. Paths and one-line responsibilities only.
 | `index.html` | Document shell: manifest link, PNG favicons and the apple touch icon, theme colours, viewport. |
 | `public/manifest.webmanifest` | Web app manifest: name, start URL, display mode, colours, icons. |
 | `public/sw.js` | Service worker: caches build output only, and what it refuses to touch. |
-| `public/icon-*.png` + `apple-touch-icon.png` + `favicon-*.png` | The install and tab icons: the Lorex mark on the paper ground, at the padding each platform needs. All rendered from `assets/brand/lorex-icon.png` by `scripts/render-icons.py`. |
+| `public/icon-*.png` + `apple-touch-icon.png` + `favicon-*.png` | The install and tab icons: the Lorex mark, transparent except where a platform fills transparency (maskable, Apple), at the padding each one needs. All rendered from `assets/brand/lorex-icon.png` by `scripts/render-icons.py`. |
 | `public/brand-mark.png` | The same mark, transparent, for use inside the product. |
 | `src/main.tsx` | React entry point. |
 | `src/pwa.ts` | Registers the service worker, in production builds only. |
