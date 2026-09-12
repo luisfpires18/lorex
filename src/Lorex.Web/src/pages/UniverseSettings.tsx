@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
+import { ChronologySettings } from '../components/ChronologySettings'
 import { UniverseForm } from '../components/UniverseForm'
 import { downloadUniverseBackup } from '../export/api'
 import { deleteUniverse, setUniverseArchived, updateUniverse } from '../universes/api'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
 export default function UniverseSettings() {
-  const { universe, refresh } = useOutletContext<WorkspaceContext>()
+  const { universe, refresh, chronology, setChronology } = useOutletContext<WorkspaceContext>()
   const navigate = useNavigate()
 
   const [saved, setSaved] = useState(false)
@@ -84,6 +85,12 @@ export default function UniverseSettings() {
           }}
         />
       </section>
+
+      <ChronologySettings
+        universeId={universe.id}
+        chronology={chronology}
+        onSaved={setChronology}
+      />
 
       <section className="settings__section">
         <h3 className="settings__heading">Backup</h3>

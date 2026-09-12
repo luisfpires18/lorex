@@ -174,6 +174,14 @@ public sealed class EntityFieldValueConfiguration : IEntityTypeConfiguration<Ent
             .HasForeignKey(value => value.ReferencedEntityId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        // A year written in an era keeps that era. Removing it is refused by the chronology route
+        // while anything is dated in it; no action here holds the line against a race, and is
+        // checked at the end of the statement so deleting a whole universe still cascades.
+        builder.HasOne(value => value.Era)
+            .WithMany()
+            .HasForeignKey(value => value.EraId)
+            .OnDelete(DeleteBehavior.NoAction);
+
         builder.HasIndex(value => new { value.EntityId, value.FieldDefinitionId });
     }
 }

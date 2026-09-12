@@ -25,11 +25,13 @@ One ADR per durable decision. Rationale lives in the ADR, never here.
 | 0019 | An entry has one image, held in a private bucket and served by Lorex | [0019-entity-primary-image.md](0019-entity-primary-image.md) |
 | 0020 | An entity type's icon is a key from a closed, built-in set | [0020-entity-type-icon-keys.md](0020-entity-type-icon-keys.md) |
 | 0021 | An account's photo is its own user-level media, on the entry image's proven path | [0021-profile-photo.md](0021-profile-photo.md) |
+| 0022 | A universe keeps its own chronology: ordered eras, compared as structured points | [0022-universe-chronology.md](0022-universe-chronology.md) |
 
-All accepted. Next number: `0022`.
+All accepted. Next number: `0023`.
 
-Known limitations are recorded in the ADR that owns them - cross-era ordering in 0009 and
-0011, the `Age` reference year and exclusive-relationship overlap in 0011, what the
+Known limitations are recorded in the ADR that owns them - cross-era ordering on the plain
+reckoning in 0009 and 0011, and years written before a universe named its eras, the listing's
+join and the missing era reassignment in 0022, the `Age` reference year and exclusive-relationship overlap in 0011, what the
 promotion gate does not claim about stored High conflicts in 0012, unbounded history
 growth in 0013, what a backup is not in 0014, the type that cannot be freed while a
 trashed entry still uses it in 0015, the loss of substring matching in 0016, what an

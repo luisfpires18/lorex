@@ -53,6 +53,13 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Universes/UniverseConfiguration.cs` | Owner FK, indexes, per-owner unique name. |
 | `Features/Universes/UniverseEndpoints.cs` | Owner-scoped CRUD, search, paging, archive. |
 | `Features/Universes/UniverseContracts.cs` | Request and response records for universes. |
+| `Features/Chronology/ChronologyModel.cs` | `ChronologyEra`, its direction and label position. |
+| `Features/Chronology/ChronologyConfiguration.cs` | Era schema: the per-universe unique position, and the limits. |
+| `Features/Chronology/ChronologyPoint.cs` | The one date comparison: era rank, direction-signed year, month, day. The year-zero rule. |
+| `Features/Chronology/UniverseChronology.cs` | A universe's loaded reckoning: placing a stored year, and writing one out. |
+| `Features/Chronology/ChronologyEndpoints.cs` | Read and replace the eras; the gate, the in-use refusal, and the unplaced counts. |
+| `Features/Chronology/ChronologyContracts.cs` | Request and response records for the chronology. |
+| `Features/Chronology/ChronologyValidation.cs` | Era shape checks: names, labels, enums, the bound. |
 | `Features/Lore/LoreModel.cs` | Entity, type, field, option, alias, value and tag entities, and `EntityFieldSemantic`. |
 | `Features/Lore/LoreConfiguration.cs` | Lore schema: keys, indexes and delete behaviour. |
 | `Features/Lore/LoreAccess.cs` | The universe-ownership gate every lore route passes. |
@@ -91,7 +98,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Timeline/TimelineConfiguration.cs` | Timeline schema: keys, the chronological index, delete behaviour. |
 | `Features/Timeline/TimelineEndpoints.cs` | Timeline CRUD and the chronological, filtered, paged listing. |
 | `Features/Timeline/TimelineContracts.cs` | Request and response records for the timeline. |
-| `Features/Timeline/TimelineValidation.cs` | Date-kind rules and component checks. No calendar engine. |
+| `Features/Timeline/TimelineValidation.cs` | Date-kind rules, component checks, and years written in the universe's reckoning. No calendar engine. |
 | `Features/CanonIntegrity/CanonIntegrityModel.cs` | `CanonConflict`, its subject rows, severity, status and subject kind. |
 | `Features/CanonIntegrity/CanonIntegrityConfiguration.cs` | Conflict schema: the unique fingerprint index and the review index. |
 | `Features/CanonIntegrity/CanonIntegrityRule.cs` | `ICanonIntegrityRule`, the finding record and the fingerprint hash. |
@@ -102,7 +109,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/CanonIntegrity/CanonIntegrityContracts.cs` | Response records for conflicts and evaluation. |
 | `Features/CanonIntegrity/CanonRuleText.cs` | Shared wording and length fitting for rule titles and explanations. |
 | `Features/CanonIntegrity/Rules/` | The six production rules: three structural, three chronological. |
-| `Features/CanonIntegrity/Rules/CanonLifespan.cs` | Reads declared birth/death years and the moments comparable to them. |
+| `Features/CanonIntegrity/Rules/CanonLifespan.cs` | Reads declared birth/death years and the moments comparable to them, placed as chronology points. |
 | `Features/Trash/TrashEndpoints.cs` | The Trash listing and the gated restore. Entries only. |
 | `Features/Trash/TrashContracts.cs` | Response records for the Trash. |
 | `Features/Profile/ProfileImageModel.cs` | `ProfileImage`: the one photo an account may have, keyed by the account. |
@@ -141,10 +148,11 @@ Repository index. Paths and one-line responsibilities only.
 | `src/export/` | Backup download: the request, the server's filename, and handing the archive to the browser. |
 | `src/trash/` | Trash API client and DTO types. |
 | `src/relationships/` | Relationship API client, DTO types, and both-readings helper. |
-| `src/timeline/` | Timeline API client, DTO types, date formatting and year grouping. |
+| `src/chronology/` | Chronology API client and types, and `format.ts`: the one formatter every date on screen is written through. |
+| `src/timeline/` | Timeline API client, DTO types, date stamps and year grouping on top of the chronology formatter. |
 | `src/canon/` | Canon Integrity API client, DTO types, and the reader for the promotion gate's 409. |
 | `src/lib/dates.ts` | Timestamp formatting, date-input round trips, and spans. |
-| `src/components/` | `AuthLayout`, `Wordmark` (the drawn "Lore X", spoken "Lorex"), `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `EntityPortrait` (the card's picture, or its monogram), `EntityImageField` (pick, frame, replace, edit thumbnail, remove), `ImageCropDialog` (the cropper, and `CroppedPicture` for unsaved previews), `BrandMark` (the Lorex symbol, decorative, beside the wordmark), `Avatar` (the account's photo or its monogram, wherever one is drawn), `AccountMenu` (the one account dropdown: the rail's and the header's), `ProfileAvatar` (the Profile screen's circle, and upload, reframe, replace and remove), `TypeIcon`, `TypeIconPicker`, `TypeFilterBar` (the Lore browser's type chips), `ActionIcon` (the decorative icon beside an action's label), `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker` (single and multi, one shared search), `EntityHistory`, `RelationshipSection`, `RelationshipTypeManager`, `TimelineEntryForm`, `ConflictEntry`, `CanonBlockNotice` (the one refused-write presentation, shared by every gated form). |
+| `src/components/` | `AuthLayout`, `Wordmark` (the drawn "Lore X", spoken "Lorex"), `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `EntityPortrait` (the card's picture, or its monogram), `EntityImageField` (pick, frame, replace, edit thumbnail, remove), `ImageCropDialog` (the cropper, and `CroppedPicture` for unsaved previews), `BrandMark` (the Lorex symbol, decorative, beside the wordmark), `Avatar` (the account's photo or its monogram, wherever one is drawn), `AccountMenu` (the one account dropdown: the rail's and the header's), `ProfileAvatar` (the Profile screen's circle, and upload, reframe, replace and remove), `TypeIcon`, `TypeIconPicker`, `TypeFilterBar` (the Lore browser's type chips), `ActionIcon` (the decorative icon beside an action's label), `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker` (single and multi, one shared search), `EntityHistory`, `RelationshipSection`, `RelationshipTypeManager`, `TimelineEntryForm`, `ChronologySettings` (name, order and turn a universe's eras, with a preview), `ConflictEntry`, `CanonBlockNotice` (the one refused-write presentation, shared by every gated form). |
 | `src/pages/` | Login, Register, Universes browser, Profile, and the workspace: Overview, Lore, entry page, Timeline, Canon, Types, Trash and Settings. `UniverseWorkspace` also owns the collapsing narrow-screen navigation, and lets the Lore browser alone fill the workspace column. |
 | `vite.config.ts` | Dev server port 5173, proxy to the API, build config. |
 
@@ -160,7 +168,11 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.Api.Tests/LoreEndpointTests.cs` | Lore CRUD, field kinds, and cross-universe isolation. |
 | `Lorex.Api.Tests/EntityRevisionTests.cs` | What makes a version, what a version keeps, ownership, and what a restore may do. |
 | `Lorex.Api.Tests/RelationshipEndpointTests.cs` | Relationship CRUD, both perspectives, and cross-owner isolation. |
-| `Lorex.Api.Tests/TimelineEndpointTests.cs` | Date kinds, participation, ordering, paging, and ownership. |
+| `Lorex.Api.Tests/TimelineEndpointTests.cs` | Date kinds, participation, ordering, paging, and ownership, on the plain reckoning. |
+| `Lorex.Api.Tests/TimelineChronologyTests.cs` | Years in eras: order across eras, paging, precision, refusals, years written before the eras, and the listing held to the comparer. |
+| `Lorex.Api.Tests/ChronologyPointTests.cs` | The comparison alone: directions, several eras, the order from configuration, year zero. |
+| `Lorex.Api.Tests/ChronologyEndpointTests.cs` | Writing the eras, what an era in use refuses, bad shapes, ownership, counts, and the gate. |
+| `Lorex.Api.Tests/ChronologyMigrationTests.cs` | The chronology migration down and back up over real lore on a file. |
 | `Lorex.Api.Tests/CanonIntegrityEndpointTests.cs` | Conflict lifecycle, fingerprinting, the structural rules, filters and ownership. |
 | `Lorex.Api.Tests/CanonChronologyRuleTests.cs` | Semantic field assignment, the three chronology rules and every case they must stay quiet on. |
 | `Lorex.Api.Tests/CanonPromotionGateTests.cs` | What the gate refuses, what a refusal leaves behind, and what it must never block. |
@@ -178,6 +190,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.E2E/specs/lore.spec.ts` | Author an entry, edit it, filter, and cross-owner isolation. |
 | `Lorex.E2E/specs/relationships.spec.ts` | Both readings, relation kinds, refusals, and the universe and owner boundaries. |
 | `Lorex.E2E/specs/timeline.spec.ts` | Date kinds through the drawer, order, filters, paging, refusals, and the owner boundary. |
+| `Lorex.E2E/specs/chronology.spec.ts` | Eras named and ordered in Settings, a timeline across them, a relabel, a birth year in an era, and the screens from 390px to 1920px. |
 | `Lorex.E2E/specs/history.spec.ts` | One journey: versions accumulate, an old one is read in place and put back. |
 | `Lorex.E2E/specs/export.spec.ts` | One journey: the click produces a real archive on disk, named and readable. |
 | `Lorex.E2E/specs/support/account.ts` | Opening the account menu and signing out through it, wherever it is on screen. Not a spec. |

@@ -1,3 +1,5 @@
+using Lorex.Api.Features.Chronology;
+
 namespace Lorex.Api.Features.CanonIntegrity.Rules;
 
 /// <summary>
@@ -22,9 +24,10 @@ public sealed class CanonTimelineBeforeBirthRule : ICanonIntegrityRule
         CanonRuleContext context,
         CancellationToken cancellationToken)
     {
-        var lifespans = await CanonLifespanReader.LoadLifespansAsync(context, cancellationToken);
+        var chronology = await UniverseChronology.LoadAsync(context.Db, context.UniverseId, cancellationToken);
+        var lifespans = await CanonLifespanReader.LoadLifespansAsync(context, chronology, cancellationToken);
         var moments = await CanonLifespanReader.LoadComparableMomentsAsync(
-            context, lifespans, cancellationToken);
+            context, chronology, lifespans, cancellationToken);
 
         return [.. moments.OrderBy(moment => moment.EntryId).SelectMany(moment => Findings(moment, lifespans))];
     }
@@ -37,18 +40,13 @@ public sealed class CanonTimelineBeforeBirthRule : ICanonIntegrityRule
         CanonMoment moment,
         Dictionary<Guid, CanonLifespan> lifespans)
     {
-        var latest = CanonLifespanReader.LatestYear(moment);
-
-        if (latest is not { } year)
-        {
-            yield break;
-        }
+        var latest = CanonLifespanReader.LatestPoint(moment);
 
         foreach (var participant in moment.Participants.OrderBy(id => id))
         {
             if (lifespans.TryGetValue(participant, out var lifespan)
                 && lifespan.Birth is { } birth
-                && year < birth.Year)
+                && latest < birth.Point)
             {
                 yield return Finding(moment, lifespan, birth);
             }
@@ -60,7 +58,7 @@ public sealed class CanonTimelineBeforeBirthRule : ICanonIntegrityRule
         var who = CanonRuleText.Quoted(lifespan.EntityName);
         var what = CanonRuleText.Quoted(moment.Title);
         var when = CanonLifespanReader.DatePhrase(moment, byLatest: true);
-        var born = CanonLifespanReader.Year(birth.Year);
+        var born = birth.YearText;
 
         var title = $"Canon moment {what} {when}, before {who} is born in {born}";
 

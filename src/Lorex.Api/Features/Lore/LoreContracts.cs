@@ -55,7 +55,13 @@ public sealed record FieldDefinitionResponse(
 
 // ---------- Entities ----------
 
-/// <summary>One submitted field value. Only the member matching the field kind is read.</summary>
+/// <summary>
+/// One submitted field value. Only the member matching the field kind is read.
+///
+/// <paramref name="EraId"/> goes with <paramref name="Number"/>: the era of the universe's
+/// chronology the number is a year in. A universe that names eras requires one on a birth or
+/// death year; any number may carry one; and a universe that names none refuses it.
+/// </summary>
 public sealed record FieldValueInput(
     Guid FieldDefinitionId,
     string? Text,
@@ -63,7 +69,8 @@ public sealed record FieldValueInput(
     bool? Boolean,
     DateTime? Date,
     IReadOnlyList<Guid>? OptionIds,
-    Guid? ReferencedEntityId);
+    Guid? ReferencedEntityId,
+    Guid? EraId = null);
 
 public sealed record EntityRequest(
     Guid EntityTypeId,
@@ -94,7 +101,8 @@ public sealed record FieldValueResponse(
     IReadOnlyList<string> OptionValues,
     Guid? ReferencedEntityId,
     string? ReferencedEntityName,
-    bool ReferencedEntityIsTrashed);
+    bool ReferencedEntityIsTrashed,
+    Guid? EraId);
 
 /// <summary>
 /// The entry's primary image, as identity and shape - never as a URL.

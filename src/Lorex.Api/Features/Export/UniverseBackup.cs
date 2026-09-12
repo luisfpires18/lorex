@@ -1,4 +1,5 @@
 using Lorex.Api.Features.CanonIntegrity;
+using Lorex.Api.Features.Chronology;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Timeline;
 
@@ -42,8 +43,17 @@ public sealed record UniverseBackup(
     /// <see cref="BackupEntity.Image"/> names where each one sits. This is the largest kind of
     /// change the version can carry: a reader that only knows versions 1 and 2 is handed a file
     /// it cannot parse at all, which is exactly what a version number is for.
+    ///
+    /// 4 - A universe may name its eras (ADR 0022). <see cref="UniverseBackupPayload.ChronologyEras"/>
+    /// carries them, and <see cref="BackupTimelineEntry.StartEraId"/>,
+    /// <see cref="BackupTimelineEntry.EndEraId"/> and <see cref="BackupFieldValue.EraId"/> say
+    /// which era a year is counted in. Each member is nullable, but together they re-mean the year
+    /// beside them: a start year of 10 in an era that counts down is ten years before that era
+    /// ends, not the signed year 10. A reader that ignored them would put every such year on the
+    /// wrong line - the re-meaning case above, so it is a bump. A file at versions 1 to 3 names no
+    /// eras, and every year in it is a plain signed year.
     /// </summary>
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 4;
 
     public static UniverseBackup Of(UniverseBackupPayload payload, DateTime generatedAt) =>
         new(FormatName, CurrentVersion, generatedAt, payload);
@@ -54,9 +64,13 @@ public sealed record UniverseBackup(
 ///
 /// This object is the deterministic half of the file: two exports of unchanged lore
 /// serialise it byte for byte. Only the envelope around it carries anything volatile.
+///
+/// <paramref name="ChronologyEras"/> is the universe's reckoning, earliest era first. Empty means
+/// plain signed years; absent - null, in any file before version 4 - means the same thing.
 /// </summary>
 public sealed record UniverseBackupPayload(
     BackupUniverse Universe,
+    IReadOnlyList<BackupChronologyEra>? ChronologyEras,
     IReadOnlyList<BackupEntityType> EntityTypes,
     IReadOnlyList<BackupTag> Tags,
     IReadOnlyList<BackupEntity> Entities,
@@ -78,6 +92,21 @@ public sealed record BackupUniverse(
     bool IsArchived,
     DateTime CreatedAt,
     DateTime UpdatedAt);
+
+/// <summary>
+/// One era of the universe's reckoning. The id is preserved because timeline entries and years on
+/// entries reference it; <paramref name="SortOrder"/> and <paramref name="Direction"/> are what
+/// place every year counted in it, and <paramref name="Abbreviation"/> and
+/// <paramref name="LabelPosition"/> are how it is written. Nothing derived from them - a formatted
+/// date, a sort key - is carried.
+/// </summary>
+public sealed record BackupChronologyEra(
+    Guid Id,
+    string Name,
+    string? Abbreviation,
+    int SortOrder,
+    ChronologyEraDirection Direction,
+    ChronologyLabelPosition LabelPosition);
 
 public sealed record BackupEntityType(
     Guid Id,
@@ -207,11 +236,15 @@ public sealed record BackupImageCrop(double X, double Y, double Width, double He
 /// The value row's own id is absent. It is rewritten every time the entry is saved - which
 /// is precisely why ADR 0010 fingerprints the field definition instead - so it identifies
 /// nothing worth carrying.
+///
+/// <paramref name="EraId"/> is the era <paramref name="NumberValue"/> is a year in, or null for
+/// a plain number - since version 4.
 /// </summary>
 public sealed record BackupFieldValue(
     Guid FieldDefinitionId,
     string? TextValue,
     double? NumberValue,
+    Guid? EraId,
     bool? BooleanValue,
     DateTime? DateValue,
     Guid? OptionId,
@@ -238,6 +271,11 @@ public sealed record BackupRevision(
     IReadOnlyList<string> Tags,
     IReadOnlyList<BackupRevisionFieldValue> FieldValues);
 
+/// <summary>
+/// One value of one version. <paramref name="EraLabel"/> is what was written beside the year at
+/// the time, kept with <paramref name="EraId"/> the way every other reference in a version keeps
+/// its display text.
+/// </summary>
 public sealed record BackupRevisionFieldValue(
     Guid FieldDefinitionId,
     string FieldName,
@@ -245,6 +283,8 @@ public sealed record BackupRevisionFieldValue(
     int DisplayOrder,
     string? TextValue,
     double? NumberValue,
+    Guid? EraId,
+    string? EraLabel,
     bool? BooleanValue,
     DateTime? DateValue,
     Guid? OptionId,
@@ -276,9 +316,12 @@ public sealed record BackupRelationship(
     DateTime UpdatedAt);
 
 /// <summary>
-/// One moment. The date components stay signed integers with the era label beside them, so a
-/// year before a universe's own zero survives as the number the author typed (ADR 0009) and
-/// is never coerced into a Gregorian date.
+/// One moment. The date components stay integers with their eras beside them, so a year survives
+/// as the number the author typed (ADR 0009) and is never coerced into a Gregorian date.
+///
+/// <paramref name="StartEraId"/> and <paramref name="EndEraId"/> name the era each year is counted
+/// in, on a universe with eras (version 4). Null means a plain signed year, and then
+/// <paramref name="EraLabel"/> is the free-text label that reckoning allows.
 /// </summary>
 public sealed record BackupTimelineEntry(
     Guid Id,
@@ -292,6 +335,8 @@ public sealed record BackupTimelineEntry(
     int? EndYear,
     int? EndMonth,
     int? EndDay,
+    Guid? StartEraId,
+    Guid? EndEraId,
     string? EraLabel,
     DateTime CreatedAt,
     DateTime UpdatedAt,

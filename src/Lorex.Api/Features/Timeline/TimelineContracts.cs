@@ -6,6 +6,11 @@ namespace Lorex.Api.Features.Timeline;
 /// Everything a client may set on a timeline entry. Explicit, so nothing else on the
 /// stored row - ownership, timestamps, the universe - can be reached by posting extra
 /// fields.
+///
+/// <paramref name="StartEraId"/> and <paramref name="EndEraId"/> say which of the universe's
+/// eras each year is counted in. A universe that names eras requires them on every dated
+/// moment and refuses <paramref name="EraLabel"/>; one that does not refuses them and keeps
+/// plain signed years with an optional label, exactly as before eras existed.
 /// </summary>
 public sealed record TimelineEntryRequest(
     string? Title,
@@ -19,12 +24,15 @@ public sealed record TimelineEntryRequest(
     int? EndMonth,
     int? EndDay,
     string? EraLabel,
-    IReadOnlyList<Guid>? EntityIds);
+    IReadOnlyList<Guid>? EntityIds,
+    Guid? StartEraId = null,
+    Guid? EndEraId = null);
 
 /// <summary>
 /// The chronology of one entry, already normalized. The components come back as numbers
 /// and the precision as an enum, so a client formats the date it wants without ever
-/// parsing a string back into parts.
+/// parsing a string back into parts. The eras come back as ids, formatted by the client
+/// from the universe's own chronology.
 /// </summary>
 public sealed record TimelineDate(
     TimelineDateKind Kind,
@@ -36,7 +44,9 @@ public sealed record TimelineDate(
     int? EndDay,
     string? EraLabel,
     TimelineDatePrecision StartPrecision,
-    TimelineDatePrecision EndPrecision);
+    TimelineDatePrecision EndPrecision,
+    Guid? StartEraId,
+    Guid? EndEraId);
 
 /// <summary>
 /// One entity taking part, resolved enough to render without a second request.

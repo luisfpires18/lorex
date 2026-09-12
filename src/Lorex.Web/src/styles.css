@@ -1233,6 +1233,95 @@ a {
   color: var(--danger);
 }
 
+.settings__caution {
+  margin: 0 0 1rem;
+  padding-left: 0.9rem;
+  border-left: 2px solid var(--rule-strong);
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+
+/* ---------- Chronology settings ----------
+
+   One card per era, in the order the eras run. The four settings of an era sit two by two
+   when there is room and stack when there is not - the grid decides, not a breakpoint - so
+   a phone never gets a sideways form and a list of several eras stays one column to scan. */
+
+.eras {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.era {
+  padding: 0.9rem 1rem 0.75rem;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+}
+
+.era__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 0.9rem 1.25rem;
+}
+
+.era__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-top: 0.85rem;
+}
+
+.era__use {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.era__tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.eras__preview {
+  margin: 1.25rem 0 1rem;
+}
+
+.eras__line {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.6rem;
+  font-family: var(--display);
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.eras__line li {
+  overflow-wrap: anywhere;
+}
+
+.eras__line li + li::before {
+  content: '\2192';
+  margin-right: 0.6rem;
+  font-family: var(--ui);
+  font-size: 0.8rem;
+  color: var(--rule-strong);
+}
+
+.eras__actions {
+  margin-top: 1.25rem;
+}
+
 .button--danger {
   border-color: var(--danger);
   background: var(--danger);
@@ -3139,6 +3228,9 @@ a {
   font-size: clamp(1.4rem, 2.2vw, 1.85rem);
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
+
+  /* An era written by its full name can be longer than the margin is wide. */
+  overflow-wrap: anywhere;
 }
 
 .chron__yearnum--none {
@@ -3472,6 +3564,19 @@ a {
   align-items: start;
 }
 
+/* With named eras the era leads the row, the way the year is read. */
+.momentform__point--era {
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 0.8fr);
+}
+
+/* A number that is a year in an era: the era, then the year, on one line. */
+.fieldera {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: end;
+}
+
 /* ---------- Chronology on a narrow screen ---------- */
 
 @media (max-width: 700px) {
@@ -3497,7 +3602,8 @@ a {
     grid-column: 1;
   }
 
-  .momentform__point {
+  .momentform__point,
+  .momentform__point--era {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 

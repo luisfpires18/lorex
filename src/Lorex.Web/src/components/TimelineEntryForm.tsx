@@ -3,6 +3,8 @@ import { EntityMultiPicker, type EntityChoice } from './EntityPicker'
 import { CanonBlockNotice } from './CanonBlockNotice'
 import { blockingFindingsOf } from '../canon/blocked'
 import type { CanonBlockingFinding } from '../canon/types'
+import { namesEras } from '../chronology/format'
+import type { Chronology } from '../chronology/types'
 import { ApiError } from '../lib/api'
 import { CANON_LABELS, CANON_ORDER, CanonStatus, type CanonStatusValue } from '../lore/types'
 import { createTimelineEntry, updateTimelineEntry } from '../timeline/api'
@@ -17,7 +19,8 @@ import {
 
 /**
  * The draft holds every component as a string. An empty number input is genuinely empty
- * rather than zero, and a year of 0 stays distinct from no year at all.
+ * rather than zero, and a year of 0 stays distinct from no year at all. An empty era is no
+ * era chosen yet.
  */
 interface MomentDraft {
   title: string
@@ -30,12 +33,16 @@ interface MomentDraft {
   endYear: string
   endMonth: string
   endDay: string
+  startEraId: string
+  endEraId: string
   eraLabel: string
   entities: EntityChoice[]
 }
 
 /** The six chronology boxes, named so one handler can serve all of them. */
 type ComponentKey = 'startYear' | 'startMonth' | 'startDay' | 'endYear' | 'endMonth' | 'endDay'
+
+type EraKey = 'startEraId' | 'endEraId'
 
 const EMPTY: MomentDraft = {
   title: '',
@@ -48,6 +55,8 @@ const EMPTY: MomentDraft = {
   endYear: '',
   endMonth: '',
   endDay: '',
+  startEraId: '',
+  endEraId: '',
   eraLabel: '',
   entities: [],
 }
@@ -68,6 +77,8 @@ function draftFrom(entry: TimelineEntry): MomentDraft {
     endYear: numberText(entry.date.endYear),
     endMonth: numberText(entry.date.endMonth),
     endDay: numberText(entry.date.endDay),
+    startEraId: entry.date.startEraId ?? '',
+    endEraId: entry.date.endEraId ?? '',
     eraLabel: entry.date.eraLabel ?? '',
     // A participant in the Trash keeps its place in the set - the form posts every id back,
     // so dropping it here would delete the participation on the next save. It is labelled
@@ -96,6 +107,8 @@ interface TimelineEntryFormProps {
   universeId: string
   /** The moment being changed, or null when one is being written for the first time. */
   entry: TimelineEntry | null
+  /** How this universe keeps time. With eras, every dated moment says which one it is in. */
+  chronology: Chronology
   onClose: () => void
   onSaved: () => void
 }
@@ -106,8 +119,18 @@ interface TimelineEntryFormProps {
  *
  * Only the components the chosen kind allows are shown, and switching kind clears the
  * ones it forbids, so the form can never send a shape the API is bound to refuse.
+ *
+ * On a universe that names its eras, each year is chosen with its era beside it and the
+ * free-text label of the plain reckoning is gone. On one that names none, the form is exactly
+ * what it always was.
  */
-export function TimelineEntryForm({ universeId, entry, onClose, onSaved }: TimelineEntryFormProps) {
+export function TimelineEntryForm({
+  universeId,
+  entry,
+  chronology,
+  onClose,
+  onSaved,
+}: TimelineEntryFormProps) {
   const dialog = useRef<HTMLDialogElement>(null)
   const title = useRef<HTMLInputElement>(null)
   const [draft, setDraft] = useState<MomentDraft>(() => (entry ? draftFrom(entry) : EMPTY))
@@ -115,6 +138,8 @@ export function TimelineEntryForm({ universeId, entry, onClose, onSaved }: Timel
   const [message, setMessage] = useState<string | null>(null)
   const [blocked, setBlocked] = useState<CanonBlockingFinding[] | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+
+  const reckonsInEras = namesEras(chronology)
 
   useEffect(() => {
     // showModal, not the open attribute: it brings the focus trap, the backdrop and
@@ -130,7 +155,7 @@ export function TimelineEntryForm({ universeId, entry, onClose, onSaved }: Timel
     setDraft((current) => ({ ...current, ...change }))
   }
 
-  function setComponent(key: ComponentKey, value: string) {
+  function setComponent(key: ComponentKey | EraKey, value: string) {
     setDraft((current) => ({ ...current, [key]: value }))
   }
 
@@ -145,11 +170,13 @@ export function TimelineEntryForm({ universeId, entry, onClose, onSaved }: Timel
         endYear: '',
         endMonth: '',
         endDay: '',
+        startEraId: '',
+        endEraId: '',
       })
     } else if (dateKind === DateKind.Range) {
       edit({ dateKind })
     } else {
-      edit({ dateKind, endYear: '', endMonth: '', endDay: '' })
+      edit({ dateKind, endYear: '', endMonth: '', endDay: '', endEraId: '' })
     }
   }
 
@@ -158,6 +185,9 @@ export function TimelineEntryForm({ universeId, entry, onClose, onSaved }: Timel
     setFieldErrors({})
     setBlocked(null)
     setIsSaving(true)
+
+    const isDatedKind = draft.dateKind !== DateKind.Unknown
+    const isRangeKind = draft.dateKind === DateKind.Range
 
     const input = {
       title: draft.title.trim(),
@@ -170,7 +200,10 @@ export function TimelineEntryForm({ universeId, entry, onClose, onSaved }: Timel
       endYear: toNumber(draft.endYear),
       endMonth: toNumber(draft.endMonth),
       endDay: toNumber(draft.endDay),
-      eraLabel: trimmed(draft.eraLabel),
+      // A universe with eras has no free-text label; one without has no eras to send.
+      eraLabel: reckonsInEras ? null : trimmed(draft.eraLabel),
+      startEraId: reckonsInEras && isDatedKind ? trimmed(draft.startEraId) : null,
+      endEraId: reckonsInEras && isRangeKind ? trimmed(draft.endEraId) : null,
       entityIds: draft.entities.map((choice) => choice.id),
     }
 
@@ -208,16 +241,46 @@ export function TimelineEntryForm({ universeId, entry, onClose, onSaved }: Timel
   function point(
     prefix: 'start' | 'end',
     yearLabel: string,
-    yearError: string | undefined,
-    monthError: string | undefined,
-    dayError: string | undefined,
+    errors: {
+      era: string | undefined
+      year: string | undefined
+      month: string | undefined
+      day: string | undefined
+    },
   ) {
     const year: ComponentKey = prefix === 'start' ? 'startYear' : 'endYear'
     const month: ComponentKey = prefix === 'start' ? 'startMonth' : 'endMonth'
     const day: ComponentKey = prefix === 'start' ? 'startDay' : 'endDay'
+    const era: EraKey = prefix === 'start' ? 'startEraId' : 'endEraId'
 
     return (
-      <div className="momentform__point">
+      <div
+        className={reckonsInEras ? 'momentform__point momentform__point--era' : 'momentform__point'}
+      >
+        {reckonsInEras ? (
+          <div className="field">
+            <label className="field__label" htmlFor={`moment-${era}`}>
+              {prefix === 'start' ? (isRange ? 'Starts in era' : 'Era') : 'Ends in era'}
+            </label>
+            <select
+              id={`moment-${era}`}
+              className="field__input field__input--select"
+              value={draft[era]}
+              onChange={(event) => setComponent(era, event.target.value)}
+              aria-invalid={errors.era ? true : undefined}
+              data-testid={`moment-${era}`}
+            >
+              <option value="">Choose an era</option>
+              {chronology.eras.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.abbreviation ? `${option.name} (${option.abbreviation})` : option.name}
+                </option>
+              ))}
+            </select>
+            {errors.era ? <p className="field__error">{errors.era}</p> : null}
+          </div>
+        ) : null}
+
         <div className="field">
           <label className="field__label" htmlFor={`moment-${year}`}>
             {yearLabel}
@@ -227,14 +290,15 @@ export function TimelineEntryForm({ universeId, entry, onClose, onSaved }: Timel
             className="field__input"
             type="number"
             step="1"
+            min={reckonsInEras ? 1 : undefined}
             inputMode="numeric"
-            placeholder="3018"
+            placeholder={reckonsInEras ? '10' : '3018'}
             value={draft[year]}
             onChange={(event) => setComponent(year, event.target.value)}
-            aria-invalid={yearError ? true : undefined}
+            aria-invalid={errors.year ? true : undefined}
             data-testid={`moment-${year}`}
           />
-          {yearError ? <p className="field__error">{yearError}</p> : null}
+          {errors.year ? <p className="field__error">{errors.year}</p> : null}
         </div>
 
         <div className="field">
@@ -252,10 +316,10 @@ export function TimelineEntryForm({ universeId, entry, onClose, onSaved }: Timel
             placeholder="—"
             value={draft[month]}
             onChange={(event) => setComponent(month, event.target.value)}
-            aria-invalid={monthError ? true : undefined}
+            aria-invalid={errors.month ? true : undefined}
             data-testid={`moment-${month}`}
           />
-          {monthError ? <p className="field__error">{monthError}</p> : null}
+          {errors.month ? <p className="field__error">{errors.month}</p> : null}
         </div>
 
         <div className="field">
@@ -273,10 +337,10 @@ export function TimelineEntryForm({ universeId, entry, onClose, onSaved }: Timel
             placeholder="—"
             value={draft[day]}
             onChange={(event) => setComponent(day, event.target.value)}
-            aria-invalid={dayError ? true : undefined}
+            aria-invalid={errors.day ? true : undefined}
             data-testid={`moment-${day}`}
           />
-          {dayError ? <p className="field__error">{dayError}</p> : null}
+          {errors.day ? <p className="field__error">{errors.day}</p> : null}
         </div>
       </div>
     )
@@ -398,46 +462,53 @@ export function TimelineEntryForm({ universeId, entry, onClose, onSaved }: Timel
 
           {isDated ? (
             <>
-              {point(
-                'start',
-                isRange ? 'Starts in year' : 'Year',
-                fieldErrors.startyear,
-                fieldErrors.startmonth,
-                fieldErrors.startday,
-              )}
+              {point('start', isRange ? 'Starts in year' : 'Year', {
+                era: fieldErrors.starteraid,
+                year: fieldErrors.startyear,
+                month: fieldErrors.startmonth,
+                day: fieldErrors.startday,
+              })}
 
               {isRange
-                ? point(
-                    'end',
-                    'Ends in year',
-                    fieldErrors.endyear,
-                    fieldErrors.endmonth,
-                    fieldErrors.endday,
-                  )
+                ? point('end', 'Ends in year', {
+                    era: fieldErrors.enderaid,
+                    year: fieldErrors.endyear,
+                    month: fieldErrors.endmonth,
+                    day: fieldErrors.endday,
+                  })
                 : null}
             </>
           ) : null}
 
-          <div className="field">
-            <label className="field__label" htmlFor="moment-era">
-              Era
-            </label>
-            <p className="field__hint">
-              A name for the reckoning: Third Age, AC, Before the Flood. Lorex shows it, but does
-              not order by it yet.
-            </p>
-            <input
-              id="moment-era"
-              className="field__input"
-              type="text"
-              placeholder="Optional"
-              value={draft.eraLabel}
-              onChange={(event) => edit({ eraLabel: event.target.value })}
-              aria-invalid={fieldErrors.eralabel ? true : undefined}
-              data-testid="moment-era"
-            />
-            {fieldErrors.eralabel ? <p className="field__error">{fieldErrors.eralabel}</p> : null}
-          </div>
+          {reckonsInEras ? (
+            draft.eraLabel ? (
+              <p className="field__hint" data-testid="moment-old-label">
+                Labelled &ldquo;{draft.eraLabel}&rdquo; before this universe named its eras. Choose
+                its era above; the old label is dropped when you save.
+              </p>
+            ) : null
+          ) : (
+            <div className="field">
+              <label className="field__label" htmlFor="moment-era">
+                Era
+              </label>
+              <p className="field__hint">
+                A name for the reckoning: Third Age, AC, Before the Flood. Lorex shows it, but does
+                not order by it yet.
+              </p>
+              <input
+                id="moment-era"
+                className="field__input"
+                type="text"
+                placeholder="Optional"
+                value={draft.eraLabel}
+                onChange={(event) => edit({ eraLabel: event.target.value })}
+                aria-invalid={fieldErrors.eralabel ? true : undefined}
+                data-testid="moment-era"
+              />
+              {fieldErrors.eralabel ? <p className="field__error">{fieldErrors.eralabel}</p> : null}
+            </div>
+          )}
 
           <EntityMultiPicker
             label="Who and what took part"

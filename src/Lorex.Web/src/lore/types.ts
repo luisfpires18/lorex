@@ -137,6 +137,14 @@ export interface FieldValue {
    * time an unrelated field was touched. Render it as unavailable and do not link it.
    */
   referencedEntityIsTrashed: boolean
+
+  /** The universe's era `number` is a year in, or null for a plain number. */
+  eraId: string | null
+}
+
+/** True for the meanings that are years a chronology rule places on the universe's line. */
+export function isYearMeaning(semantic: FieldSemanticValue | null) {
+  return semantic === FieldSemantic.BirthYear || semantic === FieldSemantic.DeathYear
 }
 
 /**
@@ -217,6 +225,12 @@ export interface FieldValueInput {
   date: string | null
   optionIds: string[] | null
   referencedEntityId: string | null
+
+  /**
+   * The era `number` is a year in. Required for a birth or death year on a universe that names
+   * eras, allowed on any number there, and refused on a universe that names none.
+   */
+  eraId: string | null
 }
 
 export interface EntityInput {

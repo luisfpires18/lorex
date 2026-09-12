@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Lorex.Api.Data;
 using Lorex.Api.Features.CanonIntegrity;
+using Lorex.Api.Features.Chronology;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Universes;
 using Microsoft.AspNetCore.Mvc;
@@ -69,7 +70,9 @@ public static class TimelineEndpoints
         var totalCount = await query.CountAsync(cancellationToken);
         var skip = (int)Math.Min((long)(page - 1) * pageSize, int.MaxValue);
 
-        var rows = await Ordered(query)
+        var namesEras = await db.ChronologyEras.AnyAsync(era => era.UniverseId == universeId, cancellationToken);
+
+        var rows = await Ordered(query, namesEras)
             .Skip(skip)
             .Take(pageSize)
             .Select(Projection())
@@ -127,7 +130,9 @@ public static class TimelineEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (TimelineValidation.Validate(request) is { } errors)
+        var chronology = await UniverseChronology.LoadAsync(db, universeId, cancellationToken);
+
+        if (TimelineValidation.Validate(request, chronology) is { } errors)
         {
             return Results.ValidationProblem(errors);
         }
@@ -207,7 +212,9 @@ public static class TimelineEndpoints
             return Results.NotFound();
         }
 
-        if (TimelineValidation.Validate(request) is { } errors)
+        var chronology = await UniverseChronology.LoadAsync(db, universeId, cancellationToken);
+
+        if (TimelineValidation.Validate(request, chronology) is { } errors)
         {
             return Results.ValidationProblem(errors);
         }
@@ -306,6 +313,8 @@ public static class TimelineEndpoints
         entry.EndYear = request.EndYear;
         entry.EndMonth = request.EndMonth;
         entry.EndDay = request.EndDay;
+        entry.StartEraId = request.StartEraId;
+        entry.EndEraId = request.EndEraId;
         entry.EraLabel = TimelineValidation.Normalize(request.EraLabel);
     }
 
@@ -344,19 +353,29 @@ public static class TimelineEndpoints
     /// <summary>
     /// The chronological order, done in SQL so paging stays stable.
     ///
-    /// Unknown dates go last as a block: they are placed in the story but not in time, and
-    /// leaving them among year zero would be arbitrary. Within a year, an entry known only
-    /// to the year comes before any dated moment inside it, because an absent month counts
-    /// as zero. Title then id break the remaining ties, so two moments in the same year
-    /// never swap places between one page and the next.
+    /// The key is <see cref="ChronologyPoint"/>'s, written as a query: the start era's place in
+    /// the order, then the start year signed by that era's direction, then month and day with
+    /// an absent one counting as zero - so an entry known only to its year comes before any
+    /// dated moment inside it. A universe with no eras has no era to rank by and its years are
+    /// already signed, which is exactly the order the timeline has always had. A test holds this
+    /// query and the comparer to the same answer.
     ///
-    /// Era labels take no part: Phase 008 does no cross-era arithmetic, so entries under
-    /// different eras still order by their raw year numbers.
+    /// Three blocks, in order. Moments placed in time. Then, only on a universe that names eras,
+    /// dated moments written before it did: they carry no era, so they are not on its line at
+    /// all, and ranking them among the eras would be guessing which one they meant. Then unknown
+    /// dates, which are placed in the story but not in time. The free-text era label of the
+    /// plain reckoning takes no part in any of it. Title then id break the remaining ties, so two
+    /// moments never swap places between one page and the next.
     /// </summary>
-    private static IOrderedQueryable<TimelineEntry> Ordered(IQueryable<TimelineEntry> query) =>
+    private static IOrderedQueryable<TimelineEntry> Ordered(IQueryable<TimelineEntry> query, bool namesEras) =>
         query
-            .OrderBy(entry => entry.DateKind == TimelineDateKind.Unknown ? 1 : 0)
-            .ThenBy(entry => entry.StartYear)
+            .OrderBy(entry => entry.DateKind == TimelineDateKind.Unknown ? 2
+                : namesEras && entry.StartEraId == null ? 1
+                : 0)
+            .ThenBy(entry => entry.StartEraId == null ? 0 : entry.StartEra!.SortOrder)
+            .ThenBy(entry => entry.StartEraId != null && entry.StartEra!.Direction == ChronologyEraDirection.Descending
+                ? -entry.StartYear
+                : entry.StartYear)
             .ThenBy(entry => entry.StartMonth ?? 0)
             .ThenBy(entry => entry.StartDay ?? 0)
             .ThenBy(entry => entry.Title)
@@ -393,6 +412,8 @@ public static class TimelineEndpoints
         int? EndMonth,
         int? EndDay,
         string? EraLabel,
+        Guid? StartEraId,
+        Guid? EndEraId,
         List<TimelineEntityLink> Entities,
         DateTime CreatedAt,
         DateTime UpdatedAt);
@@ -411,6 +432,8 @@ public static class TimelineEndpoints
             entry.EndMonth,
             entry.EndDay,
             entry.EraLabel,
+            entry.StartEraId,
+            entry.EndEraId,
             entry.EntityLinks
                 .OrderBy(link => link.Entity!.Name)
                 .ThenBy(link => link.EntityId)
@@ -443,7 +466,9 @@ public static class TimelineEndpoints
                 row.EndDay,
                 row.EraLabel,
                 TimelineValidation.PrecisionOf(row.StartYear, row.StartMonth, row.StartDay),
-                TimelineValidation.PrecisionOf(row.EndYear, row.EndMonth, row.EndDay)),
+                TimelineValidation.PrecisionOf(row.EndYear, row.EndMonth, row.EndDay),
+                row.StartEraId,
+                row.EndEraId),
             row.Entities,
             row.CreatedAt,
             row.UpdatedAt);

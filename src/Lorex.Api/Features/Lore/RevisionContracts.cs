@@ -14,7 +14,11 @@ public sealed record EntityRevisionSummary(
     Guid? RestoredFromRevisionId,
     DateTime CreatedAt);
 
-/// <summary>One value as it stood, with the text it displayed then rather than a live join.</summary>
+/// <summary>
+/// One value as it stood, with the text it displayed then rather than a live join.
+/// <paramref name="EraLabel"/> is what was written beside a year at the time, so the version
+/// still reads correctly once the era is renamed or removed.
+/// </summary>
 public sealed record EntityRevisionFieldResponse(
     Guid FieldDefinitionId,
     string Name,
@@ -24,7 +28,9 @@ public sealed record EntityRevisionFieldResponse(
     bool? Boolean,
     DateTime? Date,
     IReadOnlyList<string> OptionValues,
-    string? ReferencedEntityName);
+    string? ReferencedEntityName,
+    Guid? EraId,
+    string? EraLabel);
 
 /// <summary>
 /// One whole version, shaped like <see cref="EntityDetail"/> so the dossier can render an

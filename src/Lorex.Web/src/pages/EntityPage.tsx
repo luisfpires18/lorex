@@ -12,6 +12,8 @@ import { entityImageUrl, setEntityImage } from '../lore/images'
 import { TokenInput } from '../components/TokenInput'
 import { blockingFindingsOf } from '../canon/blocked'
 import type { CanonBlockingFinding } from '../canon/types'
+import { formatChronologyYear } from '../chronology/format'
+import type { Chronology } from '../chronology/types'
 import { CanonBlockNotice } from '../components/CanonBlockNotice'
 import { ApiError } from '../lib/api'
 import { formatDate } from '../lib/dates'
@@ -58,6 +60,7 @@ function draftFromDetail(detail: EntityDetail): Draft {
       date: value.date,
       optionIds: value.optionIds,
       referencedEntityId: value.referencedEntityId,
+      eraId: value.eraId,
     }
   }
 
@@ -74,7 +77,7 @@ function draftFromDetail(detail: EntityDetail): Draft {
 }
 
 export default function EntityPage() {
-  const { universe } = useOutletContext<WorkspaceContext>()
+  const { universe, chronology } = useOutletContext<WorkspaceContext>()
   const { entityId } = useParams<{ entityId: string }>()
   const navigate = useNavigate()
 
@@ -522,6 +525,7 @@ export default function EntityPage() {
                     value={draft.fields[definition.id] ?? emptyValue(definition)}
                     candidates={candidates}
                     retainedReference={retainedReference(detail, candidates, definition.id)}
+                    chronology={chronology}
                     onChange={(next) =>
                       setDraft((current) =>
                         current
@@ -543,7 +547,7 @@ export default function EntityPage() {
                   {detail!.fields.map((value) => (
                     <div className="facts__row" key={value.fieldDefinitionId}>
                       <dt className="facts__key">{value.name}</dt>
-                      <dd className="facts__value">{renderFact(value)}</dd>
+                      <dd className="facts__value">{renderFact(value, chronology)}</dd>
                     </div>
                   ))}
                 </dl>
@@ -583,6 +587,7 @@ export default function EntityPage() {
           <EntityHistory
             universeId={universe.id}
             entityId={entityId}
+            chronology={chronology}
             reloadKey={historyKey}
             onRestored={() => void reloadAfterRestore()}
           />
@@ -674,22 +679,30 @@ function retainedReference(
   }
 }
 
-function renderFact(value: {
-  kind: number
-  text: string | null
-  number: number | null
-  boolean: boolean | null
-  date: string | null
-  optionValues: string[]
-  referencedEntityName: string | null
-  referencedEntityIsTrashed: boolean
-}) {
+function renderFact(
+  value: {
+    kind: number
+    text: string | null
+    number: number | null
+    eraId: string | null
+    boolean: boolean | null
+    date: string | null
+    optionValues: string[]
+    referencedEntityName: string | null
+    referencedEntityIsTrashed: boolean
+  },
+  chronology: Chronology,
+) {
   switch (value.kind) {
     case FieldKind.ShortText:
     case FieldKind.LongText:
       return value.text ?? '—'
     case FieldKind.Number:
-      return value.number ?? '—'
+      if (value.number === null) return '—'
+      // A year in an era reads the way the universe writes it; any other number stays as typed.
+      return value.eraId
+        ? formatChronologyYear(chronology, value.number, value.eraId)
+        : value.number
     case FieldKind.Boolean:
       return value.boolean ? 'Yes' : 'No'
     case FieldKind.Date:

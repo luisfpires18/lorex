@@ -1,3 +1,5 @@
+import { formatChronologyPoint, isPlaced, namesEras } from '../chronology/format'
+import type { Chronology } from '../chronology/types'
 import {
   DateKind,
   DatePrecision,
@@ -7,38 +9,40 @@ import {
 } from './types'
 
 /**
- * A negative year gets a real minus sign, not a hyphen, so a span reads
- * "−42 – −30" rather than dissolving into a row of dashes.
+ * One end of a date, down to the precision the API derived and no further, written the way this
+ * universe writes years. The writing itself is the shared chronology formatter's.
  */
-export function formatYear(year: number) {
-  return year < 0 ? `\u2212${Math.abs(year)}` : String(year)
-}
-
-function pad(value: number) {
-  return String(value).padStart(2, '0')
-}
-
-/**
- * One point on the chronology, largest part first: `3018`, `3018.09`, `3018.09.22`.
- *
- * Month and day stay numeric on purpose. The calendar belongs to the author's world, so
- * naming month 9 "September" would invent a Gregorian fact the API never claimed.
- */
-export function formatPoint(
+function formatPoint(
+  chronology: Chronology,
   year: number | null,
   month: number | null,
   day: number | null,
   precision: DatePrecisionValue,
+  eraId: string | null,
 ) {
   if (year === null || precision === DatePrecision.None) return ''
-  if (precision === DatePrecision.Year || month === null) return formatYear(year)
-  if (precision === DatePrecision.Month || day === null) return `${formatYear(year)}.${pad(month)}`
-  return `${formatYear(year)}.${pad(month)}.${pad(day)}`
+
+  const withMonth = precision !== DatePrecision.Year && month !== null
+  const withDay = withMonth && precision === DatePrecision.Day && day !== null
+
+  return formatChronologyPoint(chronology, {
+    year,
+    month: withMonth ? month : null,
+    day: withDay ? day : null,
+    eraId,
+  })
 }
 
 /** The whole date as one readable stamp, built from the components the API sent. */
-export function formatTimelineDate(date: TimelineDate) {
-  const start = formatPoint(date.startYear, date.startMonth, date.startDay, date.startPrecision)
+export function formatTimelineDate(date: TimelineDate, chronology: Chronology) {
+  const start = formatPoint(
+    chronology,
+    date.startYear,
+    date.startMonth,
+    date.startDay,
+    date.startPrecision,
+    date.startEraId,
+  )
 
   switch (date.kind) {
     case DateKind.Exact:
@@ -46,35 +50,54 @@ export function formatTimelineDate(date: TimelineDate) {
     case DateKind.Approximate:
       return start ? `c. ${start}` : ''
     case DateKind.Range: {
-      const end = formatPoint(date.endYear, date.endMonth, date.endDay, date.endPrecision)
-      return end ? `${start} \u2013 ${end}` : start
+      const end = formatPoint(
+        chronology,
+        date.endYear,
+        date.endMonth,
+        date.endDay,
+        date.endPrecision,
+        date.endEraId,
+      )
+      return end ? `${start} – ${end}` : start
     }
     default:
       return 'Date unknown'
   }
 }
 
-/** A run of moments that share a year, and an era label when one was given. */
+/** A run of moments that share a year - and an era, or a free-text era label - in listing order. */
 export interface YearGroup {
   /** Unique across the page, so React keeps two runs of the same year apart. */
   key: string
   /** The year and era the run stands for. What the next moment is measured against. */
   run: string
   year: number
+  /** The universe's era the run is counted in, when it names eras. */
+  eraId: string | null
+  /** The free-text label of the plain reckoning, when one was written. */
   eraLabel: string | null
   entries: TimelineEntry[]
 }
 
-/** The moments placed in time, and the ones that are not. */
+/** The moments placed in time, the ones dated in no era, and the ones not placed at all. */
 export interface GroupedTimeline {
   groups: YearGroup[]
+  /**
+   * Dated moments that are not on this universe's line: written as plain years before it named
+   * its eras. The API lists them after every placed moment, and they are shown apart for the same
+   * reason - nothing says which era they meant.
+   */
+  unreckoned: TimelineEntry[]
   unplaced: TimelineEntry[]
-  /** True when more than one reckoning is on the page, so the order cannot be trusted. */
+  /**
+   * True when more than one free-text label is on the page of a universe that names no eras, so
+   * the order cannot be trusted. Named eras are ordered by the API, so this never applies to them.
+   */
   mixedEras: boolean
 }
 
 function groupKey(entry: TimelineEntry) {
-  return `${entry.date.eraLabel ?? ''}|${entry.date.startYear}`
+  return `${entry.date.startEraId ?? ''}|${entry.date.eraLabel ?? ''}|${entry.date.startYear}`
 }
 
 /**
@@ -83,10 +106,11 @@ function groupKey(entry: TimelineEntry) {
  * Runs are consecutive rather than gathered: the API decides the order, and pulling two
  * separated moments of year 3018 together would quietly rewrite it.
  */
-export function groupTimeline(entries: TimelineEntry[]): GroupedTimeline {
+export function groupTimeline(entries: TimelineEntry[], chronology: Chronology): GroupedTimeline {
   const groups: YearGroup[] = []
+  const unreckoned: TimelineEntry[] = []
   const unplaced: TimelineEntry[] = []
-  const eras = new Set<string | null>()
+  const labels = new Set<string | null>()
 
   for (const entry of entries) {
     if (entry.date.kind === DateKind.Unknown || entry.date.startYear === null) {
@@ -94,7 +118,12 @@ export function groupTimeline(entries: TimelineEntry[]): GroupedTimeline {
       continue
     }
 
-    eras.add(entry.date.eraLabel)
+    if (!isPlaced(chronology, entry.date.startEraId)) {
+      unreckoned.push(entry)
+      continue
+    }
+
+    labels.add(entry.date.eraLabel)
 
     const run = groupKey(entry)
     const open = groups.at(-1)
@@ -106,11 +135,12 @@ export function groupTimeline(entries: TimelineEntry[]): GroupedTimeline {
         key: `${run}|${groups.length}`,
         run,
         year: entry.date.startYear,
+        eraId: entry.date.startEraId,
         eraLabel: entry.date.eraLabel,
         entries: [entry],
       })
     }
   }
 
-  return { groups, unplaced, mixedEras: eras.size > 1 }
+  return { groups, unreckoned, unplaced, mixedEras: !namesEras(chronology) && labels.size > 1 }
 }

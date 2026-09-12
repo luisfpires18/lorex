@@ -1,7 +1,8 @@
 # ADR 0014 - A backup is one versioned archive holding a universe's authored data
 
-Status: accepted (2026-09-09), amended 2026-09-10 (version 3: the file became an archive), and
-2026-09-11 (type icon keys, and a short-lived image framing member, both within version 3)
+Status: accepted (2026-09-09), amended 2026-09-10 (version 3: the file became an archive),
+2026-09-11 (type icon keys, and a short-lived image framing member, both within version 3), and
+2026-09-13 (version 4: a universe's eras)
 
 ## Context
 
@@ -95,6 +96,16 @@ written down.
 reader that only knows versions 1 and 2 is handed a file it cannot parse at all, rather than one
 it parses and misunderstands. That is exactly what a version number is for.
 
+**Version 4 (2026-09-13) carries the chronology.** A universe may name ordered eras (ADR 0022).
+`payload.chronologyEras` holds them - id, name, short label, order, direction, label position -
+and a timeline entry's `startEraId` and `endEraId`, a stored value's `eraId`, and a revision
+value's `eraId` and `eraLabel` say which era a year is counted in. Each member is nullable, but
+together they re-mean the year beside them: a start year of 10 in an era that counts down is not
+the signed year 10, and a reader that skipped the era would put it on the wrong line. That is the
+re-meaning clause, so it is a bump. A file at versions 1 to 3 names no eras - `chronologyEras` is
+absent and reads as null - and every year in it is a plain signed year. Nothing derived from the
+eras, such as a formatted date or a sort key, is carried.
+
 **Only the authored data.** The test for inclusion is: did a person write this, or would
 Lorex produce it again from what a person wrote?
 
@@ -105,7 +116,8 @@ Lorex produce it again from what a person wrote?
 | Entries: name, summary, Tiptap article, canon status, archived flag, `deletedAt` | - |
 | Aliases, tags, stored values including entity references | Alias and value row ids |
 | Relationship types and relationships | - |
-| Timeline entries, their signed date components and era labels, participants | Derived date precision |
+| The universe's eras: name, short label, order, direction, label position | Formatted dates and sort keys |
+| Timeline entries, their date components, era ids and era labels, participants | Derived date precision |
 | Every entry's revision history (ADR 0013) | - |
 | Each entry's primary image: the original bytes, its asset id, filename, content type, dimensions, chosen crop and archive path | The generated thumbnail and its id, and every R2 object key, bucket name, endpoint and URL |
 | Canon conflicts the author **dismissed** | Pending and resolved conflicts, and all conflict wording |

@@ -34,5 +34,6 @@ export function emptyValue(definition: FieldDefinition): FieldValueInput {
     date: null,
     optionIds: null,
     referencedEntityId: null,
+    eraId: null,
   }
 }

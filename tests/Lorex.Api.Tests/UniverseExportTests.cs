@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using Lorex.Api.Features.Auth;
 using Lorex.Api.Features.CanonIntegrity;
+using Lorex.Api.Features.Chronology;
 using Lorex.Api.Features.Export;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Media;
@@ -397,6 +398,206 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
 
         Assert.Equal("Before the Drowning", entry.EraLabel);
         Assert.Equal([built.Coast.Id], entry.ParticipantEntityIds);
+    }
+
+    // ---------- Chronology ----------
+
+    [Fact]
+    public async Task A_backup_carries_the_chronology_and_the_era_every_year_is_counted_in()
+    {
+        var (client, universe) = await SignedInWithUniverse("expchronology");
+        var eras = await TheFall(client, universe.Id);
+
+        var character = await CharacterType(client, universe.Id);
+        var born = await AddField(client, universe.Id, character, "Born", EntityFieldKind.Number, EntityFieldSemantic.BirthYear);
+        var aranel = await Create(
+            client, universe.Id, character, "Aranel", CanonStatus.Idea,
+            fields: [new FieldValueInput(born.Id, null, 5, null, null, null, null, eras[0].Id)]);
+        await Save(client, universe.Id, aranel with { Name = "Aranel the Elder" });
+
+        (await client.PostAsJsonAsync(
+            $"/api/universes/{universe.Id}/timeline",
+            new TimelineEntryRequest(
+                "Across the fall", null, CanonStatus.Idea, TimelineDateKind.Range, 3, null, null, 2, null, null,
+                null, [aranel.Id], StartEraId: eras[0].Id, EndEraId: eras[1].Id)))
+            .EnsureSuccessStatusCode();
+
+        var backup = await Backup(client, universe.Id);
+        var payload = backup.Payload;
+
+        Assert.Equal(4, backup.FormatVersion);
+        Assert.Equal(
+            [
+                new BackupChronologyEra(
+                    eras[0].Id, "Before the Fall", "BF", 0, ChronologyEraDirection.Descending, ChronologyLabelPosition.BeforeYear),
+                new BackupChronologyEra(
+                    eras[1].Id, "After the Fall", null, 1, ChronologyEraDirection.Ascending, ChronologyLabelPosition.AfterYear),
+            ],
+            payload.ChronologyEras!);
+
+        var entry = Assert.Single(payload.TimelineEntries);
+        Assert.Equal(3, entry.StartYear);
+        Assert.Equal(eras[0].Id, entry.StartEraId);
+        Assert.Equal(eras[1].Id, entry.EndEraId);
+        Assert.Null(entry.EraLabel);
+
+        var entity = Assert.Single(payload.Entities);
+        Assert.Equal(eras[0].Id, Value(entity, born.Id).EraId);
+
+        // Every version keeps the era's id and what was written beside the year then.
+        Assert.Equal(2, entity.Revisions.Count);
+        Assert.All(entity.Revisions, revision =>
+        {
+            var value = Assert.Single(revision.FieldValues, candidate => candidate.FieldDefinitionId == born.Id);
+            Assert.Equal(eras[0].Id, value.EraId);
+            Assert.Equal("BF", value.EraLabel);
+        });
+
+        // And every era a year names is one the same file defines.
+        var eraIds = payload.ChronologyEras!.Select(era => era.Id).ToHashSet();
+        Assert.All(
+            payload.TimelineEntries.SelectMany(moment => new[] { moment.StartEraId, moment.EndEraId }).OfType<Guid>(),
+            id => Assert.Contains(id, eraIds));
+        Assert.All(
+            payload.Entities.SelectMany(one => one.FieldValues).Select(value => value.EraId).OfType<Guid>(),
+            id => Assert.Contains(id, eraIds));
+    }
+
+    [Fact]
+    public async Task A_universe_without_eras_carries_an_empty_chronology_and_plain_years()
+    {
+        var (client, universe) = await SignedInWithUniverse("expplainchronology");
+        var built = await BuildRichUniverse(client, universe.Id);
+
+        var payload = (await Backup(client, universe.Id)).Payload;
+
+        Assert.NotNull(payload.ChronologyEras);
+        Assert.Empty(payload.ChronologyEras);
+
+        var entry = Assert.Single(payload.TimelineEntries);
+        Assert.Null(entry.StartEraId);
+        Assert.Null(entry.EndEraId);
+        Assert.Null(Value(payload.Entities.Single(entity => entity.Id == built.Warden.Id), built.BornFieldId).EraId);
+    }
+
+    [Fact]
+    public async Task Unchanged_lore_counted_in_eras_exports_the_same_payload()
+    {
+        var (client, universe) = await SignedInWithUniverse("expchronologysame");
+        var eras = await TheFall(client, universe.Id);
+        var character = await CharacterType(client, universe.Id);
+        var born = await AddField(client, universe.Id, character, "Born", EntityFieldKind.Number, EntityFieldSemantic.BirthYear);
+        await Create(
+            client, universe.Id, character, "Aranel", CanonStatus.Idea,
+            fields: [new FieldValueInput(born.Id, null, 5, null, null, null, null, eras[1].Id)]);
+
+        var first = PayloadText(await RawExport(client, universe.Id));
+        var second = PayloadText(await RawExport(client, universe.Id));
+
+        Assert.Equal(first, second);
+    }
+
+    /// <summary>
+    /// Nothing reads a backup back in yet, so what a reader of an older file gets is exactly what
+    /// the records make of it. A version 3 document names no eras, and must come out as plain
+    /// signed years - nulls where the eras would be, never a guess.
+    /// </summary>
+    [Fact]
+    public void A_version_three_document_still_reads_as_plain_signed_years()
+    {
+        const string document = """
+            {
+              "format": "lorex.universe.backup",
+              "formatVersion": 3,
+              "generatedAt": "2026-09-10T12:00:00Z",
+              "payload": {
+                "universe": {
+                  "id": "5b0f2a31-6d7e-4c1b-9a44-7f0c2e9d1a01", "name": "An older world", "description": null,
+                  "accentColor": null, "isArchived": false,
+                  "createdAt": "2026-09-01T00:00:00Z", "updatedAt": "2026-09-01T00:00:00Z"
+                },
+                "entityTypes": [],
+                "tags": [],
+                "entities": [
+                  {
+                    "id": "5b0f2a31-6d7e-4c1b-9a44-7f0c2e9d1a02", "entityTypeId": "5b0f2a31-6d7e-4c1b-9a44-7f0c2e9d1a03",
+                    "name": "Elendil", "summary": null, "content": null, "canonStatus": "Canon", "isArchived": false,
+                    "deletedAt": null, "createdAt": "2026-09-01T00:00:00Z", "updatedAt": "2026-09-01T00:00:00Z",
+                    "aliases": [], "tagIds": [],
+                    "fieldValues": [
+                      {
+                        "fieldDefinitionId": "5b0f2a31-6d7e-4c1b-9a44-7f0c2e9d1a04", "textValue": null, "numberValue": 3119,
+                        "booleanValue": null, "dateValue": null, "optionId": null, "referencedEntityId": null
+                      }
+                    ],
+                    "image": null,
+                    "revisions": [
+                      {
+                        "id": "5b0f2a31-6d7e-4c1b-9a44-7f0c2e9d1a05", "number": 1, "kind": "Created", "changes": "None",
+                        "restoredFromRevisionId": null, "createdAt": "2026-09-01T00:00:00Z",
+                        "entityTypeId": "5b0f2a31-6d7e-4c1b-9a44-7f0c2e9d1a03", "entityTypeName": "Character",
+                        "name": "Elendil", "summary": null, "content": null, "canonStatus": "Canon", "aliases": [], "tags": [],
+                        "fieldValues": [
+                          {
+                            "fieldDefinitionId": "5b0f2a31-6d7e-4c1b-9a44-7f0c2e9d1a04", "fieldName": "Born", "kind": "Number",
+                            "displayOrder": 1, "textValue": null, "numberValue": 3119, "booleanValue": null,
+                            "dateValue": null, "optionId": null, "optionValue": null, "referencedEntityId": null,
+                            "referencedEntityName": null
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "relationshipTypes": [],
+                "relationships": [],
+                "timelineEntries": [
+                  {
+                    "id": "5b0f2a31-6d7e-4c1b-9a44-7f0c2e9d1a06", "title": "The Salt Accord", "description": null,
+                    "canonStatus": "Idea", "dateKind": "Range", "startYear": -312, "startMonth": 3, "startDay": 4,
+                    "endYear": -300, "endMonth": null, "endDay": null, "eraLabel": "Before the Drowning",
+                    "createdAt": "2026-09-01T00:00:00Z", "updatedAt": "2026-09-01T00:00:00Z", "participantEntityIds": []
+                  }
+                ],
+                "dismissedConflicts": []
+              }
+            }
+            """;
+
+        var backup = JsonSerializer.Deserialize<UniverseBackup>(document, UniverseBackupJson.Options)!;
+
+        Assert.Equal(3, backup.FormatVersion);
+        Assert.Null(backup.Payload.ChronologyEras);
+
+        var entry = Assert.Single(backup.Payload.TimelineEntries);
+        Assert.Equal(-312, entry.StartYear);
+        Assert.Null(entry.StartEraId);
+        Assert.Null(entry.EndEraId);
+        Assert.Equal("Before the Drowning", entry.EraLabel);
+
+        var entity = Assert.Single(backup.Payload.Entities);
+        var value = Assert.Single(entity.FieldValues);
+        Assert.Equal(3119, value.NumberValue);
+        Assert.Null(value.EraId);
+
+        var remembered = Assert.Single(Assert.Single(entity.Revisions).FieldValues);
+        Assert.Null(remembered.EraId);
+        Assert.Null(remembered.EraLabel);
+    }
+
+    private static async Task<IReadOnlyList<ChronologyEraResponse>> TheFall(HttpClient client, Guid universeId)
+    {
+        var response = await client.PutAsJsonAsync(
+            $"/api/universes/{universeId}/chronology",
+            new ChronologyRequest(
+            [
+                new ChronologyEraRequest(
+                    null, "Before the Fall", "BF", ChronologyEraDirection.Descending, ChronologyLabelPosition.BeforeYear),
+                new ChronologyEraRequest(
+                    null, "After the Fall", null, ChronologyEraDirection.Ascending, ChronologyLabelPosition.AfterYear),
+            ]));
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<ChronologyResponse>())!.Eras;
     }
 
     [Fact]
@@ -1237,7 +1438,8 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
                     field.Boolean,
                     field.Date,
                     field.OptionIds,
-                    field.ReferencedEntityId))]));
+                    field.ReferencedEntityId,
+                    field.EraId))]));
 
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
