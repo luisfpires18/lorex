@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../auth/useAuth'
+import { useNavigate } from 'react-router-dom'
+import { AccountMenu } from '../components/AccountMenu'
 import { UniverseCard } from '../components/UniverseCard'
 import { UniverseForm } from '../components/UniverseForm'
 import { Wordmark } from '../components/Wordmark'
@@ -11,7 +11,6 @@ type LoadState =
   { kind: 'loading' } | { kind: 'ready'; page: UniversePage } | { kind: 'error'; message: string }
 
 export default function UniversesPage() {
-  const { user, logOut } = useAuth()
   const navigate = useNavigate()
 
   const [search, setSearch] = useState('')
@@ -42,11 +41,6 @@ export default function UniversesPage() {
     }
   }, [search, includeArchived, page, reloadKey])
 
-  async function handleLogOut() {
-    await logOut()
-    await navigate('/login', { replace: true })
-  }
-
   function changeFilter(next: boolean) {
     setIncludeArchived(next)
     setPage(1)
@@ -64,14 +58,7 @@ export default function UniversesPage() {
     <div className="home">
       <header className="home__bar">
         <Wordmark />
-        <div className="home__session">
-          <Link className="home__user" to="/app/profile" data-testid="signed-in-user">
-            {user?.username}
-          </Link>
-          <button className="button button--quiet" type="button" onClick={handleLogOut}>
-            Sign out
-          </button>
-        </div>
+        <AccountMenu variant="bar" />
       </header>
 
       <main className="home__body">

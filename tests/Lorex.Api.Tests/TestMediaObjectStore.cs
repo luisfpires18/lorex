@@ -23,6 +23,13 @@ public sealed class TestMediaObjectStore : IMediaObjectStore
     /// <summary>Returns an exception to throw instead of storing the key, or null to store it.</summary>
     public Func<string, Exception?>? FailPut { get; set; }
 
+    /// <summary>
+    /// Awaited before an object is stored. It is how a test holds one write open while another
+    /// arrives, which is the only way to prove from outside that a pair is written at once rather
+    /// than one after the other.
+    /// </summary>
+    public Func<string, Task>? BeforePut { get; set; }
+
     /// <summary>Returns an exception to throw instead of reading the key, or null to read it.</summary>
     public Func<string, Exception?>? FailGet { get; set; }
 
@@ -40,17 +47,21 @@ public sealed class TestMediaObjectStore : IMediaObjectStore
     /// <summary>Drops an object behind the API's back, to model a bucket that lost one.</summary>
     public void Evict(string key) => _objects.TryRemove(key, out _);
 
-    public Task PutAsync(string key, Stream content, string contentType, CancellationToken cancellationToken)
+    public async Task PutAsync(string key, Stream content, string contentType, CancellationToken cancellationToken)
     {
         if (FailPut?.Invoke(key) is { } failure)
         {
             throw failure;
         }
 
+        if (BeforePut is { } wait)
+        {
+            await wait(key);
+        }
+
         using var buffer = new MemoryStream();
-        content.CopyTo(buffer);
+        await content.CopyToAsync(buffer, cancellationToken);
         _objects[key] = new Entry(buffer.ToArray(), contentType);
-        return Task.CompletedTask;
     }
 
     public Task<StoredMediaObject?> GetAsync(string key, CancellationToken cancellationToken)

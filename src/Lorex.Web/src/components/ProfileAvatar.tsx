@@ -10,8 +10,10 @@ import {
   setProfileThumbnail,
 } from '../profile/api'
 import type { ProfileImageRef } from '../profile/types'
+import { useProfileImage } from '../profile/useProfileImage'
 import { ActionIcon } from './ActionIcon'
-import { ImageCropDialog } from './ImageCropDialog'
+import { Avatar } from './Avatar'
+import { ImageCropDialog, type SaveStage } from './ImageCropDialog'
 
 const CROP_HINT =
   'Drag the photo to place the square, or select it and use the arrow keys. The whole photo is kept; the square is what your avatar shows.'
@@ -24,28 +26,23 @@ type Framing =
   { kind: 'file'; file: File } | { kind: 'stored'; image: ProfileImageRef; source: string }
 
 /**
- * The account's picture: the circle, and the four things that can be done to it.
+ * The account's picture on the Profile screen: the circle, and the four things that can be done
+ * to it.
  *
  * The circle is the same size and in the same place whether or not there is a photo in it, so the
  * page does not jump when one arrives or goes. Without one it carries the account's initial - a
  * monogram, not a stock silhouette, because a silhouette says "a person" and an initial says
- * "you".
- *
- * The square is stored square and drawn as a circle by CSS. Nothing is cut to a circle, which is
- * what lets the same stored avatar be shown squared off later without cutting it again.
+ * "you". `Avatar` draws both, here and in the account menu, so they cannot drift.
  *
  * Every photo goes through the cropper before it goes anywhere, so a cancelled crop uploads
  * nothing. The whole picture is always kept; the square is only what the avatar shows.
+ *
+ * What is written is reported to `useProfileImage` rather than held here, so the rail, the folded
+ * mobile bar and the universes header change at the same moment this circle does.
  */
-export function ProfileAvatar({
-  name,
-  image,
-  onChanged,
-}: {
-  name: string
-  image: ProfileImageRef | null
-  onChanged: (image: ProfileImageRef | null) => void
-}) {
+export function ProfileAvatar({ name }: { name: string }) {
+  const { image, changed } = useProfileImage()
+
   const input = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -90,15 +87,24 @@ export function ProfileAvatar({
     setFraming({ kind: 'stored', image, source: profileImageUrl(image, 'original') })
   }
 
-  async function keep(crop: ImageCrop) {
+  async function keep(crop: ImageCrop, report: (stage: SaveStage) => void) {
     if (!framing) return
 
-    onChanged(
-      framing.kind === 'stored'
-        ? // Only the square is sent. The original stays exactly where it is.
-          await setProfileThumbnail(framing.image.assetId, crop)
-        : await setProfileImage(framing.file, crop),
-    )
+    if (framing.kind === 'stored') {
+      // Four numbers, no file. There is nothing to count, so the dialog is told straight away that
+      // this is server work - a byte percentage here would be invented.
+      report({ kind: 'working' })
+      changed(await setProfileThumbnail(framing.image.assetId, crop))
+    } else {
+      report({ kind: 'sending', ratio: 0 })
+      changed(
+        await setProfileImage(framing.file, crop, ({ ratio }) => {
+          // The last byte out is not the photo saved: the server still has to decode it, cut the
+          // square and store both. That is what the switch to an indeterminate stage says.
+          report(ratio !== null && ratio >= 1 ? { kind: 'working' } : { kind: 'sending', ratio })
+        }),
+      )
+    }
 
     setFraming(null)
   }
@@ -108,7 +114,7 @@ export function ProfileAvatar({
     setBusy(true)
     try {
       await removeProfileImage()
-      onChanged(null)
+      changed(null)
     } catch {
       setError('That photo could not be removed.')
     } finally {
@@ -121,27 +127,7 @@ export function ProfileAvatar({
 
   return (
     <div className="avatar" data-testid="profile-avatar-field">
-      {image ? (
-        <img
-          className="avatar__photo"
-          src={profileImageUrl(image, 'thumbnail')}
-          // Decorative beside the name printed directly under it: a screen reader that announced
-          // "photo of Alenna" right before "Alenna" would only say it twice.
-          alt=""
-          width={320}
-          height={320}
-          decoding="async"
-          data-testid="profile-avatar"
-        />
-      ) : (
-        <span
-          className="avatar__photo avatar__photo--blank"
-          aria-hidden="true"
-          data-testid="profile-avatar"
-        >
-          {monogram(name)}
-        </span>
-      )}
+      <Avatar image={image} name={name} className="avatar__photo" testId="profile-avatar" />
 
       <div className="avatar__actions">
         {/* The input comes first so the label can be styled from its state - focus and disabled
@@ -208,6 +194,7 @@ export function ProfileAvatar({
           initialCrop={framing.kind === 'stored' ? framing.image.crop : null}
           title={framing.kind === 'stored' ? 'Edit photo' : 'Frame your photo'}
           confirmLabel={framing.kind === 'stored' ? 'Save photo' : 'Upload'}
+          workingLabel={framing.kind === 'stored' ? 'Updating photo' : 'Processing photo'}
           hint={CROP_HINT}
           onConfirm={keep}
           onCancel={() => setFraming(null)}
@@ -215,9 +202,4 @@ export function ProfileAvatar({
       ) : null}
     </div>
   )
-}
-
-/** The first character the account actually carries, so an emoji or a non-Latin name survives. */
-function monogram(name: string) {
-  return [...name.trim()][0]?.toUpperCase() ?? '?'
 }

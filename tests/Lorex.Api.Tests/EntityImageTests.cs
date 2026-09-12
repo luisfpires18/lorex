@@ -497,6 +497,35 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
     }
 
     [Fact]
+    public async Task A_store_that_fails_the_original_leaves_no_thumbnail_behind()
+    {
+        var (client, universe, type) = await World("imghalf");
+        var entry = await Entry(client, universe.Id, type, "Alenna Vance");
+
+        var first = await Uploaded(client, universe.Id, entry.Id, Png(900, 600), "one.png");
+        var before = _factory.Media.Keys.Count;
+
+        // The pair is written at once, so the square can be the one that lands while the original
+        // is the one that fails. Neither order may leave litter or disturb the entry's picture.
+        _factory.Media.FailPut = key => key.EndsWith(".webp", StringComparison.Ordinal) ? null : StorageFailure();
+        try
+        {
+            await AssertStorageProblem(
+                await Upload(client, universe.Id, entry.Id, Png(400, 400), "two.png"));
+        }
+        finally
+        {
+            _factory.Media.FailPut = null;
+        }
+
+        var detail = await Detail(client, universe.Id, entry.Id);
+        Assert.Equal(first.AssetId, detail.Image!.AssetId);
+        Assert.True(_factory.Media.Contains(Key(universe.Id, entry.Id, first.AssetId, "original.png")));
+        Assert.True(_factory.Media.Contains(ThumbnailKey(universe.Id, entry.Id, first)));
+        Assert.Equal(before, _factory.Media.Keys.Count);
+    }
+
+    [Fact]
     public async Task A_store_that_fails_mid_upload_answers_503_keeps_the_working_image_and_sweeps_what_landed()
     {
         var (client, universe, type) = await World("imgr2fail");

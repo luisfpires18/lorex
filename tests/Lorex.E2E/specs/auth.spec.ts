@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { clickSignOut } from './support/account'
 
 /**
  * Credentials here are obviously synthetic and only ever exist in the local development
@@ -42,7 +43,10 @@ test.describe('authentication', () => {
     await expect(page.getByTestId('signed-in-user')).toHaveText(account.username)
     await expect(page.getByRole('heading', { name: 'Universes' })).toBeVisible()
 
-    await page.getByRole('button', { name: 'Sign out' }).click()
+    // Signing out is in the account menu, and the menu is the only place it is.
+    await expect(page.getByRole('button', { name: 'Sign out' })).toHaveCount(0)
+
+    await clickSignOut(page)
     await expect(page).toHaveURL('/login')
 
     // The protected route is closed once the session is gone.
@@ -61,7 +65,7 @@ test.describe('authentication', () => {
     await register(page, account)
     await expect(page).toHaveURL('/app')
 
-    await page.getByRole('button', { name: 'Sign out' }).click()
+    await clickSignOut(page)
     await expect(page).toHaveURL('/login')
 
     await signIn(page, account.email)
@@ -73,7 +77,7 @@ test.describe('authentication', () => {
     const account = newAccount()
 
     await register(page, account)
-    await page.getByRole('button', { name: 'Sign out' }).click()
+    await clickSignOut(page)
 
     await page.goto('/login')
     await page.getByLabel('Username or email').fill(account.username)

@@ -68,12 +68,11 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     matters - the article and editor surface at 62ch, a summary at 58ch, a settings section at
     34rem - so prose stays readable without a page-level wall. Common Lore and entry actions carry
     a decorative Lucide icon beside their unchanged label (`ActionIcon`, `.button--icon`).
-- **Profile screen** (`feat/profile-page`, **not merged, not pushed**). The signed-in account has a
+- **Profile screen** (`feat/profile-page`, merged into `dev`). The signed-in account has a
   screen of its own at `/app/profile` - a user-level route beside the universe browser, not a
   section of a world - wearing the same bar. Under the circle are the username, the email, how many
   universes the account owns and the account id, and a line saying that is all Lorex keeps. The
-  workspace sidebar links to it as the one entry that leaves the universe, marked by a Lucide
-  `UserRound`, and the signed-in name in the home bar is now a link to it.
+  account is reached from the global chrome - see the account menu below.
   - **The circle holds a real photo.** `ProfileImages` is its own table keyed by the account, on
     the entry image's proven path: upload, frame a 1:1 square, edit that square from the stored
     original, replace, remove. Objects live at `users/{userId}/profile/{assetId}/...` - ids only,
@@ -87,20 +86,50 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     in a line. The same `ImageCropDialog` frames both.
   - **A universe backup still holds no account data.** Format version 3 is untouched: no `users/`
     entry, no account id, no asset id. Pinned by a test.
+- **Account menu and upload progress** (`fix/profile-account-menu-progress`, **not merged, not
+  pushed**). Four owner notes from live DEV.
+  - **The account is global chrome, not a universe section.** Profile is gone from the beige
+    sidebar; one `AccountMenu` - a circular avatar opening onto the username, the email, View
+    profile and Sign out - sits at the foot of the black rail, and the same component replaced the
+    loose username and Sign out button in the universes header. The rail's mark and accent seal
+    stay a pair, so the avatar is bottom-anchored rather than tucked under the "L"; on a narrow
+    screen the rail is the sticky bar and the same node lands at its right-hand end, so there is no
+    second account UI on a phone. `/app/profile` is unchanged. ADR 0021.
+  - **One avatar for every place that draws one.** `ProfileImageProvider` holds the signed-in
+    account's photo and every write reports its result there, so the rail, the folded bar, the
+    header and the Profile screen agree without a reload and without four reads of one row. Its own
+    provider, not a field on the auth context: media, not identity.
+  - **A save says which half of the wait it is in.** The browser's bytes are a determinate
+    progress bar with a real `aria-valuenow`; the moment the last byte is out it becomes an
+    indeterminate bar plus "Processing photo…", because 100% uploaded is not saved. A reframe
+    sends no file and says "Updating photo…" with no percentage. The cropper goes `inert` while a
+    save is in flight and a second press cannot start a second upload. This needed
+    `XMLHttpRequest` - `fetch` cannot report upload progress - so `src/lib/upload.ts` is that one
+    exception, behind a helper that fails as the same `ApiError`; `apiFetch` is untouched.
+  - **Both object writes now overlap, and the body is not spooled to disk.** Measured first: the
+    server's own work on a 4 MB phone photo is 190-310 ms locally, and the dominant cost is moving
+    the original twice over the network. So the two R2 writes that had no order between them run
+    together, the post-commit sweep does too, and the form reader no longer writes the body to a
+    temporary file only for the handler to read it back. Every failure guarantee is unchanged and
+    both interleavings are tested, as is the overlap itself. ADR 0019 amendment. **It does not make
+    a slow uplink fast** - that is what the progress bar is for.
 
 ## Baseline
 
-- **437 API integration tests, 78 Playwright tests**, green. No frontend unit runner exists;
+- **440 API integration tests, 83 Playwright tests**, green. No frontend unit runner exists;
   the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
-- The test host no longer migrates itself, so all 437 tests boot through the same startup path a
+- The test host no longer migrates itself, so all 440 tests boot through the same startup path a
   deployment uses.
 - Under a full parallel Playwright run, `auth.spec.ts` "rejects a wrong password" intermittently
   times out (it navigates to `/login` without awaiting sign-out), and a relationships, canon or
   universes spec can time out once; each passes alone. Known, not fixed. The five profile tests
   added load, so it now shows on most full runs - a different `canon.spec.ts` test each time, with
-  the whole file green on its own, in parallel and serially.
+  the whole file green on its own, in parallel and serially. Eight more tests arrived with the
+  account menu, and a full run now usually loses one or two - a rotating pick of canon, type-filter,
+  mobile, universes or account-menu, each green on its own. It is contention on the one SQLite
+  writer, not the specs.
 - 18 migrations, latest `AddProfileImages` - creates `ProfileImages`, keyed by and cascading with
   the Identity user. `RestrictEntityTypeIconKeys`
   is data only. `has-pending-model-changes` reports none. `AddEntitySearchIndex` is raw SQL - an FTS5 virtual

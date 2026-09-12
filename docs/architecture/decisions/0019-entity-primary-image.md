@@ -268,3 +268,46 @@ until its author crops it again.
 ignored and its crop applied; a reframing that asked for a fit had no crop, and is refused as any
 reframing without a square is. A version 3 backup written that day may carry `image.framing`; readers
 ignore the member (ADR 0014), so it needs no version bump.
+
+## Amendment: the pair is written at once, and the body is not spooled (2026-09-12)
+
+Status: accepted
+
+Live DEV made the wait on an upload obvious, and measuring it said where it goes: the original's
+bytes crossing the network twice - the browser to Lorex, then Lorex to R2 - plus one bounded piece
+of CPU. Decoding a 4 MB phone photo, cutting the square and encoding it took 190-310 ms on a
+development machine, a multiple of that on an F1's shared core, and neither the format gate nor the
+server-side thumbnail is negotiable. So the only latency the code could actually give back was the
+latency it was spending on order that does not exist.
+
+**The two new objects are written concurrently.** They were written one after the other: two round
+trips to a bucket on the other side of the internet for work with no dependency between them. Both
+are fully prepared in memory before either is written, under an asset id nothing is using, and
+neither can be read by anything until the association moves - so `MediaObjectWrites.PutAllAsync`
+starts both and waits for both.
+
+**The failure contract is unchanged, because it was already written for this.** The sequential
+version's catch blocks say "the original may well have landed before the thumbnail did not", and
+sweep every key they were writing; a delete of an object that was never written succeeds.
+Concurrency only widens which of the two might be the one that landed, which no caller assumed.
+`MediaStorageUnavailableException` keeps its stronger meaning - nothing was attempted, nothing to
+sweep - and is only reported when *every* write failed that way; one write failing for any other
+reason is reported as a failure, so the caller sweeps. Both interleavings are pinned by tests, as
+is the overlap itself: the test store holds each write open until the other has started, so a
+return to sequential writes fails rather than passes quietly.
+
+**The superseded pair is swept concurrently too**, after the commit, exactly as before.
+
+**The request body is no longer spooled to a temporary file.** The form reader writes any section
+over 64 KB to disk; both upload handlers then read the whole thing back into memory anyway, because
+the bytes are needed three times - to identify, to decode and to store. Raising the threshold past
+the upload limit takes that write-and-read-back off the path and holds no more memory than the
+handler already held.
+
+**What this does not do.** It does not make a slow uplink fast. On a photo of a few megabytes the
+dominant term is the browser sending the original, and after that Lorex sending it on; overlapping
+the thumbnail saves a round trip and the thumbnail's own transfer, which is the smaller half. The
+honest answer to "why does saving a photo feel slow" is that it is moving a few megabytes twice
+over a home connection to a shared-core App Service - so the wait is also *reported* now, rather
+than hidden behind one word. Nothing here weakens the format gate, the server-cut thumbnail, the
+preserved original, the private bucket or the ordering.

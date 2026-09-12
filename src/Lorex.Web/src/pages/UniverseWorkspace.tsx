@@ -1,6 +1,6 @@
-import { UserRound } from 'lucide-react'
 import { useCallback, useEffect, useId, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router-dom'
+import { AccountMenu } from '../components/AccountMenu'
 import { getUniverse } from '../universes/api'
 import type { UniverseDetail } from '../universes/types'
 
@@ -170,6 +170,20 @@ export default function UniverseWorkspace() {
         >
           {isNavOpen ? 'Close' : 'Sections'}
         </button>
+
+        {/* The account lives on the global rail, not in the sidebar: the sidebar is this
+            universe's sections, and an account is not one of them.
+
+            Last in the list, and on a wide screen pushed to the foot of the rail rather than
+            tucked under the "L". The mark and the accent seal are a pair - Lorex, and which world
+            this is - and putting a third circle between them would read as a third piece of the
+            same statement. At the foot it is where a global rail's account always is, and out of
+            the way of the one thing the rail is for.
+
+            On a narrow screen the rail is the sticky bar, this row is horizontal, and the same
+            node lands at the right-hand end - so the account is reachable on a phone without a
+            second account UI existing anywhere. */}
+        <AccountMenu variant="rail" />
       </nav>
 
       <aside className="sidebar" id={navId} data-open={isNavOpen ? 'true' : 'false'}>
@@ -206,19 +220,6 @@ export default function UniverseWorkspace() {
           <li>
             <NavLink to="settings" className="sidebar__link" data-testid="workspace-settings">
               Settings
-            </NavLink>
-          </li>
-          {/* Not a section of this universe but of the account that owns it, which is why it
-              carries a picture none of the others do and an absolute path out of the world. */}
-          <li>
-            <NavLink to="/app/profile" className="sidebar__link" data-testid="workspace-profile">
-              Profile
-              <UserRound
-                className="sidebar__icon"
-                aria-hidden="true"
-                focusable="false"
-                strokeWidth={1.75}
-              />
             </NavLink>
           </li>
         </ul>

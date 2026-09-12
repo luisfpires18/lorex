@@ -6,6 +6,7 @@ import EntityPage from './pages/EntityPage'
 import LoginPage from './pages/LoginPage'
 import LorePage from './pages/LorePage'
 import ProfilePage from './pages/ProfilePage'
+import { ProfileImageProvider } from './profile/ProfileImageProvider'
 import RegisterPage from './pages/RegisterPage'
 import TimelinePage from './pages/TimelinePage'
 import UniverseOverview from './pages/UniverseOverview'
@@ -19,30 +20,34 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route element={<RequireGuest />}>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-          </Route>
-
-          <Route element={<RequireAuth />}>
-            <Route path="/app" element={<UniversesPage />} />
-            <Route path="/app/profile" element={<ProfilePage />} />
-            <Route path="/app/universes/:id" element={<UniverseWorkspace />}>
-              <Route index element={<UniverseOverview />} />
-              <Route path="lore" element={<LorePage />} />
-              <Route path="lore/new" element={<EntityPage />} />
-              <Route path="lore/:entityId" element={<EntityPage />} />
-              <Route path="timeline" element={<TimelinePage />} />
-              <Route path="canon" element={<CanonPage />} />
-              <Route path="types" element={<UniverseTypes />} />
-              <Route path="trash" element={<UniverseTrash />} />
-              <Route path="settings" element={<UniverseSettings />} />
+        {/* Inside the session and outside the routes: every screen that draws an avatar reads the
+            same one, and it is read once per signed-in account rather than once per header. */}
+        <ProfileImageProvider>
+          <Routes>
+            <Route element={<RequireGuest />}>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
             </Route>
-          </Route>
 
-          <Route path="*" element={<Navigate to="/app" replace />} />
-        </Routes>
+            <Route element={<RequireAuth />}>
+              <Route path="/app" element={<UniversesPage />} />
+              <Route path="/app/profile" element={<ProfilePage />} />
+              <Route path="/app/universes/:id" element={<UniverseWorkspace />}>
+                <Route index element={<UniverseOverview />} />
+                <Route path="lore" element={<LorePage />} />
+                <Route path="lore/new" element={<EntityPage />} />
+                <Route path="lore/:entityId" element={<EntityPage />} />
+                <Route path="timeline" element={<TimelinePage />} />
+                <Route path="canon" element={<CanonPage />} />
+                <Route path="types" element={<UniverseTypes />} />
+                <Route path="trash" element={<UniverseTrash />} />
+                <Route path="settings" element={<UniverseSettings />} />
+              </Route>
+            </Route>
+
+            <Route path="*" element={<Navigate to="/app" replace />} />
+          </Routes>
+        </ProfileImageProvider>
       </AuthProvider>
     </BrowserRouter>
   )

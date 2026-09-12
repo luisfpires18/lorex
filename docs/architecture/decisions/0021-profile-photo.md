@@ -54,7 +54,9 @@ user id is the one segment Lorex did not mint itself, so it is refused into a ke
 plain token. A new `{assetId}` for every upload and a new `{thumbnailId}` for every square mean
 nothing is ever written over an object that is currently live.
 
-**The write ordering is ADR 0019's, exactly.** Both new objects are written first under ids nothing
+**The write ordering is ADR 0019's, exactly** - including its 2026-09-12 amendment, so the new
+original and its square are written concurrently and the superseded pair is swept concurrently.
+The rest is unchanged: Both new objects are written first under ids nothing
 is using; then the row moves; only after that commit is the superseded pair deleted. A failure before
 the commit leaves the previous photo working and sweeps what was written; a failure after it leaves
 the new photo in place with litter to log. Reframing writes a new square, moves the row only if it
@@ -70,6 +72,20 @@ photo holds no `users/` entry, no account id and no asset id.
 1:1, free drag, zoom, arrow keys, the square kept inside the picture so it can never hold empty
 space. The stored derivative is square; the circle is CSS, so nothing is ever cut round and the same
 avatar could be shown squared off later without cutting it again.
+
+**The account is reached from the global chrome, never from a universe's sidebar.** `/app/profile`
+is the route, and one `AccountMenu` - a circular avatar that opens onto the username, the email,
+View profile and Sign out - is the way to it, on the workspace's black rail and in the universes
+header. The rail's mark and its accent seal are a pair, "Lorex" and "which world this is", so the
+avatar sits at the foot of the rail rather than between them; on a narrow screen the rail is the
+sticky bar and the same node lands at its right-hand end, so a phone needs no second account UI.
+The beige sidebar stays what it is: this universe's sections, and an account is not one of them.
+
+**One reading of the avatar, for every place that draws one.** `ProfileImageProvider` holds it for
+the signed-in account and every write path reports its result there, so the rail, the folded bar,
+the universes header and the Profile screen cannot disagree and an upload does not need a reload.
+It is its own provider rather than a field on the auth context because it is media, not identity:
+a different feature's endpoint, and it changes while the session does not.
 
 ## Consequences
 

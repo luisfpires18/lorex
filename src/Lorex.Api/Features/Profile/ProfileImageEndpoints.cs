@@ -47,6 +47,12 @@ public static partial class ProfileImageEndpoints
     /// </summary>
     private const long RequestBodyCeiling = ImagePreparation.MaxUploadBytes * 2;
 
+    /// <summary>
+    /// Enough for any upload the gate will accept, so the body is never spooled to disk. An int
+    /// because that is what the form reader takes.
+    /// </summary>
+    private const int InMemoryBodyThreshold = (int)ImagePreparation.MaxUploadBytes + 64 * 1024;
+
     public static IEndpointRouteBuilder MapProfileImageEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/profile/image")
@@ -64,7 +70,13 @@ public static partial class ProfileImageEndpoints
         group.MapPut("/", UploadAsync)
             .WithName("SetProfileImage")
             .DisableAntiforgery()
-            .WithMetadata(new RequestSizeLimitAttribute(RequestBodyCeiling));
+            .WithMetadata(new RequestSizeLimitAttribute(RequestBodyCeiling))
+            // The form reader spools a section over 64 KB to a temporary file, and this handler
+            // then reads the whole thing back into memory anyway - the bytes are needed three
+            // times, to identify, to decode and to store. Raising the threshold past what the
+            // upload limit allows takes that write-and-read-back off the path entirely; it holds
+            // no more memory than the handler already held.
+            .WithMetadata(new RequestFormLimitsAttribute { MemoryBufferThreshold = InMemoryBodyThreshold });
 
         // A JSON body, so it needs no antiforgery exemption, and PUT for the same reasons.
         group.MapPut("/thumbnail", ReframeAsync).WithName("SetProfileThumbnail");
@@ -170,10 +182,16 @@ public static partial class ProfileImageEndpoints
         try
         {
             bytes.Position = 0;
-            await store.PutAsync(originalKey, bytes, prepared.ContentType, cancellationToken);
-
             using var thumbnail = new MemoryStream(prepared.Thumbnail, writable: false);
-            await store.PutAsync(thumbnailKey, thumbnail, "image/webp", cancellationToken);
+
+            // Both at once. Neither depends on the other and nothing can read either until the row
+            // moves below, so waiting for the first before starting the second only ever bought a
+            // second round trip to the bucket - see MediaObjectWrites.
+            await MediaObjectWrites.PutAllAsync(
+                store,
+                cancellationToken,
+                new PendingMediaObject(originalKey, bytes, prepared.ContentType),
+                new PendingMediaObject(thumbnailKey, thumbnail, "image/webp"));
         }
         catch (MediaStorageUnavailableException exception)
         {
@@ -543,27 +561,9 @@ public static partial class ProfileImageEndpoints
 
     // ---------- Shared ----------
 
-    /// <summary>
-    /// Deletes objects nothing points at any more, and never lets that failure reach the caller.
-    /// Every caller has already decided what the truth is; a key that will not delete is logged
-    /// and left, for the reasons ADR 0019 gives.
-    /// </summary>
-    private static async Task SweepAsync(IMediaObjectStore store, ILogger logger, params string[] keys)
-    {
-        foreach (var key in keys)
-        {
-            try
-            {
-                // Deliberately not the request's token: cleanup after a commit must not be
-                // abandoned because the client hung up.
-                await store.DeleteAsync(key, CancellationToken.None);
-            }
-            catch (Exception exception)
-            {
-                LogOrphanedObject(logger, key, exception);
-            }
-        }
-    }
+    /// <summary>Deletes objects nothing points at any more, together. See MediaObjectWrites.</summary>
+    private static Task SweepAsync(IMediaObjectStore store, ILogger logger, params string[] keys) =>
+        MediaObjectWrites.SweepAsync(store, logger, LogOrphanedObject, keys);
 
     [LoggerMessage(
         Level = LogLevel.Warning,

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { clickSignOut } from './support/account'
 
 /**
  * Each test registers its own account and builds its own universe, so nothing depends on
@@ -212,7 +213,7 @@ test.describe('lore', () => {
 
     await page.getByRole('link', { name: 'All universes' }).click()
     await page.waitForURL('/app')
-    await page.getByRole('button', { name: 'Sign out' }).click()
+    await clickSignOut(page)
     await page.waitForURL('/login')
 
     // A different account may not read the first account's entry by its URL.
