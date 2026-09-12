@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { openAccountMenu } from './support/account'
 import { png, type Rgb } from './support/png'
 import { colours, expectShows, expectSquareCovered } from './support/pixels'
 
@@ -37,6 +38,19 @@ function thirds(name: string) {
 /** A flat picture of one colour, for the steps where what it shows does not matter. */
 function plain(name: string, rgb: Rgb) {
   return { name, mimeType: 'image/png', buffer: png(400, 400, () => rgb) }
+}
+
+/**
+ * Around half a megabyte of noise, for the one test that throttles the uplink. Noise rather than a
+ * flat colour because a flat PNG compresses to almost nothing and there would be no bytes to watch
+ * go out.
+ */
+function noisy(name: string) {
+  return {
+    name,
+    mimeType: 'image/png',
+    buffer: png(400, 400, (x, y) => [(x * 7 + y) % 256, (y * 13 + x) % 256, (x + y * 3) % 256]),
+  }
 }
 
 /**
@@ -90,6 +104,54 @@ async function openCropper(page: Page): Promise<Locator> {
   return dialog
 }
 
+/**
+ * Holds the profile-photo write open until the returned release is called.
+ *
+ * Nothing here waits on how fast localhost is. The point of a held response is the opposite: the
+ * server's part of the save is made to take as long as the test needs, so "the browser has sent
+ * the bytes but the photo is not saved yet" is a state that can actually be looked at rather than
+ * a moment that has to be caught.
+ */
+async function holdSave(page: Page, route: '/api/profile/image' | '/api/profile/image/thumbnail') {
+  let release = () => {}
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+
+  let requests = 0
+
+  await page.route(route, async (interception) => {
+    // The write only. The same path answers a GET - it is how every avatar learns what to draw -
+    // and holding or counting that would be counting the wrong thing.
+    if (interception.request().method() !== 'PUT') {
+      await interception.continue()
+      return
+    }
+
+    requests += 1
+    await held
+    await interception.continue()
+  })
+
+  return {
+    /** Lets the held request go. The route stays registered, so it keeps counting. */
+    release,
+    get requests() {
+      return requests
+    },
+  }
+}
+
+/** The stage the cropper says it is at: the bar's own state, and the words beside it. */
+async function stage(page: Page) {
+  const bar = page.getByTestId('image-crop-progressbar')
+  return {
+    state: await bar.getAttribute('data-state'),
+    value: await bar.getAttribute('aria-valuenow'),
+    text: (await page.getByTestId('image-crop-stagetext').textContent()) ?? '',
+  }
+}
+
 interface Account {
   username: string
   email: string
@@ -120,7 +182,13 @@ test.describe('profile', () => {
     const account = await signUp(page)
     await newUniverse(page)
 
-    await page.getByTestId('workspace-profile').click()
+    // The account is not a section of this universe, so it is not in the universe's sidebar.
+    await expect(page.getByTestId('workspace-profile')).toHaveCount(0)
+    await expect(page.locator('.sidebar').getByText('Profile', { exact: true })).toHaveCount(0)
+
+    // It is on the global rail instead, in the one account menu Lorex has.
+    await openAccountMenu(page)
+    await page.getByTestId('account-menu-profile').click()
 
     // A user-level route: the universe is left behind rather than nested inside.
     await expect(page).toHaveURL('/app/profile')
@@ -137,8 +205,9 @@ test.describe('profile', () => {
     await page.getByRole('link', { name: 'All universes' }).click()
     await expect(page).toHaveURL('/app')
 
-    // And the bar's own name gets there too.
-    await page.getByTestId('signed-in-user').click()
+    // And the universes header carries the same menu, to the same place.
+    await openAccountMenu(page)
+    await page.getByTestId('account-menu-profile').click()
     await expect(page).toHaveURL('/app/profile')
   })
 
@@ -252,6 +321,133 @@ test.describe('profile', () => {
     await page.keyboard.press('Escape')
     await expect(dialog).toHaveCount(0)
     await expect(page.getByTestId('profile-avatar')).toHaveText(/^[A-Z]$/)
+  })
+
+  test('a save shows the bytes going, then says the server is still working', async ({ page }) => {
+    test.setTimeout(90000)
+
+    await signUp(page)
+    await page.goto('/app/profile')
+
+    // A deliberately slow uplink and a deliberately slow answer, so both stages last long enough
+    // to be looked at. The rates are the test's own, not the machine's, which is exactly what
+    // keeps this off how fast localhost happens to be: on a faster or slower machine the same two
+    // states are reached in the same order and neither is a race.
+    const cdp = await page.context().newCDPSession(page)
+    await cdp.send('Network.enable')
+    await cdp.send('Network.emulateNetworkConditions', {
+      offline: false,
+      // Added between the last byte sent and the first byte of the answer, which is precisely the
+      // window in which the photo is uploaded but not yet saved.
+      latency: 2500,
+      downloadThroughput: -1,
+      uploadThroughput: 128 * 1024,
+    })
+
+    try {
+      await page.getByTestId('profile-photo-input').setInputFiles(noisy('slow.png'))
+      const dialog = await openCropper(page)
+      await dialog.getByTestId('image-crop-confirm').click()
+
+      // Stage A: a determinate bar with a real number on it, while the bytes are moving.
+      const progress = page.getByTestId('image-crop-progress')
+      await expect(progress).toBeVisible()
+      await expect.poll(async () => (await stage(page)).state, { timeout: 30000 }).toBe('sending')
+
+      const sending = await stage(page)
+      expect(sending.text).toContain('Uploading')
+      expect(Number(sending.value)).toBeGreaterThanOrEqual(0)
+      expect(Number(sending.value)).toBeLessThanOrEqual(100)
+
+      const bar = page.getByTestId('image-crop-progressbar')
+      await expect(bar).toHaveAttribute('aria-valuemin', '0')
+      await expect(bar).toHaveAttribute('aria-valuemax', '100')
+
+      // Stage B: the body is away and the server has not answered. Reaching 100% uploaded is not
+      // the photo being saved, and this is the part that says so.
+      await expect.poll(async () => (await stage(page)).state, { timeout: 30000 }).toBe('working')
+
+      const working = await stage(page)
+      expect(working.text).toContain('Processing photo')
+
+      // No frozen percentage claiming the save is finished when it is not.
+      expect(working.value).toBeNull()
+
+      // The status is announced rather than merely drawn, so a bar that moves is not the only
+      // thing saying what is happening.
+      await expect(page.getByTestId('image-crop-stagetext')).toHaveAttribute('role', 'status')
+
+      await expect(dialog).toHaveCount(0, { timeout: 30000 })
+      await expect(page.getByTestId('profile-avatar')).toHaveAttribute('data-avatar', 'photo')
+    } finally {
+      await cdp.send('Network.emulateNetworkConditions', {
+        offline: false,
+        latency: 0,
+        downloadThroughput: -1,
+        uploadThroughput: -1,
+      })
+      await cdp.detach()
+    }
+  })
+
+  test('one press is one upload, however many times the button is pressed', async ({ page }) => {
+    await signUp(page)
+    await page.goto('/app/profile')
+
+    const save = await holdSave(page, '/api/profile/image')
+
+    await page.getByTestId('profile-photo-input').setInputFiles(thirds('bands.png'))
+    const dialog = await openCropper(page)
+    const confirm = dialog.getByTestId('image-crop-confirm')
+    await confirm.click()
+
+    await expect(page.getByTestId('image-crop-progress')).toBeVisible()
+    await expect(confirm).toBeDisabled()
+
+    // Forced, so the press lands whatever the button's own state is doing: the guard is in the
+    // handler, not in the styling.
+    await confirm.click({ force: true })
+    await confirm.click({ force: true })
+
+    // And the crop cannot move under a save that has already been given its four numbers.
+    await expect(page.getByTestId('image-crop-stage')).toHaveAttribute('inert', '')
+
+    save.release()
+
+    await expect(dialog).toHaveCount(0)
+    await expect(page.getByTestId('profile-avatar')).toHaveAttribute('data-avatar', 'photo')
+    expect(save.requests, 'the photo was uploaded more than once').toBe(1)
+  })
+
+  test('a reframe says it is updating, and never invents a byte percentage', async ({ page }) => {
+    await signUp(page)
+    await page.goto('/app/profile')
+
+    await page.getByTestId('profile-photo-input').setInputFiles(thirds('bands.png'))
+    let dialog = await openCropper(page)
+    await dialog.getByTestId('image-crop-confirm').click()
+    await expect(dialog).toHaveCount(0)
+
+    const save = await holdSave(page, '/api/profile/image/thumbnail')
+
+    await page.getByTestId('profile-photo-reframe').click()
+    dialog = await openCropper(page)
+    await dragPicture(page, 'left')
+    await dialog.getByTestId('image-crop-confirm').click()
+
+    // A reframe uploads nothing - four numbers go, and the original stays where it is - so there
+    // is nothing to count, and the dialog says what it is doing in words instead of inventing a
+    // percentage for work that has none.
+    await expect.poll(async () => (await stage(page)).state).toBe('working')
+
+    const working = await stage(page)
+    expect(working.text).toContain('Updating photo')
+    expect(working.text).not.toContain('%')
+    expect(working.value).toBeNull()
+
+    save.release()
+    await expect(dialog).toHaveCount(0)
+    expect(save.requests).toBe(1)
   })
 
   test('is closed to a signed-out visitor', async ({ page }) => {

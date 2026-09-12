@@ -20,6 +20,22 @@ const MAX_ZOOM = 4
 const KEYBOARD_STEP = 8
 
 /**
+ * How far a save has got, as the caller reports it.
+ *
+ * Two stages, because they are two different waits and saying so is the whole point. `sending` is
+ * the browser pushing bytes, which is countable and can be most of the wait on a phone. `working`
+ * is the server decoding the picture, cutting the square and storing both, which has no
+ * percentage - and reaching 100% uploaded does not mean the photo is saved.
+ *
+ * `ratio` is null when the browser cannot say how many bytes there are, which is why the bar falls
+ * back to an indeterminate one rather than inventing a number.
+ */
+export type SaveStage = { kind: 'sending'; ratio: number | null } | { kind: 'working' }
+
+/** What a caller that reports nothing is taken to be doing: server work, with no percentage. */
+const UNREPORTED: SaveStage = { kind: 'working' }
+
+/**
  * The cropper: the whole picture, a square over it, and the choice of which part the thumbnail
  * shows.
  *
@@ -42,6 +58,7 @@ export function ImageCropDialog({
   title,
   confirmLabel,
   hint = 'Drag the picture to place the square, or select it and use the arrow keys. The whole picture is kept; the square is what cards show.',
+  workingLabel = 'Saving',
   onConfirm,
   onCancel,
 }: {
@@ -53,8 +70,16 @@ export function ImageCropDialog({
   confirmLabel: string
   /** What the square is for, in the caller's own words. It is the dialog's description. */
   hint?: string
-  /** Resolves once the choice is kept; throws to keep the dialog open with the reason shown. */
-  onConfirm: (crop: ImageCrop) => Promise<void>
+  /** What the button says while the work has no percentage. "Processing" for an upload. */
+  workingLabel?: string
+  /**
+   * Resolves once the choice is kept; throws to keep the dialog open with the reason shown.
+   *
+   * `report` is how the save says which stage it is at. A caller that never calls it is taken to
+   * be doing server work, which is right for anything that sends no file - reframing sends four
+   * numbers, and a percentage there would be a fiction.
+   */
+  onConfirm: (crop: ImageCrop, report: (stage: SaveStage) => void) => Promise<void>
   onCancel: () => void
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
@@ -67,8 +92,12 @@ export function ImageCropDialog({
   const [pixels, setPixels] = useState<Area | null>(null)
   const [natural, setNatural] = useState<{ width: number; height: number } | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [stage, setStage] = useState<SaveStage | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // One flag for "a save is in flight", derived rather than stored: two pieces of state that had
+  // to agree would eventually not.
+  const saving = stage !== null
 
   useEffect(() => {
     // showModal, not the open attribute: it brings the focus trap, the backdrop and Escape.
@@ -95,25 +124,40 @@ export function ImageCropDialog({
   const loading = !natural && !loadFailed
 
   async function confirm() {
+    // The guard is the one that matters: a second press, an Enter on a still-focused button or a
+    // double tap cannot start a second upload, whatever the button's disabled state is doing.
     if (!crop || saving) return
 
-    setSaving(true)
+    // Held from here, so the square that is submitted is the square that was on screen when the
+    // button was pressed. The stage below also makes the cropper inert, so it cannot move under
+    // an upload that has already been given its four numbers.
+    const submitted = crop
+
+    setStage(UNREPORTED)
     setError(null)
     try {
-      await onConfirm(crop)
+      await onConfirm(submitted, setStage)
     } catch (failure: unknown) {
       setError(
         failure instanceof ApiError
           ? (failure.fieldErrors.file ?? failure.fieldErrors.crop ?? failure.message)
           : 'That could not be saved. Try again.',
       )
-      setSaving(false)
+      setStage(null)
     }
   }
 
   function cancel() {
     if (!saving) onCancel()
   }
+
+  const percent =
+    stage?.kind === 'sending' && stage.ratio !== null ? Math.round(stage.ratio * 100) : null
+
+  // "Uploading 40%" while bytes are moving, then the caller's own word for the server's part. The
+  // two are deliberately different: the first can be counted and the second cannot.
+  const savingLabel =
+    stage === null ? null : percent === null ? workingLabel : `Uploading ${percent}%`
 
   return (
     <dialog
@@ -137,7 +181,10 @@ export function ImageCropDialog({
           </p>
         </header>
 
-        <div className="cropper__stage" data-testid="image-crop-stage">
+        {/* Inert, not merely unstyled, once a save starts: the crop that was submitted must not be
+            able to change underneath it, by drag, by wheel or by arrow key. `pointer-events` alone
+            would leave the square focusable and the keyboard still moving it. */}
+        <div className="cropper__stage" data-testid="image-crop-stage" inert={saving || undefined}>
           {loadFailed ? (
             <p className="cropper__status" role="alert">
               That picture could not be loaded.
@@ -212,6 +259,36 @@ export function ImageCropDialog({
             <span className="cropper__caption">Thumbnail preview</span>
           </div>
 
+          {stage === null ? null : (
+            <div className="cropper__progress" data-testid="image-crop-progress">
+              {/* Determinate while the browser can count the bytes, and indeterminate after -
+                  with aria-valuenow left off rather than frozen at 100, which would claim the
+                  save had finished. */}
+              <div
+                className="progressbar"
+                role="progressbar"
+                aria-label={percent === null ? workingLabel : 'Uploading photo'}
+                aria-valuemin={percent === null ? undefined : 0}
+                aria-valuemax={percent === null ? undefined : 100}
+                aria-valuenow={percent ?? undefined}
+                aria-valuetext={percent === null ? undefined : `${percent}%`}
+                data-state={percent === null ? 'working' : 'sending'}
+                data-testid="image-crop-progressbar"
+              >
+                <span
+                  className="progressbar__fill"
+                  style={percent === null ? undefined : { width: `${percent}%` }}
+                />
+              </div>
+
+              {/* The words are the status, not the animation: a bar that only moves says nothing
+                  to a screen reader, and nothing at all with reduced motion. */}
+              <p className="cropper__stagetext" role="status" data-testid="image-crop-stagetext">
+                {percent === null ? `${workingLabel}…` : `Uploading… ${percent}%`}
+              </p>
+            </div>
+          )}
+
           {error ? (
             <p className="field__error" role="alert" data-testid="image-crop-error">
               {error}
@@ -228,7 +305,7 @@ export function ImageCropDialog({
             data-testid="image-crop-confirm"
           >
             <ActionIcon icon={Check} />
-            {saving ? 'Saving' : confirmLabel}
+            {savingLabel ?? confirmLabel}
           </button>
           <button
             className="button button--quiet button--icon"

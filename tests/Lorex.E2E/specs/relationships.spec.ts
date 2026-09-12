@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { clickSignOut } from './support/account'
 
 /**
  * Relationships, end to end. Each test registers its own account and builds its own
@@ -407,7 +408,7 @@ test.describe('relationships', () => {
     // A different account gets the same answer as for a universe that never existed,
     // and is told nothing about what is inside.
     await page.goto('/app')
-    await page.getByRole('button', { name: 'Sign out' }).click()
+    await clickSignOut(page)
     await page.waitForURL('/login')
     await signUp(page)
 

@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
+import { AccountMenu } from '../components/AccountMenu'
 import { ProfileAvatar } from '../components/ProfileAvatar'
 import { Wordmark } from '../components/Wordmark'
-import { getProfileImage } from '../profile/api'
-import type { ProfileImageRef } from '../profile/types'
 import { listUniverses } from '../universes/api'
 
 /**
@@ -19,11 +18,9 @@ import { listUniverses } from '../universes/api'
  * genuinely holds rather than fields it would have to invent.
  */
 export default function ProfilePage() {
-  const { user, logOut } = useAuth()
-  const navigate = useNavigate()
+  const { user } = useAuth()
 
   const [universeCount, setUniverseCount] = useState<number | null>(null)
-  const [image, setImage] = useState<ProfileImageRef | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -39,25 +36,6 @@ export default function ProfilePage() {
     }
   }, [])
 
-  useEffect(() => {
-    const controller = new AbortController()
-
-    // A photo that cannot be read leaves the monogram standing, which is the same thing an
-    // account without one shows. Nothing here is worth failing the page over.
-    getProfileImage(controller.signal)
-      .then(setImage)
-      .catch(() => setImage(null))
-
-    return () => {
-      controller.abort()
-    }
-  }, [])
-
-  async function handleLogOut() {
-    await logOut()
-    await navigate('/login', { replace: true })
-  }
-
   // RequireAuth holds this route, so a signed-out visitor never reaches this render.
   if (!user) return null
 
@@ -69,9 +47,7 @@ export default function ProfilePage() {
           <Link className="home__back" to="/app">
             All universes
           </Link>
-          <button className="button button--quiet" type="button" onClick={handleLogOut}>
-            Sign out
-          </button>
+          <AccountMenu variant="bar" />
         </div>
       </header>
 
@@ -79,7 +55,7 @@ export default function ProfilePage() {
         <article className="profile" data-testid="profile">
           <h1 className="profile__title">Profile</h1>
 
-          <ProfileAvatar name={user.username} image={image} onChanged={setImage} />
+          <ProfileAvatar name={user.username} />
 
           <p className="profile__name" data-testid="profile-name">
             {user.username}

@@ -383,6 +383,44 @@ a {
   margin: 0 0 2rem;
 }
 
+/* ---------- Progress ---------- */
+
+/* One bar, two states, told apart by `data-state` rather than by two classes: `sending` fills to
+   the fraction of bytes that have left, `working` has no fraction and sweeps instead. The words
+   beside it are what actually say which - the movement is decoration, and under reduced motion
+   there is no movement at all. */
+.progressbar {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 0.4rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper);
+}
+
+.progressbar__fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 120ms linear;
+}
+
+.progressbar[data-state='working'] .progressbar__fill {
+  width: 35%;
+  animation: progress-sweep 1.1s ease-in-out infinite;
+}
+
+@keyframes progress-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(300%);
+  }
+}
+
 /* ---------- The avatar, and what can be done to it ---------- */
 
 .avatar {
@@ -514,6 +552,160 @@ a {
   line-height: 1.6;
   color: var(--muted);
   text-align: left;
+}
+
+/* ---------- The account menu ---------- */
+
+/* One component on two surfaces: the black rail down the side of a workspace, and the paper bar
+   above the universes. Only the colours and where the panel opens differ. */
+.accountmenu {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: none;
+}
+
+/* On a wide screen the rail is a column, and the account belongs at its foot - see the comment in
+   UniverseWorkspace. The narrow layer below turns the rail into a row and this back into nothing. */
+.accountmenu--rail {
+  margin-top: auto;
+}
+
+.accountmenu__name {
+  font-size: 0.925rem;
+  color: var(--muted);
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountmenu__trigger {
+  display: flex;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  line-height: 0;
+}
+
+/* The circle itself. Two sizes only - the rail's and the bar's are the same, because an avatar in
+   chrome is chrome. */
+.accountmenu__avatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 1px solid var(--rule-strong);
+  background: var(--paper);
+  object-fit: cover;
+}
+
+.accountmenu__avatar--blank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--display);
+  font-size: 0.95rem;
+  line-height: 1;
+  color: var(--muted);
+}
+
+/* The rail is graphite in both schemes, so the circle on it is ruled and lettered in the plate's
+   own ink rather than in the page's. */
+.accountmenu--rail .accountmenu__avatar {
+  border-color: var(--plate-muted);
+  background: var(--plate);
+}
+
+.accountmenu--rail .accountmenu__avatar--blank {
+  color: var(--plate-ink);
+}
+
+.accountmenu--rail .accountmenu__trigger:hover .accountmenu__avatar {
+  border-color: var(--plate-ink);
+}
+
+.accountmenu__panel {
+  position: absolute;
+  z-index: 20;
+  min-width: 14.5rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.35rem;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--surface);
+
+  /* The panel is paper wherever it hangs from. Without this it inherits the rail's own ink,
+     which is near-white - and near-white text on a near-white panel is no text at all. */
+  color: var(--ink);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Out of the rail sideways, aligned with its foot, so it never covers the rail it came from. */
+.accountmenu--rail .accountmenu__panel {
+  bottom: 0;
+  left: calc(100% + 0.5rem);
+}
+
+/* Under the bar and pinned to the right edge, which is the only direction it can open without
+   leaving the viewport. */
+.accountmenu--bar .accountmenu__panel {
+  top: calc(100% + 0.6rem);
+  right: 0;
+}
+
+.accountmenu__who {
+  padding: 0.5rem 0.65rem 0.6rem;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 0.35rem;
+  min-width: 0;
+}
+
+.accountmenu__username {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.accountmenu__email {
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* A link and a button that read as one list. Left-aligned and full width, unlike a `.button`,
+   because these are destinations rather than the action a screen exists for. */
+.accountmenu__item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.accountmenu__item:hover:not(:disabled) {
+  background: var(--paper);
+  color: var(--accent);
+}
+
+.accountmenu__item:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 /* ---------- Create composer ---------- */
@@ -913,17 +1105,6 @@ a {
 }
 
 .sidebar__link--planned:hover {
-  color: var(--muted);
-}
-
-/* The picture on the one link in the list that leaves this universe. Decorative - the label
-   beside it is what is read out - and sat in the space the link's own layout already leaves at
-   its end. Centred rather than on the baseline, which is where a drawing belongs next to text. */
-.sidebar__icon {
-  flex: none;
-  align-self: center;
-  width: 1.05em;
-  height: 1.05em;
   color: var(--muted);
 }
 
@@ -1657,6 +1838,20 @@ a {
 .cropper__caption {
   font-size: 0.78rem;
   color: var(--muted);
+}
+
+.cropper__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+}
+
+.cropper__stagetext {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .cropper__actions {
@@ -2769,6 +2964,25 @@ a {
     border-color: var(--plate-ink);
   }
 
+  /* The rail is a row here, so the foot of a column means nothing: the same node lands at the
+     right-hand end of the bar, which is where a thumb is. */
+  .accountmenu--rail {
+    margin-top: 0;
+  }
+
+  .accountmenu--rail .accountmenu__panel {
+    bottom: auto;
+    left: auto;
+    right: 0;
+    top: calc(100% + 0.5rem);
+  }
+
+  /* The bar has the wordmark, the count and the menu to fit; a username as well would be the
+     thing that pushed it sideways. The panel carries it, where there is room. */
+  .accountmenu__name {
+    display: none;
+  }
+
   .sidebar {
     border-right: 0;
     border-bottom: 1px solid var(--rule);
@@ -3756,6 +3970,7 @@ a {
     height: 2.75rem;
   }
 
+  .accountmenu__trigger,
   .sidebar__link,
   .rail__toggle {
     min-height: 2.75rem;

@@ -50,6 +50,25 @@ function flattenFieldErrors(errors: Record<string, string[]> | undefined) {
 }
 
 /**
+ * One failed response, read the same way whichever transport carried it.
+ *
+ * Exported because the upload helper in `lib/upload.ts` uses `XMLHttpRequest` rather than
+ * `fetch` - it is the only way to see byte progress - and a failure there has to become exactly
+ * the `ApiError` every caller already handles.
+ */
+export function apiErrorFrom(status: number, payload: unknown) {
+  const problem = (payload ?? {}) as ProblemDetails
+  const fieldErrors = flattenFieldErrors(problem.errors)
+  const message =
+    problem.detail ??
+    Object.values(fieldErrors)[0] ??
+    problem.title ??
+    'Something went wrong. Try again.'
+
+  return new ApiError(status, message, fieldErrors, problem.code ?? null, payload)
+}
+
+/**
  * Calls the API on the same origin. The session cookie is HttpOnly, so the browser
  * attaches it and no token is ever held in JavaScript.
  */
@@ -77,14 +96,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   const payload: unknown = isJson ? await response.json() : null
 
   if (!response.ok) {
-    const problem = (payload ?? {}) as ProblemDetails
-    const fieldErrors = flattenFieldErrors(problem.errors)
-    const message =
-      problem.detail ??
-      Object.values(fieldErrors)[0] ??
-      problem.title ??
-      'Something went wrong. Try again.'
-    throw new ApiError(response.status, message, fieldErrors, problem.code ?? null, payload)
+    throw apiErrorFrom(response.status, payload)
   }
 
   return payload as T

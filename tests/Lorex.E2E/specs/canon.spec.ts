@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { clickSignOut } from './support/account'
 
 /**
  * Canon integrity, end to end. Each test registers its own account and builds its own
@@ -40,7 +41,7 @@ async function signUp(page: Page) {
 
 async function signOut(page: Page) {
   await page.goto('/app')
-  await page.getByRole('button', { name: 'Sign out' }).click()
+  await clickSignOut(page)
   await page.waitForURL('/login')
 }
 

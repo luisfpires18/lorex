@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { clickSignOut } from './support/account'
 
 /**
  * Every test registers its own account, so each one starts from an empty universe list
@@ -134,7 +135,7 @@ test.describe('universes', () => {
 
     await page.getByRole('link', { name: 'All universes' }).click()
     await page.waitForURL('/app')
-    await page.getByRole('button', { name: 'Sign out' }).click()
+    await clickSignOut(page)
     await page.waitForURL('/login')
 
     await page.goto(workspaceUrl)
@@ -148,7 +149,7 @@ test.describe('universes', () => {
 
     await page.getByRole('link', { name: 'All universes' }).click()
     await page.waitForURL('/app')
-    await page.getByRole('button', { name: 'Sign out' }).click()
+    await clickSignOut(page)
     await page.waitForURL('/login')
 
     // A different account may not read the first account's universe by its id.

@@ -419,6 +419,75 @@ public sealed class ProfileImageTests(LorexApiFactory factory) : IClassFixture<L
     // ---------- When storage fails ----------
 
     [Fact]
+    public async Task The_original_and_its_square_are_written_at_the_same_time()
+    {
+        var (client, userId) = await Account("photoconc");
+
+        // Neither write may finish until the other has started. If the pair were written one
+        // after the other, the first would wait for a second that had not begun, and the wait
+        // would time out rather than the upload succeeding.
+        var originalStarted = new TaskCompletionSource();
+        var thumbnailStarted = new TaskCompletionSource();
+
+        _factory.Media.BeforePut = async key =>
+        {
+            if (key.EndsWith(".webp", StringComparison.Ordinal))
+            {
+                thumbnailStarted.TrySetResult();
+                await originalStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            }
+            else
+            {
+                originalStarted.TrySetResult();
+                await thumbnailStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            }
+        };
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await Upload(client, Png(900, 600), "me.png");
+        }
+        finally
+        {
+            _factory.Media.BeforePut = null;
+        }
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var stored = (await response.Content.ReadFromJsonAsync<ProfileImageRef>())!;
+        Assert.True(_factory.Media.Contains(Key(userId, stored.AssetId, "original.png")));
+        Assert.True(_factory.Media.Contains(ThumbnailKey(userId, stored)));
+    }
+
+    [Fact]
+    public async Task A_store_that_fails_the_original_leaves_the_square_nothing_points_at_swept()
+    {
+        var (client, userId) = await Account("photohalf");
+
+        var first = await Uploaded(client, Png(900, 600), "one.png");
+        var before = _factory.Media.Keys.Count;
+
+        // The mirror of the case below it: now the square lands and the original does not. Both
+        // orders are reachable once the pair is written at once, and neither may leave litter or
+        // disturb the photo the account already had.
+        _factory.Media.FailPut = key => key.EndsWith(".webp", StringComparison.Ordinal) ? null : StorageFailure();
+        try
+        {
+            await AssertStorageProblem(await Upload(client, Png(400, 400), "two.png"));
+        }
+        finally
+        {
+            _factory.Media.FailPut = null;
+        }
+
+        Assert.Equal(first.AssetId, (await Current(client))!.AssetId);
+        Assert.True(_factory.Media.Contains(Key(userId, first.AssetId, "original.png")));
+        Assert.True(_factory.Media.Contains(ThumbnailKey(userId, first)));
+        Assert.Equal(before, _factory.Media.Keys.Count);
+    }
+
+    [Fact]
     public async Task A_store_that_fails_mid_upload_leaves_the_previous_photo_working_and_no_litter()
     {
         var (client, userId) = await Account("photofail");

@@ -1,5 +1,6 @@
 import { apiFetch } from '../lib/api'
 import type { ImageCrop } from '../lib/imageCrop'
+import { apiUpload, type UploadProgress } from '../lib/upload'
 import type { ProfileImageRef } from './types'
 
 const BASE = '/api/profile/image'
@@ -36,13 +37,22 @@ export async function getProfileImage(signal?: AbortSignal) {
  *
  * The file and its framing travel in one request, so nothing is uploaded until the square has
  * been confirmed. The crop is only a request: the server cuts the avatar itself, from the original.
+ *
+ * Sent through `apiUpload` rather than `apiFetch`, and this is the only call in Lorex that is:
+ * it is the only one where the body is large enough that a person waits for it, and byte progress
+ * needs `XMLHttpRequest`. `onProgress` stops at the last byte out - what happens after that is
+ * the server decoding and storing, which has no percentage.
  */
-export function setProfileImage(file: File, crop: ImageCrop) {
+export function setProfileImage(
+  file: File,
+  crop: ImageCrop,
+  onProgress?: (progress: UploadProgress) => void,
+) {
   const body = new FormData()
   body.append('file', file)
   body.append('crop', JSON.stringify(crop))
 
-  return apiFetch<ProfileImageRef>(BASE, { method: 'PUT', body })
+  return apiUpload<ProfileImageRef>(BASE, body, { method: 'PUT', onProgress })
 }
 
 /**

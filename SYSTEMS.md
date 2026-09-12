@@ -65,6 +65,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Lore/EntityImageEndpoints.cs` | Set, reframe, read and remove the image; the replace, reframe and cleanup ordering; storage failures as 503. |
 | `Features/Media/ImagePreparation.cs` | The one upload gate: what is accepted as an image, the orientation rule, placing a crop on pixels, cutting the square. Shared by entry pictures and profile photos. |
 | `Features/Media/ImageCrop.cs` | The crop as four fractions, and the column lengths a stored image needs. |
+| `Features/Media/MediaObjectWrites.cs` | Writing a pair of objects at once and sweeping a set at once, and why that is safe. |
 | `Features/Media/MediaObjectStore.cs` | `IMediaObjectStore`, its two failure exceptions, and what is registered when nothing is configured. |
 | `Features/Media/R2MediaObjectStore.cs` | Cloudflare R2 over its S3-compatible API: the two upload flags R2 needs, and SDK failures kept inside. |
 | `Features/Media/InMemoryMediaObjectStore.cs` | Objects in a dictionary, for local development and Playwright. |
@@ -130,9 +131,10 @@ Repository index. Paths and one-line responsibilities only.
 | `src/styles.css` | Design tokens, all component styles, and the narrow-screen and touch layers. |
 | `src/lib/api.ts` | Same-origin fetch wrapper and `ApiError`. |
 | `src/lib/imageCrop.ts` | The crop shape, the accepted formats and the size ceiling, shared by both pictures. |
+| `src/lib/upload.ts` | The one `XMLHttpRequest` in Lorex: a multipart upload that reports byte progress, failing as the same `ApiError`. |
 | `src/auth/` | Session context, `useAuth`, and the route guards. |
 | `src/universes/` | Universe API client and types. |
-| `src/profile/` | Profile photo API client and DTO types, and the address of one stored variant. |
+| `src/profile/` | Profile photo API client and DTO types, the address of one stored variant, and the provider every avatar reads so they cannot disagree. |
 | `src/lore/` | Lore API client, shared types, document and field helpers, the revision client, the image client that composes an asset's URL, and `typeIcons.ts` (the built-in type icon keys and their glyphs). |
 | `src/export/` | Backup download: the request, the server's filename, and handing the archive to the browser. |
 | `src/trash/` | Trash API client and DTO types. |
@@ -140,7 +142,7 @@ Repository index. Paths and one-line responsibilities only.
 | `src/timeline/` | Timeline API client, DTO types, date formatting and year grouping. |
 | `src/canon/` | Canon Integrity API client, DTO types, and the reader for the promotion gate's 409. |
 | `src/lib/dates.ts` | Timestamp formatting, date-input round trips, and spans. |
-| `src/components/` | `AuthLayout`, `Wordmark` (the drawn "Lore X", spoken "Lorex"), `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `EntityPortrait` (the card's picture, or its monogram), `EntityImageField` (pick, frame, replace, edit thumbnail, remove), `ImageCropDialog` (the cropper, and `CroppedPicture` for unsaved previews), `ProfileAvatar` (the account's circle, and upload, reframe, replace and remove), `TypeIcon`, `TypeIconPicker`, `TypeFilterBar` (the Lore browser's type chips), `ActionIcon` (the decorative icon beside an action's label), `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker` (single and multi, one shared search), `EntityHistory`, `RelationshipSection`, `RelationshipTypeManager`, `TimelineEntryForm`, `ConflictEntry`, `CanonBlockNotice` (the one refused-write presentation, shared by every gated form). |
+| `src/components/` | `AuthLayout`, `Wordmark` (the drawn "Lore X", spoken "Lorex"), `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `EntityPortrait` (the card's picture, or its monogram), `EntityImageField` (pick, frame, replace, edit thumbnail, remove), `ImageCropDialog` (the cropper, and `CroppedPicture` for unsaved previews), `Avatar` (the account's photo or its monogram, wherever one is drawn), `AccountMenu` (the one account dropdown: the rail's and the header's), `ProfileAvatar` (the Profile screen's circle, and upload, reframe, replace and remove), `TypeIcon`, `TypeIconPicker`, `TypeFilterBar` (the Lore browser's type chips), `ActionIcon` (the decorative icon beside an action's label), `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker` (single and multi, one shared search), `EntityHistory`, `RelationshipSection`, `RelationshipTypeManager`, `TimelineEntryForm`, `ConflictEntry`, `CanonBlockNotice` (the one refused-write presentation, shared by every gated form). |
 | `src/pages/` | Login, Register, Universes browser, Profile, and the workspace: Overview, Lore, entry page, Timeline, Canon, Types, Trash and Settings. `UniverseWorkspace` also owns the collapsing narrow-screen navigation, and lets the Lore browser alone fill the workspace column. |
 | `vite.config.ts` | Dev server port 5173, proxy to the API, build config. |
 
@@ -176,6 +178,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.E2E/specs/timeline.spec.ts` | Date kinds through the drawer, order, filters, paging, refusals, and the owner boundary. |
 | `Lorex.E2E/specs/history.spec.ts` | One journey: versions accumulate, an old one is read in place and put back. |
 | `Lorex.E2E/specs/export.spec.ts` | One journey: the click produces a real archive on disk, named and readable. |
+| `Lorex.E2E/specs/support/account.ts` | Opening the account menu and signing out through it, wherever it is on screen. Not a spec. |
 | `Lorex.E2E/specs/support/png.ts` | Builds a real PNG, pixel by pixel, with an optional EXIF orientation. Not a spec. |
 | `Lorex.E2E/specs/support/pixels.ts` | Reads colours back out of a displayed picture, and checks a crop square sits wholly on it. Not a spec. |
 | `Lorex.E2E/specs/support/zip.ts` | Reads a downloaded archive's table of contents. Not a spec. |
@@ -184,7 +187,8 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.E2E/specs/mobile.spec.ts` | One journey at 390px: navigation, authoring, a reachable action, the drawer picker, and no sideways scroll. |
 | `Lorex.E2E/specs/entity-image.spec.ts` | Add, replace and remove a picture; framing and reframing read back from the card; one square crop the picture always covers; a sideways photo; the cropper and layout on a phone; history; backup; the worker. |
 | `Lorex.E2E/specs/type-filter.spec.ts` | Type icons chosen and removed on the Types screen; the Lore type bar with search, Trash and keyboard; the bar on a phone; the Lore browser filling a desktop's workspace column. |
-| `Lorex.E2E/specs/profile.spec.ts` | The account screen: reached from a universe, what it prints, the guard, the photo added, framed, reframed, replaced and removed, and the circle on a phone. |
+| `Lorex.E2E/specs/profile.spec.ts` | The account screen: reached from a universe, what it prints, the guard, the photo added, framed, reframed, replaced and removed, the two stages of a save, and the circle on a phone. |
+| `Lorex.E2E/specs/account-menu.spec.ts` | The one account menu: on the global rail and not in a universe's sidebar, the same in the universes header, the avatar agreeing everywhere, the keyboard, and a phone. |
 | `Lorex.E2E/specs/pwa.spec.ts` | Manifest, icons and metadata, and what the service worker is never allowed to cache. |
 
 ## `scripts`
