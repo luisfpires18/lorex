@@ -118,12 +118,16 @@ transparent margin cannot bleed a dark fringe into the mark's edges. Still stand
 only: an area average is the right filter for a reduction of four to eighty times, and it is
 thirty lines.
 
-**Every platform-facing asset carries the paper ground, and that is measured rather than
-tasteful.** 62% of the artwork's opaque pixels sit below luminance 40 - it is mostly very dark
-red - so on a black launcher, a dark tab strip or iOS's own plate most of the symbol disappears.
-So the icons are composited onto `--paper`, `#f6f2ea`, which is already the manifest's
-`background_color`: invisible on a light surface, a legible plate on a dark one. Only the in-app
-`brand-mark.png` keeps its transparency, because there the surface underneath is Lorex's own.
+**The icons keep the master's transparency; two of them cannot, and say why.** The artwork is
+mostly very dark red - 62% of its opaque pixels sit below luminance 40 - so the first cut put
+every platform-facing asset on `--paper`, `#f6f2ea`, to keep the whole symbol visible on a dark
+surface. Shipped and looked at, that is a pale tile sitting in a dark tab strip: more conspicuous
+than the problem it solved. Rendered against a browser's own tab greys at 16px, the transparent
+mark is legible anyway - the lit red rings carry the shape and the dark side merges into the
+ground, which reads as a lit sphere. So the favicons, the two `any` icons and the in-app mark are
+transparent, and the ground survives only where transparency is not a choice: the maskable icon,
+which a platform crops to its own shape and fills, and the Apple touch icon, which iOS composites
+onto black.
 
 **Paddings are what each platform needs.** The maskable icon keeps the mark inside the middle
 62% of the canvas, so Android cropping to a circle of 80% cannot clip it; Apple gets 12%,
@@ -131,10 +135,10 @@ because iOS redraws the corners itself; the favicons are cropped to 2-4%, becaus
 pixel of margin is a pixel not spent on the rings. The manifest still declares one maskable
 icon and two `any` icons, and the maskable claim is now backed by real safe-zone padding.
 
-**`CACHE_VERSION` is bumped to `v2`.** The icon filenames did not change but their bytes did,
-and root static files are cached by path, so without a bump an installed or merely long-lived
-browser would keep serving the old struck `X` out of `lorex-static-v1`. The policy is untouched;
-only the version moved.
+**`CACHE_VERSION` is bumped, twice.** The icon filenames never change but their bytes have now
+changed twice - the new artwork, then the paper tile coming off the favicons - and root static
+files are cached by path, so without a bump a browser keeps serving whichever version it saw
+first. `v1` to `v2` to `v3`. The policy is untouched; only the version moved.
 
 **Where the symbol appears in the product, and where it deliberately does not.** Large on the
 auth plate above the `Lore X` wordmark, and small beside that wordmark in the two paper bars.

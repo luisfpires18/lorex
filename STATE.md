@@ -23,22 +23,27 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - `ci.yml` validates every pull request into `dev`; `deploy-dev.yml` calls it and then deploys,
     from `dev` only, over OIDC. No credential is stored in the repository.
   - Runbook, limitations and troubleshooting: `docs/deployment/azure-dev.md`.
-- **The Lorex mark** (`feat/lorex-brand-icon`, **not merged, not pushed**). The owner supplied the
+- **The Lorex mark** (`feat/lorex-brand-icon`, merged into `dev`). The owner supplied the
   real icon - three interlocking red rings around a star - so the drawn stand-in is gone.
   `assets/brand/lorex-icon.png` is the one source, unaltered, and `scripts/render-icons.py` now
   resamples it into every shipped asset rather than reading geometry out of an SVG. The source has
   genuine transparency; the checkerboard a viewer shows is the viewer's.
-  - **Every platform-facing asset sits on `--paper`**, because 62% of the artwork is darker than
-    luminance 40 and would disappear on a dark launcher or tab strip. Only the in-app
-    `brand-mark.png` stays transparent. Paddings are per platform: the maskable icon keeps the
-    mark inside the middle 62% so Android's circle cannot clip it, Apple gets 12%, the favicons
-    2-4%. `public/icon.svg` is deleted - tracing shaded artwork into vectors would be redrawing
-    it - so the favicon is PNG at 48, 32 and 16.
+  - **The icons keep the master's transparency** (`fix/transparent-app-icons`, **not merged, not
+    pushed**). The first cut put every platform-facing asset on `--paper`, because 62% of the
+    artwork is darker than luminance 40; in a dark tab strip that is a pale tile, which the owner
+    saw straight away. Rendered against a browser's own tab greys, the transparent mark is
+    legible at 16px anyway. The ground survives only where transparency is not a choice: the
+    maskable icon, which a platform crops and fills, and the Apple touch icon, which iOS
+    composites onto black. `CACHE_VERSION` is `v3`.
+  - Paddings are per platform: the maskable icon keeps the mark inside the middle 62% so
+    Android's circle cannot clip it, Apple gets 12%, the favicons 2-4%. `public/icon.svg` is
+    deleted - tracing shaded artwork into vectors would be redrawing it - so the favicon is PNG
+    at 48, 32 and 16.
   - **The rail keeps its `L`.** The symbol was tried there: at ~30px it reads as a red tangle and
     it puts the only saturated colour in the chrome above the universe accent seal. The mark is
     large on the auth plate and small beside the wordmark in the paper bars, decorative in both.
-  - **`CACHE_VERSION` is `v2`.** Same filenames, new bytes, and root static files are cached by
-    path. ADR 0017 amendment.
+  - Same filenames, new bytes, and root static files are cached by path - hence the version
+    bumps. ADR 0017 amendment.
 - **Numbered implementation pauses after 022.** Current mode is **owner-led manual testing,
   stabilization and feature polish**, on unnumbered `<type>/<description>` branches.
   **Phase 023 - Production Hardening / PostgreSQL - remains deferred** and is not started; the
