@@ -70,32 +70,45 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     a decorative Lucide icon beside their unchanged label (`ActionIcon`, `.button--icon`).
 - **Profile screen** (`feat/profile-page`, **not merged, not pushed**). The signed-in account has a
   screen of its own at `/app/profile` - a user-level route beside the universe browser, not a
-  section of a world - wearing the same bar. A centred circle carries the account's initial,
-  because the auth model stores no picture and this branch deliberately does not add one; under it
-  are the username, the email, how many universes the account owns and the account id, and a line
-  saying that is all Lorex keeps. The workspace sidebar links to it as the one entry that leaves
-  the universe, marked by a Lucide `UserRound`, and the signed-in name in the home bar is now a
-  link to it.
+  section of a world - wearing the same bar. Under the circle are the username, the email, how many
+  universes the account owns and the account id, and a line saying that is all Lorex keeps. The
+  workspace sidebar links to it as the one entry that leaves the universe, marked by a Lucide
+  `UserRound`, and the signed-in name in the home bar is now a link to it.
+  - **The circle holds a real photo.** `ProfileImages` is its own table keyed by the account, on
+    the entry image's proven path: upload, frame a 1:1 square, edit that square from the stored
+    original, replace, remove. Objects live at `users/{userId}/profile/{assetId}/...` - ids only,
+    and deliberately not under `universes/`. Ownership is the session and nothing else: no route
+    carries a user id, so another account's photo is not a request that can be made. No photo is
+    still the monogram. ADR 0021.
+  - **One upload gate now, for both pictures.** `EntityImageProcessing` moved to
+    `Features/Media/ImagePreparation.cs` unchanged in behaviour, so the formats, the 8 MB ceiling,
+    the orientation rule and the crop arithmetic cannot drift between a portrait and an avatar.
+    `EntityImageCrop` stays as the lore wire and v3 backup shape and converts to `Media.ImageCrop`
+    in a line. The same `ImageCropDialog` frames both.
+  - **A universe backup still holds no account data.** Format version 3 is untouched: no `users/`
+    entry, no account id, no asset id. Pinned by a test.
 
 ## Baseline
 
-- **417 API integration tests, 73 Playwright tests**, green. No frontend unit runner exists;
+- **437 API integration tests, 78 Playwright tests**, green. No frontend unit runner exists;
   the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
-- The test host no longer migrates itself, so all 417 tests boot through the same startup path a
+- The test host no longer migrates itself, so all 437 tests boot through the same startup path a
   deployment uses.
 - Under a full parallel Playwright run, `auth.spec.ts` "rejects a wrong password" intermittently
   times out (it navigates to `/login` without awaiting sign-out), and a relationships, canon or
-  universes spec can time out once; each passes alone. Known, not fixed.
-- 17 migrations, latest `RemoveEntityImageFramingMode` - drops the image framing column that
-  `AddEntityImageFramingMode` added; EF rebuilds `EntityImages` to do it. `RestrictEntityTypeIconKeys`
+  universes spec can time out once; each passes alone. Known, not fixed. The five profile tests
+  added load, so it now shows on most full runs - a different `canon.spec.ts` test each time, with
+  the whole file green on its own, in parallel and serially.
+- 18 migrations, latest `AddProfileImages` - creates `ProfileImages`, keyed by and cascading with
+  the Identity user. `RestrictEntityTypeIconKeys`
   is data only. `has-pending-model-changes` reports none. `AddEntitySearchIndex` is raw SQL - an FTS5 virtual
   table and the trigger that empties it - so no EF Core model describes it and the pending check
   cannot see it either way.
 - No automated test reaches Cloudflare and none can: the API host registers an in-process object
   store, Playwright runs against `Media:Provider=InMemory`, and the R2 adapter tests answer the SDK
-  from an in-process HTTP handler.
+  from an in-process HTTP handler. That covers profile photos too - they use the same store.
 - Six rules in `src/Lorex.Api/Features/CanonIntegrity/Rules/`: three structural (Medium), three
   chronological (High). Behaviour: ADR 0010, 0011, 0012.
 

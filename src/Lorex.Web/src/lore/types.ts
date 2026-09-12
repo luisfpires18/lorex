@@ -1,3 +1,5 @@
+import type { ImageCrop } from '../lib/imageCrop'
+
 /** Mirrors the backend enum. Ordered from least to most committed. */
 export const CanonStatus = {
   Idea: 0,
@@ -164,16 +166,11 @@ export interface EntityImageRef {
 }
 
 /**
- * The square a thumbnail is cut from, as fractions of the picture rather than pixels of any
- * screen: `x` and `width` of its width, `y` and `height` of its height, from the top-left corner.
- * The same four numbers select the same pixels however large the cropper happened to be drawn.
+ * The square a thumbnail is cut from. Its own name here because it is what the lore API and a
+ * backup call it, and the shape itself is shared - the cropper and the server's crop arithmetic
+ * are the same for an entry's portrait and an account's photo.
  */
-export interface EntityImageCrop {
-  x: number
-  y: number
-  width: number
-  height: number
-}
+export type EntityImageCrop = ImageCrop
 
 export interface EntitySummary {
   id: string

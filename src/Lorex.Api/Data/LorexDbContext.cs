@@ -1,6 +1,7 @@
 using Lorex.Api.Features.Auth;
 using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Lore;
+using Lorex.Api.Features.Profile;
 using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.Timeline;
 using Lorex.Api.Features.Universes;
@@ -57,6 +58,8 @@ public class LorexDbContext(DbContextOptions<LorexDbContext> options)
     public DbSet<CanonConflict> CanonConflicts => Set<CanonConflict>();
 
     public DbSet<CanonConflictSubject> CanonConflictSubjects => Set<CanonConflictSubject>();
+
+    public DbSet<ProfileImage> ProfileImages => Set<ProfileImage>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

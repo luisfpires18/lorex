@@ -5,29 +5,35 @@ using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.Formats.Webp;
 using SixLabors.ImageSharp.Processing;
 
-namespace Lorex.Api.Features.Lore;
+namespace Lorex.Api.Features.Media;
 
-/// <summary>What passed validation, and everything the write path needs from the bytes.</summary>
-/// <param name="Width">Displayed width - after orientation, see <see cref="EntityImageProcessing"/>.</param>
+/// <summary>What passed validation, and everything a write path needs from the bytes.</summary>
+/// <param name="Width">Displayed width - after orientation, see <see cref="ImagePreparation"/>.</param>
 /// <param name="Height">Displayed height.</param>
 /// <param name="Crop">The square actually cut, as fractions. Always set, even when none was asked for.</param>
-internal sealed record PreparedEntityImage(
+internal sealed record PreparedImage(
     string ContentType,
     string Extension,
     int Width,
     int Height,
-    EntityImageCrop Crop,
+    ImageCrop Crop,
     byte[] Thumbnail);
 
 /// <summary>Why an image was not accepted, and which part of the request to blame.</summary>
-internal sealed record EntityImageRejection(string Field, string Message);
+internal sealed record ImageRejection(string Field, string Message);
 
 /// <summary>A crop, placed on pixels: a square, inside the image, in whole pixels.</summary>
 internal readonly record struct CropSquare(int Left, int Top, int Side);
 
 /// <summary>
-/// The upload gate: what Lorex will accept as an entry's picture, and the thumbnail it makes
-/// from it.
+/// The upload gate: what Lorex will accept as a picture anywhere in the product, and the square
+/// thumbnail it makes from it.
+///
+/// One gate, two callers. An entry's primary image and a person's profile photo are the same
+/// problem - accept only a real picture, orient it the way a browser will draw it, cut the square
+/// its owner framed - and the differences between them are where the bytes go and who may ask,
+/// which is the callers' business and not this file's. Nothing here knows about a universe, an
+/// entry or an account.
 ///
 /// Nothing here trusts the request. The filename is a label, the browser's content type is a
 /// claim, and both are ignored - the format is whatever the bytes decode as, and an upload
@@ -46,13 +52,13 @@ internal readonly record struct CropSquare(int Left, int Top, int Side);
 /// a small file claiming to be 60,000 pixels square is refused before anything tries to
 /// allocate it.
 /// </summary>
-internal static class EntityImageProcessing
+internal static class ImagePreparation
 {
     public const string FileField = "file";
 
     public const string CropField = "crop";
 
-    /// <summary>Largest upload accepted. One picture on one entry does not need more.</summary>
+    /// <summary>Largest upload accepted. One picture on one entry or one account does not need more.</summary>
     public const long MaxUploadBytes = 8L * 1024 * 1024;
 
     /// <summary>Longest side accepted, before any pixel is decoded.</summary>
@@ -66,9 +72,9 @@ internal static class EntityImageProcessing
     public const long MaxPixels = 24_000_000;
 
     /// <summary>
-    /// Square edge of the generated thumbnail. The lore grid lays cards out at a 17.5rem
-    /// minimum, so the portrait on one is drawn at well under half this - which leaves room
-    /// for a high-density screen and for the card portrait to grow, without storing a second
+    /// Square edge of the generated thumbnail. The largest place one is drawn is the profile
+    /// avatar, at 7.5rem, and the lore grid draws its portraits at well under half of this - so
+    /// there is room for a high-density screen and for either to grow, without storing a second
     /// near-full-size copy of every image.
     /// </summary>
     public const int ThumbnailSize = 320;
@@ -104,7 +110,7 @@ internal static class EntityImageProcessing
     /// describing a non-empty rectangle that stays inside the picture. Whether it is square can
     /// only be decided against the picture's pixels, and <see cref="Place"/> does that.
     /// </summary>
-    public static string? CheckCrop(EntityImageCrop crop)
+    public static string? CheckCrop(ImageCrop crop)
     {
         if (!double.IsFinite(crop.X) || !double.IsFinite(crop.Y)
             || !double.IsFinite(crop.Width) || !double.IsFinite(crop.Height))
@@ -135,10 +141,10 @@ internal static class EntityImageProcessing
     /// centred square, and the crop that describes it is returned anyway, so every picture
     /// stored from here on records its framing.
     /// </summary>
-    public static async Task<(PreparedEntityImage? Image, EntityImageRejection? Rejection)> PrepareAsync(
+    public static async Task<(PreparedImage? Image, ImageRejection? Rejection)> PrepareAsync(
         Stream upload,
         long byteLength,
-        EntityImageCrop? crop,
+        ImageCrop? crop,
         CancellationToken cancellationToken)
     {
         if (byteLength <= 0)
@@ -235,7 +241,7 @@ internal static class EntityImageProcessing
             var thumbnail = await RenderThumbnailAsync(decoded, square, cancellationToken);
 
             return (
-                new PreparedEntityImage(
+                new PreparedImage(
                     format.DefaultMimeType,
                     extension,
                     width,
@@ -269,7 +275,7 @@ internal static class EntityImageProcessing
     /// No crop means the largest centred square, which is what every thumbnail was before an
     /// author could choose.
     /// </summary>
-    internal static (CropSquare Square, string? Rejection) Place(EntityImageCrop? crop, int width, int height)
+    internal static (CropSquare Square, string? Rejection) Place(ImageCrop? crop, int width, int height)
     {
         if (crop is null)
         {
@@ -303,7 +309,7 @@ internal static class EntityImageProcessing
     }
 
     /// <summary>The square that was cut, back as fractions - the form it is stored and exported in.</summary>
-    private static EntityImageCrop Describe(CropSquare square, int width, int height) =>
+    private static ImageCrop Describe(CropSquare square, int width, int height) =>
         new(
             (double)square.Left / width,
             (double)square.Top / height,
@@ -354,6 +360,6 @@ internal static class EntityImageProcessing
         return buffer.ToArray();
     }
 
-    private static (PreparedEntityImage? Image, EntityImageRejection? Rejection) Refuse(string field, string message) =>
-        (null, new EntityImageRejection(field, message));
+    private static (PreparedImage? Image, ImageRejection? Rejection) Refuse(string field, string message) =>
+        (null, new ImageRejection(field, message));
 }

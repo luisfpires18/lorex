@@ -1,3 +1,5 @@
+using Lorex.Api.Features.Media;
+
 namespace Lorex.Api.Features.Lore;
 
 // ---------- Entity types ----------
@@ -148,12 +150,23 @@ public sealed record EntityImageRef(
 /// a PNG, and as stored for a WebP - which is how browsers draw each one, so the square an author
 /// frames is the square that gets cut. <see cref="EntityImageProcessing"/> owns that rule.
 /// </summary>
+/// <remarks>
+/// Its own record rather than <see cref="ImageCrop"/> directly, because this one is a published
+/// wire and backup shape: a v3 archive holds <c>image.crop</c> and nothing may quietly change what
+/// that is. The two convert in a line each, and the arithmetic lives in <see cref="ImagePreparation"/>
+/// where both an entry's picture and a profile photo reach it.
+/// </remarks>
 public sealed record EntityImageCrop(double X, double Y, double Width, double Height)
 {
     internal static EntityImageCrop? Of(EntityImage image) =>
         image is { CropX: { } x, CropY: { } y, CropWidth: { } width, CropHeight: { } height }
             ? new EntityImageCrop(x, y, width, height)
             : null;
+
+    internal static EntityImageCrop From(ImageCrop crop) =>
+        new(crop.X, crop.Y, crop.Width, crop.Height);
+
+    internal ImageCrop ToShared() => new(X, Y, Width, Height);
 }
 
 /// <summary>

@@ -2,18 +2,19 @@ using Lorex.Api.Features.Media;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace Lorex.Api.Features.Lore;
+namespace Lorex.Api.Features.Profile;
 
 /// <summary>
-/// Schema for the one primary image. The entry's id is the key, so "at most one" is a
-/// constraint rather than a convention every write path has to remember.
+/// Schema for the one profile photo. The account's id is the key, so "at most one" is a
+/// constraint rather than a convention every write path has to remember, and the row goes when
+/// the account does.
 /// </summary>
-public sealed class EntityImageConfiguration : IEntityTypeConfiguration<EntityImage>
+public sealed class ProfileImageConfiguration : IEntityTypeConfiguration<ProfileImage>
 {
-    public void Configure(EntityTypeBuilder<EntityImage> builder)
+    public void Configure(EntityTypeBuilder<ProfileImage> builder)
     {
-        builder.ToTable("EntityImages");
-        builder.HasKey(image => image.EntityId);
+        builder.ToTable("ProfileImages");
+        builder.HasKey(image => image.UserId);
 
         builder.Property(image => image.OriginalKey)
             .IsRequired()
@@ -27,9 +28,9 @@ public sealed class EntityImageConfiguration : IEntityTypeConfiguration<EntityIm
         builder.Property(image => image.FileName)
             .HasMaxLength(StoredImageLimits.FileNameMaxLength);
 
-        builder.HasOne(image => image.Entity)
-            .WithOne(entity => entity.Image)
-            .HasForeignKey<EntityImage>(image => image.EntityId)
+        builder.HasOne(image => image.User)
+            .WithOne()
+            .HasForeignKey<ProfileImage>(image => image.UserId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

@@ -1,15 +1,5 @@
 namespace Lorex.Api.Features.Lore;
 
-public static class EntityImageLimits
-{
-    /// <summary>Comfortably longer than the convention below can ever produce.</summary>
-    public const int ObjectKeyMaxLength = 400;
-
-    public const int ContentTypeMaxLength = 100;
-
-    public const int FileNameMaxLength = 255;
-}
-
 /// <summary>
 /// Where an entry's image lives in the bucket.
 ///

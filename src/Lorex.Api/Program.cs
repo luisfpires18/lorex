@@ -5,6 +5,7 @@ using Lorex.Api.Features.Export;
 using Lorex.Api.Features.Health;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Media;
+using Lorex.Api.Features.Profile;
 using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.Timeline;
 using Lorex.Api.Features.Trash;
@@ -60,6 +61,7 @@ app.UseAuthorization();
 
 app.MapHealthEndpoints();
 app.MapAuthEndpoints();
+app.MapProfileImageEndpoints();
 app.MapUniverseEndpoints();
 app.MapEntityTypeEndpoints();
 app.MapEntityEndpoints();

@@ -54,11 +54,11 @@ public static partial class EntityImageEndpoints
     public const string OriginalUnavailableCode = "image_original_unavailable";
 
     /// <summary>
-    /// A backstop well above <see cref="EntityImageProcessing.MaxUploadBytes"/>, not a second
+    /// A backstop well above <see cref="ImagePreparation.MaxUploadBytes"/>, not a second
     /// limit. The friendly refusal is the validation one; this only stops a request that is
     /// gross rather than merely too big.
     /// </summary>
-    private const long RequestBodyCeiling = EntityImageProcessing.MaxUploadBytes * 2;
+    private const long RequestBodyCeiling = ImagePreparation.MaxUploadBytes * 2;
 
     public static IEndpointRouteBuilder MapEntityImageEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -138,7 +138,7 @@ public static partial class EntityImageEndpoints
 
         if (file is null || file.Length == 0)
         {
-            return Invalid(EntityImageProcessing.FileField, "Choose an image to upload.");
+            return Invalid(ImagePreparation.FileField, "Choose an image to upload.");
         }
 
         EntityImageCrop? requestedCrop = null;
@@ -148,7 +148,7 @@ public static partial class EntityImageEndpoints
 
             if (requestedCrop is null)
             {
-                return Invalid(EntityImageProcessing.CropField, "The thumbnail selection could not be read.");
+                return Invalid(ImagePreparation.CropField, "The thumbnail selection could not be read.");
             }
         }
 
@@ -161,8 +161,8 @@ public static partial class EntityImageEndpoints
         await upload.CopyToAsync(bytes, cancellationToken);
         bytes.Position = 0;
 
-        var (prepared, rejection) = await EntityImageProcessing.PrepareAsync(
-            bytes, bytes.Length, requestedCrop, cancellationToken);
+        var (prepared, rejection) = await ImagePreparation.PrepareAsync(
+            bytes, bytes.Length, requestedCrop?.ToShared(), cancellationToken);
 
         if (prepared is null)
         {
@@ -325,12 +325,12 @@ public static partial class EntityImageEndpoints
 
         if (request.Crop is null)
         {
-            return Invalid(EntityImageProcessing.CropField, "Choose the part of the image the thumbnail shows.");
+            return Invalid(ImagePreparation.CropField, "Choose the part of the image the thumbnail shows.");
         }
 
-        if (EntityImageProcessing.CheckCrop(request.Crop) is { } badCrop)
+        if (ImagePreparation.CheckCrop(request.Crop.ToShared()) is { } badCrop)
         {
-            return Invalid(EntityImageProcessing.CropField, badCrop);
+            return Invalid(ImagePreparation.CropField, badCrop);
         }
 
         if (request.AssetId != image.AssetId)
@@ -345,7 +345,7 @@ public static partial class EntityImageEndpoints
         {
             var original = await store.GetAsync(image.OriginalKey, cancellationToken);
 
-            if (original is null || original.Length > EntityImageProcessing.MaxUploadBytes)
+            if (original is null || original.Length > ImagePreparation.MaxUploadBytes)
             {
                 if (original is not null)
                 {
@@ -376,15 +376,15 @@ public static partial class EntityImageEndpoints
 
         bytes.Position = 0;
 
-        var (prepared, rejection) = await EntityImageProcessing.PrepareAsync(
-            bytes, bytes.Length, request.Crop, cancellationToken);
+        var (prepared, rejection) = await ImagePreparation.PrepareAsync(
+            bytes, bytes.Length, request.Crop.ToShared(), cancellationToken);
 
         if (prepared is null)
         {
             // A crop that is not square on this picture is the author's to fix. Anything else
             // means the stored original itself no longer passes, which is not.
-            return rejection!.Field == EntityImageProcessing.CropField
-                ? Invalid(EntityImageProcessing.CropField, rejection.Message)
+            return rejection!.Field == ImagePreparation.CropField
+                ? Invalid(ImagePreparation.CropField, rejection.Message)
                 : OriginalUnavailable();
         }
 
@@ -693,7 +693,7 @@ public static partial class EntityImageEndpoints
         Message = "Image storage failed during {Operation} for entry {EntityId}. Nothing was changed.")]
     private static partial void LogStorageFailure(ILogger logger, string operation, Guid entityId, Exception exception);
 
-    private static void SetCrop(EntityImage image, EntityImageCrop crop)
+    private static void SetCrop(EntityImage image, ImageCrop crop)
     {
         image.CropX = crop.X;
         image.CropY = crop.Y;
@@ -754,7 +754,7 @@ public static partial class EntityImageEndpoints
         return name.Length switch
         {
             0 => null,
-            > EntityImageLimits.FileNameMaxLength => name[..EntityImageLimits.FileNameMaxLength],
+            > StoredImageLimits.FileNameMaxLength => name[..StoredImageLimits.FileNameMaxLength],
             _ => name,
         };
     }

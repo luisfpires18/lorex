@@ -3,7 +3,7 @@ import Cropper, { type Area } from 'react-easy-crop'
 import 'react-easy-crop/react-easy-crop.css'
 import { Check, X } from 'lucide-react'
 import { ApiError } from '../lib/api'
-import type { EntityImageCrop } from '../lore/types'
+import type { ImageCrop } from '../lib/imageCrop'
 import { ActionIcon } from './ActionIcon'
 
 /**
@@ -41,17 +41,20 @@ export function ImageCropDialog({
   initialCrop,
   title,
   confirmLabel,
+  hint = 'Drag the picture to place the square, or select it and use the arrow keys. The whole picture is kept; the square is what cards show.',
   onConfirm,
   onCancel,
 }: {
   /** An object URL for a file not yet uploaded, or the stored original's own address. */
   source: string
   /** Where the square starts. Null starts on the centred square. */
-  initialCrop: EntityImageCrop | null
+  initialCrop: ImageCrop | null
   title: string
   confirmLabel: string
+  /** What the square is for, in the caller's own words. It is the dialog's description. */
+  hint?: string
   /** Resolves once the choice is kept; throws to keep the dialog open with the reason shown. */
-  onConfirm: (crop: EntityImageCrop) => Promise<void>
+  onConfirm: (crop: ImageCrop) => Promise<void>
   onCancel: () => void
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
@@ -130,8 +133,7 @@ export function ImageCropDialog({
             {title}
           </h2>
           <p className="cropper__hint" id={hintId}>
-            Drag the picture to place the square, or select it and use the arrow keys. The whole
-            picture is kept; the square is what cards show.
+            {hint}
           </p>
         </header>
 
@@ -162,6 +164,8 @@ export function ImageCropDialog({
               mediaProps={{ alt: '', onError: () => setLoadFailed(true) }}
               cropperProps={{
                 role: 'group',
+                // Names the control, not the errand: the dialog's own title and hint already say
+                // whether this square becomes a card's portrait or an avatar.
                 'aria-label': 'Thumbnail square',
                 'aria-describedby': hintId,
               }}
@@ -256,7 +260,7 @@ export function CroppedPicture({
   testId,
 }: {
   source: string
-  crop: EntityImageCrop | null
+  crop: ImageCrop | null
   className: string
   testId?: string
 }) {
@@ -286,7 +290,7 @@ export function CroppedPicture({
  * pixels in, so the server rounds each edge straight back onto them; clamped, so floating-point
  * noise can never push an edge past the picture.
  */
-function fractionsOf(area: Area, natural: { width: number; height: number }): EntityImageCrop {
+function fractionsOf(area: Area, natural: { width: number; height: number }): ImageCrop {
   const x = clamp(area.x / natural.width)
   const y = clamp(area.y / natural.height)
 
