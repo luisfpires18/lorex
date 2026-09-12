@@ -14,12 +14,21 @@ not in this document. Every value below is entered in the Cloudflare dashboard, 
 
 ## What is stored, and where
 
-Two objects per image, under one prefix per asset:
+Two objects per image, under one prefix per asset. Two kinds of image live here - an entry's
+picture and an account's profile photo - under two top-level prefixes that never overlap:
 
 ```
 universes/{universeId}/entities/{entityId}/primary/{assetId}/original.{jpg|png|webp}
 universes/{universeId}/entities/{entityId}/primary/{assetId}/thumbnail-{thumbnailId}.webp
+
+users/{userId}/profile/{assetId}/original.{jpg|png|webp}
+users/{userId}/profile/{assetId}/thumbnail-{thumbnailId}.webp
 ```
+
+A profile photo is account data and is deliberately not under `universes/`, so no per-world rule
+or bulk operation can sweep it up with authored lore. It is otherwise the same in every respect:
+the same accepted formats and limits, the same server-cut square, the same write ordering, and the
+same private-bucket, served-only-by-Lorex rule. [ADR 0021](../architecture/decisions/0021-profile-photo.md).
 
 Ids only - no username, no email, no world name, no entry name. R2 has no folders; the slashes
 are a key prefix the console happens to draw as a tree. `{assetId}` is new for every upload and
@@ -146,6 +155,9 @@ With the settings in place, sign in, open any entry, and add an image. Then:
 - Replacing the image adds a new `{assetId}` prefix and removes the previous one.
 - Removing the image empties the entry's prefix.
 
+Then add a photo on `/app/profile`. The same four checks hold under `users/.../profile/.../`,
+where "Edit photo" is the reframe and "Remove photo" empties the prefix.
+
 If an upload answers `503 Image storage is unavailable.` with the provider configured, the API log
 has an `Image storage failed during upload` error carrying R2's own message. The provider's
 wording never reaches the browser.
@@ -194,6 +206,11 @@ or a URL. ADR 0014.
 
 If an object a backup needs cannot be read, the export fails with `backup_media_missing` and
 names the entry. It does not hand over a smaller archive.
+
+**A backup holds no profile photo.** The archive is one world's authored data, and an account's
+photo is neither authored nor part of a world - nothing under `users/` is exported, and no account
+id or asset id appears in `backup.json`. Losing this bucket loses every avatar with no way to
+restore one; its owner still has the file they uploaded. ADR 0021.
 
 **It is not a history of anything.** A revision records that an entry's picture changed, never
 which picture it was, because the superseded objects are gone. Restoring an old version leaves

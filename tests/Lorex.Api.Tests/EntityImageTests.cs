@@ -224,7 +224,7 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
             client,
             universe.Id,
             entry.Id,
-            new byte[EntityImageProcessing.MaxUploadBytes + 1],
+            new byte[ImagePreparation.MaxUploadBytes + 1],
             "portrait.png");
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -254,7 +254,7 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         var entry = await Entry(client, universe.Id, type, "Alenna Vance");
 
         var response = await Upload(
-            client, universe.Id, entry.Id, Png(EntityImageProcessing.MaxSide + 1, 4), "banner.png");
+            client, universe.Id, entry.Id, Png(ImagePreparation.MaxSide + 1, 4), "banner.png");
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.False(await HasImage(entry.Id));
@@ -1043,7 +1043,7 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         // regenerated from a backup would drift from the one the author approved.
         var crop = new EntityImageCrop((double)left / width, (double)top / height, (double)side / width, (double)side / height);
 
-        var (square, rejection) = EntityImageProcessing.Place(crop, width, height);
+        var (square, rejection) = ImagePreparation.Place(crop.ToShared(), width, height);
 
         Assert.Null(rejection);
         Assert.Equal(new CropSquare(left, top, side), square);

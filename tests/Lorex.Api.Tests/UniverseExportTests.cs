@@ -8,6 +8,7 @@ using Lorex.Api.Features.Auth;
 using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Export;
 using Lorex.Api.Features.Lore;
+using Lorex.Api.Features.Media;
 using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.Timeline;
 using Lorex.Api.Features.Universes;
@@ -745,10 +746,10 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
         var original = EntryBytes(archive, image.MediaPath);
         using var stream = new MemoryStream(original, writable: false);
 
-        var (regenerated, rejection) = await EntityImageProcessing.PrepareAsync(
+        var (regenerated, rejection) = await ImagePreparation.PrepareAsync(
             stream,
             original.Length,
-            new EntityImageCrop(image.Crop!.X, image.Crop.Y, image.Crop.Width, image.Crop.Height),
+            new ImageCrop(image.Crop!.X, image.Crop.Y, image.Crop.Width, image.Crop.Height),
             CancellationToken.None);
 
         Assert.Null(rejection);

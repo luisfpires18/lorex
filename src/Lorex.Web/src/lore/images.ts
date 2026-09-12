@@ -1,11 +1,8 @@
 import { apiFetch } from '../lib/api'
 import type { EntityImageCrop, EntityImageRef } from './types'
 
-/** What an author may pick in the file dialog. The API decides again by decoding the bytes. */
-export const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp'
-
-/** Mirrors the API's own ceiling, so an obviously oversized file is refused without a round trip. */
-export const IMAGE_MAX_BYTES = 8 * 1024 * 1024
+// Shared with the profile photo, which the same cropper frames and the same server code cuts.
+export { IMAGE_ACCEPT, IMAGE_MAX_BYTES } from '../lib/imageCrop'
 
 function base(universeId: string, entityId: string) {
   return `/api/universes/${universeId}/entities/${entityId}/image`
