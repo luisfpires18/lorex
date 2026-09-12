@@ -5,6 +5,7 @@ import CanonPage from './pages/CanonPage'
 import EntityPage from './pages/EntityPage'
 import LoginPage from './pages/LoginPage'
 import LorePage from './pages/LorePage'
+import ProfilePage from './pages/ProfilePage'
 import RegisterPage from './pages/RegisterPage'
 import TimelinePage from './pages/TimelinePage'
 import UniverseOverview from './pages/UniverseOverview'
@@ -26,6 +27,7 @@ export default function App() {
 
           <Route element={<RequireAuth />}>
             <Route path="/app" element={<UniversesPage />} />
+            <Route path="/app/profile" element={<ProfilePage />} />
             <Route path="/app/universes/:id" element={<UniverseWorkspace />}>
               <Route index element={<UniverseOverview />} />
               <Route path="lore" element={<LorePage />} />

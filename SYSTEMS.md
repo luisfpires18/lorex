@@ -133,7 +133,7 @@ Repository index. Paths and one-line responsibilities only.
 | `src/canon/` | Canon Integrity API client, DTO types, and the reader for the promotion gate's 409. |
 | `src/lib/dates.ts` | Timestamp formatting, date-input round trips, and spans. |
 | `src/components/` | `AuthLayout`, `Wordmark` (the drawn "Lore X", spoken "Lorex"), `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `EntityPortrait` (the card's picture, or its monogram), `EntityImageField` (pick, frame, replace, edit thumbnail, remove), `ImageCropDialog` (the cropper, and `CroppedPicture` for unsaved previews), `TypeIcon`, `TypeIconPicker`, `TypeFilterBar` (the Lore browser's type chips), `ActionIcon` (the decorative icon beside an action's label), `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker` (single and multi, one shared search), `EntityHistory`, `RelationshipSection`, `RelationshipTypeManager`, `TimelineEntryForm`, `ConflictEntry`, `CanonBlockNotice` (the one refused-write presentation, shared by every gated form). |
-| `src/pages/` | Login, Register, Universes browser, and the workspace: Overview, Lore, entry page, Timeline, Canon, Types, Trash and Settings. `UniverseWorkspace` also owns the collapsing narrow-screen navigation, and lets the Lore browser alone fill the workspace column. |
+| `src/pages/` | Login, Register, Universes browser, Profile, and the workspace: Overview, Lore, entry page, Timeline, Canon, Types, Trash and Settings. `UniverseWorkspace` also owns the collapsing narrow-screen navigation, and lets the Lore browser alone fill the workspace column. |
 | `vite.config.ts` | Dev server port 5173, proxy to the API, build config. |
 
 ## `tests`
@@ -173,6 +173,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.E2E/specs/mobile.spec.ts` | One journey at 390px: navigation, authoring, a reachable action, the drawer picker, and no sideways scroll. |
 | `Lorex.E2E/specs/entity-image.spec.ts` | Add, replace and remove a picture; framing and reframing read back from the card; one square crop the picture always covers; a sideways photo; the cropper and layout on a phone; history; backup; the worker. |
 | `Lorex.E2E/specs/type-filter.spec.ts` | Type icons chosen and removed on the Types screen; the Lore type bar with search, Trash and keyboard; the bar on a phone; the Lore browser filling a desktop's workspace column. |
+| `Lorex.E2E/specs/profile.spec.ts` | The account screen: reached from a universe, what it prints, the guard, and the circle on a phone. |
 | `Lorex.E2E/specs/pwa.spec.ts` | Manifest, icons and metadata, and what the service worker is never allowed to cache. |
 
 ## `scripts`
