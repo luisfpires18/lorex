@@ -366,7 +366,7 @@ test.describe('the type bar', () => {
     await expect(card(page, 'The Tide Vigil')).toBeVisible()
   })
 
-  test('fills the workspace column with card columns, while other screens keep their reading width', async ({
+  test('fills the workspace column on every screen, and the Lore grid turns that into columns', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1920, height: 1080 })
@@ -375,53 +375,54 @@ test.describe('the type bar', () => {
     const ids = await typeIds(page, universeId)
     await createEntry(page, universeId, ids.get('Character')!, 'Alenna Vance', 'Warden.')
 
-    const canvasWidth = () =>
-      page.locator('main.canvas').evaluate((element) => element.getBoundingClientRect().width)
-
-    // The width every screen reads at, taken from one that is not the Lore browser.
-    await page.getByTestId('workspace-types').click()
-    await page.waitForURL(/\/types$/)
-    const reading = await canvasWidth()
-
-    // The free space either side of the canvas, inside the workspace column - which starts where
-    // the sidebar ends and runs to the edge of the window.
-    const freeSpace = () =>
+    // What the shell leaves a page - the column from the end of the sidebar to the edge of the
+    // window - and what the canvas takes of it, with the rail and sidebar measured in their own
+    // rem so this says nothing about one screen's pixels.
+    const column = () =>
       page.locator('main.canvas').evaluate((element) => {
         const box = element.getBoundingClientRect()
-        const column = document.querySelector('.sidebar')!.getBoundingClientRect().right
-        return { left: box.left - column, right: document.documentElement.clientWidth - box.right }
+        const rail = document.querySelector('.rail')!.getBoundingClientRect()
+        const sidebar = document.querySelector('.sidebar')!.getBoundingClientRect()
+        const rem = parseFloat(getComputedStyle(document.documentElement).fontSize)
+        return {
+          left: box.left - sidebar.right,
+          right: document.documentElement.clientWidth - box.right,
+          width: box.width,
+          railRem: rail.width / rem,
+          sidebarRem: sidebar.width / rem,
+        }
       })
 
-    // A constrained page sits in the middle of that column, not against its left edge.
-    const types = await freeSpace()
-    expect(types.left).toBeGreaterThan(0)
-    expect(Math.abs(types.left - types.right)).toBeLessThanOrEqual(2)
+    // Every section fills that column, edge to edge, and none of them moves the chrome.
+    for (const section of [
+      'workspace-lore',
+      'workspace-timeline',
+      'workspace-canon',
+      'workspace-types',
+      'workspace-trash',
+      'workspace-settings',
+    ]) {
+      await page.getByTestId(section).click()
+      await expect.poll(async () => Math.round((await column()).left)).toBe(0)
 
-    // The Lore browser takes more of the screen, and its grid turns that into columns.
+      const box = await column()
+      expect(Math.abs(box.right), section).toBeLessThanOrEqual(1)
+      expect(box.railRem, section).toBeCloseTo(3.5, 1)
+      expect(box.sidebarRem, section).toBeCloseTo(15, 1)
+      expect(await pageOverflow(page), section).toBeLessThanOrEqual(1)
+    }
+
+    // ---------- The Lore browser ----------
+
     await page.getByTestId('workspace-lore').click()
     await page.waitForURL(/\/lore$/)
     await expect(card(page, 'Alenna Vance')).toBeVisible()
-    expect(await canvasWidth()).toBeGreaterThan(reading)
-
-    // Not a wider cap of its own: it runs to the right-hand edge of the window, which is the end of
-    // the workspace column.
-    const edges = await page.locator('main.canvas').evaluate((element) => ({
-      right: element.getBoundingClientRect().right,
-      window: document.documentElement.clientWidth,
-    }))
-    expect(Math.abs(edges.right - edges.window)).toBeLessThanOrEqual(1)
-
-    // It starts where the column starts too, so it takes the whole of it and is not centred in it.
-    const lore = await freeSpace()
-    expect(Math.abs(lore.left)).toBeLessThanOrEqual(1)
-    expect(Math.abs(lore.right)).toBeLessThanOrEqual(1)
 
     const grid = page.getByTestId('entity-grid')
     const columns = await grid.evaluate(
       (element) => getComputedStyle(element).gridTemplateColumns.split(' ').length,
     )
     expect(columns).toBeGreaterThanOrEqual(4)
-    expect(await pageOverflow(page)).toBeLessThanOrEqual(1)
 
     // More columns rather than wider cards: none is as wide as two of the grid's narrowest.
     const first = (await card(page, 'Alenna Vance').boundingBox())!
@@ -447,29 +448,30 @@ test.describe('the type bar', () => {
     // The primary action still answers to its name with an icon beside it.
     await expect(page.getByRole('link', { name: 'New entry', exact: true })).toBeVisible()
 
-    // An entry's own page is not the browser, and keeps the reading width.
+    // ---------- An entry's own page ----------
+
     await card(page, 'Alenna Vance').click()
     await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
     await expect(page.getByTestId('entry-name')).toBeVisible()
-    expect(Math.abs((await canvasWidth()) - reading)).toBeLessThanOrEqual(1)
 
-    const entry = await freeSpace()
-    expect(entry.left).toBeGreaterThan(0)
-    expect(Math.abs(entry.left - entry.right)).toBeLessThanOrEqual(2)
+    const entry = await column()
+    expect(Math.abs(entry.left)).toBeLessThanOrEqual(1)
+    expect(Math.abs(entry.right)).toBeLessThanOrEqual(1)
 
-    // On a tablet the browser has nothing extra to take, and nothing scrolls sideways.
-    await page.getByTestId('workspace-lore').click()
-    await page.waitForURL(/\/lore$/)
+    // The page fills the column, but its prose does not: a summary still reads at its own measure.
+    const summary = (await page.getByTestId('entry-summary').boundingBox())!
+    expect(summary.width).toBeLessThan(entry.width * 0.8)
+
+    // ---------- A tablet is as it was ----------
+
     await page.setViewportSize({ width: 768, height: 1024 })
-    await expect.poll(() => canvasWidth()).toBeLessThanOrEqual(768)
+    await expect.poll(async () => Math.round((await column()).right)).toBe(0)
     expect(await pageOverflow(page)).toBeLessThanOrEqual(1)
 
-    // And a constrained page on a tablet is what it always was: the column is narrower than the
-    // reading width, so there is no room to share and nothing to centre.
     await page.getByTestId('workspace-nav-toggle').click()
     await page.getByTestId('workspace-types').click()
     await page.waitForURL(/\/types$/)
-    await expect.poll(() => canvasWidth()).toBeGreaterThan(700)
+    await expect.poll(async () => (await column()).width).toBeGreaterThan(700)
     expect(await pageOverflow(page)).toBeLessThanOrEqual(1)
   })
 })
