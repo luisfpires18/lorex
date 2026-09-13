@@ -1,6 +1,7 @@
 using Lorex.Api.Data;
 using Lorex.Api.Features.Auth;
 using Lorex.Api.Features.CanonIntegrity;
+using Lorex.Api.Features.Chronology;
 using Lorex.Api.Features.Export;
 using Lorex.Api.Features.Health;
 using Lorex.Api.Features.Lore;
@@ -63,6 +64,7 @@ app.MapHealthEndpoints();
 app.MapAuthEndpoints();
 app.MapProfileImageEndpoints();
 app.MapUniverseEndpoints();
+app.MapChronologyEndpoints();
 app.MapEntityTypeEndpoints();
 app.MapEntityEndpoints();
 app.MapEntityImageEndpoints();

@@ -1,3 +1,5 @@
+using Lorex.Api.Features.Chronology;
+
 namespace Lorex.Api.Features.CanonIntegrity.Rules;
 
 /// <summary>
@@ -24,13 +26,14 @@ public sealed class CanonLifespanOrderRule : ICanonIntegrityRule
         CanonRuleContext context,
         CancellationToken cancellationToken)
     {
-        var lifespans = await CanonLifespanReader.LoadLifespansAsync(context, cancellationToken);
+        var chronology = await UniverseChronology.LoadAsync(context.Db, context.UniverseId, cancellationToken);
+        var lifespans = await CanonLifespanReader.LoadLifespansAsync(context, chronology, cancellationToken);
 
         return
         [
             .. lifespans.Values
                 .Where(lifespan => lifespan is { Birth: not null, Death: not null }
-                    && lifespan.Birth.Year > lifespan.Death.Year)
+                    && lifespan.Birth.Point > lifespan.Death.Point)
                 .OrderBy(lifespan => lifespan.EntityId)
                 .Select(Finding),
         ];
@@ -42,14 +45,12 @@ public sealed class CanonLifespanOrderRule : ICanonIntegrityRule
         var death = lifespan.Death!;
         var name = CanonRuleText.Quoted(lifespan.EntityName);
 
-        var title =
-            $"{name} is born in {CanonLifespanReader.Year(birth.Year)} but dies in " +
-            $"{CanonLifespanReader.Year(death.Year)}";
+        var title = $"{name} is born in {birth.YearText} but dies in {death.YearText}";
 
         var explanation =
             $"{name} is marked Canon. Its {birth.FieldName} field gives the year " +
-            $"{CanonLifespanReader.Year(birth.Year)} and its {death.FieldName} field gives " +
-            $"{CanonLifespanReader.Year(death.Year)}, so it dies before it is born. One of the two " +
+            $"{birth.YearText} and its {death.FieldName} field gives " +
+            $"{death.YearText}, so it dies before it is born. One of the two " +
             "years is wrong. Correct whichever it is, or clear it.";
 
         return new CanonFinding(

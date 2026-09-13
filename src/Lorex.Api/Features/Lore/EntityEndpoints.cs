@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using System.Security.Claims;
 using Lorex.Api.Data;
 using Lorex.Api.Features.CanonIntegrity;
+using Lorex.Api.Features.Chronology;
 using Lorex.Api.Features.Universes;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -645,6 +646,7 @@ public static class EntityEndpoints
 
         var byId = definitions.ToDictionary(field => field.Id);
         var supplied = new Dictionary<Guid, FieldValueInput>();
+        var chronology = await UniverseChronology.LoadAsync(db, universeId, cancellationToken);
 
         foreach (var input in request.Fields ?? [])
         {
@@ -662,7 +664,8 @@ public static class EntityEndpoints
         {
             supplied.TryGetValue(definition.Id, out var input);
 
-            var rows = await BuildRowsAsync(db, universeId, entity, definition, input, errors, cancellationToken);
+            var rows = await BuildRowsAsync(
+                db, universeId, entity, definition, input, chronology, errors, cancellationToken);
 
             if (definition.IsRequired && rows.Count == 0)
             {
@@ -681,6 +684,7 @@ public static class EntityEndpoints
         LoreEntity entity,
         EntityFieldDefinition definition,
         FieldValueInput? input,
+        UniverseChronology chronology,
         Dictionary<string, string[]> errors,
         CancellationToken cancellationToken)
     {
@@ -734,8 +738,15 @@ public static class EntityEndpoints
                     break;
                 }
 
+                if (EraProblem(definition, number, input.EraId, chronology) is { } eraProblem)
+                {
+                    errors[definition.Id.ToString()] = [eraProblem];
+                    break;
+                }
+
                 var row = New();
                 row.NumberValue = number;
+                row.EraId = input.EraId;
                 rows.Add(row);
                 break;
             }
@@ -826,6 +837,42 @@ public static class EntityEndpoints
         return rows;
     }
 
+    /// <summary>
+    /// What is wrong with the era a number arrived with, or null when nothing is.
+    ///
+    /// A birth or death year is what the chronology rules place against the timeline, so on a
+    /// universe that names eras it must say which one - a bare number there is a year in no era,
+    /// and Lorex does not guess. Any other number may carry an era or not. A universe that names
+    /// no eras has none to carry, and an id from another universe resolves the same way as one
+    /// that is not an era at all.
+    /// </summary>
+    private static string? EraProblem(
+        EntityFieldDefinition definition,
+        double number,
+        Guid? eraId,
+        UniverseChronology chronology)
+    {
+        if (eraId is null)
+        {
+            var isYear = definition.Semantic is EntityFieldSemantic.BirthYear or EntityFieldSemantic.DeathYear;
+
+            return isYear && chronology.NamesEras
+                ? $"Choose the era {definition.Name} is counted in."
+                : null;
+        }
+
+        if (chronology.Era(eraId) is null)
+        {
+            return chronology.NamesEras
+                ? $"{definition.Name} must use an era this universe names."
+                : $"{definition.Name} cannot name an era, because this universe does not name any.";
+        }
+
+        return ChronologyPoint.IsEraYear(number)
+            ? null
+            : $"{definition.Name} is a year inside an era, so it is a whole number from 1.";
+    }
+
     // ---------- Reading ----------
 
     /// <summary>
@@ -868,6 +915,7 @@ public static class EntityEndpoints
                     value.FieldDefinition.DisplayOrder,
                     value.TextValue,
                     value.NumberValue,
+                    value.EraId,
                     value.BooleanValue,
                     value.DateValue,
                     value.OptionId,
@@ -923,7 +971,8 @@ public static class EntityEndpoints
                 group.Where(value => value.OptionValue != null).Select(value => value.OptionValue!).ToList(),
                 group.Select(value => value.ReferencedEntityId).FirstOrDefault(id => id != null),
                 group.Select(value => value.ReferencedName).FirstOrDefault(name => name != null),
-                group.Any(value => value.ReferencedTrashed)))
+                group.Any(value => value.ReferencedTrashed),
+                group.Select(value => value.EraId).FirstOrDefault(id => id != null)))
             .ToList();
 
         return new EntityDetail(

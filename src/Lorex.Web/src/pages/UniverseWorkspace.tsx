@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useId, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router-dom'
 import { AccountMenu } from '../components/AccountMenu'
+import { getChronology } from '../chronology/api'
+import type { Chronology } from '../chronology/types'
 import { getUniverse } from '../universes/api'
 import type { UniverseDetail } from '../universes/types'
 
@@ -26,13 +28,21 @@ const PLANNED = ['Stories', 'Plot', 'Ideas', 'Search']
 
 type LoadState =
   | { kind: 'loading' }
-  | { kind: 'ready'; universe: UniverseDetail }
+  | { kind: 'ready'; universe: UniverseDetail; chronology: Chronology }
   | { kind: 'missing' }
   | { kind: 'error'; message: string }
 
 export interface WorkspaceContext {
   universe: UniverseDetail
   refresh: (next?: UniverseDetail) => void
+
+  /**
+   * How this universe writes and orders its years. Held here, beside the universe, so the
+   * timeline, an entry's birth year and its history all format dates from the same copy, and a
+   * change saved in Settings reaches every one of them without a reload.
+   */
+  chronology: Chronology
+  setChronology: (next: Chronology) => void
 }
 
 /** The part of the URL below this universe, without its surrounding slashes. */
@@ -69,8 +79,8 @@ export default function UniverseWorkspace() {
   const load = useCallback(
     (signal?: AbortSignal) => {
       if (!id) return
-      getUniverse(id, signal)
-        .then((universe) => setState({ kind: 'ready', universe }))
+      Promise.all([getUniverse(id, signal), getChronology(id, signal)])
+        .then(([universe, chronology]) => setState({ kind: 'ready', universe, chronology }))
         .catch((error: unknown) => {
           if (signal?.aborted) return
           // The API answers 404 both for a missing universe and for someone else's.
@@ -99,13 +109,17 @@ export default function UniverseWorkspace() {
   const refresh = useCallback(
     (next?: UniverseDetail) => {
       if (next) {
-        setState({ kind: 'ready', universe: next })
+        setState((current) => (current.kind === 'ready' ? { ...current, universe: next } : current))
       } else {
         load()
       }
     },
     [load],
   )
+
+  const setChronology = useCallback((chronology: Chronology) => {
+    setState((current) => (current.kind === 'ready' ? { ...current, chronology } : current))
+  }, [])
 
   if (state.kind === 'loading') {
     return (
@@ -138,7 +152,7 @@ export default function UniverseWorkspace() {
     )
   }
 
-  const { universe } = state
+  const { universe, chronology } = state
   const accent = universe.accentColor ?? undefined
 
   return (
@@ -233,7 +247,9 @@ export default function UniverseWorkspace() {
       </aside>
 
       <main className="canvas">
-        <Outlet context={{ universe, refresh } satisfies WorkspaceContext} />
+        <Outlet
+          context={{ universe, refresh, chronology, setChronology } satisfies WorkspaceContext}
+        />
       </main>
     </div>
   )

@@ -1,3 +1,4 @@
+using Lorex.Api.Features.Chronology;
 using Lorex.Api.Features.Universes;
 
 namespace Lorex.Api.Features.Lore;
@@ -234,6 +235,16 @@ public sealed class EntityFieldValue
     public string? TextValue { get; set; }
 
     public double? NumberValue { get; set; }
+
+    /// <summary>
+    /// The era <see cref="NumberValue"/> is a year in, on a universe that names its eras. Required
+    /// for a birth or death year there, allowed on any other number, and always null on a universe
+    /// that keeps plain signed years. Metadata on the number rather than a field kind of its own:
+    /// see <c>docs/architecture/decisions/0022-universe-chronology.md</c>.
+    /// </summary>
+    public Guid? EraId { get; set; }
+
+    public ChronologyEra? Era { get; set; }
 
     public bool? BooleanValue { get; set; }
 

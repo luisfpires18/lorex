@@ -1,13 +1,21 @@
+using Lorex.Api.Features.Chronology;
+
 namespace Lorex.Api.Features.Timeline;
 
 /// <summary>
-/// Input checks for the timeline feature. Deliberately not a calendar engine: month and
-/// day ranges are the ordinary ones, and no fictional calendar's own rules about how long
-/// a month runs are enforced or invented here.
+/// Input checks for the timeline feature. Deliberately not a calendar engine: month and day
+/// ranges are the ordinary ones, and no fictional calendar's own rules about how long a month
+/// runs are enforced or invented here.
+///
+/// Where a year sits is the universe's reckoning to say. A universe with no eras takes plain
+/// signed years, as it always has; one that names its eras takes a year counted from 1 inside
+/// one of them. Comparing two points goes through <see cref="ChronologyPoint"/> and nothing else.
 /// </summary>
 public static class TimelineValidation
 {
-    public static Dictionary<string, string[]>? Validate(TimelineEntryRequest request)
+    public static Dictionary<string, string[]>? Validate(
+        TimelineEntryRequest request,
+        UniverseChronology chronology)
     {
         var errors = new Dictionary<string, string[]>();
 
@@ -46,6 +54,7 @@ public static class TimelineValidation
 
         ValidateComponents(request, errors);
         ValidateKind(request, errors);
+        ValidateReckoning(request, chronology, errors);
 
         if (request.EntityIds is { Count: > TimelineLimits.MaxLinkedEntities })
         {
@@ -112,7 +121,8 @@ public static class TimelineValidation
     {
         var hasEnd = request.EndYear is not null
             || request.EndMonth is not null
-            || request.EndDay is not null;
+            || request.EndDay is not null
+            || request.EndEraId is not null;
 
         switch (request.DateKind)
         {
@@ -141,24 +151,20 @@ public static class TimelineValidation
                     errors["endYear"] = ["Give the year the span ends in."];
                 }
 
-                if (request.StartYear is not null
-                    && request.EndYear is not null
-                    && SortKey(request.EndYear, request.EndMonth, request.EndDay)
-                        < SortKey(request.StartYear, request.StartMonth, request.StartDay))
-                {
-                    errors["endYear"] = ["The span cannot end before it starts."];
-                }
-
                 break;
 
             case TimelineDateKind.Unknown:
                 if (request.StartYear is not null
                     || request.StartMonth is not null
                     || request.StartDay is not null
+                    || request.StartEraId is not null
                     || hasEnd)
                 {
-                    errors["dateKind"] =
-                        ["An unknown date carries no year, month or day. Clear them or pick a kind."];
+                    // Worded as it always was unless an era is actually among what was sent, so
+                    // the plain reckoning's refusal reads exactly as it did before eras existed.
+                    errors["dateKind"] = request.StartEraId is null && request.EndEraId is null
+                        ? ["An unknown date carries no year, month or day. Clear them or pick a kind."]
+                        : ["An unknown date carries no year, month, day or era. Clear them or pick a kind."];
                 }
 
                 break;
@@ -166,12 +172,92 @@ public static class TimelineValidation
     }
 
     /// <summary>
-    /// The single number the components compare as. Absent month and day count as zero, so
-    /// a bare year sorts before any dated moment inside it, which is also how the listing
-    /// orders. Only meaningful within one era; see the ADR on fictional chronology.
+    /// Whether the years are written the way this universe keeps time, and - for a range -
+    /// whether the end comes after the start on that reckoning. Runs after the kind check, and
+    /// says nothing about a component the kind has already refused.
     /// </summary>
-    private static long SortKey(int? year, int? month, int? day) =>
-        ((long)(year ?? 0) * 10000) + ((month ?? 0) * 100) + (day ?? 0);
+    private static void ValidateReckoning(
+        TimelineEntryRequest request,
+        UniverseChronology chronology,
+        Dictionary<string, string[]> errors)
+    {
+        if (request.DateKind == TimelineDateKind.Unknown)
+        {
+            return;
+        }
+
+        var isRange = request.DateKind == TimelineDateKind.Range;
+
+        if (!chronology.NamesEras)
+        {
+            const string noEras =
+                "This universe does not name any eras. Add them in Settings, or leave the era out.";
+
+            if (request.StartEraId is not null)
+            {
+                errors.TryAdd("startEraId", [noEras]);
+            }
+
+            if (isRange && request.EndEraId is not null)
+            {
+                errors.TryAdd("endEraId", [noEras]);
+            }
+        }
+        else
+        {
+            if (Normalize(request.EraLabel) is not null)
+            {
+                errors["eraLabel"] =
+                    ["This universe names its eras. Choose one of those rather than writing a label."];
+            }
+
+            ValidateEraYear(request.StartYear, request.StartEraId, "start", chronology, errors);
+
+            if (isRange)
+            {
+                ValidateEraYear(request.EndYear, request.EndEraId, "end", chronology, errors);
+            }
+        }
+
+        if (isRange
+            && !errors.ContainsKey("startYear") && !errors.ContainsKey("startEraId")
+            && !errors.ContainsKey("endYear") && !errors.ContainsKey("endEraId")
+            && chronology.Point(request.StartEraId, request.StartYear, request.StartMonth, request.StartDay) is { } start
+            && chronology.Point(request.EndEraId, request.EndYear, request.EndMonth, request.EndDay) is { } end
+            && end < start)
+        {
+            errors["endYear"] = ["The span cannot end before it starts."];
+        }
+    }
+
+    private static void ValidateEraYear(
+        int? year,
+        Guid? eraId,
+        string prefix,
+        UniverseChronology chronology,
+        Dictionary<string, string[]> errors)
+    {
+        if (year is not { } value)
+        {
+            return;
+        }
+
+        if (eraId is null)
+        {
+            errors.TryAdd($"{prefix}EraId", ["Choose the era this year is counted in."]);
+        }
+        else if (chronology.Era(eraId) is null)
+        {
+            // Said the same way for an id that is not an era at all and for one from another
+            // universe, so the answer discloses nothing about the second.
+            errors.TryAdd($"{prefix}EraId", ["Choose an era this universe names."]);
+        }
+
+        if (!ChronologyPoint.IsEraYear(value))
+        {
+            errors.TryAdd($"{prefix}Year", ["Years inside an era count up from 1."]);
+        }
+    }
 
     public static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

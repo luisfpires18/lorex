@@ -176,6 +176,15 @@ public sealed class EntityRevisionFieldValue
 
     public double? NumberValue { get; set; }
 
+    /// <summary>Raw id of the era the number was a year in. No foreign key, like every id here.</summary>
+    public Guid? EraId { get; set; }
+
+    /// <summary>
+    /// What was written beside the year at the time - the era's short label, or its name - so a
+    /// version still reads "BF 10" once the era is renamed or gone.
+    /// </summary>
+    public string? EraLabel { get; set; }
+
     public bool? BooleanValue { get; set; }
 
     public DateTime? DateValue { get; set; }

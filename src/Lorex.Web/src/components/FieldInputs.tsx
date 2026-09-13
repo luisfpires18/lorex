@@ -1,5 +1,8 @@
+import { namesEras } from '../chronology/format'
+import type { Chronology } from '../chronology/types'
 import {
   FieldKind,
+  isYearMeaning,
   type EntitySummary,
   type FieldDefinition,
   type FieldValueInput,
@@ -19,6 +22,9 @@ interface FieldInputProps {
    * saving an unrelated field would quietly destroy the reference.
    */
   retainedReference?: { id: string; label: string } | null
+
+  /** How the universe keeps time, for a number that is a year in one of its eras. */
+  chronology: Chronology
   onChange: (next: FieldValueInput) => void
 }
 
@@ -28,14 +34,34 @@ export function FieldInput({
   value,
   candidates,
   retainedReference,
+  chronology,
   onChange,
 }: FieldInputProps) {
   const id = `field-${definition.id}`
   const label = definition.isRequired ? `${definition.name} (required)` : definition.name
 
+  // A birth or death year on a universe that names eras is written in one of them, and so is any
+  // number that already carries an era - showing it keeps a save from quietly dropping it.
+  const yearMeaning = isYearMeaning(definition.semantic)
+  const showsEra = namesEras(chronology) && (yearMeaning || value.eraId !== null)
+
   function patch(part: Partial<FieldValueInput>) {
     onChange({ ...value, ...part })
   }
+
+  const numberInput = (
+    <input
+      id={id}
+      type="number"
+      className="field__input"
+      min={showsEra && value.eraId ? 1 : undefined}
+      step={showsEra && value.eraId ? 1 : undefined}
+      value={value.number ?? ''}
+      onChange={(event) =>
+        patch({ number: event.target.value === '' ? null : Number(event.target.value) })
+      }
+    />
+  )
 
   return (
     <div className="field">
@@ -63,15 +89,27 @@ export function FieldInput({
       ) : null}
 
       {definition.kind === FieldKind.Number ? (
-        <input
-          id={id}
-          type="number"
-          className="field__input"
-          value={value.number ?? ''}
-          onChange={(event) =>
-            patch({ number: event.target.value === '' ? null : Number(event.target.value) })
-          }
-        />
+        showsEra ? (
+          <div className="fieldera">
+            <select
+              className="field__input field__input--select"
+              aria-label={`${definition.name}: era`}
+              value={value.eraId ?? ''}
+              onChange={(event) => patch({ eraId: event.target.value || null })}
+              data-testid={`field-era-${definition.id}`}
+            >
+              <option value="">{yearMeaning ? 'Choose an era' : 'No era'}</option>
+              {chronology.eras.map((era) => (
+                <option key={era.id} value={era.id}>
+                  {era.abbreviation ? `${era.name} (${era.abbreviation})` : era.name}
+                </option>
+              ))}
+            </select>
+            {numberInput}
+          </div>
+        ) : (
+          numberInput
+        )
       ) : null}
 
       {definition.kind === FieldKind.Boolean ? (

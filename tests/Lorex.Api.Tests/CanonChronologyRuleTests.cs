@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Lorex.Api.Data;
 using Lorex.Api.Features.Auth;
 using Lorex.Api.Features.CanonIntegrity;
+using Lorex.Api.Features.Chronology;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Timeline;
 using Lorex.Api.Features.Universes;
@@ -473,6 +474,197 @@ public sealed class CanonChronologyRuleTests(LorexApiFactory factory) : IClassFi
         Assert.Equal(2, (await Conflicts(client, universe.Id, "CANON-LIFE-002")).Count);
     }
 
+    // ---------- Named eras ----------
+
+    [Fact]
+    public async Task Born_in_BF_5_a_moment_in_BF_10_happens_before_the_birth()
+    {
+        var (client, universe) = await SignedInWithUniverse("erabefore");
+        var eras = await TheFall(client, universe.Id);
+        var fields = await LifespanFields(client, universe.Id);
+        var aranel = await Character(client, universe.Id, "Aranel", fields, birth: 5, death: null, birthEra: eras.Before);
+        await Moment(client, universe.Id, "The old siege", 10, participants: [aranel.Id], startEra: eras.Before);
+
+        await Evaluate(client, universe.Id);
+        var conflict = Assert.Single(await Conflicts(client, universe.Id, "CANON-LIFE-002"));
+
+        // The years read the way the universe writes them, never as a bare signed number.
+        Assert.Contains("BF 10", conflict.Explanation, StringComparison.Ordinal);
+        Assert.Contains("BF 5", conflict.Explanation, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Born_in_BF_5_a_moment_in_BF_1_happens_after_the_birth()
+    {
+        var (client, universe) = await SignedInWithUniverse("eraafterbirth");
+        var eras = await TheFall(client, universe.Id);
+        var fields = await LifespanFields(client, universe.Id);
+        var aranel = await Character(client, universe.Id, "Aranel", fields, birth: 5, death: null, birthEra: eras.Before);
+        await Moment(client, universe.Id, "The eve of the fall", 1, participants: [aranel.Id], startEra: eras.Before);
+
+        Assert.Equal(0, (await Evaluate(client, universe.Id)).Detected);
+    }
+
+    [Fact]
+    public async Task Born_in_AF_5_a_moment_in_AF_2_happens_before_the_birth()
+    {
+        var (client, universe) = await SignedInWithUniverse("eraascending");
+        var eras = await TheFall(client, universe.Id);
+        var fields = await LifespanFields(client, universe.Id);
+        var aranel = await Character(client, universe.Id, "Aranel", fields, birth: 5, death: null, birthEra: eras.After);
+        await Moment(client, universe.Id, "The first harvest", 2, participants: [aranel.Id], startEra: eras.After);
+
+        await Evaluate(client, universe.Id);
+        Assert.Single(await Conflicts(client, universe.Id, "CANON-LIFE-002"));
+    }
+
+    [Fact]
+    public async Task Dead_in_AF_20_a_moment_in_AF_30_happens_after_the_death()
+    {
+        var (client, universe) = await SignedInWithUniverse("eradeath");
+        var eras = await TheFall(client, universe.Id);
+        var fields = await LifespanFields(client, universe.Id);
+        var aranel = await Character(
+            client, universe.Id, "Aranel", fields, birth: 1, death: 20, birthEra: eras.After, deathEra: eras.After);
+        await Moment(client, universe.Id, "A late council", 30, participants: [aranel.Id], startEra: eras.After);
+
+        await Evaluate(client, universe.Id);
+        var conflict = Assert.Single(await Conflicts(client, universe.Id, "CANON-LIFE-003"));
+        Assert.Contains("AF 30", conflict.Explanation, StringComparison.Ordinal);
+        Assert.Contains("AF 20", conflict.Explanation, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Born_before_the_fall_a_moment_after_it_is_inside_the_life()
+    {
+        var (client, universe) = await SignedInWithUniverse("eracrossinside");
+        var eras = await TheFall(client, universe.Id);
+        var fields = await LifespanFields(client, universe.Id);
+        var aranel = await Character(
+            client, universe.Id, "Aranel", fields, birth: 5, death: 3, birthEra: eras.Before, deathEra: eras.After);
+        await Moment(client, universe.Id, "Crossing over", 1, participants: [aranel.Id], startEra: eras.After);
+
+        // BF 5 to AF 3 is a forward life, and AF 1 sits inside it.
+        Assert.Equal(0, (await Evaluate(client, universe.Id)).Detected);
+    }
+
+    [Fact]
+    public async Task Dead_before_the_fall_a_moment_after_it_happens_after_the_death()
+    {
+        var (client, universe) = await SignedInWithUniverse("eracrossdeath");
+        var eras = await TheFall(client, universe.Id);
+        var fields = await LifespanFields(client, universe.Id);
+        var aranel = await Character(
+            client, universe.Id, "Aranel", fields, birth: 90, death: 5, birthEra: eras.Before, deathEra: eras.Before);
+        await Moment(client, universe.Id, "The rebuilding", 1, participants: [aranel.Id], startEra: eras.After);
+
+        await Evaluate(client, universe.Id);
+        Assert.Single(await Conflicts(client, universe.Id, "CANON-LIFE-003"));
+    }
+
+    [Fact]
+    public async Task Born_after_the_fall_a_moment_before_it_happens_before_the_birth()
+    {
+        var (client, universe) = await SignedInWithUniverse("eracrossbirth");
+        var eras = await TheFall(client, universe.Id);
+        var fields = await LifespanFields(client, universe.Id);
+        var aranel = await Character(client, universe.Id, "Aranel", fields, birth: 1, death: null, birthEra: eras.After);
+        await Moment(client, universe.Id, "The last days", 1, participants: [aranel.Id], startEra: eras.Before);
+
+        await Evaluate(client, universe.Id);
+        Assert.Single(await Conflicts(client, universe.Id, "CANON-LIFE-002"));
+    }
+
+    [Fact]
+    public async Task Born_after_the_fall_and_dead_before_it_is_a_life_that_runs_backwards()
+    {
+        var (client, universe) = await SignedInWithUniverse("eralifeback");
+        var eras = await TheFall(client, universe.Id);
+        var fields = await LifespanFields(client, universe.Id);
+        await Character(
+            client, universe.Id, "Aranel", fields, birth: 5, death: 3, birthEra: eras.After, deathEra: eras.Before);
+
+        await Evaluate(client, universe.Id);
+        var conflict = Assert.Single(await Conflicts(client, universe.Id, "CANON-LIFE-001"));
+        Assert.Contains("AF 5", conflict.Title, StringComparison.Ordinal);
+        Assert.Contains("BF 3", conflict.Title, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Inside_a_counting_down_era_a_larger_death_year_is_an_earlier_death()
+    {
+        var (client, universe) = await SignedInWithUniverse("eradownlife");
+        var eras = await TheFall(client, universe.Id);
+        var fields = await LifespanFields(client, universe.Id);
+
+        // Born BF 10, died BF 40: thirty years before being born.
+        await Character(
+            client, universe.Id, "Aranel", fields, birth: 10, death: 40, birthEra: eras.Before, deathEra: eras.Before);
+
+        await Evaluate(client, universe.Id);
+        Assert.Single(await Conflicts(client, universe.Id, "CANON-LIFE-001"));
+    }
+
+    [Fact]
+    public async Task A_range_across_the_fall_that_reaches_into_a_life_proves_nothing()
+    {
+        var (client, universe) = await SignedInWithUniverse("erarangeinside");
+        var eras = await TheFall(client, universe.Id);
+        var fields = await LifespanFields(client, universe.Id);
+        var aranel = await Character(client, universe.Id, "Aranel", fields, birth: 1, death: null, birthEra: eras.Before);
+
+        await Moment(
+            client, universe.Id, "The long war", 10, participants: [aranel.Id], kind: TimelineDateKind.Range,
+            endYear: 2, startEra: eras.Before, endEra: eras.After);
+
+        Assert.Equal(0, (await Evaluate(client, universe.Id)).Detected);
+    }
+
+    [Fact]
+    public async Task Named_eras_are_compared_rather_than_standing_the_rules_down()
+    {
+        var (client, universe) = await SignedInWithUniverse("eranostanddown");
+        var eras = await TheFall(client, universe.Id);
+        var fields = await LifespanFields(client, universe.Id);
+        var aranel = await Character(client, universe.Id, "Aranel", fields, birth: 5, death: null, birthEra: eras.Before);
+
+        await Moment(client, universe.Id, "Too early", 10, participants: [aranel.Id], startEra: eras.Before);
+        await Moment(client, universe.Id, "Fine", 3, participants: [aranel.Id], startEra: eras.After);
+
+        // Two eras on one timeline no longer silence the rules: the eras are ordered, so the
+        // comparison is sound, and exactly the one moment before the birth is reported.
+        await Evaluate(client, universe.Id);
+        Assert.Single(await Conflicts(client, universe.Id, "CANON-LIFE-002"));
+    }
+
+    [Fact]
+    public async Task A_birth_year_written_before_the_eras_proves_nothing_until_it_names_one()
+    {
+        var (client, universe) = await SignedInWithUniverse("eralegacybirth");
+        var fields = await LifespanFields(client, universe.Id);
+        var aranel = await Character(client, universe.Id, "Aranel", fields, birth: 3119, death: null);
+
+        var eras = await TheFall(client, universe.Id);
+        await Moment(client, universe.Id, "Dated in an era", 10, participants: [aranel.Id], startEra: eras.Before);
+
+        // 3119 is a year in no era. Reading it as one would be picking the era for the author.
+        Assert.Equal(0, (await Evaluate(client, universe.Id)).Detected);
+    }
+
+    [Fact]
+    public async Task A_moment_written_before_the_eras_proves_nothing_until_it_names_one()
+    {
+        var (client, universe) = await SignedInWithUniverse("eralegacymoment");
+        var fields = await LifespanFields(client, universe.Id);
+        var aranel = await Character(client, universe.Id, "Aranel", fields, birth: null, death: null);
+        await Moment(client, universe.Id, "An old moment", 1, participants: [aranel.Id]);
+
+        var eras = await TheFall(client, universe.Id);
+        await SetYears(client, universe.Id, aranel, fields, birth: 5, death: null, birthEra: eras.After);
+
+        Assert.Equal(0, (await Evaluate(client, universe.Id)).Detected);
+    }
+
     // ---------- Fingerprint and lifecycle ----------
 
     [Fact]
@@ -691,6 +883,26 @@ public sealed class CanonChronologyRuleTests(LorexApiFactory factory) : IClassFi
             await AddField(client, universeId, type.Id, "Died", EntityFieldKind.Number, EntityFieldSemantic.DeathYear));
     }
 
+    private sealed record FallEras(Guid Before, Guid After);
+
+    /// <summary>Before the Fall counts down to it, After the Fall counts up from it.</summary>
+    private static async Task<FallEras> TheFall(HttpClient client, Guid universeId)
+    {
+        var response = await client.PutAsJsonAsync(
+            $"/api/universes/{universeId}/chronology",
+            new ChronologyRequest(
+            [
+                new ChronologyEraRequest(
+                    null, "Before the Fall", "BF", ChronologyEraDirection.Descending, ChronologyLabelPosition.BeforeYear),
+                new ChronologyEraRequest(
+                    null, "After the Fall", "AF", ChronologyEraDirection.Ascending, ChronologyLabelPosition.BeforeYear),
+            ]));
+        response.EnsureSuccessStatusCode();
+
+        var eras = (await response.Content.ReadFromJsonAsync<ChronologyResponse>())!.Eras;
+        return new FallEras(eras[0].Id, eras[1].Id);
+    }
+
     private async Task<EntityDetail> Character(
         HttpClient client,
         Guid universeId,
@@ -698,10 +910,12 @@ public sealed class CanonChronologyRuleTests(LorexApiFactory factory) : IClassFi
         LifespanFieldPair fields,
         double? birth,
         double? death,
-        CanonStatus status = CanonStatus.Canon)
+        CanonStatus status = CanonStatus.Canon,
+        Guid? birthEra = null,
+        Guid? deathEra = null)
     {
         var entity = await CreateEntity(
-            client, universeId, name, CanonStatus.Draft, Years(fields, birth, death));
+            client, universeId, name, CanonStatus.Draft, Years(fields, birth, death, birthEra, deathEra));
 
         if (status != CanonStatus.Canon)
         {
@@ -716,18 +930,23 @@ public sealed class CanonChronologyRuleTests(LorexApiFactory factory) : IClassFi
         (await client.GetFromJsonAsync<EntityDetail>(
             $"/api/universes/{universeId}/entities/{entityId}"))!;
 
-    private static List<FieldValueInput> Years(LifespanFieldPair fields, double? birth, double? death)
+    private static List<FieldValueInput> Years(
+        LifespanFieldPair fields,
+        double? birth,
+        double? death,
+        Guid? birthEra = null,
+        Guid? deathEra = null)
     {
         var values = new List<FieldValueInput>();
 
         if (birth is { } bornIn)
         {
-            values.Add(Number(fields.Birth.Id, bornIn));
+            values.Add(Number(fields.Birth.Id, bornIn) with { EraId = birthEra });
         }
 
         if (death is { } diedIn)
         {
-            values.Add(Number(fields.Death.Id, diedIn));
+            values.Add(Number(fields.Death.Id, diedIn) with { EraId = deathEra });
         }
 
         return values;
@@ -742,8 +961,10 @@ public sealed class CanonChronologyRuleTests(LorexApiFactory factory) : IClassFi
         EntityDetail entity,
         LifespanFieldPair fields,
         double? birth,
-        double? death) =>
-        Save(client, universeId, entity, fields: Years(fields, birth, death));
+        double? death,
+        Guid? birthEra = null,
+        Guid? deathEra = null) =>
+        Save(client, universeId, entity, fields: Years(fields, birth, death, birthEra, deathEra));
 
     private async Task<TimelineEntryResponse> Moment(
         HttpClient client,
@@ -754,13 +975,15 @@ public sealed class CanonChronologyRuleTests(LorexApiFactory factory) : IClassFi
         CanonStatus status = CanonStatus.Canon,
         TimelineDateKind kind = TimelineDateKind.Exact,
         int? endYear = null,
-        string? era = null)
+        string? era = null,
+        Guid? startEra = null,
+        Guid? endEra = null)
     {
         var response = await client.PostAsJsonAsync(
             $"/api/universes/{universeId}/timeline",
             new TimelineEntryRequest(
                 title, null, CanonStatus.Draft, kind, startYear, null, null, endYear, null, null,
-                era, participants));
+                era, participants, startEra, endEra));
         response.EnsureSuccessStatusCode();
 
         var entry = (await response.Content.ReadFromJsonAsync<TimelineEntryResponse>())!;

@@ -113,6 +113,8 @@ internal static class EntityRevisions
                     value.DisplayOrder,
                     value.TextValue,
                     value.NumberValue,
+                    value.EraId,
+                    value.EraLabel,
                     value.BooleanValue,
                     value.DateValue,
                     value.OptionId,
@@ -129,6 +131,8 @@ internal static class EntityRevisions
         int DisplayOrder,
         string? TextValue,
         double? NumberValue,
+        Guid? EraId,
+        string? EraLabel,
         bool? BooleanValue,
         DateTime? DateValue,
         Guid? OptionId,
@@ -164,6 +168,8 @@ internal static class EntityRevisions
                     value.FieldDefinition.DisplayOrder,
                     value.TextValue,
                     value.NumberValue,
+                    value.EraId,
+                    value.Era != null ? value.Era.Abbreviation ?? value.Era.Name : null,
                     value.BooleanValue,
                     value.DateValue,
                     value.OptionId,
@@ -242,13 +248,16 @@ internal static class EntityRevisions
 
     /// <summary>
     /// Everything about one stored value that is authored, in one comparable string. Culture
-    /// invariant and round-trippable, so the same value never compares unequal to itself.
+    /// invariant and round-trippable, so the same value never compares unequal to itself. The
+    /// era is its id alone: moving a year to another era is an edit to the entry, renaming the
+    /// era is not.
     /// </summary>
     private static string ValueKey(SnapshotField field) => string.Join(
         Separator,
         Key(field.FieldDefinitionId),
         field.TextValue,
         field.NumberValue?.ToString("R", CultureInfo.InvariantCulture),
+        Key(field.EraId),
         field.BooleanValue?.ToString(CultureInfo.InvariantCulture),
         field.DateValue?.ToString("O", CultureInfo.InvariantCulture),
         Key(field.OptionId),
@@ -322,6 +331,8 @@ internal static class EntityRevisions
                 DisplayOrder = field.DisplayOrder,
                 TextValue = field.TextValue,
                 NumberValue = field.NumberValue,
+                EraId = field.EraId,
+                EraLabel = field.EraLabel,
                 BooleanValue = field.BooleanValue,
                 DateValue = field.DateValue,
                 OptionId = field.OptionId,

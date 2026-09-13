@@ -1,3 +1,5 @@
+using Lorex.Api.Features.Chronology;
+
 namespace Lorex.Api.Features.CanonIntegrity.Rules;
 
 /// <summary>
@@ -22,9 +24,10 @@ public sealed class CanonTimelineAfterDeathRule : ICanonIntegrityRule
         CanonRuleContext context,
         CancellationToken cancellationToken)
     {
-        var lifespans = await CanonLifespanReader.LoadLifespansAsync(context, cancellationToken);
+        var chronology = await UniverseChronology.LoadAsync(context.Db, context.UniverseId, cancellationToken);
+        var lifespans = await CanonLifespanReader.LoadLifespansAsync(context, chronology, cancellationToken);
         var moments = await CanonLifespanReader.LoadComparableMomentsAsync(
-            context, lifespans, cancellationToken);
+            context, chronology, lifespans, cancellationToken);
 
         return [.. moments.OrderBy(moment => moment.EntryId).SelectMany(moment => Findings(moment, lifespans))];
     }
@@ -33,18 +36,13 @@ public sealed class CanonTimelineAfterDeathRule : ICanonIntegrityRule
         CanonMoment moment,
         Dictionary<Guid, CanonLifespan> lifespans)
     {
-        var earliest = CanonLifespanReader.EarliestYear(moment);
-
-        if (earliest is not { } year)
-        {
-            yield break;
-        }
+        var earliest = CanonLifespanReader.EarliestPoint(moment);
 
         foreach (var participant in moment.Participants.OrderBy(id => id))
         {
             if (lifespans.TryGetValue(participant, out var lifespan)
                 && lifespan.Death is { } death
-                && year > death.Year)
+                && earliest > death.Point)
             {
                 yield return Finding(moment, lifespan, death);
             }
@@ -56,7 +54,7 @@ public sealed class CanonTimelineAfterDeathRule : ICanonIntegrityRule
         var who = CanonRuleText.Quoted(lifespan.EntityName);
         var what = CanonRuleText.Quoted(moment.Title);
         var when = CanonLifespanReader.DatePhrase(moment, byLatest: false);
-        var died = CanonLifespanReader.Year(death.Year);
+        var died = death.YearText;
 
         var title = $"Canon moment {what} {when}, after {who} dies in {died}";
 

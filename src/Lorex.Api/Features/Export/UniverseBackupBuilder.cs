@@ -62,6 +62,7 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                 universe.IsArchived,
                 Utc(universe.CreatedAt),
                 Utc(universe.UpdatedAt)),
+            await ErasAsync(universeId, cancellationToken),
             await EntityTypesAsync(universeId, cancellationToken),
             await TagsAsync(universeId, cancellationToken),
             await EntitiesAsync(universeId, images, cancellationToken),
@@ -102,6 +103,35 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
         await db.EntityImages.AsNoTracking()
             .Where(image => image.Entity!.UniverseId == universeId)
             .ToDictionaryAsync(image => image.EntityId, cancellationToken);
+
+    // ---------- Chronology ----------
+
+    /// <summary>
+    /// The reckoning, earliest era first. Positions are unique per universe, so the id only breaks
+    /// a tie the schema already forbids - there for determinism, not because it is expected.
+    /// </summary>
+    private async Task<IReadOnlyList<BackupChronologyEra>> ErasAsync(
+        Guid universeId,
+        CancellationToken cancellationToken)
+    {
+        var eras = await db.ChronologyEras.AsNoTracking()
+            .Where(era => era.UniverseId == universeId)
+            .ToListAsync(cancellationToken);
+
+        return
+        [
+            .. eras
+                .OrderBy(era => era.SortOrder)
+                .ThenBy(era => Key(era.Id), StringComparer.Ordinal)
+                .Select(era => new BackupChronologyEra(
+                    era.Id,
+                    era.Name,
+                    era.Abbreviation,
+                    era.SortOrder,
+                    era.Direction,
+                    era.LabelPosition)),
+        ];
+    }
 
     // ---------- Types and fields ----------
 
@@ -255,6 +285,7 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                             value.FieldDefinitionId,
                             value.TextValue,
                             value.NumberValue,
+                            value.EraId,
                             value.BooleanValue,
                             Utc(value.DateValue),
                             value.OptionId,
@@ -361,6 +392,8 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                             value.DisplayOrder,
                             value.TextValue,
                             value.NumberValue,
+                            value.EraId,
+                            value.EraLabel,
                             value.BooleanValue,
                             Utc(value.DateValue),
                             value.OptionId,
@@ -493,6 +526,8 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                     entry.EndYear,
                     entry.EndMonth,
                     entry.EndDay,
+                    entry.StartEraId,
+                    entry.EndEraId,
                     entry.EraLabel,
                     Utc(entry.CreatedAt),
                     Utc(entry.UpdatedAt),

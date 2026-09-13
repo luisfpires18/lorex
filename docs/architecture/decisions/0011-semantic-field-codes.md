@@ -1,6 +1,6 @@
 # ADR 0011 - A field declares what it means, in a closed enum, on Number only
 
-Status: accepted (2026-09-08)
+Status: accepted (2026-09-08), amended 2026-09-13 (a declared year may carry an era: ADR 0022)
 
 ## Context
 
@@ -85,8 +85,10 @@ Exclusive-relationship overlap was considered for the same phase and dropped.
 say a type is exclusive. Detecting it would mean inventing schema for a rule rather than
 the other way round.
 
-Era remains unsolved and now bounds a rule. A declared birth year names no era, so
-comparing it to a moment labelled "Second Age" is not sound. The chronology rules therefore
-stand down entirely for a universe whose timeline uses more than one named era, which is
-correct but blunt; making it precise needs the first-class era rows already recorded as
-deferred in STATE.md.
+Era bounds the rules on the plain reckoning. There a declared birth year names no era, so
+comparing it to a moment labelled "Second Age" is not sound, and the chronology rules stand
+down entirely for a universe whose timeline uses more than one free-text label - correct but
+blunt. *Amended 2026-09-13:* a universe that names its eras is no longer bounded this way. A
+birth or death year there is still a Number, and carries the era it is counted in as metadata
+on the value; the rules place it and the moment on the same ordered line and compare them
+(ADR 0022). A year written before the eras existed carries none, and proves nothing until it does.

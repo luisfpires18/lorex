@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { EntityPicker, type EntityChoice } from '../components/EntityPicker'
 import { TimelineEntryForm } from '../components/TimelineEntryForm'
+import { findEra, formatChronologyYear, formatSignedYear } from '../chronology/format'
 import { ApiError } from '../lib/api'
 import { CANON_LABELS, CANON_ORDER, type CanonStatusValue } from '../lore/types'
 import { deleteTimelineEntry, listTimelineEntries } from '../timeline/api'
-import { formatTimelineDate, formatYear, groupTimeline } from '../timeline/format'
+import { formatTimelineDate, groupTimeline } from '../timeline/format'
 import { DATE_KIND_LABELS, type TimelineEntry, type TimelineEntryPage } from '../timeline/types'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
@@ -17,7 +18,7 @@ type LoadState =
 type FormState = { mode: 'closed' } | { mode: 'new' } | { mode: 'edit'; entry: TimelineEntry }
 
 export default function TimelinePage() {
-  const { universe } = useOutletContext<WorkspaceContext>()
+  const { universe, chronology } = useOutletContext<WorkspaceContext>()
 
   const [canonStatus, setCanonStatus] = useState<CanonStatusValue | null>(null)
   const [participant, setParticipant] = useState<EntityChoice | null>(null)
@@ -74,7 +75,7 @@ export default function TimelinePage() {
     }
   }
 
-  const { groups, unplaced, mixedEras } = groupTimeline(result?.items ?? [])
+  const { groups, unreckoned, unplaced, mixedEras } = groupTimeline(result?.items ?? [], chronology)
 
   /**
    * `heading` is the year already standing in the margin. A moment known only to that
@@ -82,7 +83,7 @@ export default function TimelinePage() {
    * the line; anything finer, approximate or spanning still says what it claims.
    */
   function moment(entry: TimelineEntry, heading?: string) {
-    const stamp = formatTimelineDate(entry.date)
+    const stamp = formatTimelineDate(entry.date, chronology)
     const restates = stamp === heading
 
     return (
@@ -252,17 +253,47 @@ export default function TimelinePage() {
 
       {result && result.items.length > 0 ? (
         <div className="chron__stream" data-testid="chron-stream">
-          {groups.map((group) => (
-            <section className="chron__group" key={group.key}>
+          {groups.map((group) => {
+            const heading = formatChronologyYear(chronology, group.year, group.eraId)
+
+            // The margin carries the year as the universe writes it, and the era's full name
+            // beneath - or the free-text label of a universe that names no eras. An era with no
+            // short label is written by its name, which would wrap the year across the narrow
+            // margin, so there the margin shows the year and leaves the name to the line below.
+            const era = findEra(chronology, group.eraId)
+            const margin = era && !era.abbreviation ? formatSignedYear(group.year) : heading
+            const aside = era ? era.name : group.eraLabel
+
+            return (
+              <section className="chron__group" key={group.key}>
+                <h3 className="chron__year">
+                  <span className="chron__yearnum">{margin}</span>
+                  {aside ? <span className="chron__era">{aside}</span> : null}
+                </h3>
+                <ul className="chron__moments">
+                  {group.entries.map((entry) => moment(entry, heading))}
+                </ul>
+              </section>
+            )
+          })}
+
+          {unreckoned.length > 0 ? (
+            <section className="chron__group chron__group--unplaced" data-testid="chron-unreckoned">
               <h3 className="chron__year">
-                <span className="chron__yearnum">{formatYear(group.year)}</span>
-                {group.eraLabel ? <span className="chron__era">{group.eraLabel}</span> : null}
+                <span className="chron__yearnum chron__yearnum--none">?</span>
+                <span className="chron__era">No era yet</span>
               </h3>
-              <ul className="chron__moments">
-                {group.entries.map((entry) => moment(entry, formatYear(group.year)))}
-              </ul>
+              <div>
+                <p className="chron__aside">
+                  Dated before this universe named its eras. Edit each one to choose the era its
+                  year is counted in; until then it is not placed among them.
+                </p>
+                <ul className="chron__moments chron__moments--unplaced">
+                  {unreckoned.map((entry) => moment(entry))}
+                </ul>
+              </div>
             </section>
-          ))}
+          ) : null}
 
           {unplaced.length > 0 ? (
             <section className="chron__group chron__group--unplaced">
@@ -334,6 +365,7 @@ export default function TimelinePage() {
         <TimelineEntryForm
           universeId={universe.id}
           entry={form.mode === 'edit' ? form.entry : null}
+          chronology={chronology}
           onClose={() => setForm({ mode: 'closed' })}
           onSaved={() => {
             setForm({ mode: 'closed' })

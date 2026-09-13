@@ -3,6 +3,8 @@ import { LoreArticle } from './LoreEditor'
 import { CanonBlockNotice } from './CanonBlockNotice'
 import { blockingFindingsOf } from '../canon/blocked'
 import type { CanonBlockingFinding } from '../canon/types'
+import { findEra, formatChronologyYear, formatSignedYear, withEraLabel } from '../chronology/format'
+import { EraLabelPosition, type Chronology } from '../chronology/types'
 import { ApiError } from '../lib/api'
 import { formatDate, formatDateTime } from '../lib/dates'
 import { isEmptyDocument } from '../lore/document'
@@ -25,6 +27,9 @@ interface EntityHistoryProps {
   universeId: string
   entityId: string
 
+  /** How the universe writes years now, for a version whose year is in an era that still exists. */
+  chronology: Chronology
+
   /**
    * Bumped by the dossier whenever it saves. History is derived from writes made
    * elsewhere on the page, so it reloads on a signal rather than by holding shared state.
@@ -46,7 +51,13 @@ interface EntityHistoryProps {
  * Restoring is an ordinary gated save on the API, so a refusal reads exactly as it does in
  * the edit form: the same notice, and nothing changed.
  */
-export function EntityHistory({ universeId, entityId, reloadKey, onRestored }: EntityHistoryProps) {
+export function EntityHistory({
+  universeId,
+  entityId,
+  chronology,
+  reloadKey,
+  onRestored,
+}: EntityHistoryProps) {
   const [revisions, setRevisions] = useState<EntityRevisionSummary[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [expanded, setExpanded] = useState<{ id: string; key: number } | null>(null)
@@ -229,7 +240,7 @@ export function EntityHistory({ universeId, entityId, reloadKey, onRestored }: E
                       Opening&hellip;
                     </p>
                   ) : (
-                    <Snapshot revision={opened} />
+                    <Snapshot revision={opened} chronology={chronology} />
                   )}
                 </div>
               ) : null}
@@ -242,7 +253,13 @@ export function EntityHistory({ universeId, entityId, reloadKey, onRestored }: E
 }
 
 /** One version read whole, in the same shapes the dossier uses for the live entry. */
-function Snapshot({ revision }: { revision: EntityRevisionDetail }) {
+function Snapshot({
+  revision,
+  chronology,
+}: {
+  revision: EntityRevisionDetail
+  chronology: Chronology
+}) {
   return (
     <>
       <h4 className="snapshot__name">{revision.name}</h4>
@@ -267,7 +284,7 @@ function Snapshot({ revision }: { revision: EntityRevisionDetail }) {
           {revision.fields.map((value) => (
             <div className="facts__row" key={value.fieldDefinitionId}>
               <dt className="facts__key">{value.name}</dt>
-              <dd className="facts__value">{renderRevisionFact(value)}</dd>
+              <dd className="facts__value">{renderRevisionFact(value, chronology)}</dd>
             </div>
           ))}
         </dl>
@@ -290,13 +307,22 @@ function Snapshot({ revision }: { revision: EntityRevisionDetail }) {
  * A stored value as it read then. Names come from the snapshot rather than a live lookup,
  * so a version still reads correctly once the field or the entry it pointed at is gone.
  */
-function renderRevisionFact(value: RevisionFieldValue) {
+function renderRevisionFact(value: RevisionFieldValue, chronology: Chronology) {
   switch (value.kind) {
     case FieldKind.ShortText:
     case FieldKind.LongText:
       return value.text ?? '—'
     case FieldKind.Number:
-      return value.number ?? '—'
+      if (value.number === null) return '—'
+      if (value.eraId === null) return value.number
+      // An era that still exists is written the way it is written now. One since removed is
+      // written with the label the version remembered, which is all that is left of it.
+      if (findEra(chronology, value.eraId)) {
+        return formatChronologyYear(chronology, value.number, value.eraId)
+      }
+      return value.eraLabel
+        ? withEraLabel(formatSignedYear(value.number), value.eraLabel, EraLabelPosition.BeforeYear)
+        : value.number
     case FieldKind.Boolean:
       return value.boolean ? 'Yes' : 'No'
     case FieldKind.Date:

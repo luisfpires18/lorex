@@ -1,6 +1,6 @@
 # ADR 0009 - Fictional chronology is stored as signed integer components
 
-Status: accepted (2026-09-08)
+Status: accepted (2026-09-08), amended 2026-09-13 (named eras: ADR 0022)
 
 ## Context
 
@@ -48,11 +48,12 @@ a string back into parts.
   arbitrary. Within a year, an absent month counts as zero, so an entry known only to its
   year comes before any dated moment inside it. Title then id break the remaining ties, so
   two entries never swap places between one page and the next.
-- **Cross-era ordering is not solved.** `EraLabel` is display metadata in Phase 008 and
-  takes no part in the sort, so entries under different eras still order by their raw year
-  numbers. A Second Age 3441 sorts after a Third Age 3018 even though it is earlier in the
-  story. That fallback is deterministic, not correct. Making it correct needs eras to be
-  first-class rows with an order and an offset, which is a later phase.
+- **Cross-era ordering is not solved by a label.** `EraLabel` is display metadata and takes no
+  part in the sort, so entries under different labels still order by their raw year numbers. A
+  Second Age 3441 sorts after a Third Age 3018 even though it is earlier in the story. That
+  fallback is deterministic, not correct. *Amended 2026-09-13:* a universe that names its eras now
+  gets first-class, ordered era rows and a correct order across them (ADR 0022), and refuses the
+  label. What is said here stays true of a universe that names none.
 - Negative years work, so a calendar may count down to its own zero.
 - Two entries can claim the same moment. Nothing detects that they contradict each other;
   Canon Integrity is deferred.

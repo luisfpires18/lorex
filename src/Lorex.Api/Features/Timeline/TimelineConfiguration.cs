@@ -31,6 +31,21 @@ public sealed class TimelineEntryConfiguration : IEntityTypeConfiguration<Timeli
             .HasForeignKey(entry => entry.UniverseId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // No action, not cascade and not set-null: an era a moment is dated in cannot quietly
+        // take the moment with it or leave its year floating in no era. The chronology route
+        // refuses the deletion first; this is what holds if a race gets past it. No action
+        // rather than restrict so that deleting a whole universe, which cascades to its eras
+        // and its moments in the same statement, is checked once the statement is done.
+        builder.HasOne(entry => entry.StartEra)
+            .WithMany()
+            .HasForeignKey(entry => entry.StartEraId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        builder.HasOne(entry => entry.EndEra)
+            .WithMany()
+            .HasForeignKey(entry => entry.EndEraId)
+            .OnDelete(DeleteBehavior.NoAction);
+
         // The chronological listing is the only read that matters here, so the index
         // carries the sort itself: unknown dates are pushed last by the query, and
         // everything else is already ordered by year, month and day inside one universe.

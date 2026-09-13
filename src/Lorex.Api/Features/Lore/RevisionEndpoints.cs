@@ -200,7 +200,9 @@ public static class RevisionEndpoints
                 [.. group.Where(value => value.OptionValue != null)
                     .Select(value => value.OptionValue!)
                     .Order(StringComparer.Ordinal)],
-                group.Select(value => value.ReferencedEntityName).FirstOrDefault(name => name != null)))
+                group.Select(value => value.ReferencedEntityName).FirstOrDefault(name => name != null),
+                group.Select(value => value.EraId).FirstOrDefault(id => id != null),
+                group.Select(value => value.EraLabel).FirstOrDefault(label => label != null)))
             .ToList();
 
         return new EntityRevisionDetail(
@@ -295,6 +297,24 @@ public static class RevisionEndpoints
             missing.Add($"the entry \"{value.ReferencedEntityName ?? value.FieldName}\"");
         }
 
+        var eraIds = revision.FieldValues
+            .Where(value => value.EraId is not null)
+            .Select(value => value.EraId!.Value)
+            .Distinct()
+            .ToList();
+
+        var liveEraIds = await db.ChronologyEras.AsNoTracking()
+            .Where(era => eraIds.Contains(era.Id) && era.UniverseId == universeId)
+            .Select(era => era.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var value in revision.FieldValues
+            .Where(value => value.EraId is { } id && !liveEraIds.Contains(id))
+            .DistinctBy(value => value.EraId))
+        {
+            missing.Add($"the era \"{value.EraLabel ?? value.FieldName}\"");
+        }
+
         return missing;
     }
 
@@ -313,7 +333,8 @@ public static class RevisionEndpoints
                 group.Select(value => value.BooleanValue).FirstOrDefault(flag => flag != null),
                 group.Select(value => value.DateValue).FirstOrDefault(date => date != null),
                 [.. group.Where(value => value.OptionId is not null).Select(value => value.OptionId!.Value)],
-                group.Select(value => value.ReferencedEntityId).FirstOrDefault(id => id != null)))
+                group.Select(value => value.ReferencedEntityId).FirstOrDefault(id => id != null),
+                group.Select(value => value.EraId).FirstOrDefault(id => id != null)))
             .ToList();
 
         return new EntityRequest(

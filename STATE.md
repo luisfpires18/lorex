@@ -134,14 +134,27 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     temporary file only for the handler to read it back. Every failure guarantee is unchanged and
     both interleavings are tested, as is the overlap itself. ADR 0019 amendment. **It does not make
     a slow uplink fast** - that is what the progress bar is for.
+- **Universe chronology** (`feat/universe-chronology`, **not merged, not pushed**). Owner-requested
+  feature after Phase 1 stabilization; unnumbered because numbering is paused and `023` is reserved
+  (branching.md). A universe may name ordered eras, and Timeline, declared birth/death years and the
+  chronology rules share one comparison. ADR 0022.
+  - `ChronologyEras` rows owned by the universe: name, short label, order, direction, label position.
+    No eras is the plain reckoning, unchanged in every respect. Settings replaces the whole list in
+    one gated `PUT`, with a preview; an era anything is dated in cannot be removed (409).
+  - Inside an era a year is whole and counts from 1 - no year 0. Plain years keep 0 and negatives.
+  - Timeline entries carry start/end era ids; a birth or death year carries its era as metadata on
+    the Number. `ChronologyPoint` is the one comparison, and the listing's SQL order is held to it.
+  - Years written before a universe named eras are never reinterpreted: listed apart as having no
+    era yet, ignored by Canon, and given one on their next save.
+  - Backup format version 4 carries the eras and every era reference. ADR 0014.
 
 ## Baseline
 
-- **440 API integration tests, 83 Playwright tests**, green. No frontend unit runner exists;
+- **528 API integration tests, 86 Playwright tests**, green. No frontend unit runner exists;
   the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
-- The test host no longer migrates itself, so all 440 tests boot through the same startup path a
+- The test host no longer migrates itself, so every API test boots through the same startup path a
   deployment uses.
 - Under a full parallel Playwright run, `auth.spec.ts` "rejects a wrong password" intermittently
   times out (it navigates to `/login` without awaiting sign-out), and a relationships, canon or
@@ -151,16 +164,17 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   account menu, and a full run now usually loses one or two - a rotating pick of canon, type-filter,
   mobile, universes or account-menu, each green on its own. It is contention on the one SQLite
   writer, not the specs.
-- 18 migrations, latest `AddProfileImages` - creates `ProfileImages`, keyed by and cascading with
-  the Identity user. `RestrictEntityTypeIconKeys`
-  is data only. `has-pending-model-changes` reports none. `AddEntitySearchIndex` is raw SQL - an FTS5 virtual
+- 19 migrations, latest `AddUniverseChronology` - creates `ChronologyEras` and adds era references,
+  rebuilding `TimelineEntries` and `EntityFieldValues` as SQLite requires for a foreign key. Walked
+  down and back up over real lore on a file by `ChronologyMigrationTests`; rolling back discards the
+  eras. `RestrictEntityTypeIconKeys` is data only. `has-pending-model-changes` reports none. `AddEntitySearchIndex` is raw SQL - an FTS5 virtual
   table and the trigger that empties it - so no EF Core model describes it and the pending check
   cannot see it either way.
 - No automated test reaches Cloudflare and none can: the API host registers an in-process object
   store, Playwright runs against `Media:Provider=InMemory`, and the R2 adapter tests answer the SDK
   from an in-process HTTP handler. That covers profile photos too - they use the same store.
 - Six rules in `src/Lorex.Api/Features/CanonIntegrity/Rules/`: three structural (Medium), three
-  chronological (High). Behaviour: ADR 0010, 0011, 0012.
+  chronological (High), which compare across named eras. Behaviour: ADR 0010, 0011, 0012, 0022.
 
 ## Remote
 
@@ -192,7 +206,11 @@ tool has changed the picture.
   `docs/deployment/azure-dev.md`, `docs/deployment/cloudflare-r2.md`.
 - **Full security audit.** Relationships, timeline and Canon Integrity each had a focused check
   backed by tests. Outstanding: rate limiting, header/cookie hardening, dependency review, auth.
-- **Cross-era ordering** unsolved, and it bounds the chronology rules. ADR 0009, ADR 0011.
+- **Era tooling.** Cross-era order is solved only for a universe that names its eras; free-text
+  labels on the plain reckoning still order nothing and still stand the rules down. Years written
+  before eras are given one entry by entry - no bulk assignment - and removing an era needs its
+  dates moved first, with no reassignment tool. Month names, calendars and conversion: not started.
+  ADR 0022.
 - **`Age`** is declarable but read by nothing until a structured reference year exists. ADR 0011.
 - **Tooling trial verdict.** `docs/tooling/agent-tooling-trial.md` holds the evidence. Keep /
   conditional / remove is the owner's call, per tool.

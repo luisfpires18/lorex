@@ -1,3 +1,4 @@
+using Lorex.Api.Features.Chronology;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -79,6 +80,7 @@ public sealed class EntityRevisionFieldValueConfiguration
         builder.Property(value => value.TextValue).HasMaxLength(LoreLimits.TextValueMaxLength);
         builder.Property(value => value.OptionValue).HasMaxLength(LoreLimits.OptionMaxLength);
         builder.Property(value => value.ReferencedEntityName).HasMaxLength(LoreLimits.NameMaxLength);
+        builder.Property(value => value.EraLabel).HasMaxLength(ChronologyLimits.NameMaxLength);
         builder.Property(value => value.Kind).HasConversion<int>();
 
         builder.HasOne(value => value.Revision)
@@ -86,8 +88,9 @@ public sealed class EntityRevisionFieldValueConfiguration
             .HasForeignKey(value => value.RevisionId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // No key on FieldDefinitionId, OptionId or ReferencedEntityId on purpose: a snapshot
-        // must never keep a live definition from being deleted, nor be rewritten when one is.
+        // No key on FieldDefinitionId, OptionId, ReferencedEntityId or EraId on purpose: a
+        // snapshot must never keep a live definition or era from being deleted, nor be rewritten
+        // when one is.
         builder.HasIndex(value => value.RevisionId);
     }
 }

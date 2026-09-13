@@ -1,3 +1,4 @@
+using Lorex.Api.Features.Chronology;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Universes;
 
@@ -77,8 +78,23 @@ public sealed class TimelineEntry
     public int? EndDay { get; set; }
 
     /// <summary>
-    /// Display metadata only: "Third Age", "AC". Phase 008 does no cross-era arithmetic,
-    /// so two entries labelled differently still order by their raw year numbers.
+    /// The era the start year is counted in, on a universe that names its eras; null on one
+    /// that keeps plain signed years. An id, never a name, so renaming the era moves nothing.
+    /// See <c>docs/architecture/decisions/0022-universe-chronology.md</c>.
+    /// </summary>
+    public Guid? StartEraId { get; set; }
+
+    public ChronologyEra? StartEra { get; set; }
+
+    /// <summary>The era the end year is counted in. A range may start in one era and end in another.</summary>
+    public Guid? EndEraId { get; set; }
+
+    public ChronologyEra? EndEra { get; set; }
+
+    /// <summary>
+    /// A free-text label for the plain reckoning: "Third Age", "AC". Display metadata only - it
+    /// takes no part in any order. A universe that names its eras uses <see cref="StartEraId"/>
+    /// instead and refuses a label, so a moment never carries two competing ideas of its era.
     /// </summary>
     public string? EraLabel { get; set; }
 

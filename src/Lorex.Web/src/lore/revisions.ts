@@ -100,6 +100,10 @@ export interface RevisionFieldValue {
   date: string | null
   optionValues: string[]
   referencedEntityName: string | null
+
+  /** The era the number was a year in, and what was written beside it then. */
+  eraId: string | null
+  eraLabel: string | null
 }
 
 export interface EntityRevisionDetail {

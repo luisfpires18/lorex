@@ -42,7 +42,12 @@ export const DatePrecision = {
 
 export type DatePrecisionValue = (typeof DatePrecision)[keyof typeof DatePrecision]
 
-/** The chronology as numbers. Never a string the client has to parse back apart. */
+/**
+ * The chronology as numbers. Never a string the client has to parse back apart.
+ *
+ * `startEraId` and `endEraId` name the universe's era each year is counted in, and are null on
+ * a universe that keeps plain signed years - where `eraLabel` is the free-text label instead.
+ */
 export interface TimelineDate {
   kind: DateKindValue
   startYear: number | null
@@ -54,6 +59,8 @@ export interface TimelineDate {
   eraLabel: string | null
   startPrecision: DatePrecisionValue
   endPrecision: DatePrecisionValue
+  startEraId: string | null
+  endEraId: string | null
 }
 
 /** One entity taking part, resolved by the API so a moment renders in one request. */
@@ -107,6 +114,8 @@ export interface TimelineEntryInput {
   endDay: number | null
   eraLabel: string | null
   entityIds: string[]
+  startEraId: string | null
+  endEraId: string | null
 }
 
 export interface TimelineQuery {
