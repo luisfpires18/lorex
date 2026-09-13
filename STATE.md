@@ -134,7 +134,7 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     temporary file only for the handler to read it back. Every failure guarantee is unchanged and
     both interleavings are tested, as is the overlap itself. ADR 0019 amendment. **It does not make
     a slow uplink fast** - that is what the progress bar is for.
-- **Universe chronology** (`feat/universe-chronology`, **not merged, not pushed**). Owner-requested
+- **Universe chronology** (`feat/universe-chronology`, merged into `dev`). Owner-requested
   feature after Phase 1 stabilization; unnumbered because numbering is paused and `023` is reserved
   (branching.md). A universe may name ordered eras, and Timeline, declared birth/death years and the
   chronology rules share one comparison. ADR 0022.
@@ -147,10 +147,24 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - Years written before a universe named eras are never reinterpreted: listed apart as having no
     era yet, ignored by Canon, and given one on their next save.
   - Backup format version 4 carries the eras and every era reference. ADR 0014.
+- **Relationship Canon constraints** (`feat/relationship-canon-constraints`, **not merged, not
+  pushed**). Owner-requested, unnumbered. A relation kind may say which end must be older and bound
+  the gap between the two birth years; Canon Integrity checks Canon links against that. Nothing is
+  inferred from a kind's name. ADR 0023.
+  - Typed columns on `RelationshipTypes` - `AgeOrder`, `MinAgeDifferenceYears`,
+    `MaxAgeDifferenceYears` - defaulting to no rule. The API's `canonConstraints` group, left out of
+    an update, keeps what is stored. A symmetric kind may bound a gap but not name an older end; a
+    minimum above the maximum is refused, never swapped.
+  - `CANON-REL-002` (order) and `CANON-REL-003` (gap), both Medium, so nothing is refused: a breaking
+    link, a breaking birth year and a rule existing links already break are all saved and reported on
+    the write. Equal years, missing or unplaced years, non-Canon ends and unmeasurable gaps stand down.
+  - The gap is `UniverseChronology.YearsBetween`: the signed difference inside one era or the plain
+    reckoning, `a + b - 1` from a countdown era into the ascending era after it, unknown otherwise.
+  - Edited inside the relation kind form on the Types screen. Backup stays version 4, additively.
 
 ## Baseline
 
-- **528 API integration tests, 86 Playwright tests**, green. No frontend unit runner exists;
+- **582 API integration tests, 89 Playwright tests**, green. No frontend unit runner exists;
   the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
@@ -163,8 +177,11 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   the whole file green on its own, in parallel and serially. Eight more tests arrived with the
   account menu, and a full run now usually loses one or two - a rotating pick of canon, type-filter,
   mobile, universes or account-menu, each green on its own. It is contention on the one SQLite
-  writer, not the specs.
-- 19 migrations, latest `AddUniverseChronology` - creates `ChronologyEras` and adds era references,
+  writer, not the specs. The relationship-constraints run lost one canon and one type-filter test,
+  both green alone.
+- 20 migrations, latest `AddRelationshipTypeCanonConstraints` - three plain columns, walked down (a
+  table rebuild) and back up over real lore by `RelationshipConstraintMigrationTests`.
+  `AddUniverseChronology` creates `ChronologyEras` and adds era references,
   rebuilding `TimelineEntries` and `EntityFieldValues` as SQLite requires for a foreign key. Walked
   down and back up over real lore on a file by `ChronologyMigrationTests`; rolling back discards the
   eras. `RestrictEntityTypeIconKeys` is data only. `has-pending-model-changes` reports none. `AddEntitySearchIndex` is raw SQL - an FTS5 virtual
@@ -173,8 +190,9 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 - No automated test reaches Cloudflare and none can: the API host registers an in-process object
   store, Playwright runs against `Media:Provider=InMemory`, and the R2 adapter tests answer the SDK
   from an in-process HTTP handler. That covers profile photos too - they use the same store.
-- Six rules in `src/Lorex.Api/Features/CanonIntegrity/Rules/`: three structural (Medium), three
-  chronological (High), which compare across named eras. Behaviour: ADR 0010, 0011, 0012, 0022.
+- Eight rules in `src/Lorex.Api/Features/CanonIntegrity/Rules/`: three structural (Medium), three
+  chronological (High), which compare across named eras, and two relationship constraints (Medium).
+  Behaviour: ADR 0010, 0011, 0012, 0022, 0023.
 
 ## Remote
 
@@ -212,6 +230,9 @@ tool has changed the picture.
   dates moved first, with no reassignment tool. Month names, calendars and conversion: not started.
   ADR 0022.
 - **`Age`** is declarable but read by nothing until a structured reference year exists. ADR 0011.
+- **Relationship life-state constraints** (an end alive at the link's date) wait for dated
+  relationships: `StartDate`/`EndDate` are real-world timestamps, not chronology points. A birth-year
+  gap across eras of unrecorded length waits for era lengths. ADR 0023.
 - **Tooling trial verdict.** `docs/tooling/agent-tooling-trial.md` holds the evidence. Keep /
   conditional / remove is the owner's call, per tool.
 - **ImageSharp's licence.** `SixLabors.ImageSharp` is under the Six Labors Split License - free

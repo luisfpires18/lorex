@@ -4,12 +4,19 @@ namespace Lorex.Api.Features.Relationships;
 
 // ---------- Relationship types ----------
 
+/// <summary>
+/// <paramref name="CanonConstraints"/> is optional. On a create, null means no constraints. On an
+/// update, null leaves the stored constraints exactly as they are, the way a null
+/// <paramref name="DisplayOrder"/> leaves the order - so a client that predates constraints cannot
+/// wipe them by saving a rename. To clear them, send the group with no rule in it.
+/// </summary>
 public sealed record RelationshipTypeRequest(
     string? Name,
     string? InverseName,
     bool IsSymmetric,
     string? Description,
-    int? DisplayOrder);
+    int? DisplayOrder,
+    RelationshipTypeCanonConstraints? CanonConstraints = null);
 
 public sealed record RelationshipTypeResponse(
     Guid Id,
@@ -18,7 +25,24 @@ public sealed record RelationshipTypeResponse(
     bool IsSymmetric,
     string? Description,
     int DisplayOrder,
-    int RelationshipCount);
+    int RelationshipCount,
+    RelationshipTypeCanonConstraints CanonConstraints);
+
+/// <summary>
+/// The rules Canon Integrity checks every Canon relationship of a type against, all on the stored
+/// direction. A closed set of typed members, never an expression: see ADR 0023.
+/// </summary>
+public sealed record RelationshipTypeCanonConstraints(
+    RelationshipAgeOrder AgeOrder,
+    int? MinAgeDifferenceYears,
+    int? MaxAgeDifferenceYears)
+{
+    /// <summary>No rule at all: how every type behaves until its author configures one.</summary>
+    public static RelationshipTypeCanonConstraints None { get; } = new(RelationshipAgeOrder.None, null, null);
+
+    public static RelationshipTypeCanonConstraints Of(RelationshipType type) =>
+        new(type.AgeOrder, type.MinAgeDifferenceYears, type.MaxAgeDifferenceYears);
+}
 
 // ---------- Relationships ----------
 

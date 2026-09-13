@@ -32,9 +32,39 @@ public sealed class RelationshipType
 
     public int DisplayOrder { get; set; }
 
+    /// <summary>
+    /// Which end of every Canon relationship of this type must be older, as the author configured
+    /// it. Stated on the stored direction, source then target, and never read out of
+    /// <see cref="Name"/>: "parent of" orders nothing until someone says it does. See
+    /// <c>docs/architecture/decisions/0023-relationship-canon-constraints.md</c>.
+    /// </summary>
+    public RelationshipAgeOrder AgeOrder { get; set; }
+
+    /// <summary>The smallest gap allowed between the two ends' birth years, in whole years. Null for none.</summary>
+    public int? MinAgeDifferenceYears { get; set; }
+
+    /// <summary>The largest gap allowed between the two ends' birth years, in whole years. Null for none.</summary>
+    public int? MaxAgeDifferenceYears { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
+}
+
+/// <summary>
+/// Which end of a relationship must have been born first. A Canon constraint the author sets on a
+/// <see cref="RelationshipType"/>; Canon Integrity checks it and nothing else reads it.
+/// </summary>
+public enum RelationshipAgeOrder
+{
+    /// <summary>No age order. Every type written before constraints existed, and the default.</summary>
+    None = 0,
+
+    /// <summary>The source was born before the target.</summary>
+    SourceOlder = 1,
+
+    /// <summary>The source was born after the target.</summary>
+    SourceYounger = 2,
 }
 
 /// <summary>

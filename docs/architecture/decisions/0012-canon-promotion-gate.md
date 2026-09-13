@@ -73,8 +73,8 @@ Reconciled but not gated, each for a stated reason rather than by omission:
 | Path | Why not gated | Why still reconciled |
 | --- | --- | --- |
 | entity, timeline delete | Every rule reads facts a record contributes, so removing one only takes findings away. | A conflict about lore that no longer exists is worse than no conflict. |
-| relationship create, update, delete | No High rule reads a relationship. | `CANON-REL-001` does, and Medium findings are still findings. |
-| relationship type update | A rename changes no fact any rule tests. | `CANON-REL-001` quotes the type's name in the sentence it stores, and the name is not in the fingerprint, so the same conflict is reworded in place. |
+| relationship create, update, delete | No High rule reads a relationship. | `CANON-REL-001`, `-002` and `-003` do, and Medium findings are still findings. |
+| relationship type update | A rename changes no fact any rule tests, and neither does a Canon constraint: it changes the rule being checked, and both constraint rules are Medium (ADR 0023). | `CANON-REL-001` quotes the type's name in the sentence it stores, and the name is not in the fingerprint, so the same conflict is reworded in place. `CANON-REL-002` and `-003` read the type's constraints, so a change can open or resolve conflicts on every link of the type. |
 
 Neither gated nor reconciled: adding a field or relationship type, neither of which anything
 references yet. Deleting a type, field or option is refused outright while it holds authored
