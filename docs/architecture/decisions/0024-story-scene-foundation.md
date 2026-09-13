@@ -1,6 +1,7 @@
 # ADR 0024 - A story is authored narrative that references lore, told in its own order
 
-Status: accepted (2026-09-13)
+Status: accepted (2026-09-13), amended 2026-09-13 (chapters, ADR 0025: scene order is now per chapter or
+Unchaptered)
 
 ## Context
 
@@ -38,7 +39,9 @@ layer could later sit between story and scene without replacing it.
   by an index. A new scene is appended; deleting one closes the gap; only
   `PUT .../scenes/order` moves one, and it must name every scene in the story exactly once. A move
   parks the scenes at negative positions and then places them, inside one transaction - the same
-  technique era reordering uses.
+  technique era reordering uses. *Since ADR 0025 all of this holds per container - one chapter, or
+  Unchaptered - rather than per story, the order route names its container, and a position route moves a
+  scene between containers.*
 - A scene's chronology is where it happens in the world. It is optional, it is shown on the scene,
   and nothing reads it to order, group, validate or warn. A scene placed before the scene told ahead
   of it is valid: nonlinear stories are valid. The API and the client both hold this in tests.
@@ -83,7 +86,7 @@ reader that ignored them would restore a world with every story silently missing
 
 ## Deferred
 
-- Chapters, acts, sequences, beats and arcs; multiple points of view per scene.
+- Acts, sequences, beats and arcs; multiple points of view per scene. (Chapters: ADR 0025.)
 - Manuscript prose, rich text, Markdown, word counts, writing goals, comments, export to documents.
 - Story or scene revision history. ADR 0013's snapshots are shaped around an entry - its fields,
   options, tags and references - and extending them is not a side effect of stories being editable.

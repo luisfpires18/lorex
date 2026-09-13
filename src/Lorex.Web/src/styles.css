@@ -3929,7 +3929,8 @@ a.lorechip--pov:focus-visible .lorechip__name {
   font-size: 0.85rem;
 }
 
-.scene__tools {
+/* The quiet row of tools under a scene or a chapter heading. */
+.storytools {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -3937,28 +3938,190 @@ a.lorechip--pov:focus-visible .lorechip__name {
   margin-top: 0.75rem;
 }
 
-.scene__tools .button--quiet {
+.storytools .button--quiet {
   padding: 0.15rem 0;
   border: 0;
   color: var(--muted);
   font-size: 0.8rem;
 }
 
-.scene__tools .button--quiet:hover:not(:disabled) {
+.storytools .button--quiet:hover:not(:disabled) {
   color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 0.2em;
 }
 
-.scene__tools .button--quiet:disabled {
+.storytools .button--quiet:disabled {
   opacity: 0.35;
 }
 
 /* A touch screen gets targets a thumb can hit, not the pointer's hairline links. */
 @media (pointer: coarse) {
-  .scene__tools .button--quiet {
+  .storytools .button--quiet {
     min-height: 2.75rem;
     padding: 0 0.2rem;
+  }
+}
+
+.story__sceneactions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+/*
+ * A chapter is a heading and a rule, not a box: the scenes under it keep the rows they always had, so
+ * grouping adds one level of hierarchy and no card around cards.
+ */
+.chapter {
+  margin-top: 2.5rem;
+}
+
+.chapter__head {
+  padding-top: 1rem;
+  border-top: 2px solid var(--rule-strong);
+}
+
+.chapter__title {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(1.15rem, 1.8vw, 1.4rem);
+  overflow-wrap: anywhere;
+}
+
+.chapter__number {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.chapter__dash {
+  color: var(--muted);
+}
+
+.chapter__meta {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.chapter__summary {
+  margin: 0.55rem 0 0;
+  max-width: 62ch;
+  font-size: 0.95rem;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.chapter__empty {
+  margin: 1rem 0 0;
+  padding: 0.9rem 0;
+  border-top: 1px solid var(--rule);
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.chapter .scenes,
+.storygroup .scenes {
+  margin-top: 1rem;
+}
+
+/* Unchaptered is a holding area: named quietly, with no number, no rule of its own and no tools. */
+.storygroup {
+  margin-top: 1.75rem;
+}
+
+.storygroup__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.8rem;
+}
+
+.storygroup__title {
+  margin: 0;
+  font-family: var(--ui);
+  font-weight: 500;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+
+.storygroup__hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/*
+ * "Move to…". The panel hangs from the scene's body rather than from the button, so however far along
+ * a wrapped row of tools the button sits, the panel starts at the scene's own left edge and never runs
+ * off a phone's screen.
+ */
+.scene__body {
+  position: relative;
+}
+
+.movemenu {
+  display: inline-flex;
+}
+
+.movemenu__panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  width: min(22rem, 100%);
+  padding: 0.35rem;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+}
+
+.movemenu__label {
+  margin: 0;
+  padding: 0.35rem 0.65rem 0.25rem;
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.movemenu__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.movemenu__item {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.movemenu__item:hover,
+.movemenu__item:focus-visible {
+  background: var(--paper);
+  color: var(--accent);
+}
+
+@media (pointer: coarse) {
+  .movemenu__item {
+    min-height: 2.75rem;
   }
 }
 

@@ -9,9 +9,33 @@ public static class StoryLimits
     public const int PremiseMaxLength = 2000;
     public const int SceneSummaryMaxLength = 2000;
     public const int SceneNotesMaxLength = 10_000;
+    public const int ChapterSummaryMaxLength = 2000;
+    public const int ChapterNotesMaxLength = 10_000;
 
     /// <summary>The same bound a timeline moment has: enough for a crowded scene, one request stays small.</summary>
     public const int MaxLinkedEntities = 100;
+}
+
+public sealed class ChapterConfiguration : IEntityTypeConfiguration<Chapter>
+{
+    public void Configure(EntityTypeBuilder<Chapter> builder)
+    {
+        builder.ToTable("Chapters");
+        builder.HasKey(chapter => chapter.Id);
+
+        builder.Property(chapter => chapter.Title).IsRequired().HasMaxLength(StoryLimits.TitleMaxLength);
+        builder.Property(chapter => chapter.Summary).HasMaxLength(StoryLimits.ChapterSummaryMaxLength);
+        builder.Property(chapter => chapter.Notes).HasMaxLength(StoryLimits.ChapterNotesMaxLength);
+
+        // A chapter belongs to its story, and goes with it.
+        builder.HasOne(chapter => chapter.Story)
+            .WithMany(story => story.Chapters)
+            .HasForeignKey(chapter => chapter.StoryId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Chapter order is contiguous and unique per story, like scene order inside a container.
+        builder.HasIndex(chapter => new { chapter.StoryId, chapter.SortOrder }).IsUnique();
+    }
 }
 
 public sealed class StoryConfiguration : IEntityTypeConfiguration<Story>
@@ -69,9 +93,31 @@ public sealed class SceneConfiguration : IEntityTypeConfiguration<Scene>
             .HasForeignKey(scene => scene.EraId)
             .OnDelete(DeleteBehavior.NoAction);
 
-        // The narrative order is the only order a story is read in, and it is contiguous and unique
-        // per story. Unique, so two scenes can never claim the same place in the telling.
-        builder.HasIndex(scene => new { scene.StoryId, scene.SortOrder }).IsUnique();
+        // No action, deliberately not SET NULL. Emptying a chapter is the chapter route's work: it moves
+        // the scenes to the end of Unchaptered and renumbers them first. A bare SET NULL would drop them
+        // into Unchaptered carrying their old positions, colliding with the scenes already there. So a
+        // chapter that still holds a scene cannot be removed on its own. Checked at the end of the
+        // statement, so deleting a whole story or universe still cascades through both.
+        builder.HasOne(scene => scene.Chapter)
+            .WithMany(chapter => chapter.Scenes)
+            .HasForeignKey(scene => scene.ChapterId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        // Narrative order is contiguous and unique per container: one chapter, or the story's
+        // Unchaptered scenes. Two filtered indexes rather than one over (StoryId, ChapterId, SortOrder),
+        // because a unique index treats every null as distinct - it would guard each chapter and leave
+        // Unchaptered, the one container every existing scene is in, unguarded.
+        builder.HasIndex(scene => new { scene.StoryId, scene.SortOrder })
+            .IsUnique()
+            .HasFilter("\"ChapterId\" IS NULL");
+
+        builder.HasIndex(scene => new { scene.ChapterId, scene.SortOrder })
+            .IsUnique()
+            .HasFilter("\"ChapterId\" IS NOT NULL");
+
+        // The story read and the story list take every scene in a story whatever its container, which
+        // neither filtered index can answer.
+        builder.HasIndex(scene => scene.StoryId);
     }
 }
 

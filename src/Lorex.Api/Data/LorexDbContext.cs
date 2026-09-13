@@ -67,6 +67,8 @@ public class LorexDbContext(DbContextOptions<LorexDbContext> options)
 
     public DbSet<Story> Stories => Set<Story>();
 
+    public DbSet<Chapter> Chapters => Set<Chapter>();
+
     public DbSet<Scene> Scenes => Set<Scene>();
 
     public DbSet<SceneEntityLink> SceneEntityLinks => Set<SceneEntityLink>();

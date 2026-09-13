@@ -74,6 +74,7 @@ app.MapRelationshipTypeEndpoints();
 app.MapRelationshipEndpoints();
 app.MapTimelineEndpoints();
 app.MapStoryEndpoints();
+app.MapChapterEndpoints();
 app.MapSceneEndpoints();
 app.MapCanonIntegrityEndpoints();
 app.MapTrashEndpoints();

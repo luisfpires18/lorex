@@ -153,8 +153,8 @@ public static class StoryEndpoints
     }
 
     /// <summary>
-    /// Permanent. The story's scenes and their links go with it, by the database's own cascade; the
-    /// lore they referenced is untouched. There is no Trash for stories - ADR 0015 keeps the Trash
+    /// Permanent. The story's chapters, scenes and their links go with it, by the database's own
+    /// cascade; the lore they referenced is untouched. There is no Trash for stories - ADR 0015 keeps the Trash
     /// for lore entries, whose removal used to destroy work other records depended on, and nothing
     /// depends on a story.
     /// </summary>
@@ -196,8 +196,24 @@ public static class StoryEndpoints
             cancellationToken);
 
     /// <summary>
-    /// The story and every scene in it. A fixed number of queries whatever the story holds: the
-    /// story, its scenes with their link ids, and one read of every entry any of them references.
+    /// Whether the caller owns the universe and the story is in it. For reads; a write finds the story
+    /// tracked instead, with <see cref="FindAsync"/>.
+    /// </summary>
+    internal static async Task<bool> OwnsStoryAsync(
+        LorexDbContext db,
+        Guid universeId,
+        Guid storyId,
+        ClaimsPrincipal principal,
+        CancellationToken cancellationToken) =>
+        await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken)
+        && await db.Stories.AnyAsync(
+            story => story.Id == storyId && story.UniverseId == universeId,
+            cancellationToken);
+
+    /// <summary>
+    /// The story, its chapters and every scene in it. A fixed number of queries whatever the story holds:
+    /// the story, its chapters, its scenes with their link ids, and one read of every entry any scene
+    /// references - four for a story of ten chapters and a hundred scenes, as for an empty one.
     /// </summary>
     internal static async Task<StoryDetail?> LoadDetailAsync(
         LorexDbContext db,
@@ -223,6 +239,8 @@ public static class StoryEndpoints
             return null;
         }
 
+        var chapters = await ChapterEndpoints.LoadChaptersAsync(db, storyId, cancellationToken);
+
         var scenes = await SceneEndpoints.LoadScenesAsync(
             db,
             universeId,
@@ -234,6 +252,7 @@ public static class StoryEndpoints
             story.Title,
             story.Premise,
             story.Status,
+            chapters,
             scenes,
             story.CreatedAt,
             story.UpdatedAt);

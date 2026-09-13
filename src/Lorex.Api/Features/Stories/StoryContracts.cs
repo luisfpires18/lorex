@@ -20,24 +20,55 @@ public sealed record StorySummary(
     DateTime UpdatedAt);
 
 /// <summary>
-/// One story with every scene in it, in narrative order, and every lore reference already resolved,
-/// so the story page is one request however many scenes it holds.
+/// One story with its whole structure and every lore reference already resolved, so the story page is
+/// one request however many chapters and scenes it holds.
+///
+/// <paramref name="Chapters"/> are in story order. <paramref name="Scenes"/> is every scene, each naming
+/// its container by <c>chapterId</c> (null for Unchaptered), listed Unchaptered first and then chapter
+/// by chapter, each container in its own narrative order.
 /// </summary>
 public sealed record StoryDetail(
     Guid Id,
     string Title,
     string? Premise,
     StoryStatus Status,
+    IReadOnlyList<ChapterResponse> Chapters,
     IReadOnlyList<SceneResponse> Scenes,
     DateTime CreatedAt,
     DateTime UpdatedAt);
 
 /// <summary>
+/// Everything a client may set on a chapter. The order is absent - a new chapter is appended and only
+/// the chapter order route moves one - and so is any number: "Chapter 3" is the chapter's position,
+/// shown, never stored.
+/// </summary>
+public sealed record ChapterRequest(string? Title, string? Summary, string? Notes);
+
+/// <summary>One chapter. <paramref name="SortOrder"/> is its place in the story, from 0.</summary>
+public sealed record ChapterResponse(
+    Guid Id,
+    Guid StoryId,
+    int SortOrder,
+    string Title,
+    string? Summary,
+    string? Notes,
+    DateTime CreatedAt,
+    DateTime UpdatedAt);
+
+/// <summary>The story's whole chapter order: every chapter id in the story, each exactly once, first first.</summary>
+public sealed record ChapterOrderRequest(IReadOnlyList<Guid>? ChapterIds);
+
+/// <summary>
 /// Everything a client may set on a scene. <c>SortOrder</c> is deliberately absent: a new scene is
-/// appended, and only the order route moves one.
+/// appended to its container, and only the order and position routes move one inside it.
 ///
 /// <paramref name="EntityIds"/> is the scene's whole set of linked lore, replaced on every save.
 /// <paramref name="Chronology"/> is null for a scene not placed in time.
+///
+/// <paramref name="ChapterId"/> is the chapter the scene is told in, or null for Unchaptered - the same
+/// meaning it has everywhere a scene is described. Like the point of view, it is part of the whole scene
+/// sent on every save: changing it moves the scene to the end of that chapter, and a request that leaves
+/// it out means Unchaptered.
 /// </summary>
 public sealed record SceneRequest(
     string? Title,
@@ -45,7 +76,8 @@ public sealed record SceneRequest(
     string? Notes,
     Guid? PovEntityId,
     ChronologyValue? Chronology,
-    IReadOnlyList<Guid>? EntityIds);
+    IReadOnlyList<Guid>? EntityIds,
+    Guid? ChapterId = null);
 
 /// <summary>
 /// A lore entry as a scene shows it, read from the entry itself on every request - never stored on
@@ -67,12 +99,15 @@ public sealed record SceneLoreReference(
     EntityImageRef? Image);
 
 /// <summary>
-/// One scene. <paramref name="SortOrder"/> is its place in the telling, from 0;
-/// <paramref name="Chronology"/> is where it happens in the world, or null. The two are independent.
+/// One scene. <paramref name="ChapterId"/> is its container - null for Unchaptered - and
+/// <paramref name="SortOrder"/> its place in that container's telling, from 0.
+/// <paramref name="Chronology"/> is where it happens in the world, or null. Order and chronology are
+/// independent.
 /// </summary>
 public sealed record SceneResponse(
     Guid Id,
     Guid StoryId,
+    Guid? ChapterId,
     int SortOrder,
     string Title,
     string? Summary,
@@ -84,7 +119,17 @@ public sealed record SceneResponse(
     DateTime UpdatedAt);
 
 /// <summary>
-/// The story's whole narrative order: every scene id in the story, each exactly once, first told
-/// first.
+/// One container's whole narrative order: every scene id in the chapter named by
+/// <paramref name="ChapterId"/> - or in Unchaptered, when it is null - each exactly once, first told
+/// first. A scene in any other container is refused rather than pulled across; moving between
+/// containers is the position route's work.
 /// </summary>
-public sealed record SceneOrderRequest(IReadOnlyList<Guid>? SceneIds);
+public sealed record SceneOrderRequest(IReadOnlyList<Guid>? SceneIds, Guid? ChapterId = null);
+
+/// <summary>
+/// Where a scene should be told: in the chapter named by <paramref name="ChapterId"/>, or Unchaptered
+/// when it is null, at <paramref name="Position"/> inside it - from 0, counted among the scenes already
+/// there - or at the end when <paramref name="Position"/> is null. The scene keeps its id and everything
+/// else it holds; both containers are renumbered.
+/// </summary>
+public sealed record ScenePositionRequest(Guid? ChapterId, int? Position);

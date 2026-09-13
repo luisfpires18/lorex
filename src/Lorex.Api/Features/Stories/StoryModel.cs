@@ -45,7 +45,54 @@ public sealed class Story
 
     public DateTime CreatedAt { get; set; }
 
-    /// <summary>When the story or any of its scenes was last written to.</summary>
+    /// <summary>When the story, its chapters or any of its scenes was last written to.</summary>
+    public DateTime UpdatedAt { get; set; }
+
+    public ICollection<Chapter> Chapters { get; } = [];
+
+    public ICollection<Scene> Scenes { get; } = [];
+}
+
+/// <summary>
+/// An optional grouping of a story's scenes.
+///
+/// A chapter is structure, not content: a title, a short summary, the author's notes and a place in the
+/// story. It holds no prose, no chronology, no point of view and no Canon state, and a story needs none
+/// at all - a scene that belongs to no chapter is <i>Unchaptered</i>, which is a null
+/// <see cref="Scene.ChapterId"/> and never a row pretending to be a chapter.
+///
+/// The number an author reads - "Chapter 3" - is <see cref="SortOrder"/> plus one, worked out when it is
+/// shown. It is not stored and it is not part of <see cref="Title"/>, so reordering renumbers every
+/// chapter without touching a word the author wrote.
+///
+/// Owned by the story and deleted with it. Deleting only the chapter never deletes a scene: its scenes
+/// move to the end of Unchaptered, in their order. See
+/// <c>docs/architecture/decisions/0025-story-chapters.md</c>.
+/// </summary>
+public sealed class Chapter
+{
+    public Guid Id { get; set; }
+
+    public Guid StoryId { get; set; }
+
+    public Story? Story { get; set; }
+
+    public required string Title { get; set; }
+
+    /// <summary>What the chapter covers, briefly. Planning text, not manuscript prose.</summary>
+    public string? Summary { get; set; }
+
+    /// <summary>The author's own planning notes.</summary>
+    public string? Notes { get; set; }
+
+    /// <summary>
+    /// The chapter's place in its story, from 0. Contiguous and unique per story: creating appends,
+    /// deleting closes the gap, and only the chapter order route moves one.
+    /// </summary>
+    public int SortOrder { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
     public DateTime UpdatedAt { get; set; }
 
     public ICollection<Scene> Scenes { get; } = [];
@@ -54,8 +101,8 @@ public sealed class Story
 /// <summary>
 /// One scene of one story.
 ///
-/// <b>Two orders, never one.</b> <see cref="SortOrder"/> is where the author tells the scene: the
-/// story is always presented in it, and only the author moves it. The chronology - <see cref="EraId"/>,
+/// <b>Two orders, never one.</b> <see cref="SortOrder"/> is where the author tells the scene inside its
+/// container - its chapter, or Unchaptered - and only the author moves it. The chronology - <see cref="EraId"/>,
 /// <see cref="Year"/>, <see cref="Month"/>, <see cref="Day"/> - is where the scene happens in the
 /// world, and is optional. Neither is derived from, checked against or reordered by the other, so a
 /// story that opens on the aftermath and flashes back to a childhood is exactly as valid as one told
@@ -83,8 +130,18 @@ public sealed class Scene
     public string? Notes { get; set; }
 
     /// <summary>
-    /// The scene's place in its story's telling, from 0. Contiguous and unique per story: creating
-    /// appends, deleting closes the gap, and reordering rewrites the whole sequence in one transaction.
+    /// The chapter the scene is told in, or null when it is Unchaptered. Null is a real state, not a
+    /// missing value: Unchaptered is a place in the story with its own order, and no chapter row stands
+    /// in for it. A move between chapters changes this and the order, and nothing else about the scene.
+    /// </summary>
+    public Guid? ChapterId { get; set; }
+
+    public Chapter? Chapter { get; set; }
+
+    /// <summary>
+    /// The scene's place inside its container - its chapter, or Unchaptered - from 0. Contiguous and
+    /// unique per container, never across the whole story: creating appends to the container, deleting
+    /// or moving out closes the gap, and reordering rewrites one container in one transaction.
     /// </summary>
     public int SortOrder { get; set; }
 

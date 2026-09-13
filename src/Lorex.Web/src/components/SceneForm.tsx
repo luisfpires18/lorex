@@ -9,7 +9,8 @@ import { namesEras } from '../chronology/format'
 import type { Chronology, ChronologyValue } from '../chronology/types'
 import { ApiError } from '../lib/api'
 import { createScene, updateScene } from '../stories/api'
-import type { Scene, SceneLoreReference } from '../stories/types'
+import { chapterLabel, UNCHAPTERED } from '../stories/format'
+import type { Chapter, Scene, SceneLoreReference } from '../stories/types'
 
 const EMPTY_POINT: ChronologyPointDraft = { eraId: '', year: '', month: '', day: '' }
 
@@ -20,6 +21,8 @@ interface SceneDraft {
   pov: EntityChoice | null
   point: ChronologyPointDraft
   entities: EntityChoice[]
+  /** The chapter's id, or '' for Unchaptered - the select's own empty value. */
+  chapterId: string
 }
 
 /**
@@ -37,12 +40,21 @@ function numberText(value: number | null) {
   return value === null ? '' : String(value)
 }
 
-function draftFrom(scene: Scene | null): SceneDraft {
+function draftFrom(scene: Scene | null, chapterId: string | null): SceneDraft {
   if (!scene) {
-    return { title: '', summary: '', notes: '', pov: null, point: EMPTY_POINT, entities: [] }
+    return {
+      title: '',
+      summary: '',
+      notes: '',
+      pov: null,
+      point: EMPTY_POINT,
+      entities: [],
+      chapterId: chapterId ?? '',
+    }
   }
 
   return {
+    chapterId: scene.chapterId ?? '',
     title: scene.title,
     summary: scene.summary ?? '',
     notes: scene.notes ?? '',
@@ -87,33 +99,39 @@ function chronologyOf(point: ChronologyPointDraft, reckonsInEras: boolean): Chro
 interface SceneFormProps {
   universeId: string
   storyId: string
-  /** The scene being changed, or null for a new one - which is always appended. */
+  /** The scene being changed, or null for a new one - which is always appended to its chapter. */
   scene: Scene | null
+  /** The story's chapters, in order. None means the form asks nothing about chapters. */
+  chapters: Chapter[]
+  /** Where a new scene starts out: the chapter it was added from, or null for Unchaptered. */
+  chapterId: string | null
   chronology: Chronology
   onClose: () => void
   onSaved: (scene: Scene) => void
 }
 
 /**
- * A scene's title, summary, notes, point of view, place in the world and linked lore, in the drawer
- * every Lorex form uses.
+ * A scene's title, chapter, summary, notes, point of view, place in the world and linked lore, in the
+ * drawer every Lorex form uses.
  *
- * Nothing here decides where the scene is told: a new scene goes last and only the story page moves
- * it. The chronology is where it happens in the world, and the form says so, because a nonlinear
- * story is a valid one. The pickers search live lore only, so nothing in the Trash can be newly
- * chosen.
+ * Nothing here decides where inside its chapter the scene is told: a new scene goes last, a scene moved
+ * to another chapter goes last there, and only the story page moves it further. The chronology is where
+ * it happens in the world, and the form says so, because a nonlinear story is a valid one. The pickers
+ * search live lore only, so nothing in the Trash can be newly chosen.
  */
 export function SceneForm({
   universeId,
   storyId,
   scene,
+  chapters,
+  chapterId,
   chronology,
   onClose,
   onSaved,
 }: SceneFormProps) {
   const dialog = useRef<HTMLDialogElement>(null)
   const title = useRef<HTMLInputElement>(null)
-  const [draft, setDraft] = useState<SceneDraft>(() => draftFrom(scene))
+  const [draft, setDraft] = useState<SceneDraft>(() => draftFrom(scene, chapterId))
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -149,6 +167,7 @@ export function SceneForm({
       povEntityId: draft.pov?.id ?? null,
       chronology: chronologyOf(draft.point, reckonsInEras),
       entityIds: draft.entities.map((choice) => choice.id),
+      chapterId: draft.chapterId === '' ? null : draft.chapterId,
     }
 
     try {
@@ -224,6 +243,37 @@ export function SceneForm({
             />
             {fieldErrors.title ? <p className="field__error">{fieldErrors.title}</p> : null}
           </div>
+
+          {chapters.length > 0 ? (
+            <div className="field">
+              <label className="field__label" htmlFor="scene-chapter">
+                Chapter
+              </label>
+              <p className="field__hint">
+                {scene
+                  ? 'Choosing another chapter moves the scene there, last.'
+                  : 'The scene goes last in it.'}
+              </p>
+              <select
+                id="scene-chapter"
+                className="field__input field__input--select"
+                value={draft.chapterId}
+                onChange={(event) => edit({ chapterId: event.target.value })}
+                aria-invalid={fieldErrors.chapterid ? true : undefined}
+                data-testid="scene-chapter-select"
+              >
+                <option value="">{UNCHAPTERED}</option>
+                {chapters.map((chapter, index) => (
+                  <option key={chapter.id} value={chapter.id}>
+                    {chapterLabel(index, chapter.title)}
+                  </option>
+                ))}
+              </select>
+              {fieldErrors.chapterid ? (
+                <p className="field__error">{fieldErrors.chapterid}</p>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="field">
             <label className="field__label" htmlFor="scene-summary">

@@ -53,12 +53,29 @@ export interface SceneLoreReference {
 }
 
 /**
- * One scene. `sortOrder` is its place in the telling; `chronology` is where it happens in the world.
- * The two are independent, and the client never orders scenes by chronology.
+ * An optional grouping of a story's scenes: structure, not content. Its number - "Chapter 3" - is its
+ * position, worked out on screen and never stored, so `title` is only what the author wrote.
+ */
+export interface Chapter {
+  id: string
+  storyId: string
+  sortOrder: number
+  title: string
+  summary: string | null
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * One scene. `chapterId` is its container - null for Unchaptered - and `sortOrder` its place in that
+ * container's telling; `chronology` is where it happens in the world. Order and chronology are
+ * independent, and the client never orders scenes by chronology.
  */
 export interface Scene {
   id: string
   storyId: string
+  chapterId: string | null
   sortOrder: number
   title: string
   summary: string | null
@@ -70,12 +87,16 @@ export interface Scene {
   updatedAt: string
 }
 
-/** One story with every scene in narrative order, resolved in one request. */
+/**
+ * One story with its whole structure, resolved in one request: chapters in order, and every scene -
+ * Unchaptered first, then chapter by chapter, each container in its own narrative order.
+ */
 export interface StoryDetail {
   id: string
   title: string
   premise: string | null
   status: StoryStatusValue
+  chapters: Chapter[]
   scenes: Scene[]
   createdAt: string
   updatedAt: string
@@ -87,7 +108,11 @@ export interface StoryInput {
   status: StoryStatusValue
 }
 
-/** Everything a client may set on a scene. The order is not here: only the order route moves a scene. */
+/**
+ * Everything a client may set on a scene. The order is not here: a scene is appended to its container,
+ * and only the order and position routes move it inside one. `chapterId` null is Unchaptered; a different
+ * chapter than the scene is in moves it to the end of that one.
+ */
 export interface SceneInput {
   title: string
   summary: string | null
@@ -95,4 +120,12 @@ export interface SceneInput {
   povEntityId: string | null
   chronology: ChronologyValue | null
   entityIds: string[]
+  chapterId: string | null
+}
+
+/** Everything a client may set on a chapter. No number and no order: both are its position. */
+export interface ChapterInput {
+  title: string
+  summary: string | null
+  notes: string | null
 }
