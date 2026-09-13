@@ -20,6 +20,7 @@ public sealed class RelationshipTypeConfiguration : IEntityTypeConfiguration<Rel
         builder.Property(type => type.Name).IsRequired().HasMaxLength(RelationshipLimits.NameMaxLength);
         builder.Property(type => type.InverseName).HasMaxLength(RelationshipLimits.NameMaxLength);
         builder.Property(type => type.Description).HasMaxLength(RelationshipLimits.DescriptionMaxLength);
+        builder.Property(type => type.AgeOrder).HasConversion<int>();
 
         builder.HasOne(type => type.Universe)
             .WithMany()

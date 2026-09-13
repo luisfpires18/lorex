@@ -10,6 +10,25 @@ export const Perspective = {
 
 export type PerspectiveValue = (typeof Perspective)[keyof typeof Perspective]
 
+/** Mirrors `RelationshipAgeOrder`. Which end of a link must have been born first. */
+export const AgeOrder = {
+  None: 0,
+  SourceOlder: 1,
+  SourceYounger: 2,
+} as const
+
+export type AgeOrderValue = (typeof AgeOrder)[keyof typeof AgeOrder]
+
+/**
+ * Rules Canon Integrity checks every Canon link of a type against, on the stored direction:
+ * source, then target. Configured by the author and never inferred from the type's name.
+ */
+export interface RelationshipCanonConstraints {
+  ageOrder: AgeOrderValue
+  minAgeDifferenceYears: number | null
+  maxAgeDifferenceYears: number | null
+}
+
 export interface RelationshipType {
   id: string
   name: string
@@ -18,6 +37,7 @@ export interface RelationshipType {
   description: string | null
   displayOrder: number
   relationshipCount: number
+  canonConstraints: RelationshipCanonConstraints
 }
 
 export interface RelationshipTypeInput {
@@ -26,6 +46,8 @@ export interface RelationshipTypeInput {
   isSymmetric: boolean
   description: string | null
   displayOrder: number | null
+  /** Null on an update leaves the stored constraints as they are. */
+  canonConstraints: RelationshipCanonConstraints | null
 }
 
 /** The stored link as it is, used when creating, editing and reading one row. */

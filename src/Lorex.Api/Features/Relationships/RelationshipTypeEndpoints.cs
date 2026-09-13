@@ -55,7 +55,9 @@ public static class RelationshipTypeEndpoints
             return Results.NotFound();
         }
 
-        if (RelationshipValidation.ValidateType(request) is { } errors)
+        var constraints = request.CanonConstraints ?? RelationshipTypeCanonConstraints.None;
+
+        if (RelationshipValidation.ValidateType(request, constraints) is { } errors)
         {
             return Results.ValidationProblem(errors);
         }
@@ -84,6 +86,9 @@ public static class RelationshipTypeEndpoints
             IsSymmetric = request.IsSymmetric,
             Description = RelationshipValidation.Normalize(request.Description),
             DisplayOrder = order,
+            AgeOrder = constraints.AgeOrder,
+            MinAgeDifferenceYears = constraints.MinAgeDifferenceYears,
+            MaxAgeDifferenceYears = constraints.MaxAgeDifferenceYears,
             CreatedAt = now,
             UpdatedAt = now,
         };
@@ -106,17 +111,22 @@ public static class RelationshipTypeEndpoints
     }
 
     /// <summary>
-    /// Reconciled but not gated, and for a reason worth writing down: this route changes no
-    /// fact any rule tests, only a word one of them quotes.
+    /// Reconciled but not gated, for two reasons worth writing down.
     ///
     /// <c>CANON-REL-001</c> reads this type's name into the sentence it stores, while its
     /// fingerprint is the relationship and the offending endpoint - so a rename rewords an
-    /// existing conflict in place and cannot open, close or duplicate one. Without reconciling
-    /// here, that sentence would name a relation kind the author has already renamed, until
-    /// somebody happened to ask for an evaluation. Nothing here can reach High, so there is
-    /// nothing to refuse.
+    /// existing conflict in place and cannot open, close or duplicate one. <c>CANON-REL-002</c> and
+    /// <c>CANON-REL-003</c> read this type's Canon constraints, so changing one can open or resolve
+    /// conflicts on every relationship of this type at once. Either way the conflict table has to
+    /// say so when the write lands, not whenever somebody next asks for an evaluation.
     ///
-    /// Creating a type is not covered: a type with no relationships on it is quoted by nothing.
+    /// Nothing is refused, on purpose. A constraint changes the rule being checked, never a fact:
+    /// the years and the links are exactly what they were, and reporting what they now contradict is
+    /// the whole job of Canon Integrity. Contrast a chronology change, which re-places dated facts
+    /// and is gated. All three rules are Medium in any case, so there is nothing a gate could refuse
+    /// (ADR 0012, ADR 0023).
+    ///
+    /// Creating a type is not covered: a type with no relationships on it is read by nothing.
     /// Deleting one is refused outright while it is in use, so it cannot change a finding either.
     /// </summary>
     private static async Task<IResult> UpdateAsync(
@@ -148,7 +158,9 @@ public static class RelationshipTypeEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (RelationshipValidation.ValidateType(request) is { } errors)
+        var constraints = request.CanonConstraints ?? RelationshipTypeCanonConstraints.Of(relationshipType);
+
+        if (RelationshipValidation.ValidateType(request, constraints) is { } errors)
         {
             return Results.ValidationProblem(errors);
         }
@@ -169,6 +181,9 @@ public static class RelationshipTypeEndpoints
             request.IsSymmetric ? null : RelationshipValidation.Normalize(request.InverseName);
         relationshipType.Description = RelationshipValidation.Normalize(request.Description);
         relationshipType.DisplayOrder = request.DisplayOrder ?? relationshipType.DisplayOrder;
+        relationshipType.AgeOrder = constraints.AgeOrder;
+        relationshipType.MinAgeDifferenceYears = constraints.MinAgeDifferenceYears;
+        relationshipType.MaxAgeDifferenceYears = constraints.MaxAgeDifferenceYears;
         relationshipType.UpdatedAt = DateTime.UtcNow;
 
         try
@@ -253,7 +268,11 @@ public static class RelationshipTypeEndpoints
                 type.IsSymmetric,
                 type.Description,
                 type.DisplayOrder,
-                db.Relationships.Count(relationship => relationship.RelationshipTypeId == type.Id)))
+                db.Relationships.Count(relationship => relationship.RelationshipTypeId == type.Id),
+                new RelationshipTypeCanonConstraints(
+                    type.AgeOrder,
+                    type.MinAgeDifferenceYears,
+                    type.MaxAgeDifferenceYears)))
             .ToListAsync(cancellationToken);
 
     private static IResult NameTaken() =>

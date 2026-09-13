@@ -56,7 +56,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Chronology/ChronologyModel.cs` | `ChronologyEra`, its direction and label position. |
 | `Features/Chronology/ChronologyConfiguration.cs` | Era schema: the per-universe unique position, and the limits. |
 | `Features/Chronology/ChronologyPoint.cs` | The one date comparison: era rank, direction-signed year, month, day. The year-zero rule. |
-| `Features/Chronology/UniverseChronology.cs` | A universe's loaded reckoning: placing a stored year, and writing one out. |
+| `Features/Chronology/UniverseChronology.cs` | A universe's loaded reckoning: placing a stored year, the years between two where the configuration defines it, and writing one out. |
 | `Features/Chronology/ChronologyEndpoints.cs` | Read and replace the eras; the gate, the in-use refusal, and the unplaced counts. |
 | `Features/Chronology/ChronologyContracts.cs` | Request and response records for the chronology. |
 | `Features/Chronology/ChronologyValidation.cs` | Era shape checks: names, labels, enums, the bound. |
@@ -88,12 +88,12 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Lore/EntitySearchIndex.cs` | The SQLite FTS5 index: reindex, backfill, the scored query, and how typed words become an expression. |
 | `Features/Lore/EntitySearchBackfill.cs` | Indexes entries that have no index row, once, at startup. |
 | `Features/Lore/LoreValidation.cs` | Shared lore input checks. |
-| `Features/Relationships/RelationshipModel.cs` | `RelationshipType` and `LoreRelationship`. |
+| `Features/Relationships/RelationshipModel.cs` | `RelationshipType` with its Canon constraints, `RelationshipAgeOrder`, and `LoreRelationship`. |
 | `Features/Relationships/RelationshipConfiguration.cs` | Relationship schema: keys, indexes, delete behaviour. |
 | `Features/Relationships/RelationshipTypeEndpoints.cs` | Relationship-type CRUD; delete refused while in use. |
 | `Features/Relationships/RelationshipEndpoints.cs` | Relationship CRUD and the per-entity, perspective-resolved list. |
 | `Features/Relationships/RelationshipContracts.cs` | Request and response records for relationships. |
-| `Features/Relationships/RelationshipValidation.cs` | Relationship input checks, UTC coercion, perspective labels. |
+| `Features/Relationships/RelationshipValidation.cs` | Relationship and Canon constraint input checks, UTC coercion, perspective labels. |
 | `Features/Timeline/TimelineModel.cs` | `TimelineEntry`, its participation link, date kind and precision. |
 | `Features/Timeline/TimelineConfiguration.cs` | Timeline schema: keys, the chronological index, delete behaviour. |
 | `Features/Timeline/TimelineEndpoints.cs` | Timeline CRUD and the chronological, filtered, paged listing. |
@@ -108,8 +108,9 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/CanonIntegrity/CanonIntegrityEndpoints.cs` | List, get, evaluate, dismiss, reopen; subject-name resolution. |
 | `Features/CanonIntegrity/CanonIntegrityContracts.cs` | Response records for conflicts and evaluation. |
 | `Features/CanonIntegrity/CanonRuleText.cs` | Shared wording and length fitting for rule titles and explanations. |
-| `Features/CanonIntegrity/Rules/` | The six production rules: three structural, three chronological. |
+| `Features/CanonIntegrity/Rules/` | The eight production rules: three structural, three chronological, two relationship constraints. |
 | `Features/CanonIntegrity/Rules/CanonLifespan.cs` | Reads declared birth/death years and the moments comparable to them, placed as chronology points. |
+| `Features/CanonIntegrity/Rules/CanonRelationshipAge.cs` | Reads Canon relationships whose type carries an age constraint, with both ends' birth years placed. |
 | `Features/Trash/TrashEndpoints.cs` | The Trash listing and the gated restore. Entries only. |
 | `Features/Trash/TrashContracts.cs` | Response records for the Trash. |
 | `Features/Profile/ProfileImageModel.cs` | `ProfileImage`: the one photo an account may have, keyed by the account. |
@@ -167,10 +168,13 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.Api.Tests/UniverseEndpointTests.cs` | Universe CRUD and the ownership invariant. |
 | `Lorex.Api.Tests/LoreEndpointTests.cs` | Lore CRUD, field kinds, and cross-universe isolation. |
 | `Lorex.Api.Tests/EntityRevisionTests.cs` | What makes a version, what a version keeps, ownership, and what a restore may do. |
-| `Lorex.Api.Tests/RelationshipEndpointTests.cs` | Relationship CRUD, both perspectives, and cross-owner isolation. |
+| `Lorex.Api.Tests/RelationshipEndpointTests.cs` | Relationship CRUD, both perspectives, Canon constraint configuration, and cross-owner isolation. |
+| `Lorex.Api.Tests/CanonRelationshipAgeRuleTests.cs` | The two relationship constraint rules: order and gap, across eras, every case they stand down on, and that nothing is refused. |
+| `Lorex.Api.Tests/RelationshipConstraintMigrationTests.cs` | The constraint migration down and back up over real lore on a file. |
 | `Lorex.Api.Tests/TimelineEndpointTests.cs` | Date kinds, participation, ordering, paging, and ownership, on the plain reckoning. |
 | `Lorex.Api.Tests/TimelineChronologyTests.cs` | Years in eras: order across eras, paging, precision, refusals, years written before the eras, and the listing held to the comparer. |
 | `Lorex.Api.Tests/ChronologyPointTests.cs` | The comparison alone: directions, several eras, the order from configuration, year zero. |
+| `Lorex.Api.Tests/ChronologyYearsBetweenTests.cs` | The year distance alone: one era, the countdown boundary, and every span with no answer. |
 | `Lorex.Api.Tests/ChronologyEndpointTests.cs` | Writing the eras, what an era in use refuses, bad shapes, ownership, counts, and the gate. |
 | `Lorex.Api.Tests/ChronologyMigrationTests.cs` | The chronology migration down and back up over real lore on a file. |
 | `Lorex.Api.Tests/CanonIntegrityEndpointTests.cs` | Conflict lifecycle, fingerprinting, the structural rules, filters and ownership. |
@@ -189,6 +193,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.E2E/specs/universes.spec.ts` | Create, edit, search, archive, paginate, ownership. |
 | `Lorex.E2E/specs/lore.spec.ts` | Author an entry, edit it, filter, and cross-owner isolation. |
 | `Lorex.E2E/specs/relationships.spec.ts` | Both readings, relation kinds, refusals, and the universe and owner boundaries. |
+| `Lorex.E2E/specs/relationship-constraints.spec.ts` | A kind's Canon constraints: configured, broken, reported, corrected, edited and cleared; the editor from 390px to 1920px, light and dark. |
 | `Lorex.E2E/specs/timeline.spec.ts` | Date kinds through the drawer, order, filters, paging, refusals, and the owner boundary. |
 | `Lorex.E2E/specs/chronology.spec.ts` | Eras named and ordered in Settings, a timeline across them, a relabel, a birth year in an era, and the screens from 390px to 1920px. |
 | `Lorex.E2E/specs/history.spec.ts` | One journey: versions accumulate, an old one is read in place and put back. |

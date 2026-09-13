@@ -15,11 +15,13 @@ namespace Lorex.Api.Features.Relationships;
 /// id crosses a universe boundary and nothing another owner holds is ever disclosed.
 ///
 /// These writes are reconciled but not gated, which is the distinction Phase 014 turns on.
-/// Only <c>CANON-REL-001</c> reads relationships, and it is Medium - a Canon link resting on a
-/// draft endpoint is a loose end, not an impossibility - while the three High rules read
-/// declared years and Canon moments, neither of which a relationship can touch. So no
-/// relationship write can introduce a High finding and there is nothing here to refuse;
-/// gating anyway would sweep the rules a second time per write to prove an empty set. The
+/// The rules that read relationships are all Medium: <c>CANON-REL-001</c>, because a Canon link
+/// resting on a draft endpoint is a loose end rather than an impossibility, and
+/// <c>CANON-REL-002</c> and <c>CANON-REL-003</c>, because a breached age constraint is a breach of
+/// a rule the author configured, which Lorex cannot tell from a law of the world (ADR 0023). The
+/// three High rules read declared years and Canon moments, neither of which a relationship can
+/// touch. So no relationship write can introduce a High finding and there is nothing here to
+/// refuse; gating anyway would sweep the rules a second time per write to prove an empty set. The
 /// moment a High rule does read a relationship - exclusivity overlap is the obvious candidate,
 /// and it needs schema that does not exist yet - these routes swap <c>RecordAsync</c> for
 /// <c>RunAsync</c> and nothing else changes.

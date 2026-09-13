@@ -452,6 +452,9 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                     type.IsSymmetric,
                     type.Description,
                     type.DisplayOrder,
+                    type.AgeOrder,
+                    type.MinAgeDifferenceYears,
+                    type.MaxAgeDifferenceYears,
                     Utc(type.CreatedAt),
                     Utc(type.UpdatedAt))),
         ];

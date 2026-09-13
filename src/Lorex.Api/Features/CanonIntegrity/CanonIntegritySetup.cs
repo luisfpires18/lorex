@@ -15,6 +15,11 @@ public static class CanonIntegritySetup
         services.AddScoped<ICanonIntegrityRule, CanonTimelineEntityStatusRule>();
         services.AddScoped<ICanonIntegrityRule, CanonEntityReferenceStatusRule>();
 
+        // Relationship constraints. These check only what an author configured on a relationship
+        // type, against declared birth years; a type with no constraint is invisible to them.
+        services.AddScoped<ICanonIntegrityRule, CanonRelationshipAgeOrderRule>();
+        services.AddScoped<ICanonIntegrityRule, CanonRelationshipAgeGapRule>();
+
         // Chronology. These read what a field means rather than how records link, so they
         // only see entities whose author declared a birth or death year.
         services.AddScoped<ICanonIntegrityRule, CanonLifespanOrderRule>();

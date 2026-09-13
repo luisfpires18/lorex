@@ -1,3 +1,4 @@
+using System.Globalization;
 using Lorex.Api.Features.Lore;
 
 namespace Lorex.Api.Features.CanonIntegrity;
@@ -38,6 +39,10 @@ internal static class CanonRuleText
 
     /// <summary>Quotes a name so a title reads as a sentence about a record.</summary>
     public static string Quoted(string name) => $"“{name}”";
+
+    /// <summary>A number of years as a sentence reads it: "1 year", "12 years", "8.5 years".</summary>
+    public static string Years(double years) =>
+        years == 1 ? "1 year" : $"{years.ToString("0.####", CultureInfo.InvariantCulture)} years";
 
     public static string StatusWord(CanonStatus status) => status switch
     {

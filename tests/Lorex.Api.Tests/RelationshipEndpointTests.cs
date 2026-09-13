@@ -527,6 +527,232 @@ public sealed class RelationshipEndpointTests(LorexApiFactory factory) : IClassF
         Assert.Single(await ListFor(client, universe.Id, world.First.Id));
     }
 
+    // ---------- Canon constraints ----------
+
+    [Fact]
+    public async Task A_type_has_no_canon_constraints_until_its_author_configures_some()
+    {
+        var (client, universe) = await SignedInWithUniverse("relcons-default");
+
+        var created = await CreateType(client, universe.Id, "parent of", "child of");
+
+        Assert.Equal(RelationshipTypeCanonConstraints.None, created.CanonConstraints);
+        Assert.Equal(
+            RelationshipTypeCanonConstraints.None,
+            Assert.Single(await ListTypes(client, universe.Id)).CanonConstraints);
+    }
+
+    [Theory]
+    [InlineData("older", RelationshipAgeOrder.SourceOlder, null, null)]
+    [InlineData("younger", RelationshipAgeOrder.SourceYounger, null, null)]
+    [InlineData("min", RelationshipAgeOrder.None, 12, null)]
+    [InlineData("max", RelationshipAgeOrder.None, null, 40)]
+    [InlineData("both", RelationshipAgeOrder.SourceOlder, 12, 60)]
+    [InlineData("zero", RelationshipAgeOrder.None, 0, 0)]
+    public async Task Each_constraint_is_stored_exactly_as_configured(
+        string tag,
+        RelationshipAgeOrder order,
+        int? min,
+        int? max)
+    {
+        var (client, universe) = await SignedInWithUniverse($"relcons-{tag}");
+        var constraints = new RelationshipTypeCanonConstraints(order, min, max);
+
+        var created = await CreateType(client, universe.Id, "parent of", "child of", constraints: constraints);
+
+        Assert.Equal(constraints, created.CanonConstraints);
+        Assert.Equal(constraints, Assert.Single(await ListTypes(client, universe.Id)).CanonConstraints);
+    }
+
+    [Fact]
+    public async Task Constraints_can_be_changed_and_cleared()
+    {
+        var (client, universe) = await SignedInWithUniverse("relcons-edit");
+        var type = await CreateType(
+            client, universe.Id, "parent of", "child of",
+            constraints: new RelationshipTypeCanonConstraints(RelationshipAgeOrder.SourceOlder, 12, null));
+
+        var changed = await UpdateType(
+            client, universe.Id, type.Id,
+            new RelationshipTypeRequest(
+                "parent of", "child of", false, null, null,
+                new RelationshipTypeCanonConstraints(RelationshipAgeOrder.SourceYounger, null, 30)));
+
+        Assert.Equal(
+            new RelationshipTypeCanonConstraints(RelationshipAgeOrder.SourceYounger, null, 30),
+            changed.CanonConstraints);
+
+        var cleared = await UpdateType(
+            client, universe.Id, type.Id,
+            new RelationshipTypeRequest(
+                "parent of", "child of", false, null, null, RelationshipTypeCanonConstraints.None));
+
+        Assert.Equal(RelationshipTypeCanonConstraints.None, cleared.CanonConstraints);
+    }
+
+    [Fact]
+    public async Task Saving_a_type_without_sending_constraints_keeps_the_ones_it_has()
+    {
+        var (client, universe) = await SignedInWithUniverse("relcons-keep");
+        var configured = new RelationshipTypeCanonConstraints(RelationshipAgeOrder.SourceOlder, 12, 60);
+        var type = await CreateType(client, universe.Id, "parent of", "child of", constraints: configured);
+
+        // A client that predates constraints renames the type and knows nothing else about it.
+        var renamed = await UpdateType(
+            client, universe.Id, type.Id,
+            new RelationshipTypeRequest("begat", "begotten by", false, null, null));
+
+        Assert.Equal("begat", renamed.Name);
+        Assert.Equal(configured, renamed.CanonConstraints);
+    }
+
+    [Theory]
+    [InlineData("min", -1, null, "canonConstraints.minAgeDifferenceYears")]
+    [InlineData("max", null, -1, "canonConstraints.maxAgeDifferenceYears")]
+    public async Task A_negative_age_gap_is_refused(string tag, int? min, int? max, string field)
+    {
+        var (client, universe) = await SignedInWithUniverse($"relcons-neg{tag}");
+
+        var response = await PostType(
+            client, universe.Id,
+            new RelationshipTypeRequest(
+                "parent of", "child of", false, null, null,
+                new RelationshipTypeCanonConstraints(RelationshipAgeOrder.None, min, max)));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains(field, await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.Empty(await ListTypes(client, universe.Id));
+    }
+
+    [Fact]
+    public async Task A_minimum_above_the_maximum_is_refused_rather_than_swapped()
+    {
+        var (client, universe) = await SignedInWithUniverse("relcons-minmax");
+        var configured = new RelationshipTypeCanonConstraints(RelationshipAgeOrder.None, 5, 10);
+        var type = await CreateType(client, universe.Id, "parent of", "child of", constraints: configured);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/universes/{universe.Id}/relationship-types/{type.Id}",
+            new RelationshipTypeRequest(
+                "parent of", "child of", false, null, null,
+                new RelationshipTypeCanonConstraints(RelationshipAgeOrder.None, 20, 10)));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("canonConstraints.maxAgeDifferenceYears", body, StringComparison.Ordinal);
+        Assert.Contains("20 years", body, StringComparison.Ordinal);
+
+        // Neither the two numbers nor anything else about the type moved.
+        Assert.Equal(configured, Assert.Single(await ListTypes(client, universe.Id)).CanonConstraints);
+    }
+
+    [Fact]
+    public async Task An_age_order_lorex_does_not_know_is_refused()
+    {
+        var (client, universe) = await SignedInWithUniverse("relcons-enum");
+
+        var byNumber = await PostType(
+            client, universe.Id,
+            new RelationshipTypeRequest(
+                "parent of", "child of", false, null, null,
+                new RelationshipTypeCanonConstraints((RelationshipAgeOrder)99, null, null)));
+
+        Assert.Equal(HttpStatusCode.BadRequest, byNumber.StatusCode);
+        Assert.Contains("canonConstraints.ageOrder", await byNumber.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+
+        var byName = await client.PostAsJsonAsync(
+            $"/api/universes/{universe.Id}/relationship-types",
+            new
+            {
+                name = "parent of",
+                inverseName = "child of",
+                isSymmetric = false,
+                canonConstraints = new { ageOrder = "Banana" },
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, byName.StatusCode);
+        Assert.Empty(await ListTypes(client, universe.Id));
+    }
+
+    [Fact]
+    public async Task A_symmetric_type_may_bound_an_age_gap_but_cannot_name_an_older_end()
+    {
+        var (client, universe) = await SignedInWithUniverse("relcons-sym");
+
+        var ordered = await PostType(
+            client, universe.Id,
+            new RelationshipTypeRequest(
+                "sibling of", null, true, null, null,
+                new RelationshipTypeCanonConstraints(RelationshipAgeOrder.SourceOlder, null, null)));
+
+        Assert.Equal(HttpStatusCode.BadRequest, ordered.StatusCode);
+        Assert.Contains("canonConstraints.ageOrder", await ordered.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+
+        var gap = new RelationshipTypeCanonConstraints(RelationshipAgeOrder.None, null, 20);
+        var created = await CreateType(client, universe.Id, "sibling of", isSymmetric: true, constraints: gap);
+
+        Assert.Equal(gap, created.CanonConstraints);
+    }
+
+    [Fact]
+    public async Task A_type_cannot_be_turned_symmetric_beneath_an_age_order_it_already_has()
+    {
+        var (client, universe) = await SignedInWithUniverse("relcons-symswitch");
+        var configured = new RelationshipTypeCanonConstraints(RelationshipAgeOrder.SourceOlder, null, null);
+        var type = await CreateType(client, universe.Id, "parent of", "child of", constraints: configured);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/universes/{universe.Id}/relationship-types/{type.Id}",
+            new RelationshipTypeRequest("parent of", null, true, null, null));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var stored = Assert.Single(await ListTypes(client, universe.Id));
+        Assert.False(stored.IsSymmetric);
+        Assert.Equal(configured, stored.CanonConstraints);
+    }
+
+    [Fact]
+    public async Task Another_owner_cannot_change_a_types_constraints()
+    {
+        var (alice, aliceUniverse) = await SignedInWithUniverse("relcons-own-a");
+        var aliceType = await CreateType(alice, aliceUniverse.Id, "parent of", "child of");
+
+        var bob = await SignedInClient("user-relcons-own-b");
+
+        var response = await bob.PutAsJsonAsync(
+            $"/api/universes/{aliceUniverse.Id}/relationship-types/{aliceType.Id}",
+            new RelationshipTypeRequest(
+                "parent of", "child of", false, null, null,
+                new RelationshipTypeCanonConstraints(RelationshipAgeOrder.SourceOlder, 12, null)));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(
+            RelationshipTypeCanonConstraints.None,
+            Assert.Single(await ListTypes(alice, aliceUniverse.Id)).CanonConstraints);
+    }
+
+    [Fact]
+    public async Task A_type_cannot_be_configured_through_a_universe_it_does_not_belong_to()
+    {
+        var (client, first) = await SignedInWithUniverse("relcons-scope");
+        var second = await CreateUniverse(client, "World relcons-scope two");
+        var type = await CreateType(client, first.Id, "parent of", "child of");
+
+        // The same owner, so this is not about the account: the type is simply not in that universe.
+        var response = await client.PutAsJsonAsync(
+            $"/api/universes/{second.Id}/relationship-types/{type.Id}",
+            new RelationshipTypeRequest(
+                "parent of", "child of", false, null, null,
+                new RelationshipTypeCanonConstraints(RelationshipAgeOrder.SourceOlder, null, null)));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Empty(await ListTypes(client, second.Id));
+        Assert.Equal(
+            RelationshipTypeCanonConstraints.None,
+            Assert.Single(await ListTypes(client, first.Id)).CanonConstraints);
+    }
+
     // ---------- Helpers ----------
 
     private async Task<HttpClient> SignedInClient(string username)
@@ -606,11 +832,32 @@ public sealed class RelationshipEndpointTests(LorexApiFactory factory) : IClassF
         string name,
         string? inverseName = null,
         bool isSymmetric = false,
-        string? description = null)
+        string? description = null,
+        RelationshipTypeCanonConstraints? constraints = null)
     {
-        var response = await client.PostAsJsonAsync(
-            $"/api/universes/{universeId}/relationship-types",
-            new RelationshipTypeRequest(name, inverseName, isSymmetric, description, null));
+        var response = await PostType(
+            client,
+            universeId,
+            new RelationshipTypeRequest(name, inverseName, isSymmetric, description, null, constraints));
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<RelationshipTypeResponse>())!;
+    }
+
+    private static Task<HttpResponseMessage> PostType(
+        HttpClient client,
+        Guid universeId,
+        RelationshipTypeRequest request) =>
+        client.PostAsJsonAsync($"/api/universes/{universeId}/relationship-types", request);
+
+    private static async Task<RelationshipTypeResponse> UpdateType(
+        HttpClient client,
+        Guid universeId,
+        Guid typeId,
+        RelationshipTypeRequest request)
+    {
+        var response = await client.PutAsJsonAsync(
+            $"/api/universes/{universeId}/relationship-types/{typeId}",
+            request);
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<RelationshipTypeResponse>())!;
     }

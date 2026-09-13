@@ -376,6 +376,70 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
     }
 
     [Fact]
+    public async Task A_relationship_types_canon_constraints_travel_with_it_and_an_unconstrained_type_says_so()
+    {
+        var (client, universe) = await SignedInWithUniverse("expconstraints");
+
+        (await client.PostAsJsonAsync(
+            $"/api/universes/{universe.Id}/relationship-types",
+            new RelationshipTypeRequest(
+                "parent of", "child of", false, null, 1,
+                new RelationshipTypeCanonConstraints(RelationshipAgeOrder.SourceOlder, 12, 60))))
+            .EnsureSuccessStatusCode();
+        (await client.PostAsJsonAsync(
+            $"/api/universes/{universe.Id}/relationship-types",
+            new RelationshipTypeRequest("rules", "ruled by", false, null, 2)))
+            .EnsureSuccessStatusCode();
+
+        var backup = await Backup(client, universe.Id);
+
+        // Authored configuration, added within version 4: no fact changes meaning without it.
+        Assert.Equal(4, backup.FormatVersion);
+
+        var parent = backup.Payload.RelationshipTypes.Single(type => type.Name == "parent of");
+        Assert.Equal(RelationshipAgeOrder.SourceOlder, parent.AgeOrder);
+        Assert.Equal(12, parent.MinAgeDifferenceYears);
+        Assert.Equal(60, parent.MaxAgeDifferenceYears);
+
+        var rules = backup.Payload.RelationshipTypes.Single(type => type.Name == "rules");
+        Assert.Equal(RelationshipAgeOrder.None, rules.AgeOrder);
+        Assert.Null(rules.MinAgeDifferenceYears);
+        Assert.Null(rules.MaxAgeDifferenceYears);
+
+        // Written out by name, with the nulls present rather than omitted, and the same bytes twice.
+        var first = await RawExport(client, universe.Id);
+        Assert.Equal(PayloadText(first), PayloadText(await RawExport(client, universe.Id)));
+
+        using var document = JsonDocument.Parse(first);
+        var written = document.RootElement.GetProperty("payload").GetProperty("relationshipTypes")
+            .EnumerateArray()
+            .Single(type => type.GetProperty("name").GetString() == "rules");
+
+        Assert.Equal("None", written.GetProperty("ageOrder").GetString());
+        Assert.Equal(JsonValueKind.Null, written.GetProperty("minAgeDifferenceYears").ValueKind);
+        Assert.Equal(JsonValueKind.Null, written.GetProperty("maxAgeDifferenceYears").ValueKind);
+    }
+
+    [Fact]
+    public void A_relationship_type_written_before_constraints_existed_reads_as_unconstrained()
+    {
+        const string written = """
+            {
+              "id": "5b0f2a31-6d7e-4c1b-9a44-7f0c2e9d1a10", "name": "parent of", "inverseName": "child of",
+              "isSymmetric": false, "description": null, "displayOrder": 1,
+              "createdAt": "2026-09-01T00:00:00Z", "updatedAt": "2026-09-01T00:00:00Z"
+            }
+            """;
+
+        var type = JsonSerializer.Deserialize<BackupRelationshipType>(written, UniverseBackupJson.Options)!;
+
+        Assert.Equal("parent of", type.Name);
+        Assert.Equal(RelationshipAgeOrder.None, type.AgeOrder);
+        Assert.Null(type.MinAgeDifferenceYears);
+        Assert.Null(type.MaxAgeDifferenceYears);
+    }
+
+    [Fact]
     public async Task The_timeline_keeps_its_signed_years_its_precision_and_who_took_part()
     {
         var (client, universe) = await SignedInWithUniverse("exptimeline");

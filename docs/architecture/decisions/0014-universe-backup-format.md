@@ -1,8 +1,9 @@
 # ADR 0014 - A backup is one versioned archive holding a universe's authored data
 
 Status: accepted (2026-09-09), amended 2026-09-10 (version 3: the file became an archive),
-2026-09-11 (type icon keys, and a short-lived image framing member, both within version 3), and
-2026-09-13 (version 4: a universe's eras)
+2026-09-11 (type icon keys, and a short-lived image framing member, both within version 3),
+2026-09-13 (version 4: a universe's eras), and 2026-09-13 (relationship type Canon constraints,
+within version 4)
 
 ## Context
 
@@ -106,6 +107,12 @@ re-meaning clause, so it is a bump. A file at versions 1 to 3 names no eras - `c
 absent and reads as null - and every year in it is a plain signed year. Nothing derived from the
 eras, such as a formatted date or a sort key, is carried.
 
+Relationship types carry their Canon constraints (ADR 0023): `ageOrder` by name,
+`minAgeDifferenceYears` and `maxAgeDifferenceYears`, always written, `None` and two nulls on a type
+with none. That is not a bump. The constraints are rules checked against the lore, not lore: a reader
+that ignores them loses the checks and misreads no year, link or entry. A version 4 file written before
+them lacks all three, and means no constraint.
+
 **Only the authored data.** The test for inclusion is: did a person write this, or would
 Lorex produce it again from what a person wrote?
 
@@ -115,7 +122,7 @@ Lorex produce it again from what a person wrote?
 | Entity types with their icon key, field definitions with their declared `Semantic`, options | - |
 | Entries: name, summary, Tiptap article, canon status, archived flag, `deletedAt` | - |
 | Aliases, tags, stored values including entity references | Alias and value row ids |
-| Relationship types and relationships | - |
+| Relationship types with their Canon constraints, and relationships | - |
 | The universe's eras: name, short label, order, direction, label position | Formatted dates and sort keys |
 | Timeline entries, their date components, era ids and era labels, participants | Derived date precision |
 | Every entry's revision history (ADR 0013) | - |

@@ -7,23 +7,51 @@ import {
   listRelationshipTypes,
   updateRelationshipType,
 } from '../relationships/api'
-import type { RelationshipType } from '../relationships/types'
+import {
+  AgeOrder,
+  type AgeOrderValue,
+  type RelationshipCanonConstraints,
+  type RelationshipType,
+} from '../relationships/types'
 
 interface TypeDraft {
   name: string
   inverseName: string
   isSymmetric: boolean
   description: string
+  ageOrder: AgeOrderValue
+  /** As typed, so a half-written number is never silently read as "no gap". */
+  minGap: string
+  maxGap: string
 }
 
-const BLANK: TypeDraft = { name: '', inverseName: '', isSymmetric: false, description: '' }
+const BLANK: TypeDraft = {
+  name: '',
+  inverseName: '',
+  isSymmetric: false,
+  description: '',
+  ageOrder: AgeOrder.None,
+  minGap: '',
+  maxGap: '',
+}
+
+/** The server's field keys, lowercased the way `ApiError` hands them over. */
+const ORDER_KEY = 'canonconstraints.ageorder'
+const MIN_KEY = 'canonconstraints.minagedifferenceyears'
+const MAX_KEY = 'canonconstraints.maxagedifferenceyears'
+
+const GAP_MESSAGE = 'An age gap is a whole number of years, 0 or more.'
 
 function draftFrom(type: RelationshipType): TypeDraft {
+  const constraints = type.canonConstraints
   return {
     name: type.name,
     inverseName: type.inverseName ?? '',
     isSymmetric: type.isSymmetric,
     description: type.description ?? '',
+    ageOrder: constraints.ageOrder,
+    minGap: constraints.minAgeDifferenceYears?.toString() ?? '',
+    maxGap: constraints.maxAgeDifferenceYears?.toString() ?? '',
   }
 }
 
@@ -32,6 +60,40 @@ function reading(type: RelationshipType) {
   return type.isSymmetric
     ? `${type.name}, both ways`
     : `${type.name} one way, ${type.inverseName ?? type.name} the other`
+}
+
+/** Blank is no gap; anything else must be a whole number of years, 0 or more. */
+function readGap(text: string): number | null | 'invalid' {
+  const trimmed = text.trim()
+  if (trimmed === '') return null
+  return /^\d+$/.test(trimmed) ? Number(trimmed) : 'invalid'
+}
+
+function years(count: number) {
+  return count === 1 ? '1 year' : `${count} years`
+}
+
+/** What a kind's Canon constraints say, in words, or null when it has none. */
+function constraintSummary(constraints: RelationshipCanonConstraints) {
+  const parts: string[] = []
+
+  if (constraints.ageOrder === AgeOrder.SourceOlder) parts.push('source older than target')
+  if (constraints.ageOrder === AgeOrder.SourceYounger) parts.push('source younger than target')
+
+  const min = constraints.minAgeDifferenceYears
+  const max = constraints.maxAgeDifferenceYears
+
+  if (min !== null && max !== null) {
+    parts.push(
+      min === max ? `born exactly ${years(min)} apart` : `born ${min} to ${max} years apart`,
+    )
+  } else if (min !== null) {
+    parts.push(`born at least ${years(min)} apart`)
+  } else if (max !== null) {
+    parts.push(`born at most ${years(max)} apart`)
+  }
+
+  return parts.length > 0 ? `Canon: ${parts.join(', ')}` : null
 }
 
 export function RelationshipTypeManager({ universeId }: { universeId: string }) {
@@ -71,6 +133,22 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
   async function save() {
     setMessage(null)
     setFieldErrors({})
+
+    // The same checks the API makes, so a mistake is named beside its field before a request.
+    // A minimum above the maximum is never swapped: which number was mistyped is the author's call.
+    const min = readGap(draft.minGap)
+    const max = readGap(draft.maxGap)
+    const errors: Record<string, string> = {}
+    if (min === 'invalid') errors[MIN_KEY] = GAP_MESSAGE
+    if (max === 'invalid') errors[MAX_KEY] = GAP_MESSAGE
+    if (typeof min === 'number' && typeof max === 'number' && min > max) {
+      errors[MAX_KEY] = `The largest gap cannot be smaller than the smallest gap, ${years(min)}.`
+    }
+    if (Object.keys(errors).length > 0 || min === 'invalid' || max === 'invalid') {
+      setFieldErrors(errors)
+      return
+    }
+
     setIsSaving(true)
 
     const input = {
@@ -80,6 +158,12 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
       isSymmetric: draft.isSymmetric,
       description: draft.description.trim() ? draft.description.trim() : null,
       displayOrder: null,
+      canonConstraints: {
+        // Nor does it have an older end, which is why the control is not offered for one.
+        ageOrder: draft.isSymmetric ? AgeOrder.None : draft.ageOrder,
+        minAgeDifferenceYears: min,
+        maxAgeDifferenceYears: max,
+      },
     }
 
     try {
@@ -120,6 +204,8 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
   function edit(change: Partial<TypeDraft>) {
     setDraft((current) => ({ ...current, ...change }))
   }
+
+  const orderError = fieldErrors[ORDER_KEY]
 
   const form = (
     <div className="reltype__form" data-testid="relationship-type-form">
@@ -165,6 +251,76 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
         onChange={(event) => edit({ description: event.target.value })}
         error={fieldErrors.description}
       />
+
+      <fieldset className="reltype__canon" data-testid="reltype-canon">
+        <legend className="reltype__legend">Canon constraints</legend>
+        <p className="field__hint">
+          Optional rules used by Canon Integrity. LoreX never infers these from the relationship
+          name.
+        </p>
+
+        <p className="reltype__direction" data-testid="reltype-direction">
+          <span className="reltype__end">Source</span>
+          <span aria-hidden="true">→</span>
+          <span>{draft.name.trim() || 'reads as'}</span>
+          <span aria-hidden="true">→</span>
+          <span className="reltype__end">Target</span>
+        </p>
+
+        {draft.isSymmetric ? (
+          <p className="field__hint" data-testid="reltype-no-order">
+            Reads the same from both sides, so neither end is the older one. An age gap still
+            applies.
+          </p>
+        ) : (
+          <div className="field">
+            <label className="field__label" htmlFor="reltype-age-order">
+              Age ordering
+            </label>
+            <select
+              id="reltype-age-order"
+              className="field__input field__input--select"
+              value={draft.ageOrder}
+              onChange={(event) => edit({ ageOrder: Number(event.target.value) as AgeOrderValue })}
+              aria-invalid={orderError ? true : undefined}
+              aria-describedby={orderError ? 'reltype-age-order-error' : undefined}
+              data-testid="reltype-age-order"
+            >
+              <option value={AgeOrder.None}>No age rule</option>
+              <option value={AgeOrder.SourceOlder}>Source must be older</option>
+              <option value={AgeOrder.SourceYounger}>Source must be younger</option>
+            </select>
+            {orderError ? (
+              <p className="field__error" id="reltype-age-order-error">
+                {orderError}
+              </p>
+            ) : null}
+          </div>
+        )}
+
+        <div className="reltype__gaps">
+          <Field
+            label="Minimum age gap (years)"
+            name="reltype-min-gap"
+            inputMode="numeric"
+            placeholder="None"
+            value={draft.minGap}
+            onChange={(event) => edit({ minGap: event.target.value })}
+            error={fieldErrors[MIN_KEY]}
+            data-testid="reltype-min-gap"
+          />
+          <Field
+            label="Maximum age gap (years)"
+            name="reltype-max-gap"
+            inputMode="numeric"
+            placeholder="None"
+            value={draft.maxGap}
+            onChange={(event) => edit({ maxGap: event.target.value })}
+            error={fieldErrors[MAX_KEY]}
+            data-testid="reltype-max-gap"
+          />
+        </div>
+      </fieldset>
 
       <div className="relform__actions">
         <button
@@ -234,12 +390,18 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
         </p>
       ) : (
         <ul className="types__list" data-testid="relationship-type-list">
-          {types.map((type) =>
-            editingId === type.id ? (
-              <li className="types__row" key={type.id}>
-                {form}
-              </li>
-            ) : (
+          {types.map((type) => {
+            if (editingId === type.id) {
+              return (
+                <li className="types__row" key={type.id}>
+                  {form}
+                </li>
+              )
+            }
+
+            const summary = constraintSummary(type.canonConstraints)
+
+            return (
               <li className="types__row" key={type.id} data-reltype-name={type.name}>
                 <div className="types__head">
                   <span className="types__name">{type.name}</span>
@@ -275,10 +437,18 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
                 </div>
 
                 <p className="types__description">{reading(type)}</p>
+                {summary ? (
+                  <p
+                    className="types__description reltype__rule"
+                    data-testid={`reltype-constraints-${type.name}`}
+                  >
+                    {summary}
+                  </p>
+                ) : null}
                 {type.description ? <p className="types__description">{type.description}</p> : null}
               </li>
-            ),
-          )}
+            )
+          })}
         </ul>
       )}
     </section>

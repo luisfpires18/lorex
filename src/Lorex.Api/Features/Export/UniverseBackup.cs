@@ -1,6 +1,7 @@
 using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Chronology;
 using Lorex.Api.Features.Lore;
+using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.Timeline;
 
 namespace Lorex.Api.Features.Export;
@@ -292,6 +293,16 @@ public sealed record BackupRevisionFieldValue(
     Guid? ReferencedEntityId,
     string? ReferencedEntityName);
 
+/// <summary>
+/// One relationship type, with the Canon constraints its author configured (ADR 0023).
+///
+/// <paramref name="AgeOrder"/>, <paramref name="MinAgeDifferenceYears"/> and
+/// <paramref name="MaxAgeDifferenceYears"/> were added within version 4, not as a bump, by the rule on
+/// <see cref="UniverseBackup.CurrentVersion"/>. They are rules checked against the lore, not lore: a
+/// reader that ignores them loses the checks and misreads no year, link or entry. A type is written
+/// with <c>None</c> and two nulls when it has no constraint, and a file written before they existed -
+/// where all three are absent - means exactly that.
+/// </summary>
 public sealed record BackupRelationshipType(
     Guid Id,
     string Name,
@@ -299,6 +310,9 @@ public sealed record BackupRelationshipType(
     bool IsSymmetric,
     string? Description,
     int DisplayOrder,
+    RelationshipAgeOrder AgeOrder,
+    int? MinAgeDifferenceYears,
+    int? MaxAgeDifferenceYears,
     DateTime CreatedAt,
     DateTime UpdatedAt);
 

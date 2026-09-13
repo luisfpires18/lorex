@@ -26,8 +26,9 @@ One ADR per durable decision. Rationale lives in the ADR, never here.
 | 0020 | An entity type's icon is a key from a closed, built-in set | [0020-entity-type-icon-keys.md](0020-entity-type-icon-keys.md) |
 | 0021 | An account's photo is its own user-level media, on the entry image's proven path | [0021-profile-photo.md](0021-profile-photo.md) |
 | 0022 | A universe keeps its own chronology: ordered eras, compared as structured points | [0022-universe-chronology.md](0022-universe-chronology.md) |
+| 0023 | A relationship type may carry explicit Canon constraints, checked on the stored direction | [0023-relationship-canon-constraints.md](0023-relationship-canon-constraints.md) |
 
-All accepted. Next number: `0023`.
+All accepted. Next number: `0024`.
 
 Known limitations are recorded in the ADR that owns them - cross-era ordering on the plain
 reckoning in 0009 and 0011, and years written before a universe named its eras, the listing's
@@ -39,4 +40,4 @@ installed Lorex does not do offline in 0017, and what the DEV topology costs - o
 writer, an outage on deploy, keys unencrypted at rest and no rollback for the schema -
 in 0018, and what an entry's image costs a backup and a revision restore in 0019, and what a
 profile photo is deliberately left out of - a backup, a history and anyone else's view - in
-0021.
+0021, and the deferred life-state constraints and the gap across eras of unrecorded length in 0023.

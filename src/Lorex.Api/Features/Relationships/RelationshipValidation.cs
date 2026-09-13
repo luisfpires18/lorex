@@ -3,7 +3,14 @@ namespace Lorex.Api.Features.Relationships;
 /// <summary>Input checks for the relationship feature. Nothing invalid reaches EF Core.</summary>
 public static class RelationshipValidation
 {
-    public static Dictionary<string, string[]>? ValidateType(RelationshipTypeRequest request)
+    /// <summary>
+    /// <paramref name="constraints"/> is the group as it will be stored: the request's own, or on an
+    /// update that sent none, the type's current one. Checking the effective group rather than only
+    /// what arrived is what stops a type being turned symmetric underneath an age order it already has.
+    /// </summary>
+    public static Dictionary<string, string[]>? ValidateType(
+        RelationshipTypeRequest request,
+        RelationshipTypeCanonConstraints constraints)
     {
         var errors = new Dictionary<string, string[]>();
 
@@ -40,7 +47,53 @@ public static class RelationshipValidation
             errors["description"] = ["That description is too long."];
         }
 
+        ValidateConstraints(constraints, request.IsSymmetric, errors);
+
         return errors.Count == 0 ? null : errors;
+    }
+
+    /// <summary>
+    /// The shape of a constraint group, and nothing about whether any relationship obeys it. A type
+    /// may be given a rule its existing relationships already break: that is a finding for Canon
+    /// Integrity to report, not a reason to refuse the rule (ADR 0023).
+    ///
+    /// A minimum above the maximum is refused rather than swapped. Which of the two numbers the
+    /// author mistyped is not something Lorex can know.
+    /// </summary>
+    private static void ValidateConstraints(
+        RelationshipTypeCanonConstraints constraints,
+        bool isSymmetric,
+        Dictionary<string, string[]> errors)
+    {
+        if (!Enum.IsDefined(constraints.AgeOrder))
+        {
+            errors["canonConstraints.ageOrder"] = ["That is not an age rule Lorex knows."];
+        }
+        else if (isSymmetric && constraints.AgeOrder != RelationshipAgeOrder.None)
+        {
+            // A symmetric type says neither end is special, so "the source is older" would depend
+            // only on which entry the author happened to pick first.
+            errors["canonConstraints.ageOrder"] =
+                ["A kind that reads the same from both sides has no older side. Remove the age order, or make the kind one-way."];
+        }
+
+        var min = constraints.MinAgeDifferenceYears;
+        var max = constraints.MaxAgeDifferenceYears;
+
+        if (min is < 0)
+        {
+            errors["canonConstraints.minAgeDifferenceYears"] = ["An age gap is a whole number of years, 0 or more."];
+        }
+
+        if (max is < 0)
+        {
+            errors["canonConstraints.maxAgeDifferenceYears"] = ["An age gap is a whole number of years, 0 or more."];
+        }
+        else if (min is { } smallest and >= 0 && max is { } largest && smallest > largest)
+        {
+            errors["canonConstraints.maxAgeDifferenceYears"] =
+                [$"The largest gap cannot be smaller than the smallest gap, {smallest} {(smallest == 1 ? "year" : "years")}."];
+        }
     }
 
     public static Dictionary<string, string[]>? ValidateRelationship(RelationshipRequest request)
