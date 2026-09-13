@@ -1,10 +1,9 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { ArrowDown, ArrowRightLeft, ArrowUp, Pencil, Trash } from 'lucide-react'
+import { ArrowDown, ArrowRightLeft, ArrowUp, PenLine, Pencil, Trash } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ActionIcon } from './ActionIcon'
-import { LoreReference } from './LoreReference'
+import { SceneBeats, SceneLore, SceneStamp } from './SceneContext'
 import type { Chronology } from '../chronology/types'
-import { sceneWhen } from '../stories/format'
 import type { SceneBeatReference } from '../stories/structure'
 import type { Scene } from '../stories/types'
 
@@ -143,13 +142,17 @@ interface SceneCardProps {
  * One scene in its container's list: number, where it happens, whose eyes, what happens, what lore it
  * draws on, which plot beats point at it, and the tools. Notes stay in the form - the list is for scanning.
  *
- * The plot row is read-only. The beats own those links, so each one is a way to the beat on the story's
- * Plot view rather than something edited here.
+ * The lore and plot rows are read-only. The beats own those links, so each one is a way to the beat on the
+ * story's Plot view rather than something edited here.
  *
- * Reordering is plain buttons rather than a drag gesture, so it works from a keyboard, a screen reader
- * and a phone alike. Move up and Move down stay inside the scene's chapter; Move to… takes it to another
- * chapter or to Unchaptered, last there. Each tool's visible label is its accessible name, and the
- * scene's title describes it, so "Move up" is announced with the scene it moves.
+ * Write opens this scene on the Manuscript view - the one editor, at the scene's own address - so a writer
+ * never has to find the scene again in the outline. Reordering is plain buttons rather than a drag gesture, so
+ * it works from a keyboard, a screen reader and a phone alike. Move up and Move down stay inside the scene's
+ * chapter; Move to… takes it to another chapter or to Unchaptered, last there. Each tool's visible label is its
+ * accessible name, and the scene's title describes it, so "Move up" is announced with the scene it moves.
+ *
+ * The row takes the focus - but is never in the tab order - so a link that lands on the scene can put a keyboard
+ * and a screen reader there too.
  */
 export function SceneCard({
   universeId,
@@ -167,33 +170,22 @@ export function SceneCard({
   controlRef,
 }: SceneCardProps) {
   const titleId = useId()
-  const plotLabelId = useId()
-  const when = sceneWhen(chronology, scene.chronology)
   const Title = titleLevel === 5 ? 'h5' : 'h4'
 
   return (
-    <li className="scene" id={`scene-${scene.id}`} data-testid="scene" data-title={scene.title}>
+    <li
+      className="scene"
+      id={`scene-${scene.id}`}
+      tabIndex={-1}
+      data-testid="scene"
+      data-title={scene.title}
+    >
       <span className="scene__number" aria-hidden="true">
         {index + 1}
       </span>
 
       <div className="scene__body">
-        {when || scene.pov ? (
-          <div className="scene__stamp">
-            {when ? (
-              <span className="scene__when" data-testid="scene-when">
-                {when.text}
-                {when.placed ? null : <span className="scene__unplaced"> · no era yet</span>}
-              </span>
-            ) : null}
-            {scene.pov ? (
-              <span className="scene__pov" data-testid="scene-pov">
-                <span className="scene__label">Point of view</span>
-                <LoreReference universeId={universeId} reference={scene.pov} portrait />
-              </span>
-            ) : null}
-          </div>
-        ) : null}
+        <SceneStamp universeId={universeId} chronology={chronology} scene={scene} testId="scene" />
 
         <Title className="scene__title" id={titleId}>
           <span className="visually-hidden">Scene {index + 1}: </span>
@@ -202,43 +194,19 @@ export function SceneCard({
 
         {scene.summary ? <p className="scene__summary">{scene.summary}</p> : null}
 
-        {scene.entities.length > 0 ? (
-          <ul className="scene__lore" aria-label="Linked lore" data-testid="scene-lore">
-            {scene.entities.map((reference) => (
-              <li key={reference.entityId}>
-                <LoreReference universeId={universeId} reference={reference} />
-              </li>
-            ))}
-          </ul>
-        ) : null}
-
-        {beats.length > 0 ? (
-          <div className="scene__plot">
-            <span className="scene__label" id={plotLabelId}>
-              Plot
-            </span>
-            <ul className="scene__lore" aria-labelledby={plotLabelId} data-testid="scene-plot">
-              {beats.map((beat) => (
-                <li key={beat.beatId}>
-                  <Link
-                    className="lorechip plotchip"
-                    to={`/app/universes/${universeId}/stories/${scene.storyId}/plot#beat-${beat.beatId}`}
-                    aria-label={`${beat.arcTitle}: ${beat.beatTitle}`}
-                    data-testid="scene-plot-beat"
-                  >
-                    <span className="lorechip__name">
-                      {beat.arcTitle}
-                      <span className="plotchip__arrow"> → </span>
-                      {beat.beatTitle}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
+        <SceneLore universeId={universeId} scene={scene} testId="scene" />
+        <SceneBeats universeId={universeId} storyId={scene.storyId} beats={beats} testId="scene" />
 
         <div className="scene__tools storytools">
+          <Link
+            className="button button--quiet button--icon"
+            to={`/app/universes/${universeId}/stories/${scene.storyId}/manuscript/${scene.id}`}
+            aria-describedby={titleId}
+            data-testid="scene-write"
+          >
+            <ActionIcon icon={PenLine} />
+            Write
+          </Link>
           <button
             ref={(element) => controlRef(`${scene.id}:up`, element)}
             className="button button--quiet button--icon"
@@ -280,7 +248,7 @@ export function SceneCard({
             data-testid="scene-edit"
           >
             <ActionIcon icon={Pencil} />
-            Edit
+            Edit scene
           </button>
           <button
             className="button button--quiet button--icon"
@@ -290,7 +258,7 @@ export function SceneCard({
             data-testid="scene-delete"
           >
             <ActionIcon icon={Trash} />
-            Delete
+            Delete scene
           </button>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ApiError } from '../lib/api'
+import { useReturnFocus } from '../lib/returnFocus'
 import { createChapter, updateChapter } from '../stories/api'
 import type { Chapter } from '../stories/types'
 
@@ -50,6 +51,8 @@ export function ChapterForm({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+
+  useReturnFocus()
 
   useEffect(() => {
     dialog.current?.showModal()

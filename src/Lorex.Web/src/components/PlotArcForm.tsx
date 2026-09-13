@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ApiError } from '../lib/api'
+import { useReturnFocus } from '../lib/returnFocus'
 import { createPlotArc, updatePlotArc } from '../stories/api'
 import type { PlotArc } from '../stories/types'
 
@@ -50,6 +51,8 @@ export function PlotArcForm({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+
+  useReturnFocus()
 
   useEffect(() => {
     dialog.current?.showModal()
@@ -114,9 +117,7 @@ export function PlotArcForm({
         }}
       >
         <header className="drawer__head">
-          <p className="drawer__eyebrow">
-            {arc ? `Editing ${number ?? 'an arc'}` : 'A new plot arc'}
-          </p>
+          <p className="drawer__eyebrow">{arc ? `Editing ${number ?? 'an arc'}` : 'A new arc'}</p>
           <h2 className="drawer__title" id="plot-arc-heading">
             {arc ? arc.title : 'New arc'}
           </h2>

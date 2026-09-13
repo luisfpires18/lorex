@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ApiError } from '../lib/api'
+import { useReturnFocus } from '../lib/returnFocus'
 import { createStory, updateStory } from '../stories/api'
 import {
   STORY_STATUS_LABELS,
@@ -38,6 +39,8 @@ export function StoryForm({ universeId, story, onClose, onSaved }: StoryFormProp
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+
+  useReturnFocus()
 
   useEffect(() => {
     // showModal brings the focus trap, the backdrop and Escape with it.

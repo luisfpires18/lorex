@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { ActionIcon } from './ActionIcon'
 import { PlotArcForm } from './PlotArcForm'
 import { PlotArcSection } from './PlotArcSection'
@@ -40,6 +41,9 @@ interface PlotPanelProps {
  * is planning to scan, not a board to arrange. Move up and Move down reorder an arc among the arcs, or a beat inside
  * its arc; a beat changes arc from its form. Neither order follows the order scenes are told in, their chapters or
  * when anything happens in the world, and nothing written here becomes a fact about it.
+ *
+ * Laid out like the Scenes view: the view's own tools and a line on how it is ordered, or - with nothing planned yet -
+ * one empty state holding the one way to begin.
  */
 export function PlotPanel({
   universeId,
@@ -195,30 +199,32 @@ export function PlotPanel({
     }
   }
 
+  const newArc = (
+    <button
+      className="button button--icon"
+      type="button"
+      onClick={() => setArcForm({ mode: 'new' })}
+      data-testid="new-plot-arc"
+    >
+      <ActionIcon icon={Plus} />
+      New arc
+    </button>
+  )
+
   return (
     <section className="plot" aria-labelledby="story-plot-heading" data-testid="plot">
-      <div className="story__sceneshead">
-        <h3 className="story__subtitle" id="story-plot-heading">
-          Plot
-        </h3>
-        <div className="story__sceneactions">
-          <button
-            className="button button--icon"
-            type="button"
-            onClick={() => setArcForm({ mode: 'new' })}
-            data-testid="new-plot-arc"
-          >
-            <ActionIcon icon={Plus} />
-            New arc
-          </button>
-        </div>
-      </div>
+      <h3 className="visually-hidden" id="story-plot-heading">
+        Plot
+      </h3>
 
       {arcs.length > 0 ? (
-        <p className="chron__aside">
-          Arcs in the order you plan them, and the beats in each. Neither follows the order scenes
-          are told in or when they happen.
-        </p>
+        <div className="story__toolbar">
+          <p className="chron__aside story__aside">
+            Arcs in the order you plan them, and the beats in each. Neither follows the order scenes
+            are told in or when they happen.
+          </p>
+          <div className="story__toolbaractions">{newArc}</div>
+        </div>
       ) : null}
 
       {message ? (
@@ -229,19 +235,25 @@ export function PlotPanel({
 
       {arcs.length === 0 ? (
         <div className="empty" data-testid="plot-empty">
-          <p className="empty__line">No plot arcs yet.</p>
+          <p className="empty__line">No arcs yet.</p>
           <p className="empty__hint">
-            An arc is a thread you follow through the story; its beats are the steps.
+            An arc is a thread you follow through the story; its beats are the steps, and each can
+            point at the scenes it plays out in.
+            {story.scenes.length === 0 ? (
+              <>
+                {' '}
+                Most stories start with a scene —{' '}
+                <Link
+                  to={`/app/universes/${universeId}/stories/${story.id}`}
+                  data-testid="plot-empty-scenes"
+                >
+                  add one on the Scenes view
+                </Link>
+                . A beat needs none.
+              </>
+            ) : null}
           </p>
-          <button
-            className="button button--icon empty__action"
-            type="button"
-            onClick={() => setArcForm({ mode: 'new' })}
-            data-testid="empty-new-plot-arc"
-          >
-            <ActionIcon icon={Plus} />
-            New arc
-          </button>
+          <div className="empty__actions">{newArc}</div>
         </div>
       ) : null}
 

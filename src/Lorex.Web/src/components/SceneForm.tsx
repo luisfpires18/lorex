@@ -8,6 +8,7 @@ import { EntityMultiPicker, EntityPicker, type EntityChoice } from './EntityPick
 import { namesEras } from '../chronology/format'
 import type { Chronology, ChronologyValue } from '../chronology/types'
 import { ApiError } from '../lib/api'
+import { useReturnFocus } from '../lib/returnFocus'
 import { createScene, updateScene } from '../stories/api'
 import { chapterLabel, UNCHAPTERED } from '../stories/format'
 import type { Chapter, Scene, SceneLoreReference } from '../stories/types'
@@ -141,6 +142,8 @@ export function SceneForm({
 
   // A plain year written before the universe named its eras has no era to show in the picker.
   const unreckoned = reckonsInEras && scene?.chronology != null && scene.chronology.eraId === null
+
+  useReturnFocus()
 
   useEffect(() => {
     dialog.current?.showModal()

@@ -1,6 +1,7 @@
 # ADR 0027 - A scene's manuscript is plain prose in a row of its own, read and written on its own route
 
-Status: accepted (2026-09-13)
+Status: accepted (2026-09-13), amended 2026-09-13 (Phase 2 closeout: the shared header, Write and Show in Scenes,
+Sign out asks, Back and Forward decided)
 
 ## Context
 
@@ -95,6 +96,25 @@ never reorders. The open scene shows where it is told ("Chapter 2 — Arrival ·
 of view and plot beats, and an Edit scene button that opens the existing scene drawer in place with the draft untouched.
 The prose is a plain textarea at a 46rem measure with a sticky save bar. At 1100px and below the outline folds into a
 disclosure that names the open scene; choosing a scene closes it and puts the focus on it. No word count.
+
+## Amendment - Phase 2 closeout (2026-09-13)
+
+Reviewed as one product with Scenes and Plot, nothing about the manuscript's storage, route, bound or concurrency
+changed. What changed is how the three views meet.
+
+- **The shared header is short.** Title and facts; the premise on the Scenes view only; one bar holding the three
+  views and Edit and Delete story, which are icon-only below 640px and keep their names. On a phone the header
+  used to fill the first screen and push the text box below it.
+- **A scene and its prose are a link apart, both ways.** Every scene card has Write, to this view's address for that
+  scene - the same editor, not a second one. The manuscript page gains Show in Scenes and a Lore row beside the point
+  of view and beats, drawn by the same `SceneContext` components as the scene card. A link that lands on a scene or a
+  beat scrolls to it, focuses it and marks it for a moment.
+- **The leave guard asks on Sign out too.** Signing out is a button, so the link check never saw it and unsaved prose
+  went silently; `confirmLeaving` asks the same question first.
+- **Back and Forward stay uncaught, and this is now a decision rather than a gap.** A browser pop cannot be cancelled,
+  only undone by moving the history again. React Router's blocker does exactly that, and is the tested way to, but only
+  under a data router - moving the whole app off `BrowserRouter` to protect one editor, and still reverting a pop after
+  it happened. Not done. The manual test plan tells the owner so. Deferred below, unchanged.
 
 ## Deferred
 
