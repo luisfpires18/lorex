@@ -68,7 +68,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Lore/EntityArticleEndpoints.cs` | Read, save and restore an entry's article and read its history; live entries of the owner's universe only; the stale-save 409; the entry's `UpdatedAt` and search kept in step. The only route that carries an article. |
 | `Features/Lore/LoreConfiguration.cs` | Lore schema: keys, indexes and delete behaviour. |
 | `Features/Lore/LoreAccess.cs` | The universe-ownership gate every lore route passes. |
-| `Features/Lore/EntityEndpoints.cs` | Entity CRUD, search, filters, paging, tags. |
+| `Features/Lore/EntityEndpoints.cs` | Entity CRUD, search, filters, paging, tags; an entry write that still carries the article refused whole. |
 | `Features/Lore/EntityTypeEndpoints.cs` | Entity types and their field definitions. |
 | `Features/Lore/EntityTypeDefaults.cs` | Idempotent seeding of the starter types, each with its icon key as data. |
 | `Features/Lore/EntityTypeIcons.cs` | The closed set of icon keys a type may carry; mirrored by the web client. |
@@ -161,12 +161,12 @@ Repository index. Paths and one-line responsibilities only.
 | `public/brand-mark.png` | The same mark, transparent, for use inside the product. |
 | `src/main.tsx` | React entry point. |
 | `src/pwa.ts` | Registers the service worker, in production builds only. |
-| `src/App.tsx` | Routes and providers. |
+| `src/App.tsx` | Routes and providers, held by a data router with one catch-all route so history moves can be guarded. |
 | `src/styles.css` | Design tokens, all component styles, and the narrow-screen and touch layers. |
 | `src/lib/api.ts` | Same-origin fetch wrapper and `ApiError`. |
 | `src/lib/imageCrop.ts` | The crop shape, the accepted formats and the size ceiling, shared by both pictures. |
 | `src/lib/upload.ts` | The one `XMLHttpRequest` in Lorex: a multipart upload that reports byte progress, failing as the same `ApiError`. |
-| `src/lib/leaveGuard.ts` | `useLeaveGuard`: asks before unsaved work is left by a same-origin link or by leaving the page, and `confirmLeaving` for Sign out. Not the Back button. |
+| `src/lib/leaveGuard.ts` | `useLeaveGuard`: asks before unsaved work is left by a same-origin link or by leaving the page; `confirmLeaving` for Sign out; `HistoryLeaveGuard`, the one router blocker, for the browser's Back and Forward. |
 | `src/lib/returnFocus.ts` | `useReturnFocus`: hands the focus back to whatever opened a story drawer once it closes. |
 | `src/auth/` | Session context, `useAuth`, and the route guards. |
 | `src/universes/` | Universe API client and types. |
@@ -233,7 +233,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.Api.Tests/ProfileImageTests.cs` | The account's photo: what is stored, who may touch it, what a replace, reframe or remove leaves behind, and what a backup must never hold. |
 | `Lorex.Api.Tests/EntitySearchTests.cs` | What full text finds, what it must never find, what keeps the index in step, and the article excerpt a result carries. |
 | `Lorex.Api.Tests/ArticleTestClient.cs` | The HTTP steps the article tests share, and a sample of a real article document. Not a test. |
-| `Lorex.Api.Tests/EntityArticleEndpointTests.cs` | An article read and saved exactly, empty and cleared, the bound, refused documents, stale saves, ownership and foreign ids, independence from structured edits and entry restores, versions from before, its own history and restore, the Trash, universe deletion, and no article in any other payload. |
+| `Lorex.Api.Tests/EntityArticleEndpointTests.cs` | An article read and saved exactly, empty and cleared, the bound, refused documents, stale saves, ownership and foreign ids, independence from structured edits and entry restores, entry writes still carrying the article refused whole, versions from before, its own history and restore, the Trash, universe deletion, and no article in any other payload. |
 | `Lorex.Api.Tests/EntityArticleBackupTests.cs` | Articles in a version 9 backup: exact, with every version, cleared and trashed ones, no copy on entry revisions, determinism, and a version 8 file. |
 | `Lorex.Api.Tests/EntityArticleMigrationTests.cs` | The article migration over lore on a file: articles moved exactly with a first version, the column dropped without a rebuild, foreign keys and the search trigger intact, versions from before still readable, and a rollback with articles. |
 | `Lorex.E2E/playwright.config.ts` | Starts API + web, runs Chromium. |
@@ -241,7 +241,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.E2E/specs/auth.spec.ts` | Register, sign out, guard, sign back in. |
 | `Lorex.E2E/specs/universes.spec.ts` | Create, edit, search, archive, paginate, ownership. |
 | `Lorex.E2E/specs/lore.spec.ts` | Author an entry, edit it, filter, and cross-owner isolation. |
-| `Lorex.E2E/specs/lore-article.spec.ts` | An entry's article written, saved by button and keyboard, kept through reloads and structured edits, found by search with an excerpt, and restored from its history; asking before unsaved text is left, including Sign out; failed, stale and orphaned saves; 390px to 1920px, light and dark. |
+| `Lorex.E2E/specs/lore-article.spec.ts` | An entry's article written, saved by button and keyboard, kept through reloads and structured edits, found by search with an excerpt, and restored from its history; asking before unsaved text is left, including Sign out and the browser's Back and Forward, once per action; failed, stale and orphaned saves; 390px to 1920px, light and dark. |
 | `Lorex.E2E/specs/relationships.spec.ts` | Both readings, relation kinds, refusals, and the universe and owner boundaries. |
 | `Lorex.E2E/specs/relationship-constraints.spec.ts` | A kind's Canon constraints: configured, broken, reported, corrected, edited and cleared; the editor from 390px to 1920px, light and dark. |
 | `Lorex.E2E/specs/timeline.spec.ts` | Date kinds through the drawer, order, filters, paging, refusals, and the owner boundary. |

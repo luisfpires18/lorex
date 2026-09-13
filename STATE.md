@@ -166,7 +166,11 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   2026-09-13) and it gained everything else. ADR 0028.
   - `EntityArticles` (one per entry; `Entities.Content` dropped) and `EntityArticleRevisions`, its own history. Own route
     `.../entities/{id}/article`, `/revisions`, `/revisions/{id}/restore`; stale save 409 `entity_article_changed`. Entry
-    routes, listings, Trash and entry history carry no article; a stale client's `content` on the entry route is ignored.
+    routes, listings, Trash and entry history carry no article.
+  - **Merge-readiness fixes** (ADR 0028 amendment). An entry `POST`/`PUT` still carrying `content` - any value, any case -
+    is refused whole: 400 `entity_article_moved`, after ownership, before any write. Browser Back/Forward now ask about
+    unsaved writing: the app runs on a data router (one catch-all route around the unchanged routes) and
+    `HistoryLeaveGuard` holds history moves while a leave question stands. The manuscript gains it too.
   - A save touches the article, its version, search and the entry's `UpdatedAt` - no Canon gate, field, relationship,
     timeline or entry revision. No status of its own: it follows the entry's Canon state.
   - Entry revisions no longer copy the article and a restore never applies it. Versions recorded before keep their copy,
@@ -201,9 +205,8 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     back out. A link to a scene or beat scrolls to it, focuses it and marks it for a moment. Scene and beat tools say
     whose they are; story drawers hand the focus back to their opener. `SceneContext` draws a scene's date, point of
     view, lore and beats the same on its card and its manuscript page.
-  - The leave guard also asks on Sign out, the one in-app way out that is a button (`confirmLeaving`). Back/Forward is
-    still uncaught, deliberately: a pop can only be undone by moving the history again, and the tested way to do that
-    is a data router's blocker - an app-wide routing change, not closeout polish. ADR 0027 amendment.
+  - The leave guard also asks on Sign out, the one in-app way out that is a button (`confirmLeaving`). Back/Forward was
+    left uncaught then; Phase 3 catches it (ADR 0028 amendment).
   - "Arc" everywhere; no "plot arc" left on screen.
   - `StoryPhaseIntegrityTests` walks the whole ownership graph in one universe and proves a full story workflow changes
     no lore, relationship, timeline, revision, Canon finding or search result. `story-workspace.spec.ts` covers the
@@ -272,14 +275,15 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - Updates the story's `UpdatedAt`, not the scene's. No Canon, timeline, lore, plot link or search from prose.
   - Third story view, Manuscript, at `/stories/:id/manuscript/:sceneId?`: chapter-aware outline of links, plain textarea at
     46rem, explicit Save and Ctrl/Cmd+S, sticky save bar, Edit scene reuses the scene drawer. At 1100px and below the outline
-    folds into a disclosure. `useLeaveGuard` asks before a link or page unload drops unsaved prose; Back/Forward uncaught.
+    folds into a disclosure. `useLeaveGuard` asks before a link or page unload drops unsaved prose; Back/Forward too since ADR 0028's amendment.
   - Backup format version 8: a v7 reader would lose every word. ADR 0014.
 
 ## Baseline
 
-- **731 API integration tests, 109 Playwright tests**, green. The lore articles work ran the full Playwright suite twice;
-  each lost one different test to the known contention below - a `canon.spec.ts` 30 s timeout, then an
-  `account-menu.spec.ts` avatar read-back - and each file was green alone (6/6, 5/5). No frontend unit runner exists;
+- **735 API integration tests, 110 Playwright tests**, green. The lore articles full Playwright runs each lost one or two
+  tests to the known contention below - `canon.spec.ts` (a 30 s timeout), `account-menu.spec.ts` (the avatar read-back,
+  more than once) and, after the data-router fix, `universes.spec.ts` (a settings "saved" read) - and every file was green
+  alone (6/6, 15/15 over three repeats, 15/15 over three repeats). No frontend unit runner exists;
   the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
@@ -348,11 +352,10 @@ tool has changed the picture.
   history, Story search, a Story Trash, drag-and-drop, collaboration, manuscript export, AI, and restoring a backup.
   Also: collapsing chapters, bulk scene moves, Story-vs-Lore checks, pre-era scene years in Settings; a plot status,
   beat chronology, editing beats from a scene, board or graph views; autosave, word counts, a "has prose" marker on
-  scene cards (it needs a flag the story read can give without reading prose), and catching Back/Forward with
-  unsaved text (needs a data router - ADR 0027 amendment). ADR 0024-0027.
+  scene cards (it needs a flag the story read can give without reading prose). ADR 0024-0027.
 - **Lore article work deferred** - later, not gaps: plain text or Markdown, wiki links and backlinks, version diffs and
   pruning, restoring article text held in pre-ADR-0028 entry versions from the screen, autosave and local draft recovery
-  (Content Recovery), catching Back/Forward, word counts. Backup Import / Restore is the last Phase 3 feature. ADR 0028.
+  (Content Recovery), word counts. Backup Import / Restore is the last Phase 3 feature. ADR 0028.
 - **Relationship life-state constraints** (an end alive at the link's date) wait for dated
   relationships: `StartDate`/`EndDate` are real-world timestamps, not chronology points. A birth-year
   gap across eras of unrecorded length waits for era lengths. ADR 0023.

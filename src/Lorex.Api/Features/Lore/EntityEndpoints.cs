@@ -20,6 +20,12 @@ public static class EntityEndpoints
     private const int MaxPageSize = 50;
 
     /// <summary>
+    /// The machine-readable marker on the 400 an entry write gets when it still carries the article - a client from before
+    /// the article moved to its own route (ADR 0028).
+    /// </summary>
+    public const string ArticleMovedCode = "entity_article_moved";
+
+    /// <summary>
     /// The one grid-card projection, shared because the listing now has two orderings and only
     /// one shape: browsing reads it straight off the entity, searching reads it off the entity
     /// the score was joined to.
@@ -253,6 +259,11 @@ public static class EntityEndpoints
             return Results.NotFound();
         }
 
+        if (RefusedLegacyArticle(request) is { } refused)
+        {
+            return refused;
+        }
+
         return await gate.RunAsync(
             universeId,
             token => CreateCoreAsync(universeId, request, db, token),
@@ -339,11 +350,36 @@ public static class EntityEndpoints
             return Results.NotFound();
         }
 
+        if (RefusedLegacyArticle(request) is { } refused)
+        {
+            return refused;
+        }
+
         return await gate.RunAsync(
             universeId,
             token => UpdateCoreAsync(universeId, entityId, request, db, token),
             cancellationToken);
     }
+
+    /// <summary>
+    /// An entry write that still carries the article is refused whole, before anything runs: nothing about the entry is
+    /// saved, and the article is saved neither here nor anywhere else. Saving the entry and dropping the article would answer
+    /// an author's save with success over lost prose. Checked after ownership, so a stranger still learns nothing, and
+    /// never forwarded to the article route - a write that names no <c>updatedAt</c> could overwrite a newer article.
+    /// </summary>
+    private static IResult? RefusedLegacyArticle(EntityRequest request) =>
+        request.CarriesLegacyArticle
+            ? Results.ValidationProblem(
+                new Dictionary<string, string[]>
+                {
+                    ["content"] = ["An entry's article is saved on its own now. Reload Lorex, then save the article again."],
+                },
+                detail: "This request sent the entry's article with the entry. An article is saved on its own route, "
+                    + ".../entities/{entityId}/article, so nothing was saved - neither the entry nor its article. "
+                    + "Reload Lorex to use the current editor.",
+                title: "Article sent with the entry",
+                extensions: new Dictionary<string, object?> { ["code"] = ArticleMovedCode })
+            : null;
 
     /// <summary>
     /// The one write path for an existing entry, shared with the restore route so a restored

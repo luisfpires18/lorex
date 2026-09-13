@@ -323,6 +323,113 @@ test.describe('lore article', () => {
     await dialog.accept()
   })
 
+  test('the browser Back and Forward buttons ask once before unsaved article text is left, and a saved article moves freely', async ({
+    page,
+  }) => {
+    await signUp(page)
+    const universeId = await newUniverse(page, unique('History Article '))
+    const entityId = await seedEntity(page, universeId, 'Wayfarer')
+    await writeArticle(page, universeId, entityId, doc('Saved words.'))
+
+    const loreUrl = new RegExp(`/universes/${universeId}/lore$`)
+    const entryUrl = new RegExp(`/lore/${entityId}$`)
+    const article = page.getByTestId('article')
+    const editor = page.getByTestId('lore-editor')
+    const status = page.getByTestId('article-status')
+    const crumb = page.locator('.entry__crumbs').getByRole('link', { name: 'Lore' })
+
+    // Every question the page asks is counted and answered as the step says.
+    const questions: string[] = []
+    let answer: 'stay' | 'leave' = 'stay'
+    page.on('dialog', (dialog) => {
+      questions.push(dialog.message())
+      void (answer === 'leave' ? dialog.accept() : dialog.dismiss())
+    })
+
+    // In-app history: the Lore browser, then the entry, reached by its card.
+    await page.goto(`/app/universes/${universeId}/lore`)
+    await page.locator('[data-testid="entity-card"][data-entity-name="Wayfarer"]').click()
+    await page.waitForURL(entryUrl)
+    await expect(article.getByTestId('lore-article')).toHaveText('Saved words.')
+
+    // Nothing unsaved: Back and Forward simply move, and nothing asks.
+    await page.goBack()
+    await page.waitForURL(loreUrl)
+    await page.goForward()
+    await page.waitForURL(entryUrl)
+    await expect(article.getByTestId('lore-article')).toHaveText('Saved words.')
+
+    // With a page ahead of the entry in the history too, so Forward has somewhere to go.
+    await crumb.click()
+    await page.waitForURL(loreUrl)
+    await page.goBack()
+    await page.waitForURL(entryUrl)
+    expect(questions).toEqual([])
+
+    await page.getByTestId('article-edit').click()
+    await expect(editor).toBeFocused()
+    await page.keyboard.type(' And more.')
+    await expect(status).toHaveText('Unsaved changes')
+
+    // Back, and stay: asked once, still on the entry, still writing, the text intact and still editable.
+    await page.goBack()
+    await expect.poll(() => questions.length).toBe(1)
+    expect(questions[0]).toContain('“Wayfarer” has unsaved changes')
+    await expect(page).toHaveURL(entryUrl)
+    await expect(article).toHaveAttribute('data-state', 'editing')
+    await expect(editor).toHaveText('Saved words. And more.')
+    await expect(status).toHaveText('Unsaved changes')
+    await typeAtEnd(page, ' Still here.')
+    await expect(editor).toHaveText('Saved words. And more. Still here.')
+
+    // Forward, and stay: the same.
+    await page.goForward()
+    await expect.poll(() => questions.length).toBe(2)
+    await expect(page).toHaveURL(entryUrl)
+    await expect(editor).toHaveText('Saved words. And more. Still here.')
+
+    // A link still asks exactly once - its own question, not a second one from the history guard.
+    await crumb.click()
+    await expect.poll(() => questions.length).toBe(3)
+    await expect(page).toHaveURL(entryUrl)
+    await expect(editor).toHaveText('Saved words. And more. Still here.')
+
+    // Forward, and leave: the move is held, asked about and then made, and the unsaved text was never saved. The address
+    // changes as the move is held and again as it is made, so what is waited for is the question and the page arrived at.
+    answer = 'leave'
+    await page.goForward()
+    await expect.poll(() => questions.length).toBe(4)
+    await expect(page.getByTestId('entity-grid')).toBeVisible()
+    await expect(page).toHaveURL(loreUrl)
+    expect((await readArticle(page, universeId, entityId)).content).toBe(doc('Saved words.'))
+
+    // Back to a saved article asks nothing, and shows what is saved.
+    await page.goBack()
+    await page.waitForURL(entryUrl)
+    await expect(article.getByTestId('lore-article')).toHaveText('Saved words.')
+    expect(questions).toHaveLength(4)
+
+    // Back, and leave, from unsaved text again: one question, and the Lore browser.
+    await page.getByTestId('article-edit').click()
+    await expect(editor).toBeFocused()
+    await page.keyboard.type(' Dropped.')
+    await expect(status).toHaveText('Unsaved changes')
+    await page.goBack()
+    await expect.poll(() => questions.length).toBe(5)
+    await expect(page.getByTestId('entity-grid')).toBeVisible()
+    await expect(page).toHaveURL(loreUrl)
+    expect((await readArticle(page, universeId, entityId)).content).toBe(doc('Saved words.'))
+
+    // Saved and gone: history keeps moving without a question.
+    await page.goForward()
+    await page.waitForURL(entryUrl)
+    await expect(article.getByTestId('lore-article')).toHaveText('Saved words.')
+    await page.goBack()
+    await page.waitForURL(loreUrl)
+    await expect(page.getByTestId('entity-grid')).toBeVisible()
+    expect(questions).toHaveLength(5)
+  })
+
   test('the article reads and writes from a phone to a wide desktop, light and dark', async ({
     page,
   }) => {

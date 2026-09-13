@@ -12,9 +12,8 @@ About 30-40 minutes. Use a fresh universe so nothing else on screen confuses the
 - Create a universe. In Lore, add three or four entries - a couple of characters, a place, an item.
 - Keep a second browser tab for step 11.
 
-Known and accepted, so not bugs: story deletes are permanent (no Story Trash); the browser's Back and Forward
-buttons do **not** ask about unsaved prose (links, the story's views and Sign out do); there is no autosave, word
-count, formatting or manuscript export.
+Known and accepted, so not bugs: story deletes are permanent (no Story Trash); there is no autosave, word count,
+formatting or manuscript export.
 
 ## Steps
 
@@ -45,7 +44,8 @@ Tick each when it behaves as written. Note anything that surprised you, even if 
     with blank lines; Save (or Ctrl/Cmd+S). Status goes Unsaved changes -> Saving... -> Saved. Write in two or
     three more scenes, including one long passage (paste several pages).
 11. **Unsaved prose.** Type without saving, then try each: another scene in the outline, the Scenes/Plot view
-    links, Show in Scenes, a lore chip, the sidebar, Sign out. Every one asks; Cancel keeps your text. Then open
+    links, Show in Scenes, a lore chip, the sidebar, the browser's Back button, Sign out. Every one asks; Cancel keeps
+    your text. Then open
     the same scene in the second tab, save there, and save in the first tab: it refuses and offers "Save mine
     over it" or "Load the saved version".
 12. **Move a written scene.** On Scenes, Move to... a scene that has prose into another chapter, and reorder it.

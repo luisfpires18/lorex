@@ -13,8 +13,7 @@ second browser tab for step 6.
 - Have three entries to hand: one with an article written before this change, one without, one you can put in the Trash.
 
 Known and accepted, so not bugs: the article keeps its existing formatting toolbar and nothing new is added; there is no
-autosave, word count or diff between versions; the browser's Back and Forward buttons do **not** ask about unsaved text
-(links, Done and Sign out do); a new entry's article is written once the entry has been created.
+autosave, word count or diff between versions; a new entry's article is written once the entry has been created.
 
 ## Steps
 
@@ -33,8 +32,9 @@ Tick each when it behaves as written. Note anything that surprised you, even if 
    change.
 6. **Two tabs.** Open the same entry in the second tab, edit and save its article there. In the first tab, edit and Save:
    it refuses, keeps your text, and offers "Save mine over it" or "Load the saved version" (which asks first).
-7. **Unsaved text.** Type without saving, then try the Lore breadcrumb, the sidebar, a relationship link, Sign out, Done,
-   and closing the tab. Each asks; Cancel keeps your text.
+7. **Unsaved text.** Open the entry from the Lore list, type without saving, then try the Lore breadcrumb, the sidebar, a
+   relationship link, the browser's Back and Forward buttons (and a phone's back gesture), Sign out, Done, and closing the
+   tab. Each asks once; Cancel keeps your text and you stay put. With everything saved, Back and Forward just move.
 8. **History.** Open Article history: every save is a version. View an older one in place; Restore it: it becomes the
    newest version, "Restored version N", and nothing older disappears.
 9. **Search.** On Lore, search a word that appears only in an article. The card shows "In the article" with a few words

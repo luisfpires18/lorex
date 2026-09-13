@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Lorex.Api.Features.Media;
 
 namespace Lorex.Api.Features.Lore;
@@ -73,9 +75,9 @@ public sealed record FieldValueInput(
     Guid? EraId = null);
 
 /// <summary>
-/// The structured half of an entry. There is no article member: the article is saved on its own route
-/// (<see cref="EntityArticleRequest"/>), so a structured edit cannot overwrite it, and a client that still sends
-/// <c>content</c> here has it ignored.
+/// The structured half of an entry. The article is not part of it: the article is saved on its own route
+/// (<see cref="EntityArticleRequest"/>), so a structured edit cannot overwrite it - and a request that still sends one
+/// here is refused whole (<see cref="CarriesLegacyArticle"/>).
 /// </summary>
 public sealed record EntityRequest(
     Guid EntityTypeId,
@@ -84,7 +86,23 @@ public sealed record EntityRequest(
     CanonStatus CanonStatus,
     IReadOnlyList<string>? Aliases,
     IReadOnlyList<string>? Tags,
-    IReadOnlyList<FieldValueInput>? Fields);
+    IReadOnlyList<FieldValueInput>? Fields)
+{
+    /// <summary>
+    /// The <c>content</c> member an entry request carried before the article moved to its own route (ADR 0028), declared
+    /// only so that its presence can be seen. The serializer skips any member a record does not declare, so without this a
+    /// client still writing the article with the entry would be answered as saved and lose the article. It is matched as
+    /// every member is - case-insensitively - and whatever it holds, null included, marks that client: from an old editor,
+    /// null meant "clear the article". Never read as an article.
+    /// </summary>
+    [JsonPropertyName("content")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public JsonElement LegacyContent { get; init; }
+
+    /// <summary>Whether the request sent the article member at all. An absent member is the only accepted shape.</summary>
+    [JsonIgnore]
+    public bool CarriesLegacyArticle => LegacyContent.ValueKind != JsonValueKind.Undefined;
+}
 
 /// <summary>
 /// <paramref name="ReferencedEntityIsTrashed"/> says the reference still points at real lore

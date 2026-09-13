@@ -333,17 +333,9 @@ public sealed class EntityArticleEndpointTests(LorexApiFactory factory) : IClass
         var entity = await Detail(client, universe.Id, await CreateEntity(client, universe.Id, "Warden"));
         var saved = await WriteArticle(client, universe.Id, entity.Id, RichDocument);
 
-        // A client that still sends an article with the entry - even one a save would refuse - has it ignored.
         var edited = await client.PutAsJsonAsync(
             $"/api/universes/{universe.Id}/entities/{entity.Id}",
-            new
-            {
-                entityTypeId = entity.EntityTypeId,
-                name = "Warden of the Coast",
-                summary = "Now with a summary.",
-                content = "not json at all",
-                canonStatus = CanonStatus.Idea,
-            });
+            new EntityRequest(entity.EntityTypeId, "Warden of the Coast", "Now with a summary.", CanonStatus.Idea, null, null, null));
         Assert.Equal(HttpStatusCode.OK, edited.StatusCode);
 
         var promoted = await client.PutAsJsonAsync(
@@ -355,6 +347,136 @@ public sealed class EntityArticleEndpointTests(LorexApiFactory factory) : IClass
         Assert.Equal(RichDocument, kept.Content, StringComparer.Ordinal);
         SameMoment(saved.UpdatedAt, kept.UpdatedAt);
         Assert.Single(await ArticleRevisions(client, universe.Id, entity.Id));
+    }
+
+    // ---------- An entry write that still carries an article ----------
+
+    /// <summary>
+    /// A client from before the article moved still sends it with the entry. Saving the entry and dropping the article would
+    /// answer 200 over lost prose, so the whole write is refused - whatever the member holds, null included, however it is
+    /// cased - and nothing about the entry, its article or anything that watches them moves.
+    /// </summary>
+    [Fact]
+    public async Task An_entry_update_that_still_carries_an_article_is_refused_whole_and_changes_nothing()
+    {
+        var (client, universe) = await SignedInWithUniverse(_factory, "artlegacyput");
+        var entity = await Detail(client, universe.Id, await CreateEntity(client, universe.Id, "Warden"));
+        var saved = await WriteArticle(client, universe.Id, entity.Id, RichDocument);
+
+        var path = $"/api/universes/{universe.Id}/entities/{entity.Id}";
+        var entryBefore = await client.GetStringAsync(path);
+        var versionsBefore = await EntryRevisionCount(client, universe.Id, entity.Id);
+
+        object[] legacy =
+        [
+            new { entityTypeId = entity.EntityTypeId, name = "Renamed", summary = "Changed.", content = Doc("Rewritten in the old editor."), canonStatus = CanonStatus.Idea },
+            new { entityTypeId = entity.EntityTypeId, name = "Renamed", summary = "Changed.", content = (string?)null, canonStatus = CanonStatus.Idea },
+            new Dictionary<string, object?>
+            {
+                ["entityTypeId"] = entity.EntityTypeId,
+                ["name"] = "Renamed",
+                ["Content"] = Doc("Cased as C# would case it."),
+                ["canonStatus"] = CanonStatus.Idea,
+            },
+            new { entityTypeId = entity.EntityTypeId, name = "Renamed", content = new { type = "doc" }, canonStatus = CanonStatus.Idea },
+        ];
+
+        foreach (var body in legacy)
+        {
+            await AssertArticleMoved(await client.PutAsJsonAsync(path, body));
+        }
+
+        // Not a column, a timestamp, a version or a finding moved.
+        Assert.Equal(entryBefore, await client.GetStringAsync(path));
+        Assert.Equal(versionsBefore, await EntryRevisionCount(client, universe.Id, entity.Id));
+
+        var article = await ReadArticle(client, universe.Id, entity.Id);
+        Assert.Equal(RichDocument, article.Content, StringComparer.Ordinal);
+        SameMoment(saved.UpdatedAt, article.UpdatedAt);
+        Assert.Single(await ArticleRevisions(client, universe.Id, entity.Id));
+
+        await WithDb(_factory, async db =>
+        {
+            Assert.False(await db.CanonConflicts.AnyAsync(conflict => conflict.UniverseId == universe.Id));
+            Assert.False(await db.TimelineEntries.AnyAsync(entry => entry.UniverseId == universe.Id));
+            Assert.False(await db.Relationships.AnyAsync(link => link.UniverseId == universe.Id));
+        });
+    }
+
+    [Fact]
+    public async Task A_new_entry_that_still_carries_an_article_is_refused_and_never_created()
+    {
+        var (client, universe) = await SignedInWithUniverse(_factory, "artlegacypost");
+        var character = await CharacterTypeId(client, universe.Id);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/universes/{universe.Id}/entities",
+            new { entityTypeId = character, name = "Written in the old editor", content = Doc("Lost if accepted."), canonStatus = CanonStatus.Idea });
+        await AssertArticleMoved(response);
+
+        await WithDb(_factory, async db =>
+        {
+            Assert.False(await db.Entities.AnyAsync(entity => entity.UniverseId == universe.Id));
+            Assert.False(await db.EntityArticles.AnyAsync(article => article.Entity!.UniverseId == universe.Id));
+            Assert.False(await db.EntityRevisions.AnyAsync(revision => revision.Entity!.UniverseId == universe.Id));
+        });
+    }
+
+    /// <summary>The refusal is about the article member and nothing else: a current write saves, and other unknown members are skipped as ever.</summary>
+    [Fact]
+    public async Task A_current_entry_write_still_saves_and_other_unknown_members_are_still_skipped()
+    {
+        var (client, universe) = await SignedInWithUniverse(_factory, "artlegacycurrent");
+        var entity = await Detail(client, universe.Id, await CreateEntity(client, universe.Id, "Warden"));
+        var saved = await WriteArticle(client, universe.Id, entity.Id, Doc("Kept."));
+        var path = $"/api/universes/{universe.Id}/entities/{entity.Id}";
+
+        var current = await client.PutAsJsonAsync(
+            path, new EntityRequest(entity.EntityTypeId, "Warden of the Coast", "A summary.", CanonStatus.Draft, null, null, null));
+        Assert.Equal(HttpStatusCode.OK, current.StatusCode);
+        var after = await Detail(client, universe.Id, entity.Id);
+        Assert.Equal(("Warden of the Coast", "A summary.", CanonStatus.Draft), (after.Name, after.Summary, after.CanonStatus));
+
+        var unknown = await client.PutAsJsonAsync(
+            path,
+            new { entityTypeId = entity.EntityTypeId, name = "Warden of the Coast", summary = "Another summary.", canonStatus = CanonStatus.Draft, contentType = "text/plain", notes = "Not a member." });
+        Assert.Equal(HttpStatusCode.OK, unknown.StatusCode);
+        Assert.Equal("Another summary.", (await Detail(client, universe.Id, entity.Id)).Summary);
+
+        var article = await ReadArticle(client, universe.Id, entity.Id);
+        Assert.Equal(Doc("Kept."), article.Content);
+        SameMoment(saved.UpdatedAt, article.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task Someone_else_sending_an_article_with_an_entry_is_told_nothing_and_changes_nothing()
+    {
+        var (owner, universe) = await SignedInWithUniverse(_factory, "artlegacymine");
+        var entity = await Detail(owner, universe.Id, await CreateEntity(owner, universe.Id, "Private"));
+        var saved = await WriteArticle(owner, universe.Id, entity.Id, Doc("Only mine."));
+        var path = $"/api/universes/{universe.Id}/entities/{entity.Id}";
+        var entryBefore = await owner.GetStringAsync(path);
+
+        var stranger = await SignedIn(_factory, "user-artlegacyyours");
+        var body = new { entityTypeId = entity.EntityTypeId, name = "Mine now", content = Doc("Mine now."), canonStatus = CanonStatus.Idea };
+
+        foreach (var response in new[]
+        {
+            await stranger.PutAsJsonAsync(path, body),
+            await stranger.PostAsJsonAsync($"/api/universes/{universe.Id}/entities", body),
+        })
+        {
+            // The same answer as for anything that is not theirs: no refusal code, no hint that an article exists.
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+            var text = await response.Content.ReadAsStringAsync();
+            Assert.DoesNotContain(EntityEndpoints.ArticleMovedCode, text, StringComparison.Ordinal);
+            Assert.DoesNotContain("Only mine", text, StringComparison.Ordinal);
+        }
+
+        Assert.Equal(entryBefore, await owner.GetStringAsync(path));
+        var article = await ReadArticle(owner, universe.Id, entity.Id);
+        Assert.Equal(Doc("Only mine."), article.Content);
+        SameMoment(saved.UpdatedAt, article.UpdatedAt);
     }
 
     // ---------- History ----------
@@ -593,6 +715,17 @@ public sealed class EntityArticleEndpointTests(LorexApiFactory factory) : IClass
     // ---------- Helpers ----------
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    /// <summary>The refusal an entry write that still carries the article is given: a 400 that names the article route.</summary>
+    private static async Task AssertArticleMoved(HttpResponseMessage response)
+    {
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = problem.RootElement;
+        Assert.Equal(EntityEndpoints.ArticleMovedCode, root.GetProperty("code").GetString());
+        Assert.True(root.GetProperty("errors").TryGetProperty("content", out _));
+        Assert.Contains("/article", root.GetProperty("detail").GetString(), StringComparison.Ordinal);
+    }
 
     private static async Task<EntityDetail> Detail(HttpClient client, Guid universeId, Guid entityId) =>
         (await client.GetFromJsonAsync<EntityDetail>($"/api/universes/{universeId}/entities/{entityId}"))!;

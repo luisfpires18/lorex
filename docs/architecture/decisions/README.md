@@ -49,6 +49,6 @@ profile photo is deliberately left out of - a backup, a history and anyone else'
 what stories deliberately do not have yet - prose, history, search, a Trash, Canon checks - in
 0024, and what chapters leave for later - acts and volumes, drag-and-drop, collapsing - in 0025, and what plot
 leaves for later - a status, beat chronology, visual planning, editing beats from a scene - in 0026, and what a manuscript
-leaves for later - formatting, revisions, autosave, search, catching the Back button - and what a whole-text save costs, in
+leaves for later - formatting, revisions, autosave, search - and what a whole-text save costs, in
 0027, and what an entry article's history costs and leaves for later - plain text, diffs, pruning, restoring article text
 from entry versions recorded before it - and the excerpt's marker characters, in 0028.

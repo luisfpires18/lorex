@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { NavigationType, useBlocker } from 'react-router-dom'
 
 /** Every leave question standing right now, newest last: one per editor holding unsaved work. */
 const standing: string[] = []
@@ -7,7 +8,8 @@ const standing: string[] = []
  * Asks the newest standing leave question, if there is one, and says whether to go ahead.
  *
  * For an in-app way out that is a button rather than a link - signing out - which the link check in `useLeaveGuard`
- * cannot see. With nothing unsaved anywhere it asks nothing and answers yes.
+ * cannot see, and for the browser's Back and Forward through `HistoryLeaveGuard`. With nothing unsaved anywhere it asks
+ * nothing and answers yes.
  */
 export function confirmLeaving() {
   const message = standing[standing.length - 1]
@@ -17,15 +19,10 @@ export function confirmLeaving() {
 /**
  * Asks before unsaved work is left behind, for as long as `message` is not null.
  *
- * Lorex runs on a plain `BrowserRouter`, where React Router's navigation blocker is not available, so this covers the
- * ways out that can be caught. Following a link: any same-origin `<a>` - which is every in-app navigation a person
- * starts, from the sidebar and the account menu to a story's views and a scene in an outline. Signing out, which is a
- * button, through `confirmLeaving`. And leaving the page itself, by reload, close or a typed address, through the
- * browser's own prompt.
- *
- * The browser's Back and Forward buttons are not caught. A pop cannot be cancelled, only undone by moving the history
- * again, and the one well-tested way to do that - a data router's blocker - is a change to how the whole app routes,
- * not to this editor (ADR 0027).
+ * Every way out a person can take asks the same question, once. Following a link: any same-origin `<a>` - which is every
+ * in-app navigation a person starts, from the sidebar and the account menu to a story's views and a scene in an outline.
+ * Signing out, which is a button, through `confirmLeaving`. The browser's Back and Forward, through `HistoryLeaveGuard`.
+ * And leaving the page itself, by reload, close or a typed address, through the browser's own prompt.
  *
  * The link check listens on the document in the capture phase, so it runs before React Router's own click handler and
  * can cancel the click outright when the author chooses to stay. The question is the browser's own dialog, which a
@@ -86,4 +83,35 @@ export function useLeaveGuard(message: string | null) {
       window.removeEventListener('beforeunload', onBeforeUnload)
     }
   }, [message])
+}
+
+/**
+ * Holds the browser's Back and Forward while any leave question is standing, and asks it.
+ *
+ * Mounted once, inside the router: a router holds one blocker at a time, and every editor's question is already in
+ * `standing`, read when the navigation happens rather than when this rendered. It holds history moves only. A link has
+ * already asked, in `useLeaveGuard`'s click check, before React Router sees the click; Sign out has already asked, in
+ * `confirmLeaving`, before it navigates; so neither is asked twice.
+ *
+ * React Router does the undoing, which is why the app runs on a data router (ADR 0028): a held move is put back at once,
+ * so while the question is open the address is still the page being written on. Staying changes nothing - no route
+ * changed, so the editor, its text and its focus are exactly as they were. Leaving makes the same move again. A move back
+ * to a page from before Lorex loaded leaves the page itself, and the browser's own prompt asks about that instead.
+ */
+export function HistoryLeaveGuard() {
+  const blocker = useBlocker(
+    ({ historyAction }) => historyAction === NavigationType.Pop && standing.length > 0,
+  )
+
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return
+
+    if (confirmLeaving()) {
+      blocker.proceed()
+    } else {
+      blocker.reset()
+    }
+  }, [blocker])
+
+  return null
 }

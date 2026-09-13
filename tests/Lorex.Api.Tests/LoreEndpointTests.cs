@@ -400,11 +400,11 @@ public sealed class LoreEndpointTests(LorexApiFactory factory) : IClassFixture<L
 
     /// <summary>
     /// The article has its own route (EntityArticleEndpointTests). The entry routes carry none: a detail has no
-    /// <c>content</c> member, and a client still sending one - an older tab, a stale script - has it ignored rather than
-    /// stored or validated, so a structured save can never become an article save.
+    /// <c>content</c> member, and a client still sending one - an older tab, a stale script - is refused rather than
+    /// answered as saved, so a structured save can never quietly drop an article.
     /// </summary>
     [Fact]
-    public async Task The_entry_routes_carry_no_article_and_ignore_one_that_is_sent()
+    public async Task The_entry_routes_carry_no_article_and_refuse_one_that_is_sent()
     {
         var (client, universe) = await SignedInWithUniverse("noarticle");
         var type = await FirstDefaultType(client, universe.Id);
@@ -413,9 +413,15 @@ public sealed class LoreEndpointTests(LorexApiFactory factory) : IClassFixture<L
             {"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"She kept the tide's ledger."}]}]}
             """;
 
-        var created = await client.PostAsJsonAsync(
+        var refused = await client.PostAsJsonAsync(
             $"/api/universes/{universe.Id}/entities",
             new { entityTypeId = type.Id, name = "Ledger Keeper", content = document, canonStatus = CanonStatus.Idea });
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        Assert.Contains(EntityEndpoints.ArticleMovedCode, await refused.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+
+        var created = await client.PostAsJsonAsync(
+            $"/api/universes/{universe.Id}/entities",
+            new { entityTypeId = type.Id, name = "Ledger Keeper", canonStatus = CanonStatus.Idea });
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
 
         Guid id;
@@ -428,7 +434,8 @@ public sealed class LoreEndpointTests(LorexApiFactory factory) : IClassFixture<L
         var edited = await client.PutAsJsonAsync(
             $"/api/universes/{universe.Id}/entities/{id}",
             new { entityTypeId = type.Id, name = "Ledger Keeper", content = "not json at all", canonStatus = CanonStatus.Draft });
-        Assert.Equal(HttpStatusCode.OK, edited.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, edited.StatusCode);
+        Assert.Equal(CanonStatus.Idea, (await GetEntity(client, universe.Id, id)).CanonStatus);
 
         var article = await ArticleTestClient.ReadArticle(client, universe.Id, id);
         Assert.Equal(string.Empty, article.Content);

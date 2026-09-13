@@ -1,6 +1,7 @@
 # ADR 0028 - An entry's article lives in a row of its own, with its own history, saved on its own route
 
-Status: accepted (2026-09-13)
+Status: accepted (2026-09-13), amended 2026-09-14 (merge readiness: an entry write carrying the article is refused, and
+Back and Forward ask)
 
 ## Context
 
@@ -41,7 +42,7 @@ when nothing was ever saved.
 live entry in it: an entry in the Trash, in another universe or someone else's answers 404, and validation runs after
 ownership. Null `content` is refused, so a malformed body cannot wipe an article; a blank document is stored as `""`.
 `EntityRequest` and `EntityDetail` no longer carry an article, and a client that still sends `content` to the entry route
-has it ignored - neither stored nor validated. Listings, search results, the Trash and entry history carry none.
+is refused whole (amendment below). Listings, search results, the Trash and entry history carry none.
 
 **No silent overwrite.** The manuscript's comparison (ADR 0027): a save names the `updatedAt` it was written over, and a
 mismatch inside the write's own transaction is 409 `entity_article_changed` carrying the stored moment, with nothing
@@ -97,8 +98,8 @@ article and its versions, and the existing trigger takes the index row. No new p
   after a confirmation. An entry gone meanwhile says so and keeps the text to copy. An over-long document says so before a
   save. Unsaved is measured against the document as this editor serialised it on opening, so opening an article and closing
   it is never "unsaved".
-- `useLeaveGuard` asks before a link, Sign out or leaving the page drops unsaved text, and Done asks too. Back and Forward
-  stay uncaught (ADR 0027).
+- `useLeaveGuard` asks before a link, Sign out, the browser's Back or Forward, or leaving the page drops unsaved text, and
+  Done asks too (amendment below).
 - One editor at a time: while the entry's form is open the article cannot be opened, and while the article is open the
   entry's actions step aside, so a phone never shows two bars at its foot. Done returns the focus to the button that opened
   the writing.
@@ -117,7 +118,7 @@ stands back on each entry (a cleared one as null) and discards the article histo
 - Plain text, Markdown or any new formatting; wiki links, mentions and backlinks.
 - Diffs between versions, pruning or coalescing history, and restoring article text held in pre-decision entry versions
   from the screen.
-- Autosave, local draft recovery and broader Content Recovery; catching Back and Forward.
+- Autosave, local draft recovery and broader Content Recovery.
 - Word counts, collaboration, presence.
 - Reading a backup back in (the last Phase 3 feature).
 
@@ -129,6 +130,38 @@ stands back on each entry (a cleared one as null) and discards the article histo
 - The excerpt's match markers are the private-use characters U+E000 and U+E001; an article that itself contains them could
   mark the wrong words in an excerpt. Display only.
 - Every save sends and compares the whole document.
-- A client from before this change that saves an entry loses nothing, but its article edits are not saved: the entry route
-  ignores the member. The web client shipped with the route.
+- A client from before this change cannot save an entry at all until it is reloaded: every entry write it makes carries
+  the article member and is refused, which is the point - it is told, rather than answered as saved.
 - Rolling the migration back discards article history.
+
+## Amendment - merge readiness (2026-09-14)
+
+Two gaps found before merge, closed without a schema, backup format or article API change.
+
+**An entry write that still carries the article is refused.** The serializer skips members a request record does not
+declare, so a client from before the move could send its article with the entry, be answered 200, and lose the article.
+`EntityRequest` now declares `content` for one purpose - to see it (`LegacyContent`, a `JsonElement`, never written back
+out). When the member is present at all, `POST` and `PUT .../entities` answer **400**, a validation problem with
+`code: entity_article_moved`, `errors.content`, and a detail naming `.../entities/{entityId}/article`:
+
+- Any value is refused, null included - from an old editor, null meant "clear the article" - and the member is matched
+  case-insensitively, as every member is.
+- It is checked after ownership, so a stranger still gets the same bare 404, and before the Canon gate or any read or write,
+  so nothing is saved: not the entry, not its article, no revision, finding or timestamp.
+- It is never forwarded to the article route. That write names the `updatedAt` it was written over, and a forwarded one
+  could not, so it could overwrite newer prose.
+- Other unknown members are still skipped, as the serializer always has. The web client sends no article member.
+
+**Back and Forward ask too.** ADR 0027 left them uncaught because only a data router can hold a history move and put it
+back. The app now runs on one: `createBrowserRouter` with a single catch-all route whose element is the existing providers
+and `<Routes>`, unchanged - every route, layout and link resolves as before. `HistoryLeaveGuard`, mounted once inside it,
+uses `useBlocker` for history moves only, while a `useLeaveGuard` question is standing, and asks that question through
+`confirmLeaving`:
+
+- React Router puts the held move back at once and makes it again only when the author chooses to leave. Staying changes
+  no route, so the editor, its unsaved text, its state and its focus are exactly as they were, and the address never shows
+  the page being left.
+- Links and Sign out ask before they navigate, as before, and push or replace rather than move through history, so they are
+  never held as well: every action asks once.
+- A move to a page from before Lorex loaded leaves the document, and the browser's own prompt asks about that.
+- The manuscript editor shares the guard and asks the same way. That supersedes ADR 0027's decision.
