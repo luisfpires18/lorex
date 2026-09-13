@@ -394,8 +394,9 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
         var backup = await Backup(client, universe.Id);
 
         // Authored configuration, added within version 4: no fact changes meaning without it. The file
-        // is at version 7 because of stories, their chapters and their plot (ADR 0024-0026), not because of these.
-        Assert.Equal(7, backup.FormatVersion);
+        // is at version 8 because of stories, their chapters, their plot and their prose (ADR 0024-0027), not because
+        // of these.
+        Assert.Equal(8, backup.FormatVersion);
 
         var parent = backup.Payload.RelationshipTypes.Single(type => type.Name == "parent of");
         Assert.Equal(RelationshipAgeOrder.SourceOlder, parent.AgeOrder);
@@ -490,9 +491,9 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
         var backup = await Backup(client, universe.Id);
         var payload = backup.Payload;
 
-        // Eras arrived in version 4; stories took the file to 5, chapters to 6 and plot to 7 without changing how
-        // eras travel.
-        Assert.Equal(7, backup.FormatVersion);
+        // Eras arrived in version 4; stories took the file to 5, chapters to 6, plot to 7 and prose to 8 without
+        // changing how eras travel.
+        Assert.Equal(8, backup.FormatVersion);
         Assert.Equal(
             [
                 new BackupChronologyEra(

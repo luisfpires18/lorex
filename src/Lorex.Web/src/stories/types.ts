@@ -123,6 +123,32 @@ export interface SceneInput {
   chapterId: string | null
 }
 
+/**
+ * How long one scene's prose may be, in characters as JavaScript counts them (`string.length`, UTF-16 units). Mirrors
+ * `StoryLimits.ManuscriptMaxLength` on the API, which refuses anything longer; the editor says so before a save.
+ */
+export const MANUSCRIPT_MAX_LENGTH = 1_000_000
+
+/**
+ * A scene's prose, read on its own route and never part of the story read. Plain text, exactly as written. `content` is
+ * '' for a scene nothing has been written for; `updatedAt` is null until the first save, and goes back untouched with the
+ * next one.
+ */
+export interface SceneManuscript {
+  sceneId: string
+  content: string
+  updatedAt: string | null
+}
+
+/**
+ * One save of a scene's prose: the whole text, and the `updatedAt` it was written over - exactly as the API gave it,
+ * never parsed - so a save over prose that changed somewhere else is refused rather than silently winning.
+ */
+export interface SceneManuscriptInput {
+  content: string
+  expectedUpdatedAt: string | null
+}
+
 /** Everything a client may set on a chapter. No number and no order: both are its position. */
 export interface ChapterInput {
   title: string

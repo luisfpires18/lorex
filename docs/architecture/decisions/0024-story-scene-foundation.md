@@ -88,7 +88,8 @@ reader that ignored them would restore a world with every story silently missing
 
 - Acts, sequences, beats and arcs; multiple points of view per scene. (Chapters: ADR 0025. Plot arcs and
   beats: ADR 0026, which links to scenes without giving a scene any column.)
-- Manuscript prose, rich text, Markdown, word counts, writing goals, comments, export to documents.
+- Manuscript prose (since decided in ADR 0027: plain text, on a route of its own), rich text, Markdown, word counts,
+  writing goals, comments, export to documents.
 - Story or scene revision history. ADR 0013's snapshots are shaped around an entry - its fields,
   options, tags and references - and extending them is not a side effect of stories being editable.
 - Story search. Lore search means lore (ADR 0016); a second result domain is its own decision.

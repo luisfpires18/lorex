@@ -73,6 +73,8 @@ public class LorexDbContext(DbContextOptions<LorexDbContext> options)
 
     public DbSet<SceneEntityLink> SceneEntityLinks => Set<SceneEntityLink>();
 
+    public DbSet<SceneManuscript> SceneManuscripts => Set<SceneManuscript>();
+
     public DbSet<PlotArc> PlotArcs => Set<PlotArc>();
 
     public DbSet<PlotBeat> PlotBeats => Set<PlotBeat>();

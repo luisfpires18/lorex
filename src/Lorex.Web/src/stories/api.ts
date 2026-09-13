@@ -8,6 +8,8 @@ import type {
   PlotBeatInput,
   Scene,
   SceneInput,
+  SceneManuscript,
+  SceneManuscriptInput,
   StoryDetail,
   StoryInput,
   StorySummary,
@@ -127,6 +129,36 @@ export function reorderScenes(
   return apiFetch<Scene[]>(`${scenes(universeId, storyId)}/order`, {
     method: 'PUT',
     body: JSON.stringify({ chapterId, sceneIds }),
+  })
+}
+
+/** The code on the 409 a manuscript save gets when the prose was saved somewhere else after it was opened. */
+export const MANUSCRIPT_CHANGED = 'scene_manuscript_changed'
+
+function manuscript(universeId: string, storyId: string, sceneId: string) {
+  return `${scenes(universeId, storyId)}/${sceneId}/manuscript`
+}
+
+/** One scene's prose. Read only when that scene is opened for writing - never with the story or its outline. */
+export function getSceneManuscript(
+  universeId: string,
+  storyId: string,
+  sceneId: string,
+  signal?: AbortSignal,
+) {
+  return apiFetch<SceneManuscript>(manuscript(universeId, storyId, sceneId), { signal })
+}
+
+/** Replaces the scene's prose with exactly `input.content`, if `input.expectedUpdatedAt` is still the latest save. */
+export function saveSceneManuscript(
+  universeId: string,
+  storyId: string,
+  sceneId: string,
+  input: SceneManuscriptInput,
+) {
+  return apiFetch<SceneManuscript>(manuscript(universeId, storyId, sceneId), {
+    method: 'PUT',
+    body: JSON.stringify(input),
   })
 }
 

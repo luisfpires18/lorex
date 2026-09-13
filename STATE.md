@@ -165,9 +165,9 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   all of Phase 2 by hand only at the end, so no feature below waits on a smoke test.
   1. Story / Scene foundation - done, merged.
   2. Story chapters - done, merged.
-  3. **Plot arcs / beats - done** (`feat/story-plot-arcs-beats`, committed, **not merged, not pushed**).
-  4. Scene manuscript - **next**.
-  5. Story workspace integration / Phase 2 closeout.
+  3. Plot arcs / beats - done, merged.
+  4. **Scene manuscript - done** (`feat/story-scene-manuscript`, committed, **not merged, not pushed**).
+  5. Story workspace integration / Phase 2 closeout - **next**.
   6. Owner's full manual Phase 2 test.
 - **Story & Scene foundation** (`feat/story-scene-foundation`, merged into `dev`). The first
   Story-layer feature; owner-requested, unnumbered. Lore is what is true; a story is how an author tells
@@ -206,7 +206,7 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     chapter text and misread per-chapter `sortOrder`. ADR 0014.
   - Story page: Unchaptered shown only while it holds a scene; modest chapter headings; Move up/down stay
     in the container; "Move to…" disclosure; Chapter field in the scene form. No drag, no collapse.
-- **Story plot** (`feat/story-plot-arcs-beats`). What the author means to develop, apart from lore (true) and
+- **Story plot** (`feat/story-plot-arcs-beats`, merged into `dev`). What the author means to develop, apart from lore (true) and
   structure (shown, in order). ADR 0026.
   - `PlotArcs` (story-owned) -> `PlotBeats` (arc-owned): title, description, notes, order. No status. Beat <-> scene
     and beat <-> entry are join rows cascading from both sides - references, so no plot delete reaches a scene,
@@ -216,14 +216,26 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     another arc moves a beat last there. No stored number. Scene order, chapters and chronology never move a beat.
   - `GET .../plot-arcs` is its own fixed-query read, pinned at 5 arcs x 10 beats x 250 links; `StoryDetail` is
     unchanged. No Canon, timeline or lore change from any plot write.
-  - The story page has two views under one header: Scenes (`/stories/:id`) and Plot (`.../plot`). Arc headings,
+  - The story page gained a Plot view (`.../plot`) beside Scenes (`/stories/:id`), one header. Arc headings,
     beat rows with wrapping Scenes/Lore chips, a scene picker grouped by chapter with a filter, and a read-only Plot
     row on each scene card linking back. No sidebar entry; the greyed "Plot" placeholder is gone from it.
   - Backup format version 7: a v6 reader would lose arc and beat text and every link. ADR 0014.
+- **Scene manuscript** (`feat/story-scene-manuscript`). The prose itself, apart from a scene's planning. ADR 0027.
+  - `SceneManuscripts`: `SceneId` key and FK (cascade), `Content` unbounded text, `UpdatedAt`. No column or navigation on
+    `Scene`, so reorders, moves and the story read never load prose. No row until the first save; `""` is a valid save.
+  - Plain text stored exactly - no trim, Markdown or HTML. `GET`/`PUT .../scenes/{id}/manuscript` is the only route that
+    carries it; a test holds story, scene, chapter and plot reads to the same length around a 400k-character save.
+  - Bound 1,000,000 characters (`StoryLimits.ManuscriptMaxLength`, mirrored client-side). A save names the `updatedAt` it
+    was written over; a mismatch is 409 `scene_manuscript_changed`, nothing written, and the author chooses keep or load.
+  - Updates the story's `UpdatedAt`, not the scene's. No Canon, timeline, lore, plot link or search from prose.
+  - Third story view, Manuscript, at `/stories/:id/manuscript/:sceneId?`: chapter-aware outline of links, plain textarea at
+    46rem, explicit Save and Ctrl/Cmd+S, sticky save bar, Edit scene reuses the scene drawer. At 1100px and below the outline
+    folds into a disclosure. `useLeaveGuard` asks before a link or page unload drops unsaved prose; Back/Forward uncaught.
+  - Backup format version 8: a v7 reader would lose every word. ADR 0014.
 
 ## Baseline
 
-- **687 API integration tests, 99 Playwright tests**, green. No frontend unit runner exists;
+- **707 API integration tests, 103 Playwright tests**, green. No frontend unit runner exists;
   the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
@@ -237,8 +249,11 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   account menu, and a full run now usually loses one or two - a rotating pick of canon, type-filter,
   mobile, universes or account-menu, each green on its own. It is contention on the one SQLite
   writer, not the specs. The story, chapters and plot runs each lost one to three of canon, account-menu
-  or type-filter, every one green alone; the plot run lost a single type-filter icon read-back, 4/4 alone.
-- 23 migrations, latest `AddStoryPlotArcsAndBeats` - four tables only, walked down and up over a story in
+  or type-filter, every one green alone; the plot run lost a single type-filter icon read-back, 4/4 alone; the
+  manuscript run lost one canon and one universes test, each file green alone (6/6, 5/5).
+- 24 migrations, latest `AddSceneManuscripts` - one table, walked down and up over a story in chapters with a plot by
+  `SceneManuscriptMigrationTests`, which reads the key, columns and cascade back and rolls back with prose in the file.
+  `AddStoryPlotArcsAndBeats` - four tables only, walked down and up over a story in
   chapters by `PlotMigrationTests`, which reads each delete action, index and key back and proves the orders and
   pairs unique in SQLite.
   `AddStoryChapters` - a table, a nullable column (SQLite rebuilds `Scenes` for
@@ -297,10 +312,12 @@ tool has changed the picture.
   dates moved first, with no reassignment tool. Month names, calendars and conversion: not started.
   ADR 0022.
 - **`Age`** is declarable but read by nothing until a structured reference year exists. ADR 0011.
-- **Stories beyond plot.** Scene manuscript is next (Phase 2 sequence above). Still deferred: acts/volumes,
+- **Stories beyond the manuscript.** Story workspace integration / Phase 2 closeout is next (sequence above); on a phone
+  the shared story header fills the first screen before the prose, worth a look there. Still deferred: acts/volumes,
   story history, story search, a Trash for stories, drag-and-drop, collapsing chapters, bulk scene moves,
   Story-vs-Lore checks, counting pre-era scene years in Settings; for plot, a status, beat chronology, editing
-  beats from a scene, and any board or graph view. ADR 0024, ADR 0025, ADR 0026.
+  beats from a scene, and any board or graph view; for prose, formatting, revisions, autosave, word counts, export,
+  and catching Back/Forward with unsaved text. ADR 0024-0027.
 - **Relationship life-state constraints** (an end alive at the link's date) wait for dated
   relationships: `StartDate`/`EndDate` are real-world timestamps, not chronology points. A birth-year
   gap across eras of unrecorded length waits for era lengths. ADR 0023.
