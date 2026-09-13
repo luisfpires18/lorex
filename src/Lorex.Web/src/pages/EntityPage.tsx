@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { Check, Pencil, Trash, X } from 'lucide-react'
 import { ActionIcon } from '../components/ActionIcon'
+import { EntityArticleSection } from '../components/EntityArticle'
 import { EntityHistory } from '../components/EntityHistory'
 import { EntityImageField, type PendingImage } from '../components/EntityImageField'
 import { FieldInput } from '../components/FieldInputs'
-import { LoreArticle, LoreEditor } from '../components/LoreEditor'
 import { RelationshipSection } from '../components/RelationshipSection'
-import { emptyValue, isEmptyDocument } from '../lore/document'
+import { emptyValue } from '../lore/document'
 import { entityImageUrl, setEntityImage } from '../lore/images'
 import { TokenInput } from '../components/TokenInput'
 import { blockingFindingsOf } from '../canon/blocked'
@@ -42,7 +42,6 @@ interface Draft {
   entityTypeId: string
   name: string
   summary: string
-  content: string | null
   canonStatus: CanonStatusValue
   aliases: string[]
   tags: string[]
@@ -68,7 +67,6 @@ function draftFromDetail(detail: EntityDetail): Draft {
     entityTypeId: detail.entityTypeId,
     name: detail.name,
     summary: detail.summary ?? '',
-    content: detail.content,
     canonStatus: detail.canonStatus,
     aliases: detail.aliases,
     tags: detail.tags,
@@ -94,6 +92,15 @@ export default function EntityPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [blocked, setBlocked] = useState<CanonBlockingFinding[] | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+
+  // While the article is being written it has its own save bar, and the entry's actions step aside for it: one
+  // editor, and one bar at the foot of a phone's screen, at a time.
+  const [isWritingArticle, setIsWritingArticle] = useState(false)
+
+  /** An article save touched the entry: the rail's "last changed" says so without reading the entry again. */
+  const articleSaved = useCallback((updatedAt: string) => {
+    setDetail((current) => (current ? { ...current, updatedAt } : current))
+  }, [])
 
   // A new entry's picture, and the square its author framed, wait here until the entry exists.
   // Object keys are built from the entry's id, so there is nowhere to put it before the create
@@ -158,7 +165,6 @@ export default function EntityPage() {
       entityTypeId: types[0].id,
       name: '',
       summary: '',
-      content: null,
       canonStatus: CanonStatus.Idea,
       aliases: [],
       tags: [],
@@ -184,7 +190,6 @@ export default function EntityPage() {
       entityTypeId: draft.entityTypeId,
       name: draft.name.trim(),
       summary: draft.summary.trim() ? draft.summary.trim() : null,
-      content: isEmptyDocument(draft.content) ? null : draft.content,
       canonStatus: draft.canonStatus,
       aliases: draft.aliases,
       tags: draft.tags,
@@ -271,7 +276,6 @@ export default function EntityPage() {
         entityTypeId: updated.entityTypeId,
         name: updated.name,
         summary: updated.summary.trim() ? updated.summary.trim() : null,
-        content: isEmptyDocument(updated.content) ? null : updated.content,
         canonStatus: next,
         aliases: updated.aliases,
         tags: updated.tags,
@@ -470,20 +474,23 @@ export default function EntityPage() {
       ) : null}
 
       <div className="entry__layout">
-        <section className="entry__article" aria-label="Article">
-          {isEditing ? (
-            <LoreEditor
-              value={draft.content}
-              onChange={(json) =>
-                setDraft((current) => (current ? { ...current, content: json } : current))
-              }
-            />
-          ) : isEmptyDocument(detail?.content ?? null) ? (
-            <p className="entry__blank">No article yet. Edit this entry to start writing.</p>
-          ) : (
-            <LoreArticle content={detail?.content ?? null} />
-          )}
-        </section>
+        {isNew ? (
+          <section className="entry__article" aria-label="Article">
+            <p className="entry__blank">
+              Once the entry is created, you can write its article here.
+            </p>
+          </section>
+        ) : (
+          <EntityArticleSection
+            key={entityId}
+            universeId={universe.id}
+            entityId={entityId}
+            entityName={detail?.name ?? ''}
+            canEdit={!isEditing}
+            onEditingChange={setIsWritingArticle}
+            onSaved={articleSaved}
+          />
+        )}
 
         <aside className="entry__rail">
           {isEditing ? (
@@ -594,61 +601,63 @@ export default function EntityPage() {
         </>
       ) : null}
 
-      <footer className="entry__actions">
-        {isEditing ? (
-          <>
-            <button
-              className="button button--icon"
-              type="button"
-              onClick={save}
-              disabled={isSaving}
-              data-testid="save-entity"
-            >
-              <ActionIcon icon={Check} />
-              {isSaving ? 'Saving' : isNew ? 'Create entry' : 'Save changes'}
-            </button>
-            {!isNew ? (
+      {isWritingArticle ? null : (
+        <footer className="entry__actions">
+          {isEditing ? (
+            <>
+              <button
+                className="button button--icon"
+                type="button"
+                onClick={save}
+                disabled={isSaving}
+                data-testid="save-entity"
+              >
+                <ActionIcon icon={Check} />
+                {isSaving ? 'Saving' : isNew ? 'Create entry' : 'Save changes'}
+              </button>
+              {!isNew ? (
+                <button
+                  className="button button--quiet button--icon"
+                  type="button"
+                  onClick={() => {
+                    if (detail) setDraft(draftFromDetail(detail))
+                    setIsEditing(false)
+                    setMessage(null)
+                    setFieldErrors({})
+                    setBlocked(null)
+                  }}
+                >
+                  <ActionIcon icon={X} />
+                  Cancel
+                </button>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <button
+                className="button button--icon"
+                type="button"
+                onClick={() => setIsEditing(true)}
+                disabled={isSaving}
+                data-testid="edit-entity"
+              >
+                <ActionIcon icon={Pencil} />
+                Edit
+              </button>
               <button
                 className="button button--quiet button--icon"
                 type="button"
-                onClick={() => {
-                  if (detail) setDraft(draftFromDetail(detail))
-                  setIsEditing(false)
-                  setMessage(null)
-                  setFieldErrors({})
-                  setBlocked(null)
-                }}
+                onClick={moveToTrash}
+                disabled={isSaving}
+                data-testid="trash-entity"
               >
-                <ActionIcon icon={X} />
-                Cancel
+                <ActionIcon icon={Trash} />
+                Move to Trash
               </button>
-            ) : null}
-          </>
-        ) : (
-          <>
-            <button
-              className="button button--icon"
-              type="button"
-              onClick={() => setIsEditing(true)}
-              disabled={isSaving}
-              data-testid="edit-entity"
-            >
-              <ActionIcon icon={Pencil} />
-              Edit
-            </button>
-            <button
-              className="button button--quiet button--icon"
-              type="button"
-              onClick={moveToTrash}
-              disabled={isSaving}
-              data-testid="trash-entity"
-            >
-              <ActionIcon icon={Trash} />
-              Move to Trash
-            </button>
-          </>
-        )}
-      </footer>
+            </>
+          )}
+        </footer>
+      )}
     </article>
   )
 }

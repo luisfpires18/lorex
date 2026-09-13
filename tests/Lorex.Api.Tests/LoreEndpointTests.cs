@@ -298,7 +298,7 @@ public sealed class LoreEndpointTests(LorexApiFactory factory) : IClassFixture<L
 
         var response = await client.PostAsJsonAsync(
             $"/api/universes/{universe.Id}/entities",
-            new EntityRequest(type.Id, "Nameless", null, null, CanonStatus.Idea, null, null, null));
+            new EntityRequest(type.Id, "Nameless", null, CanonStatus.Idea, null, null, null));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -342,7 +342,7 @@ public sealed class LoreEndpointTests(LorexApiFactory factory) : IClassFixture<L
         // stored for this entity.
         var response = await client.PutAsJsonAsync(
             $"/api/universes/{universe.Id}/entities/{created.Id}",
-            new EntityRequest(type.Id, "Alenna Vance", "Now with a summary.", null,
+            new EntityRequest(type.Id, "Alenna Vance", "Now with a summary.",
                 CanonStatus.Draft, ["The Warden"], ["Coast"], null));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -366,7 +366,7 @@ public sealed class LoreEndpointTests(LorexApiFactory factory) : IClassFixture<L
 
         var response = await client.PutAsJsonAsync(
             $"/api/universes/{universe.Id}/entities/{created.Id}",
-            new EntityRequest(type.Id, "Shifting Name", null, null,
+            new EntityRequest(type.Id, "Shifting Name", null,
                 CanonStatus.Idea, ["New Alias"], ["New Tag"], null));
 
         response.EnsureSuccessStatusCode();
@@ -389,7 +389,7 @@ public sealed class LoreEndpointTests(LorexApiFactory factory) : IClassFixture<L
         {
             var response = await client.PutAsJsonAsync(
                 $"/api/universes/{universe.Id}/entities/{created.Id}",
-                new EntityRequest(type.Id, "Rising Star", null, null, status, null, null, null));
+                new EntityRequest(type.Id, "Rising Star", null, status, null, null, null));
 
             response.EnsureSuccessStatusCode();
             Assert.Equal(status, (await response.Content.ReadFromJsonAsync<EntityDetail>())!.CanonStatus);
@@ -398,74 +398,44 @@ public sealed class LoreEndpointTests(LorexApiFactory factory) : IClassFixture<L
         Assert.Equal(CanonStatus.Canon, (await GetEntity(client, universe.Id, created.Id)).CanonStatus);
     }
 
+    /// <summary>
+    /// The article has its own route (EntityArticleEndpointTests). The entry routes carry none: a detail has no
+    /// <c>content</c> member, and a client still sending one - an older tab, a stale script - has it ignored rather than
+    /// stored or validated, so a structured save can never become an article save.
+    /// </summary>
     [Fact]
-    public async Task Rich_content_round_trips()
+    public async Task The_entry_routes_carry_no_article_and_ignore_one_that_is_sent()
     {
-        var (client, universe) = await SignedInWithUniverse("content");
+        var (client, universe) = await SignedInWithUniverse("noarticle");
         var type = await FirstDefaultType(client, universe.Id);
 
         const string document = """
             {"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"She kept the tide's ledger."}]}]}
             """;
 
-        var created = await CreateEntity(client, universe.Id, type.Id, "Ledger Keeper", content: document);
-        var fetched = await GetEntity(client, universe.Id, created.Id);
-
-        Assert.Contains("tide's ledger", fetched.Content, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task Content_that_is_not_a_document_is_rejected()
-    {
-        var (client, universe) = await SignedInWithUniverse("badcontent");
-        var type = await FirstDefaultType(client, universe.Id);
-
-        var response = await client.PostAsJsonAsync(
+        var created = await client.PostAsJsonAsync(
             $"/api/universes/{universe.Id}/entities",
-            new EntityRequest(type.Id, "Broken", null, "not json at all", CanonStatus.Idea, null, null, null));
+            new { entityTypeId = type.Id, name = "Ledger Keeper", content = document, canonStatus = CanonStatus.Idea });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
+        Guid id;
+        using (var body = JsonDocument.Parse(await created.Content.ReadAsStringAsync()))
+        {
+            Assert.False(body.RootElement.TryGetProperty("content", out _));
+            id = body.RootElement.GetProperty("id").GetGuid();
+        }
 
-    [Fact]
-    public async Task A_script_link_in_the_article_is_rejected()
-    {
-        var (client, universe) = await SignedInWithUniverse("scriptlink");
-        var type = await FirstDefaultType(client, universe.Id);
+        var edited = await client.PutAsJsonAsync(
+            $"/api/universes/{universe.Id}/entities/{id}",
+            new { entityTypeId = type.Id, name = "Ledger Keeper", content = "not json at all", canonStatus = CanonStatus.Draft });
+        Assert.Equal(HttpStatusCode.OK, edited.StatusCode);
 
-        const string hostile = """
-            {"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"click",
-            "marks":[{"type":"link","attrs":{"href":"javascript:alert(1)"}}]}]}]}
-            """;
+        var article = await ArticleTestClient.ReadArticle(client, universe.Id, id);
+        Assert.Equal(string.Empty, article.Content);
+        Assert.Null(article.UpdatedAt);
 
-        var response = await client.PostAsJsonAsync(
-            $"/api/universes/{universe.Id}/entities",
-            new EntityRequest(type.Id, "Hostile", null, hostile, CanonStatus.Idea, null, null, null));
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Theory]
-    // Every shape here is legal JSON but not a legal document. Each must be answered with
-    // a validation problem, never an unhandled exception.
-    [InlineData("""{"type":123}""")]
-    [InlineData("""{"type":"doc","content":[{"type":"paragraph","marks":[{"type":42}]}]}""")]
-    [InlineData("""{"type":"doc","content":[{"type":"text","marks":[{"type":"link","attrs":"nope"}]}]}""")]
-    [InlineData("""{"type":"doc","content":[{"type":"text","marks":[{"type":"link","attrs":{"href":7}}]}]}""")]
-    [InlineData("""{"type":"doc","content":[{"type":"text","marks":[{"type":"link","attrs":{}}]}]}""")]
-    [InlineData("[]")]
-    public async Task Malformed_article_content_is_answered_without_a_server_error(string content)
-    {
-        var (client, universe) = await SignedInWithUniverse($"malformed-{content.Length}-{content.GetHashCode()}");
-        var type = await FirstDefaultType(client, universe.Id);
-
-        var response = await client.PostAsJsonAsync(
-            $"/api/universes/{universe.Id}/entities",
-            new EntityRequest(type.Id, "Odd Content", null, content, CanonStatus.Idea, null, null, null));
-
-        Assert.True(
-            response.StatusCode is HttpStatusCode.Created or HttpStatusCode.BadRequest,
-            $"Expected Created or BadRequest but got {(int)response.StatusCode}.");
+        using var detail = JsonDocument.Parse(await client.GetStringAsync($"/api/universes/{universe.Id}/entities/{id}"));
+        Assert.False(detail.RootElement.TryGetProperty("content", out _));
     }
 
     [Fact]
@@ -605,11 +575,11 @@ public sealed class LoreEndpointTests(LorexApiFactory factory) : IClassFixture<L
 
         var update = await attacker.PutAsJsonAsync(
             $"/api/universes/{universe.Id}/entities/{entity.Id}",
-            new EntityRequest(type.Id, "Hijacked", null, null, CanonStatus.Canon, null, null, null));
+            new EntityRequest(type.Id, "Hijacked", null, CanonStatus.Canon, null, null, null));
         var delete = await attacker.DeleteAsync($"/api/universes/{universe.Id}/entities/{entity.Id}");
         var create = await attacker.PostAsJsonAsync(
             $"/api/universes/{universe.Id}/entities",
-            new EntityRequest(type.Id, "Planted", null, null, CanonStatus.Idea, null, null, null));
+            new EntityRequest(type.Id, "Planted", null, CanonStatus.Idea, null, null, null));
 
         Assert.Equal(HttpStatusCode.NotFound, update.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, delete.StatusCode);
@@ -679,7 +649,7 @@ public sealed class LoreEndpointTests(LorexApiFactory factory) : IClassFixture<L
 
         var response = await attacker.PostAsJsonAsync(
             $"/api/universes/{attackerUniverse.Id}/entities",
-            new EntityRequest(victimType.Id, "Smuggled", null, null, CanonStatus.Idea, null, null, null));
+            new EntityRequest(victimType.Id, "Smuggled", null, CanonStatus.Idea, null, null, null));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -698,7 +668,7 @@ public sealed class LoreEndpointTests(LorexApiFactory factory) : IClassFixture<L
 
         var response = await attacker.PostAsJsonAsync(
             $"/api/universes/{attackerUniverse.Id}/entities",
-            new EntityRequest(attackerType.Id, "Prober", null, null, CanonStatus.Idea, null, null,
+            new EntityRequest(attackerType.Id, "Prober", null, CanonStatus.Idea, null, null,
                 [new FieldValueInput(reference.Id, null, null, null, null, null, victimEntity.Id)]));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -842,7 +812,6 @@ public sealed class LoreEndpointTests(LorexApiFactory factory) : IClassFixture<L
         Guid typeId,
         string name,
         string? summary = null,
-        string? content = null,
         CanonStatus canonStatus = CanonStatus.Idea,
         IReadOnlyList<string>? aliases = null,
         IReadOnlyList<string>? tags = null,
@@ -850,7 +819,7 @@ public sealed class LoreEndpointTests(LorexApiFactory factory) : IClassFixture<L
     {
         var response = await client.PostAsJsonAsync(
             $"/api/universes/{universeId}/entities",
-            new EntityRequest(typeId, name, summary, content, canonStatus, aliases, tags, fields));
+            new EntityRequest(typeId, name, summary, canonStatus, aliases, tags, fields));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
     }

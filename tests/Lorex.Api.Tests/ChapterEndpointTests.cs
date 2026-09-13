@@ -491,7 +491,7 @@ public sealed class ChapterEndpointTests(LorexApiFactory factory) : IClassFixtur
         var types = (await client.GetFromJsonAsync<List<EntityTypeResponse>>($"/api/universes/{universeId}/entity-types"))!;
         var response = await client.PostAsJsonAsync(
             $"/api/universes/{universeId}/entities",
-            new EntityRequest(types.First(type => type.Name == "Character").Id, name, null, null, CanonStatus.Canon, null, null, null));
+            new EntityRequest(types.First(type => type.Name == "Character").Id, name, null, CanonStatus.Canon, null, null, null));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
     }

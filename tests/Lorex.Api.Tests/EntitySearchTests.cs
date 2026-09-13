@@ -159,6 +159,10 @@ public sealed class EntitySearchTests(LorexApiFactory factory) : IClassFixture<L
         Assert.Equal(["Aldric Vane"], await SearchNames(client, universe.Id, "Aldric"));
     }
 
+    /// <summary>
+    /// An entry version puts back structured lore, and search follows it. The article is not part of an entry version -
+    /// it keeps its own history, and its restore is covered by the article's own tests.
+    /// </summary>
     [Fact]
     public async Task A_restored_revision_is_searchable_as_the_text_it_put_back()
     {
@@ -166,8 +170,12 @@ public sealed class EntitySearchTests(LorexApiFactory factory) : IClassFixture<L
         var type = await FirstDefaultType(client, universe.Id);
 
         var entity = await CreateEntity(
-            client, universe.Id, type.Id, "Aldric Vane", content: Article("Sworn to the old queen."));
-        await UpdateEntity(client, universe.Id, entity, content: Article("Exiled to the salt marshes."));
+            client, universe.Id, type.Id, "Aldric Vane", summary: "Sworn to the old queen.");
+        (await client.PutAsJsonAsync(
+            $"/api/universes/{universe.Id}/entities/{entity.Id}",
+            new EntityRequest(
+                entity.EntityTypeId, entity.Name, "Exiled to the salt marshes.", entity.CanonStatus, entity.Aliases, entity.Tags, null)))
+            .EnsureSuccessStatusCode();
 
         var history = await client.GetFromJsonAsync<List<EntityRevisionSummary>>(
             $"/api/universes/{universe.Id}/entities/{entity.Id}/revisions");
@@ -436,6 +444,96 @@ public sealed class EntitySearchTests(LorexApiFactory factory) : IClassFixture<L
         Assert.Equal(["Halloway Keep"], filtered.Items.Select(item => item.Name));
     }
 
+    // ---------- Why an article matched ----------
+
+    [Fact]
+    public async Task An_article_match_carries_a_few_words_around_it_with_the_matched_word_marked()
+    {
+        var (client, universe) = await SignedInWithUniverse("excerpt");
+        var type = await FirstDefaultType(client, universe.Id);
+
+        var entity = await CreateEntity(
+            client,
+            universe.Id,
+            type.Id,
+            "Plain Name",
+            content: Article(
+                "Long before the war, when the tide still reached the old seawall,",
+                "the siege of Halloway broke on the third winter and nobody who watched it fall ever spoke of the harbour again."));
+
+        var item = Assert.Single((await ListEntities(client, universe.Id, "search=Halloway")).Items);
+        Assert.Equal(entity.Id, item.Id);
+
+        var excerpt = item.ArticleExcerpt!;
+        Assert.Equal(["Halloway"], excerpt.Where(part => part.IsMatch).Select(part => part.Text));
+
+        var text = string.Concat(excerpt.Select(part => part.Text));
+        // FTS5 chooses where the fragment starts; wherever it does, the words beside the match are the article's own.
+        Assert.Contains("the siege of Halloway", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("paragraph", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("{", text, StringComparison.Ordinal);
+        Assert.True(text.Length < 200, $"An excerpt of a few words, not the article: {text.Length} characters.");
+    }
+
+    [Fact]
+    public async Task A_match_found_elsewhere_carries_no_excerpt_and_browsing_carries_none()
+    {
+        var (client, universe) = await SignedInWithUniverse("noexcerpt");
+        var type = await FirstDefaultType(client, universe.Id);
+
+        await CreateEntity(client, universe.Id, type.Id, "Aldric Vane", content: Article("A quiet man."));
+        await CreateEntity(client, universe.Id, type.Id, "Someone Else", content: Article("Aldric arrived late."));
+
+        var page = await ListEntities(client, universe.Id, "pageSize=50&search=Aldric");
+        Assert.Null(page.Items.Single(item => item.Name == "Aldric Vane").ArticleExcerpt);
+        Assert.NotNull(page.Items.Single(item => item.Name == "Someone Else").ArticleExcerpt);
+
+        Assert.All((await ListEntities(client, universe.Id, "pageSize=50")).Items, item => Assert.Null(item.ArticleExcerpt));
+    }
+
+    [Fact]
+    public async Task An_excerpt_is_the_text_as_written_and_bounded_however_long_a_word_is()
+    {
+        var (client, universe) = await SignedInWithUniverse("excerptbound");
+        var type = await FirstDefaultType(client, universe.Id);
+
+        // Text that looks like markup is text: it comes back as written, for the client to render as text.
+        await CreateEntity(
+            client, universe.Id, type.Id, "Looks Like Markup", content: Article("<script>alert('Brannoch')</script> &amp; more"));
+        var markup = Assert.Single((await ListEntities(client, universe.Id, "search=Brannoch")).Items);
+        Assert.Contains("<script>alert('", string.Concat(markup.ArticleExcerpt!.Select(part => part.Text)), StringComparison.Ordinal);
+
+        // One word of five thousand letters is still one word to the index, and still a short excerpt.
+        await CreateEntity(
+            client, universe.Id, type.Id, "One Long Word", content: Article("Mistral" + new string('x', 5_000) + " ends here."));
+        var longWord = Assert.Single((await ListEntities(client, universe.Id, "search=Mistral")).Items);
+        var text = string.Concat(longWord.ArticleExcerpt!.Select(part => part.Text));
+        Assert.True(text.Length <= 241, $"Bounded: {text.Length} characters.");
+        Assert.EndsWith("…", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task An_article_save_and_restore_keep_what_search_finds_and_shows_in_step()
+    {
+        var (client, universe) = await SignedInWithUniverse("excerptstep");
+        var type = await FirstDefaultType(client, universe.Id);
+
+        var entity = await CreateEntity(client, universe.Id, type.Id, "Plain Name", content: Article("Sworn to the old queen."));
+        var rewritten = await ArticleTestClient.WriteArticle(client, universe.Id, entity.Id, Article("Exiled to the salt marshes."));
+
+        Assert.Empty(await SearchNames(client, universe.Id, "sworn"));
+        var exiled = Assert.Single((await ListEntities(client, universe.Id, "search=marshes")).Items);
+        Assert.Equal(["marshes"], exiled.ArticleExcerpt!.Where(part => part.IsMatch).Select(part => part.Text));
+
+        var first = (await ArticleTestClient.ArticleRevisions(client, universe.Id, entity.Id)).Last();
+        (await ArticleTestClient.RestoreArticle(client, universe.Id, entity.Id, first.Id, rewritten.UpdatedAt))
+            .EnsureSuccessStatusCode();
+
+        Assert.Empty(await SearchNames(client, universe.Id, "marshes"));
+        var sworn = Assert.Single((await ListEntities(client, universe.Id, "search=sworn")).Items);
+        Assert.Equal(["Sworn"], sworn.ArticleExcerpt!.Where(part => part.IsMatch).Select(part => part.Text));
+    }
+
     // ---------- Content that was never well formed ----------
 
     [Fact]
@@ -551,8 +649,12 @@ public sealed class EntitySearchTests(LorexApiFactory factory) : IClassFixture<L
     private Task StoreRawContent(Guid entityId, string content) =>
         WithDatabase(async db =>
         {
+            var now = DateTime.UtcNow;
             await db.Database.ExecuteSqlAsync(
-                $"UPDATE Entities SET Content = {content} WHERE Id = {entityId}");
+                $"""
+                INSERT INTO EntityArticles (EntityId, Content, UpdatedAt) VALUES ({entityId}, {content}, {now})
+                ON CONFLICT (EntityId) DO UPDATE SET Content = excluded.Content
+                """);
             await db.Database.ExecuteSqlAsync(
                 $"DELETE FROM EntitySearchIndex WHERE EntityId = {entityId}");
         });
@@ -617,12 +719,23 @@ public sealed class EntitySearchTests(LorexApiFactory factory) : IClassFixture<L
     {
         var response = await client.PostAsJsonAsync(
             $"/api/universes/{universeId}/entities",
-            new EntityRequest(typeId, name, summary, content, CanonStatus.Idea, aliases, null, null));
+            new EntityRequest(typeId, name, summary, CanonStatus.Idea, aliases, null, null));
         response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
+        var created = (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
+
+        // The article is saved on its own route, as the editor saves it.
+        if (content is not null)
+        {
+            await ArticleTestClient.WriteArticle(client, universeId, created.Id, content);
+        }
+
+        return created;
     }
 
-    /// <summary>An edit sends the whole entry, so anything not named here is written back as it was.</summary>
+    /// <summary>
+    /// A structured edit sends the whole entry, so anything not named here is written back as it was. An article is saved
+    /// on its own route, and only when one is given.
+    /// </summary>
     private static async Task<EntityDetail> UpdateEntity(
         HttpClient client,
         Guid universeId,
@@ -631,13 +744,22 @@ public sealed class EntitySearchTests(LorexApiFactory factory) : IClassFixture<L
         string? content = null,
         IReadOnlyList<string>? aliases = null)
     {
+        if (content is not null)
+        {
+            await ArticleTestClient.WriteArticle(client, universeId, entity.Id, content);
+        }
+
+        if (name is null && aliases is null)
+        {
+            return entity;
+        }
+
         var response = await client.PutAsJsonAsync(
             $"/api/universes/{universeId}/entities/{entity.Id}",
             new EntityRequest(
                 entity.EntityTypeId,
                 name ?? entity.Name,
                 entity.Summary,
-                content ?? entity.Content,
                 entity.CanonStatus,
                 aliases ?? entity.Aliases,
                 entity.Tags,

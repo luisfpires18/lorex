@@ -809,7 +809,7 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         // A version written before there was ever a picture.
         (await client.PutAsJsonAsync(
             Entity(universe.Id, entry.Id),
-            new EntityRequest(type, "Alenna of Tidewatch", null, null, CanonStatus.Idea, null, null, null)))
+            new EntityRequest(type, "Alenna of Tidewatch", null, CanonStatus.Idea, null, null, null)))
             .EnsureSuccessStatusCode();
 
         var beforeAnyPicture = (await History(client, universe.Id, entry.Id))
@@ -1484,7 +1484,7 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
     {
         var response = await client.PostAsJsonAsync(
             $"/api/universes/{universeId}/entities",
-            new EntityRequest(typeId, name, null, null, CanonStatus.Idea, null, null, null));
+            new EntityRequest(typeId, name, null, CanonStatus.Idea, null, null, null));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
     }

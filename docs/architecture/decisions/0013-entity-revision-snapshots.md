@@ -1,6 +1,7 @@
 # ADR 0013 - An entry's history is a full snapshot per accepted write
 
-Status: accepted (2026-09-09), amended 2026-09-10 (an image change is recorded, never snapshotted)
+Status: accepted (2026-09-09), amended 2026-09-10 (an image change is recorded, never snapshotted), amended 2026-09-13
+(the article keeps its own history - ADR 0028)
 
 ## Context
 
@@ -125,3 +126,19 @@ would put back something the author never wrote.
 - An entry created before this phase has no baseline. Its first edit records a version with
   no changes flagged, which reads as "first recorded version" rather than claiming the edit
   changed nothing.
+
+## Amendment - the article keeps its own history (2026-09-13)
+
+ADR 0028 moved the article into a row of its own with a history of its own, and that changes
+three statements above.
+
+- **A version no longer holds the article.** The snapshot is the structured entry: name,
+  summary, status, type, aliases, tags and values. Capture neither reads nor compares the
+  article, so a status click records a small version, never a copy of a long document. Saving
+  the article records an article version, not an entry version.
+- **A restore never touches the article.** The replayed request has no article member, so
+  putting back an old version cannot put back - or wipe - an article saved since.
+- **Versions recorded before keep what they recorded.** `EntityRevisions.Content` still holds
+  the article as it read at those versions, and `Article` is still flagged on them. Both are
+  read-only history: shown on the version, labelled, never compared and never applied. Every
+  version recorded since has a null there, which says nothing about the article.

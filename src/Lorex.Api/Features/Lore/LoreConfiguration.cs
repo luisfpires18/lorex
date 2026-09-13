@@ -12,6 +12,8 @@ public static class LoreLimits
     public const int TagMaxLength = 60;
     public const int IconMaxLength = 40;
     public const int AccentColorLength = 7;
+
+    /// <summary>One article's document, in characters of Tiptap JSON. Mirrored by the web client.</summary>
     public const int ContentMaxLength = 200_000;
     public const int OptionMaxLength = 120;
 }
@@ -93,7 +95,6 @@ public sealed class LoreEntityConfiguration : IEntityTypeConfiguration<LoreEntit
 
         builder.Property(entity => entity.Name).IsRequired().HasMaxLength(LoreLimits.NameMaxLength);
         builder.Property(entity => entity.Summary).HasMaxLength(LoreLimits.SummaryMaxLength);
-        builder.Property(entity => entity.Content).HasMaxLength(LoreLimits.ContentMaxLength);
         builder.Property(entity => entity.CanonStatus).HasConversion<int>();
 
         builder.HasOne(entity => entity.Universe)

@@ -1,6 +1,6 @@
 # ADR 0016 - Lore is searched by a SQLite FTS5 index the write path keeps in step
 
-Status: accepted (2026-09-10)
+Status: accepted (2026-09-10), amended 2026-09-13 (the article's own row, and excerpts - ADR 0028)
 
 ## Context
 
@@ -111,3 +111,25 @@ and its filters; only what `search` means has changed. The client change is one 
   searched.
 - The FTS5 table exists in no EF Core model, so `has-pending-model-changes` is blind to it in
   both directions. It is owned by its migration, and a change to it is a new migration.
+
+## Amendment - the article's own row, and excerpts (2026-09-13)
+
+ADR 0028 moved the article out of `Entities` into `EntityArticles`. The index keeps its four
+columns, weights, tokenizer and query semantics; its rows needed no rebuild, because the
+migration moves the text unchanged.
+
+| Change | What updates the index |
+| --- | --- |
+| Save an article, or restore one of its versions | `ReindexAsync`, on the article route, inside its transaction |
+| Restore an entry version | `ReindexAsync` in `UpdateCoreAsync`, as before - the article is not part of it |
+
+`ReindexAsync` reads the article from its row. That migration drops `Entities.Content` with
+SQLite's native `DROP COLUMN`, not EF Core's table rebuild, precisely so the delete trigger
+this decision relies on survives.
+
+**A search result says why the article matched.** `EntitySummary.articleExcerpt` is FTS5's
+`snippet` over the `Article` column - sixteen words, capped at 240 characters - cut only for
+the ids already on the page and only when the article itself matched. It travels as runs of
+plain text with the matched words flagged, never as markup, and is drawn as text. The markers
+FTS5 inserts are U+E000 and U+E001. That is a third query per search page; browsing is still
+one.

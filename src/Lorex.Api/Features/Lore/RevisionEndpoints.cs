@@ -337,11 +337,13 @@ public static class RevisionEndpoints
                 group.Select(value => value.EraId).FirstOrDefault(id => id != null)))
             .ToList();
 
+        // No article. A version recorded before articles kept their own history still holds a
+        // copy of one, and it is never applied: putting back an old name or status must not
+        // put back - or wipe - an article saved since (ADR 0028).
         return new EntityRequest(
             revision.EntityTypeId,
             revision.Name,
             revision.Summary,
-            revision.Content,
             revision.CanonStatus,
             [.. revision.Aliases.Select(alias => alias.Value)],
             [.. revision.Tags.Select(tag => tag.Name)],

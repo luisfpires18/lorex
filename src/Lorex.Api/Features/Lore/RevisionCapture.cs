@@ -90,7 +90,6 @@ internal static class EntityRevisions
         string EntityTypeName,
         string Name,
         string? Summary,
-        string? Content,
         CanonStatus CanonStatus,
         IReadOnlyList<string> Aliases,
         IReadOnlyList<string> Tags,
@@ -102,7 +101,6 @@ internal static class EntityRevisions
                 revision.EntityTypeName,
                 revision.Name,
                 revision.Summary,
-                revision.Content,
                 revision.CanonStatus,
                 [.. revision.Aliases.Select(alias => alias.Value)],
                 [.. revision.Tags.Select(tag => tag.Name)],
@@ -157,7 +155,6 @@ internal static class EntityRevisions
                 EntityTypeName = entity.EntityType!.Name,
                 entity.Name,
                 entity.Summary,
-                entity.Content,
                 entity.CanonStatus,
                 Aliases = entity.Aliases.Select(alias => alias.Value).ToList(),
                 Tags = entity.EntityTags.Select(link => link.Tag!.Name).ToList(),
@@ -186,7 +183,6 @@ internal static class EntityRevisions
                 row.EntityTypeName,
                 row.Name,
                 row.Summary,
-                row.Content,
                 row.CanonStatus,
                 row.Aliases,
                 row.Tags,
@@ -198,6 +194,10 @@ internal static class EntityRevisions
     /// definition's name, kind or position can move under a snapshot without that being a
     /// change to the entry, and a referenced entity being renamed is that entity's history,
     /// not this one's.
+    ///
+    /// Blind to the article too. It is not part of the snapshot: an article keeps its own
+    /// history (ADR 0028), and a version recorded before that still holding a copy must not
+    /// make the next structured edit look like an article change.
     /// </summary>
     private static EntityRevisionChange Difference(Snapshot before, Snapshot after)
     {
@@ -211,11 +211,6 @@ internal static class EntityRevisions
         if (!string.Equals(before.Summary, after.Summary, StringComparison.Ordinal))
         {
             changes |= EntityRevisionChange.Summary;
-        }
-
-        if (!string.Equals(before.Content, after.Content, StringComparison.Ordinal))
-        {
-            changes |= EntityRevisionChange.Article;
         }
 
         if (before.CanonStatus != after.CanonStatus)
@@ -295,7 +290,6 @@ internal static class EntityRevisions
             EntityTypeName = snapshot.EntityTypeName,
             Name = snapshot.Name,
             Summary = snapshot.Summary,
-            Content = snapshot.Content,
             CanonStatus = snapshot.CanonStatus,
         };
 

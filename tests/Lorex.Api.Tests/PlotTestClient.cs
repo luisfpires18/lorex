@@ -63,7 +63,7 @@ internal static class PlotTestClient
         var entity = await PostJson<EntityDetail>(
             client,
             $"/api/universes/{universeId}/entities",
-            new EntityRequest(types.First(type => type.Name == "Character").Id, name, null, null, CanonStatus.Canon, null, null, null));
+            new EntityRequest(types.First(type => type.Name == "Character").Id, name, null, CanonStatus.Canon, null, null, null));
         return entity.Id;
     }
 

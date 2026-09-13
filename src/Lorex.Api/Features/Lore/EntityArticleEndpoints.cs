@@ -1,0 +1,346 @@
+using System.Security.Claims;
+using Lorex.Api.Data;
+using Lorex.Api.Features.Universes;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace Lorex.Api.Features.Lore;
+
+/// <summary>
+/// An entry's article and its history, read and written on their own address. The entry routes, the listing, the Trash and
+/// every other lore read carry no article, so a universe of long articles still browses without downloading one.
+///
+/// Every route proves universe ownership, then a live entry in that universe. A trashed entry's article is kept exactly as
+/// it was and is simply not reachable here, like the entry itself; an entry reached through another universe answers as a
+/// missing one does. Validation runs after ownership, so a stranger's malformed body is a 404 too.
+///
+/// <b>Not structured lore.</b> An article save passes no Canon gate and reconciles nothing, because no rule reads prose: it
+/// changes no field, status, relationship or timeline entry, and records no entry revision. It is as settled as the entry
+/// it belongs to and has no status of its own (ADR 0028).
+///
+/// <b>No silent overwrite.</b> A save names the <c>updatedAt</c> it was written over; when the stored article has moved on
+/// since - saved from another tab or device - the save is refused and nothing is written. The same comparison as a scene's
+/// manuscript (ADR 0027), inside the write's own transaction.
+/// </summary>
+public static class EntityArticleEndpoints
+{
+    /// <summary>The machine-readable marker on the 409 for a save written over an article that has since changed.</summary>
+    public const string ChangedCode = "entity_article_changed";
+
+    public static IEndpointRouteBuilder MapEntityArticleEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var group = endpoints
+            .MapGroup("/api/universes/{universeId:guid}/entities/{entityId:guid}/article")
+            .WithTags("Entities")
+            .RequireAuthorization();
+
+        group.MapGet("/", GetAsync).WithName("GetEntityArticle");
+        group.MapPut("/", SaveAsync).WithName("SaveEntityArticle");
+        group.MapGet("/revisions", ListRevisionsAsync).WithName("ListEntityArticleRevisions");
+        group.MapGet("/revisions/{revisionId:guid}", GetRevisionAsync).WithName("GetEntityArticleRevision");
+        group.MapPost("/revisions/{revisionId:guid}/restore", RestoreRevisionAsync)
+            .WithName("RestoreEntityArticleRevision");
+
+        return endpoints;
+    }
+
+    /// <summary>The entry's article, or an empty one when nothing has been written for it.</summary>
+    private static async Task<IResult> GetAsync(
+        Guid universeId,
+        Guid entityId,
+        ClaimsPrincipal principal,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
+        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken)
+            || !await IsLiveAsync(db, universeId, entityId, cancellationToken))
+        {
+            return Results.NotFound();
+        }
+
+        var stored = await db.EntityArticles.AsNoTracking()
+            .Where(article => article.EntityId == entityId)
+            .Select(article => new { article.Content, article.UpdatedAt })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return Results.Ok(stored is null
+            ? new EntityArticleResponse(entityId, string.Empty, null)
+            : new EntityArticleResponse(entityId, stored.Content, Utc(stored.UpdatedAt)));
+    }
+
+    /// <summary>Replaces the article with the document sent, and records it as the article's next version.</summary>
+    private static async Task<IResult> SaveAsync(
+        Guid universeId,
+        Guid entityId,
+        [FromBody] EntityArticleRequest request,
+        ClaimsPrincipal principal,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
+        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        {
+            return Results.NotFound();
+        }
+
+        // One transaction for the comparison and the write, so nothing can land between them: SQLite has one writer.
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        if (!await IsLiveAsync(db, universeId, entityId, cancellationToken))
+        {
+            return Results.NotFound();
+        }
+
+        if (LoreValidation.ValidateArticle(request.Content) is { } errors)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        var result = await WriteAsync(
+            db, entityId, request.Content!, request.ExpectedUpdatedAt, EntityRevisionKind.Edited, null, cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
+
+    /// <summary>Newest first, and no text: a history row says when, and whether the save cleared the article.</summary>
+    private static async Task<IResult> ListRevisionsAsync(
+        Guid universeId,
+        Guid entityId,
+        ClaimsPrincipal principal,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
+        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken)
+            || !await IsLiveAsync(db, universeId, entityId, cancellationToken))
+        {
+            return Results.NotFound();
+        }
+
+        var revisions = await db.EntityArticleRevisions.AsNoTracking()
+            .Where(revision => revision.EntityId == entityId)
+            .OrderByDescending(revision => revision.Number)
+            .Select(revision => new
+            {
+                revision.Id,
+                revision.Number,
+                revision.Kind,
+                revision.RestoredFromRevisionId,
+                revision.CreatedAt,
+                IsEmpty = revision.Content == string.Empty,
+            })
+            .ToListAsync(cancellationToken);
+
+        return Results.Ok(revisions.Select(revision => new EntityArticleRevisionSummary(
+            revision.Id,
+            revision.Number,
+            revision.Kind,
+            revision.RestoredFromRevisionId,
+            Utc(revision.CreatedAt),
+            revision.IsEmpty)));
+    }
+
+    private static async Task<IResult> GetRevisionAsync(
+        Guid universeId,
+        Guid entityId,
+        Guid revisionId,
+        ClaimsPrincipal principal,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
+        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        {
+            return Results.NotFound();
+        }
+
+        var revision = await FindRevisionAsync(db, universeId, entityId, revisionId, cancellationToken);
+
+        return revision is null
+            ? Results.NotFound()
+            : Results.Ok(new EntityArticleRevisionDetail(
+                revision.Id,
+                revision.Number,
+                revision.Kind,
+                revision.RestoredFromRevisionId,
+                Utc(revision.CreatedAt),
+                revision.Content));
+    }
+
+    /// <summary>
+    /// Puts a saved version back as the article, through the same write a save uses - so the same stale-save refusal
+    /// applies, and the restore is recorded as the next version naming what it came from. Nothing on record is moved,
+    /// rewritten or removed. Restoring a version identical to the article as it stands writes nothing.
+    /// </summary>
+    private static async Task<IResult> RestoreRevisionAsync(
+        Guid universeId,
+        Guid entityId,
+        Guid revisionId,
+        [FromBody] EntityArticleRestoreRequest request,
+        ClaimsPrincipal principal,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
+        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        {
+            return Results.NotFound();
+        }
+
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        var revision = await FindRevisionAsync(db, universeId, entityId, revisionId, cancellationToken);
+        if (revision is null)
+        {
+            return Results.NotFound();
+        }
+
+        // What is put back is held to what a save may store today, so a restore cannot write what a save would refuse.
+        if (LoreValidation.ValidateArticle(revision.Content) is { } errors)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        var result = await WriteAsync(
+            db,
+            entityId,
+            revision.Content,
+            request.ExpectedUpdatedAt,
+            EntityRevisionKind.Restored,
+            revision.Id,
+            cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
+
+    /// <summary>
+    /// The one write: compare, store, record a version, touch the entry's <c>UpdatedAt</c> and keep search in step. Runs
+    /// inside the caller's transaction. A write that changes nothing stores and records nothing and answers with the
+    /// article as it stands.
+    /// </summary>
+    private static async Task<IResult> WriteAsync(
+        LorexDbContext db,
+        Guid entityId,
+        string content,
+        DateTime? expectedUpdatedAt,
+        EntityRevisionKind kind,
+        Guid? restoredFromRevisionId,
+        CancellationToken cancellationToken)
+    {
+        // A blank document is no article: stored as "", never as whitespace that would read as text.
+        var document = string.IsNullOrWhiteSpace(content) ? string.Empty : content;
+
+        var article = await db.EntityArticles.FirstOrDefaultAsync(
+            candidate => candidate.EntityId == entityId,
+            cancellationToken);
+
+        if (!SameMoment(article?.UpdatedAt, expectedUpdatedAt))
+        {
+            return Changed(article?.UpdatedAt);
+        }
+
+        if (string.Equals(article?.Content ?? string.Empty, document, StringComparison.Ordinal))
+        {
+            return Results.Ok(new EntityArticleResponse(
+                entityId,
+                document,
+                article is null ? null : Utc(article.UpdatedAt)));
+        }
+
+        var now = DateTime.UtcNow;
+
+        if (article is null)
+        {
+            db.EntityArticles.Add(new EntityArticle { EntityId = entityId, Content = document, UpdatedAt = now });
+        }
+        else
+        {
+            article.Content = document;
+            article.UpdatedAt = now;
+        }
+
+        var lastNumber = await db.EntityArticleRevisions
+            .Where(revision => revision.EntityId == entityId)
+            .MaxAsync(revision => (int?)revision.Number, cancellationToken) ?? 0;
+
+        db.EntityArticleRevisions.Add(new EntityArticleRevision
+        {
+            Id = Guid.NewGuid(),
+            EntityId = entityId,
+            Number = lastNumber + 1,
+            Kind = lastNumber == 0 ? EntityRevisionKind.Created : kind,
+            RestoredFromRevisionId = restoredFromRevisionId,
+            CreatedAt = now,
+            Content = document,
+        });
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        // The entry was worked on, so it sorts as recently authored. Only this column: nothing structured is read or
+        // written back, so a save can never overwrite a field edited in another window.
+        await db.Entities
+            .Where(entity => entity.Id == entityId)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(entity => entity.UpdatedAt, now), cancellationToken);
+
+        await EntitySearchIndex.ReindexAsync(db, entityId, cancellationToken);
+
+        return Results.Ok(new EntityArticleResponse(entityId, document, now));
+    }
+
+    private static Task<bool> IsLiveAsync(
+        LorexDbContext db,
+        Guid universeId,
+        Guid entityId,
+        CancellationToken cancellationToken) =>
+        db.Entities.AnyAsync(
+            entity => entity.Id == entityId && entity.UniverseId == universeId && entity.DeletedAt == null,
+            cancellationToken);
+
+    /// <summary>A version reached only through a live entry of this universe, so a trashed entry's history is not reachable.</summary>
+    private static Task<EntityArticleRevision?> FindRevisionAsync(
+        LorexDbContext db,
+        Guid universeId,
+        Guid entityId,
+        Guid revisionId,
+        CancellationToken cancellationToken) =>
+        db.EntityArticleRevisions.AsNoTracking()
+            .FirstOrDefaultAsync(
+                revision => revision.Id == revisionId
+                    && revision.EntityId == entityId
+                    && revision.Entity!.UniverseId == universeId
+                    && revision.Entity.DeletedAt == null,
+                cancellationToken);
+
+    /// <summary>
+    /// Whether a save names the article as it is stored: both "nothing saved yet", or the same instant. Compared as UTC
+    /// ticks, because SQLite hands a stored moment back with no kind and JSON may carry it with or without a zone.
+    /// </summary>
+    private static bool SameMoment(DateTime? stored, DateTime? expected) =>
+        (stored, expected) switch
+        {
+            (null, null) => true,
+            ({ } a, { } b) => Utc(a).Ticks == Utc(b).Ticks,
+            _ => false,
+        };
+
+    /// <summary>Stored as UTC; written out with its zone, so a client can send back exactly what it was given.</summary>
+    private static DateTime Utc(DateTime value) => value.Kind switch
+    {
+        DateTimeKind.Utc => value,
+        DateTimeKind.Local => value.ToUniversalTime(),
+        _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+    };
+
+    /// <summary>
+    /// The refusal for a stale save. Carries the stored <c>updatedAt</c>, so a client whose author has seen the warning and
+    /// still means to keep their own text can name it and save again - a decision made by a person, never by a retry.
+    /// </summary>
+    private static IResult Changed(DateTime? current) =>
+        Results.Problem(
+            title: "Article changed",
+            detail: "This entry's article was saved somewhere else after it was opened here. Nothing was overwritten.",
+            statusCode: StatusCodes.Status409Conflict,
+            extensions: new Dictionary<string, object?>
+            {
+                ["code"] = ChangedCode,
+                ["updatedAt"] = current is { } moment ? Utc(moment) : null,
+            });
+}

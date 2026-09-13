@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace Lorex.Api.Features.Lore;
 
 /// <summary>
-/// Structural validation for the Tiptap document stored in <see cref="LoreEntity.Content"/>.
+/// Structural validation for the Tiptap document stored in <see cref="EntityArticle.Content"/>.
 ///
 /// The editor renders from this document through ProseMirror's schema, which builds DOM
 /// nodes rather than parsing HTML, so text can never become markup. The one thing that

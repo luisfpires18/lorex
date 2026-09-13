@@ -55,7 +55,8 @@ public static class EntityEndpoints
                             entity.Image.CropY!.Value,
                             entity.Image.CropWidth!.Value,
                             entity.Image.CropHeight!.Value)),
-            entity.UpdatedAt);
+            entity.UpdatedAt,
+            null);
 
     public static IEndpointRouteBuilder MapEntityEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -132,10 +133,11 @@ public static class EntityEndpoints
         // the type, the tag - is still answered by the columns below, so the index cannot
         // disagree with them about what is visible.
         IQueryable<EntitySearchMatch>? matches = null;
+        string? expression = null;
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var expression = EntitySearchIndex.BuildMatchExpression(search);
+            expression = EntitySearchIndex.BuildMatchExpression(search);
 
             // Something was typed, but not a single letter or digit in it. Nothing can match a
             // search for "%" and nothing did before either, so this is an empty page rather
@@ -200,7 +202,13 @@ public static class EntityEndpoints
             // Back into rank order: the second query returned a set, not a sequence. At most one
             // page of ids, so this is a handful of lookups.
             var byId = cards.ToDictionary(card => card.Id);
-            items = [.. ranked.Select(id => byId[id])];
+
+            // Where an article matched, a few words around the match, so a hit that is not in the
+            // name reads as why it is here. Cut by the index for this page's entries only: no
+            // article travels, and no card costs a query of its own.
+            var excerpts = await EntitySearchIndex.ArticleExcerptsAsync(db, expression!, ranked, cancellationToken);
+
+            items = [.. ranked.Select(id => byId[id] with { ArticleExcerpt = excerpts.GetValueOrDefault(id) })];
         }
 
         var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize);
@@ -284,7 +292,6 @@ public static class EntityEndpoints
             EntityTypeId = request.EntityTypeId,
             Name = request.Name!.Trim(),
             Summary = LoreValidation.Normalize(request.Summary),
-            Content = LoreValidation.Normalize(request.Content),
             CanonStatus = request.CanonStatus,
             CreatedAt = now,
             UpdatedAt = now,
@@ -386,7 +393,6 @@ public static class EntityEndpoints
         entity.EntityTypeId = request.EntityTypeId;
         entity.Name = request.Name!.Trim();
         entity.Summary = LoreValidation.Normalize(request.Summary);
-        entity.Content = LoreValidation.Normalize(request.Content);
         entity.CanonStatus = request.CanonStatus;
         entity.UpdatedAt = DateTime.UtcNow;
 
@@ -413,10 +419,10 @@ public static class EntityEndpoints
 
         await db.SaveChangesAsync(cancellationToken);
 
-        // Every edit that can change indexed text arrives here - a rename, a new summary, an
-        // article rewrite, an alias added or dropped, and a revision restore, which is this same
-        // method replaying an old version. So this one call is the whole update side of
-        // synchronization, and it runs inside the transaction the edit itself commits in.
+        // Every structured edit that can change indexed text arrives here - a rename, a new
+        // summary, an alias added or dropped, and a revision restore, which is this same method
+        // replaying an old version. The article's own save reindexes on its route. Both run inside
+        // the transaction the write itself commits in.
         await EntitySearchIndex.ReindexAsync(db, entity.Id, cancellationToken);
 
         // Before the commit, and inside the gate's transaction when there is one: the edit and
@@ -896,7 +902,6 @@ public static class EntityEndpoints
                 candidate.Id,
                 candidate.Name,
                 candidate.Summary,
-                candidate.Content,
                 candidate.CanonStatus,
                 candidate.IsArchived,
                 candidate.EntityTypeId,
@@ -979,7 +984,6 @@ public static class EntityEndpoints
             entity.Id,
             entity.Name,
             entity.Summary,
-            entity.Content,
             entity.CanonStatus,
             entity.IsArchived,
             entity.EntityTypeId,

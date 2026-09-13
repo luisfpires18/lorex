@@ -72,11 +72,15 @@ public sealed record FieldValueInput(
     Guid? ReferencedEntityId,
     Guid? EraId = null);
 
+/// <summary>
+/// The structured half of an entry. There is no article member: the article is saved on its own route
+/// (<see cref="EntityArticleRequest"/>), so a structured edit cannot overwrite it, and a client that still sends
+/// <c>content</c> here has it ignored.
+/// </summary>
 public sealed record EntityRequest(
     Guid EntityTypeId,
     string? Name,
     string? Summary,
-    string? Content,
     CanonStatus CanonStatus,
     IReadOnlyList<string>? Aliases,
     IReadOnlyList<string>? Tags,
@@ -186,7 +190,13 @@ public sealed record EntityImageCrop(double X, double Y, double Width, double He
 /// </summary>
 public sealed record EntityThumbnailRequest(Guid AssetId, EntityImageCrop? Crop);
 
-/// <summary>Card row. Carries enough to render a type-aware card, and no universe or owner id.</summary>
+/// <summary>
+/// Card row. Carries enough to render a type-aware card, and no universe or owner id - and never an article.
+///
+/// <paramref name="ArticleExcerpt"/> is set only on a search result whose article matched: a few words around the match,
+/// cut by the index, as runs of text with the matched words marked. Null when browsing, and when only the name, an alias
+/// or the summary matched.
+/// </summary>
 public sealed record EntitySummary(
     Guid Id,
     string Name,
@@ -200,13 +210,17 @@ public sealed record EntitySummary(
     IReadOnlyList<string> Aliases,
     IReadOnlyList<string> Tags,
     EntityImageRef? Image,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    IReadOnlyList<SearchExcerptPart>? ArticleExcerpt);
 
+/// <summary>One run of an article excerpt: plain text as the author wrote it, and whether it is part of the match.</summary>
+public sealed record SearchExcerptPart(string Text, bool IsMatch);
+
+/// <summary>An entry's structured lore. Its article is read on its own route (<see cref="EntityArticleResponse"/>).</summary>
 public sealed record EntityDetail(
     Guid Id,
     string Name,
     string? Summary,
-    string? Content,
     CanonStatus CanonStatus,
     bool IsArchived,
     Guid EntityTypeId,

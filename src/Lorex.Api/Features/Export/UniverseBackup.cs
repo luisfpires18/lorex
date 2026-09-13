@@ -86,8 +86,18 @@ public sealed record UniverseBackup(
     /// as the author wrote it, and when it was last saved. Nullable, and the least ignorable member yet: it is the writing
     /// itself, so a version 7 reader would restore every scene with its prose silently gone. A file at version 7 or earlier
     /// has no <c>manuscript</c>; it reads as null, which means a scene with nothing written.
+    ///
+    /// 9 - An entry's article moved into a row of its own with a history of its own (ADR 0028).
+    /// <see cref="BackupEntity.Content"/> keeps its meaning - the article as it stands - and gains
+    /// <see cref="BackupEntity.ArticleUpdatedAt"/> and <see cref="BackupEntity.ArticleRevisions"/>, every saved version of
+    /// the article. It fails the "ignorable" test twice. The versions are authored text a version 8 reader would drop
+    /// silently, as it would have dropped an entry's history. And <see cref="BackupRevision.Content"/> is re-meant: in
+    /// version 8 a null there said the entry had no article at that version, and restoring the version applied that; from
+    /// version 9 an entry revision recorded after the move holds no copy of the article at all, so a version 8 reader
+    /// restoring one would wipe an article that exists. A file at version 8 or earlier has neither new member; both read as
+    /// null, and each revision's <c>content</c> is the article as it read then.
     /// </summary>
-    public const int CurrentVersion = 8;
+    public const int CurrentVersion = 9;
 
     public static UniverseBackup Of(UniverseBackupPayload payload, DateTime generatedAt) =>
         new(FormatName, CurrentVersion, generatedAt, payload);
@@ -184,8 +194,19 @@ public sealed record BackupTag(Guid Id, string Name);
 /// One entry, with its history alongside it so a version never travels apart from the entry
 /// it is a version of.
 ///
-/// <paramref name="Content"/> is the Tiptap document exactly as stored - the same string,
-/// not a re-serialised object graph - so the article round-trips byte for byte.
+/// <paramref name="Content"/> is the article as it stands: the Tiptap document exactly as stored - the same string, not a
+/// re-serialised object graph - so it round-trips byte for byte. Null for an entry with no article, and for one whose
+/// article was written and then cleared. <paramref name="ArticleUpdatedAt"/> is when the article was last saved, null if
+/// it never was, which is what tells those two apart (since version 9).
+///
+/// <paramref name="ArticleRevisions"/> is every saved version of the article, oldest first; the newest is
+/// <paramref name="Content"/>. Each is the whole document, or <c>""</c> for a save that cleared it. Its ids are preserved,
+/// and a version's <c>restoredFromRevisionId</c> names another version of the same entry's article (since version 9).
+///
+/// A future importer restores the article to the entry of the same id, in the universe being restored and owned by the
+/// importing account - nothing about ownership is in the file. It validates each document as a save does, re-creates the
+/// versions with their ids and numbers, writes no entry revision for any of it, and reindexes search. It never applies a
+/// <see cref="BackupRevision.Content"/> to the article.
 ///
 /// <paramref name="DeletedAt"/> is when the entry was moved to the Trash, or null while it is
 /// live. Trashed entries are carried in full, with their values, aliases, tags and history:
@@ -199,6 +220,7 @@ public sealed record BackupEntity(
     string Name,
     string? Summary,
     string? Content,
+    DateTime? ArticleUpdatedAt,
     CanonStatus CanonStatus,
     bool IsArchived,
     DateTime? DeletedAt,
@@ -208,7 +230,22 @@ public sealed record BackupEntity(
     IReadOnlyList<Guid> TagIds,
     IReadOnlyList<BackupFieldValue> FieldValues,
     BackupEntityImage? Image,
-    IReadOnlyList<BackupRevision> Revisions);
+    IReadOnlyList<BackupRevision> Revisions,
+    IReadOnlyList<BackupArticleRevision>? ArticleRevisions);
+
+/// <summary>
+/// One saved version of an entry's article (since version 9). <paramref name="Content"/> is the whole document exactly as
+/// saved, or <c>""</c> for a save that cleared the article. <paramref name="Kind"/> is <c>Created</c> for the first version,
+/// <c>Edited</c> for a save and <c>Restored</c> for a version put back, which names it in
+/// <paramref name="RestoredFromRevisionId"/>.
+/// </summary>
+public sealed record BackupArticleRevision(
+    Guid Id,
+    int Number,
+    EntityRevisionKind Kind,
+    Guid? RestoredFromRevisionId,
+    DateTime CreatedAt,
+    string Content);
 
 /// <summary>
 /// The entry's primary image, as a reader of the archive needs to see it.
@@ -291,6 +328,10 @@ public sealed record BackupFieldValue(
 /// <summary>
 /// One version of one entry, as ADR 0013 recorded it: a full snapshot, carrying both the raw
 /// id of everything it references and the text that reference displayed at the time.
+///
+/// <paramref name="Content"/> is the article as it read then, for a version recorded before articles kept their own
+/// history, and null for every version recorded since - which holds no copy of the article and says nothing about it.
+/// A reader keeps it as history and never applies it to the article (version 9, ADR 0028).
 /// </summary>
 public sealed record BackupRevision(
     Guid Id,

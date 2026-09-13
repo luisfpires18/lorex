@@ -946,7 +946,7 @@ public sealed class CanonIntegrityEndpointTests(LorexApiFactory factory) : IClas
 
         var response = await client.PostAsJsonAsync(
             $"/api/universes/{universeId}/entities",
-            new EntityRequest(type.Id, name, null, null, canonStatus, null, null, fields));
+            new EntityRequest(type.Id, name, null, canonStatus, null, null, fields));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
     }
@@ -972,7 +972,6 @@ public sealed class CanonIntegrityEndpointTests(LorexApiFactory factory) : IClas
                 entity.EntityTypeId,
                 entity.Name,
                 entity.Summary,
-                entity.Content,
                 entity.CanonStatus,
                 entity.Aliases,
                 entity.Tags,
@@ -1001,7 +1000,6 @@ public sealed class CanonIntegrityEndpointTests(LorexApiFactory factory) : IClas
                 entity.EntityTypeId,
                 name,
                 entity.Summary,
-                entity.Content,
                 status,
                 entity.Aliases,
                 entity.Tags,

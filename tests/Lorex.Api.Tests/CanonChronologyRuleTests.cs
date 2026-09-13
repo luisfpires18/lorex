@@ -1065,7 +1065,7 @@ public sealed class CanonChronologyRuleTests(LorexApiFactory factory) : IClassFi
 
         var response = await client.PostAsJsonAsync(
             $"/api/universes/{universeId}/entities",
-            new EntityRequest(type.Id, name, null, null, canonStatus, null, null, fields));
+            new EntityRequest(type.Id, name, null, canonStatus, null, null, fields));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
     }
@@ -1090,7 +1090,6 @@ public sealed class CanonChronologyRuleTests(LorexApiFactory factory) : IClassFi
                 entity.EntityTypeId,
                 entity.Name,
                 entity.Summary,
-                entity.Content,
                 CanonStatus.Draft,
                 entity.Aliases,
                 entity.Tags,

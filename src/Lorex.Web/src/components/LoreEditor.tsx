@@ -1,7 +1,7 @@
 import Link from '@tiptap/extension-link'
 import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { ALLOWED_LINK_SCHEMES, isSafeHref } from '../lore/document'
 
 /**
@@ -19,6 +19,19 @@ const extensions = [
     isAllowedUri: (url) => isSafeHref(url),
   }),
 ]
+
+/**
+ * The stored document as the editor's content. A document that cannot be read - written before the API validated
+ * articles, or by a future editor - opens empty rather than taking the page down with it.
+ */
+function parseDocument(json: string | null): object | string {
+  if (!json) return ''
+  try {
+    return JSON.parse(json) as object
+  } catch {
+    return ''
+  }
+}
 
 function Toolbar({ editor }: { editor: Editor }) {
   function promptForLink() {
@@ -100,21 +113,61 @@ function Toolbar({ editor }: { editor: Editor }) {
 interface LoreEditorProps {
   value: string | null
   onChange: (json: string) => void
+
+  /**
+   * Called once the editor holds `value`, with the editor itself. What it serialises to then is the document as this
+   * editor writes it - the right thing to measure unsaved changes against, because a stored document read back may
+   * not be byte-identical to what the same editor would write for it.
+   */
+  onReady?: (editor: Editor) => void
+
+  /** Puts the caret at the end of the document as soon as the editor opens. */
+  autofocus?: boolean
+
+  /** Ids of the text that describes the editing surface - its save status, and a length warning. */
+  describedBy?: string
+
+  /** The shortcuts the surrounding page gives the editor, announced on the surface. */
+  keyShortcuts?: string
 }
 
-export function LoreEditor({ value, onChange }: LoreEditorProps) {
+export function LoreEditor({
+  value,
+  onChange,
+  onReady,
+  autofocus = false,
+  describedBy,
+  keyShortcuts,
+}: LoreEditorProps) {
   const editor = useEditor({
     extensions,
-    content: value ? (JSON.parse(value) as object) : '',
+    content: parseDocument(value),
+    autofocus: autofocus ? 'end' : false,
     onUpdate: ({ editor: current }) => onChange(JSON.stringify(current.getJSON())),
     editorProps: {
       attributes: {
         class: 'editor__surface',
         'data-testid': 'lore-editor',
         'aria-label': 'Lore article',
+        role: 'textbox',
+        'aria-multiline': 'true',
+        ...(describedBy ? { 'aria-describedby': describedBy } : {}),
+        ...(keyShortcuts ? { 'aria-keyshortcuts': keyShortcuts } : {}),
       },
     },
   })
+
+  // Reported from the instance this hook hands back, not from Tiptap's onCreate: under React's development double
+  // mount the first instance created is destroyed, and a caller holding it could neither read nor focus the editor it
+  // sees. The latest callback is kept in a ref so it is called once per instance, not once per render.
+  const ready = useRef(onReady)
+  useEffect(() => {
+    ready.current = onReady
+  })
+
+  useEffect(() => {
+    if (editor) ready.current?.(editor)
+  }, [editor])
 
   if (!editor) return null
 
@@ -135,7 +188,7 @@ export function LoreArticle({ content }: { content: string | null }) {
     {
       extensions,
       editable: false,
-      content: content ? (JSON.parse(content) as object) : '',
+      content: parseDocument(content),
       editorProps: {
         attributes: { class: 'article__body', 'data-testid': 'lore-article' },
       },

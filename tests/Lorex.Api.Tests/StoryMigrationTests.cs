@@ -231,7 +231,7 @@ public sealed class StoryMigrationTests : IDisposable
         return (await PostJson<EntityDetail>(
             client,
             $"/api/universes/{universeId}/entities",
-            new EntityRequest(types.First(type => type.Name == "Character").Id, name, null, null, CanonStatus.Idea, null, null, null)))
+            new EntityRequest(types.First(type => type.Name == "Character").Id, name, null, CanonStatus.Idea, null, null, null)))
             .Id;
     }
 

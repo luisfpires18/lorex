@@ -180,6 +180,12 @@ export interface EntityImageRef {
  */
 export type EntityImageCrop = ImageCrop
 
+/** One run of a search excerpt: plain text as the author wrote it, and whether it is part of what matched. */
+export interface SearchExcerptPart {
+  text: string
+  isMatch: boolean
+}
+
 export interface EntitySummary {
   id: string
   name: string
@@ -194,10 +200,16 @@ export interface EntitySummary {
   tags: string[]
   image: EntityImageRef | null
   updatedAt: string
+
+  /**
+   * A few words of the article around what a search matched, cut by the API. Only on a search result whose article
+   * matched; null when browsing and when the name, an alias or the summary was the match. Text, never markup.
+   */
+  articleExcerpt: SearchExcerptPart[] | null
 }
 
+/** An entry's structured lore. Its article is read on its own route - see `article.ts`. */
 export interface EntityDetail extends EntitySummary {
-  content: string | null
   fields: FieldValue[]
   createdAt: string
 }
@@ -233,11 +245,11 @@ export interface FieldValueInput {
   eraId: string | null
 }
 
+/** The structured half of an entry. No article: that is saved on its own route, so this save can never overwrite it. */
 export interface EntityInput {
   entityTypeId: string
   name: string
   summary: string | null
-  content: string | null
   canonStatus: CanonStatusValue
   aliases: string[]
   tags: string[]

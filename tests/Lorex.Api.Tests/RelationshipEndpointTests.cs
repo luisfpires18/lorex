@@ -805,7 +805,7 @@ public sealed class RelationshipEndpointTests(LorexApiFactory factory) : IClassF
     {
         var response = await client.PostAsJsonAsync(
             $"/api/universes/{universeId}/entities",
-            new EntityRequest(typeId, name, null, null, CanonStatus.Idea, null, null, null));
+            new EntityRequest(typeId, name, null, CanonStatus.Idea, null, null, null));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
     }

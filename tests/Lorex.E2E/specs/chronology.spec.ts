@@ -289,7 +289,6 @@ test.describe('chronology', () => {
         entityTypeId: character.id,
         name: 'Aranel',
         summary: null,
-        content: null,
         canonStatus: 0,
         aliases: [],
         tags: [],

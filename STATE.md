@@ -44,8 +44,8 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     large on the auth plate and small beside the wordmark in the paper bars, decorative in both.
   - Same filenames, new bytes, and root static files are cached by path - hence the version
     bumps. ADR 0017 amendment.
-- **Numbered implementation pauses after 022.** Current mode is **owner-led manual testing,
-  stabilization and feature polish**, on unnumbered `<type>/<description>` branches.
+- **Numbered implementation pauses after 022.** Work continues on unnumbered
+  `<type>/<description>` branches: Phase 2 Story, and now Phase 3.
   **Phase 023 - Production Hardening / PostgreSQL - remains deferred** and is not started; the
   next numbered phase resumes only when the owner says so.
 - **Entry images** (`feat/entity-images-r2`, merged into `dev`). An entry may carry one picture:
@@ -161,6 +161,25 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - The gap is `UniverseChronology.YearsBetween`: the signed difference inside one era or the plain
     reckoning, `a + b - 1` from a countdown era into the ascending era after it, unknown otherwise.
   - Edited inside the relation kind form on the Types screen. Backup stays version 4, additively.
+- **Phase 3 - Lore articles** (`feat/lore-articles`, committed, **not merged, not pushed**). The owner authorized Phase 3;
+  this is its first feature. Entries already had a Tiptap article; the owner kept that format (no plain-text conversion,
+  2026-09-13) and it gained everything else. ADR 0028.
+  - `EntityArticles` (one per entry; `Entities.Content` dropped) and `EntityArticleRevisions`, its own history. Own route
+    `.../entities/{id}/article`, `/revisions`, `/revisions/{id}/restore`; stale save 409 `entity_article_changed`. Entry
+    routes, listings, Trash and entry history carry no article; a stale client's `content` on the entry route is ignored.
+  - A save touches the article, its version, search and the entry's `UpdatedAt` - no Canon gate, field, relationship,
+    timeline or entry revision. No status of its own: it follows the entry's Canon state.
+  - Entry revisions no longer copy the article and a restore never applies it. Versions recorded before keep their copy,
+    read-only and labelled; the migration makes each article version 1 of its own history.
+  - Search reads the row and returns `articleExcerpt` (FTS5 snippet: 16 words, 240 characters, page ids only, article
+    matches only), drawn as text with `<mark>`. Backup format version 9 (`articleUpdatedAt`, `articleRevisions`; revision
+    `content` re-meant). ADR 0014, 0016, 0013 amended.
+  - Entry page: an Article section - Write/Edit article, Save and Ctrl/Cmd+S (focus in the article), status, conflict
+    choice, failure and gone-entry messages that keep the text, the leave guard with Sign out, Done asks; one editor at a
+    time; Article history on request. A new entry writes its article once created. Search cards show the excerpt.
+  - Fixed on the way: a narrow-screen `.entry__layout` `1fr` column let one long unbroken word widen the whole entry page
+    past the screen (now `minmax(0, 1fr)`); the refocus after Save held Tiptap's StrictMode-destroyed instance.
+  - Owner manual pass: `docs/testing/phase3-lore-article-manual-test.md`. Backup Import / Restore is Phase 3's last feature.
 - **Phase 2 Story - COMPLETE** (owner-sequenced, unnumbered branches). Implemented scope: Stories, Chapters,
   Scenes, Plot Arcs / Beats, Scene Manuscript. ADR 0024-0027. Deferred Story work is listed under Deferred, apart
   from this: none of it is a Phase 2 gap.
@@ -168,10 +187,9 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   2. Story chapters - merged.
   3. Plot arcs / beats - merged.
   4. Scene manuscript - merged.
-  5. Story workspace integration / Phase 2 closeout - done (`feat/story-phase2-closeout`, committed, **not merged,
-     not pushed**).
-  6. **Next: the owner's first full manual Phase 2 test**, once 5 is merged - `docs/testing/phase2-story-manual-test.md`.
-- **Story workspace integration / Phase 2 closeout** (`feat/story-phase2-closeout`). Polish and hardening across the
+  5. Story workspace integration / Phase 2 closeout - merged.
+  6. Owner acceptance - owner-managed, `docs/testing/phase2-story-manual-test.md`.
+- **Story workspace integration / Phase 2 closeout** (`feat/story-phase2-closeout`, merged into `dev`). Polish and hardening across the
   four features, reviewed as one product against a 24-scene story. No new subsystem, no API, schema or backup change.
   - One short header for Scenes, Plot and Manuscript: title and facts, the premise on Scenes only, and one bar holding
     the views and Edit/Delete story - icon-only below 640px, still named. At 390px the first scene and the manuscript
@@ -259,8 +277,9 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 
 ## Baseline
 
-- **709 API integration tests, 106 Playwright tests**, green. The Phase 2 closeout full run lost one test, auth
-  "rejects a wrong password" (the known flake below); `auth.spec.ts` and `account-menu.spec.ts` were 10/10 alone. No frontend unit runner exists;
+- **731 API integration tests, 109 Playwright tests**, green. The lore articles work ran the full Playwright suite twice;
+  each lost one different test to the known contention below - a `canon.spec.ts` 30 s timeout, then an
+  `account-menu.spec.ts` avatar read-back - and each file was green alone (6/6, 5/5). No frontend unit runner exists;
   the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
@@ -276,24 +295,12 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   writer, not the specs. The story, chapters and plot runs each lost one to three of canon, account-menu
   or type-filter, every one green alone; the plot run lost a single type-filter icon read-back, 4/4 alone; the
   manuscript run lost one canon and one universes test, each file green alone (6/6, 5/5).
-- 24 migrations, latest `AddSceneManuscripts` - one table, walked down and up over a story in chapters with a plot by
-  `SceneManuscriptMigrationTests`, which reads the key, columns and cascade back and rolls back with prose in the file.
-  `AddStoryPlotArcsAndBeats` - four tables only, walked down and up over a story in
-  chapters by `PlotMigrationTests`, which reads each delete action, index and key back and proves the orders and
-  pairs unique in SQLite.
-  `AddStoryChapters` - a table, a nullable column (SQLite rebuilds `Scenes` for
-  its foreign key) and the order index swap, walked down and up over real stories by
-  `ChapterMigrationTests`, which proves both filtered indexes refuse a clash.
-  `AddStories` is three new tables, walked by `StoryMigrationTests`, which reads each delete action back
-  from SQLite.
-  `AddRelationshipTypeCanonConstraints` is three plain columns, walked down (a table rebuild) and back
-  up by `RelationshipConstraintMigrationTests`.
-  `AddUniverseChronology` creates `ChronologyEras` and adds era references,
-  rebuilding `TimelineEntries` and `EntityFieldValues` as SQLite requires for a foreign key. Walked
-  down and back up over real lore on a file by `ChronologyMigrationTests`; rolling back discards the
-  eras. `RestrictEntityTypeIconKeys` is data only. `has-pending-model-changes` reports none. `AddEntitySearchIndex` is raw SQL - an FTS5 virtual
-  table and the trigger that empties it - so no EF Core model describes it and the pending check
-  cannot see it either way.
+- 25 migrations, latest `AddEntityArticles` - two tables, every article moved byte for byte with a first version, and
+  `Entities.Content` dropped with SQLite's native `DROP COLUMN`: EF Core's rebuild of `Entities` would drop the FTS delete
+  trigger it cannot see. `EntityArticleMigrationTests` walks it down and up over lore on a file and reads keys, cascades,
+  every dependant's foreign keys and the trigger back; rolling back puts each article on its entry and drops the history.
+  Every migration since `AddUniverseChronology` has a `*MigrationTests` walk on a file. `has-pending-model-changes` reports
+  none. `AddEntitySearchIndex` is raw SQL - an FTS5 table and its trigger - invisible to the pending check either way.
 - No automated test reaches Cloudflare and none can: the API host registers an in-process object
   store, Playwright runs against `Media:Provider=InMemory`, and the R2 adapter tests answer the SDK
   from an in-process HTTP handler. That covers profile photos too - they use the same store.
@@ -343,6 +350,9 @@ tool has changed the picture.
   beat chronology, editing beats from a scene, board or graph views; autosave, word counts, a "has prose" marker on
   scene cards (it needs a flag the story read can give without reading prose), and catching Back/Forward with
   unsaved text (needs a data router - ADR 0027 amendment). ADR 0024-0027.
+- **Lore article work deferred** - later, not gaps: plain text or Markdown, wiki links and backlinks, version diffs and
+  pruning, restoring article text held in pre-ADR-0028 entry versions from the screen, autosave and local draft recovery
+  (Content Recovery), catching Back/Forward, word counts. Backup Import / Restore is the last Phase 3 feature. ADR 0028.
 - **Relationship life-state constraints** (an end alive at the link's date) wait for dated
   relationships: `StartDate`/`EndDate` are real-world timestamps, not chronology points. A birth-year
   gap across eras of unrecorded length waits for era lengths. ADR 0023.
