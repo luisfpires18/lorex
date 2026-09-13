@@ -45,12 +45,15 @@ public sealed class Story
 
     public DateTime CreatedAt { get; set; }
 
-    /// <summary>When the story, its chapters or any of its scenes was last written to.</summary>
+    /// <summary>When the story, its chapters, any of its scenes or its plot was last written to.</summary>
     public DateTime UpdatedAt { get; set; }
 
     public ICollection<Chapter> Chapters { get; } = [];
 
     public ICollection<Scene> Scenes { get; } = [];
+
+    /// <summary>The story's plot arcs (ADR 0026): planning that points at scenes and lore, and owns neither.</summary>
+    public ICollection<PlotArc> PlotArcs { get; } = [];
 }
 
 /// <summary>

@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { BookPlus, Pencil, Plus, Trash } from 'lucide-react'
-import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import {
+  Link,
+  NavLink,
+  useLocation,
+  useNavigate,
+  useOutletContext,
+  useParams,
+} from 'react-router-dom'
 import { ActionIcon } from '../components/ActionIcon'
 import { ChapterForm } from '../components/ChapterForm'
 import { ChapterSection } from '../components/ChapterSection'
+import { PlotPanel } from '../components/PlotPanel'
 import { SceneCard, type MoveTarget } from '../components/SceneCard'
 import { SceneForm } from '../components/SceneForm'
 import { StoryForm } from '../components/StoryForm'
@@ -13,11 +21,13 @@ import {
   deleteScene,
   deleteStory,
   getStory,
+  listPlotArcs,
   moveScene,
   reorderChapters,
   reorderScenes,
 } from '../stories/api'
 import {
+  arcCountLabel,
   chapterCountLabel,
   chapterLabel,
   chapterNumber,
@@ -25,13 +35,19 @@ import {
   sceneCountLabel,
   UNCHAPTERED,
 } from '../stories/format'
-import { readingOrder, scenesIn } from '../stories/structure'
-import { STORY_STATUS_LABELS, type Chapter, type Scene, type StoryDetail } from '../stories/types'
+import { beatsByScene, readingOrder, scenesIn } from '../stories/structure'
+import {
+  STORY_STATUS_LABELS,
+  type Chapter,
+  type PlotArc,
+  type Scene,
+  type StoryDetail,
+} from '../stories/types'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
 type LoadState =
   | { kind: 'loading' }
-  | { kind: 'ready'; story: StoryDetail }
+  | { kind: 'ready'; story: StoryDetail; arcs: PlotArc[] }
   | { kind: 'missing' }
   | { kind: 'error'; message: string }
 
@@ -44,8 +60,18 @@ type ChapterFormState =
 /** The control that should hold the focus once a move has redrawn the page, and the one to use if it is disabled. */
 type FocusRequest = { key: string; fallback: string | null }
 
+/** "a", "a and b", "a, b and c". */
+function listed(parts: string[]) {
+  return parts.length < 2
+    ? (parts[0] ?? '')
+    : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+}
+
 /**
- * One story, told in the order its author sets.
+ * One story, told in the order its author sets, and planned in the plot its author follows.
+ *
+ * The page has two views under one heading: Scenes, at the story's own address, and Plot, at `/plot`. Both read the
+ * same story and the same plot, once, so moving between them costs nothing and the header never changes.
  *
  * Chapters are optional. A story without any is one list of scenes, exactly as before chapters existed.
  * Once it has some, the page reads Unchaptered first - a holding area, shown only while it holds a scene -
@@ -54,12 +80,14 @@ type FocusRequest = { key: string; fallback: string | null }
  *
  * Neither order is chronology. Each scene may say where it happens in the world, and that is shown on the
  * scene, but nothing on this page sorts, groups or warns by it: a story that opens on the aftermath and
- * flashes back to a childhood is exactly as valid as one told straight through.
+ * flashes back to a childhood is exactly as valid as one told straight through. The plot is a third order of
+ * its own - arcs, and the beats in each - which follows neither.
  */
-export default function StoryPage() {
+export default function StoryPage({ view = 'scenes' }: { view?: 'scenes' | 'plot' }) {
   const { universe, chronology } = useOutletContext<WorkspaceContext>()
   const { storyId } = useParams<{ storyId: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
   const [sceneForm, setSceneForm] = useState<SceneFormState>({ mode: 'closed' })
@@ -77,8 +105,11 @@ export default function StoryPage() {
     if (!storyId) return
     const controller = new AbortController()
 
-    getStory(universe.id, storyId, controller.signal)
-      .then((story) => setState({ kind: 'ready', story }))
+    Promise.all([
+      getStory(universe.id, storyId, controller.signal),
+      listPlotArcs(universe.id, storyId, controller.signal),
+    ])
+      .then(([story, arcs]) => setState({ kind: 'ready', story, arcs }))
       .catch((error: unknown) => {
         if (controller.signal.aborted) return
         setState(
@@ -107,6 +138,15 @@ export default function StoryPage() {
     const second = request.fallback ? controls.current.get(request.fallback) : undefined
     ;(first && !first.disabled ? first : second)?.focus()
   }, [state])
+
+  // A link to one scene or one beat - a beat's scene, or a scene's beat - lands on it, whichever view it opens.
+  const isReady = state.kind === 'ready'
+  useEffect(() => {
+    if (!isReady || location.hash.length < 2) return
+    document
+      .getElementById(decodeURIComponent(location.hash.slice(1)))
+      ?.scrollIntoView({ block: 'center' })
+  }, [isReady, view, location.hash])
 
   const controlRef = useCallback((key: string, element: HTMLButtonElement | null) => {
     if (element) controls.current.set(key, element)
@@ -143,10 +183,12 @@ export default function StoryPage() {
     )
   }
 
-  const { story } = state
+  const { story, arcs } = state
   const { chapters, scenes } = story
   const hasChapters = chapters.length > 0
   const unchaptered = scenesIn(scenes, null)
+  const sceneBeats = beatsByScene(arcs)
+  const storyPath = `/app/universes/${universe.id}/stories/${story.id}`
 
   const targets: MoveTarget[] = hasChapters
     ? [
@@ -159,7 +201,11 @@ export default function StoryPage() {
     : []
 
   function showStory(next: StoryDetail) {
-    setState({ kind: 'ready', story: next })
+    setState((current) => (current.kind === 'ready' ? { ...current, story: next } : current))
+  }
+
+  function showArcs(next: PlotArc[]) {
+    setState((current) => (current.kind === 'ready' ? { ...current, arcs: next } : current))
   }
 
   /** One container's scenes replaced, the rest of the story left as it is. */
@@ -167,7 +213,7 @@ export default function StoryPage() {
     setState((current) =>
       current.kind === 'ready'
         ? {
-            kind: 'ready',
+            ...current,
             story: {
               ...current.story,
               scenes: readingOrder(current.story.chapters, [
@@ -184,7 +230,7 @@ export default function StoryPage() {
     setState((current) =>
       current.kind === 'ready'
         ? {
-            kind: 'ready',
+            ...current,
             story: {
               ...current.story,
               chapters: nextChapters,
@@ -302,7 +348,15 @@ export default function StoryPage() {
   }
 
   async function removeScene(scene: Scene) {
-    if (!window.confirm(`Delete the scene “${scene.title}”? The lore it links stays.`)) return
+    const beats = sceneBeats.get(scene.id)?.length ?? 0
+    const stays =
+      beats === 0
+        ? 'The lore it links stays.'
+        : `The lore it links stays, and so ${
+            beats === 1 ? 'does the plot beat' : `do the ${beats} plot beats`
+          } that point at it.`
+
+    if (!window.confirm(`Delete the scene “${scene.title}”? ${stays}`)) return
 
     setMessage(null)
     try {
@@ -347,12 +401,14 @@ export default function StoryPage() {
   }
 
   async function removeStory() {
-    const holds = hasChapters
-      ? `its ${chapterCountLabel(chapters.length)} and ${sceneCountLabel(scenes.length)}`
-      : `its ${sceneCountLabel(scenes.length)}`
+    const holds = listed([
+      ...(hasChapters ? [chapterCountLabel(chapters.length)] : []),
+      sceneCountLabel(scenes.length),
+      ...(arcs.length > 0 ? [arcCountLabel(arcs.length)] : []),
+    ])
     if (
       !window.confirm(
-        `Delete “${story.title}” and ${holds}? This cannot be undone. The lore it draws on stays.`,
+        `Delete “${story.title}” and its ${holds}? This cannot be undone. The lore it draws on stays.`,
       )
     ) {
       return
@@ -378,6 +434,7 @@ export default function StoryPage() {
         count={container.length}
         titleLevel={titleLevel}
         moveTargets={targets.filter((target) => target.chapterId !== scene.chapterId)}
+        beats={sceneBeats.get(scene.id) ?? []}
         onMove={(target, by) => void moveWithin(target, by)}
         onMoveTo={(target, chapterId) => void moveTo(target, chapterId)}
         onEdit={(target) => setSceneForm({ mode: 'edit', scene: target })}
@@ -436,114 +493,140 @@ export default function StoryPage() {
         </div>
       </header>
 
-      <section className="story__scenes" aria-labelledby="story-scenes-heading">
-        <div className="story__sceneshead">
-          <h3 className="story__subtitle" id="story-scenes-heading">
-            Scenes
-          </h3>
-          <div className="story__sceneactions">
-            <button
-              className="button button--quiet button--icon"
-              type="button"
-              onClick={() => setChapterForm({ mode: 'new' })}
-              data-testid="new-chapter"
-            >
-              <ActionIcon icon={BookPlus} />
-              New chapter
-            </button>
-            <button
-              className="button button--icon"
-              type="button"
-              onClick={() => setSceneForm({ mode: 'new', chapterId: null })}
-              data-testid="new-scene"
-            >
-              <ActionIcon icon={Plus} />
-              New scene
-            </button>
+      <nav className="storyviews" aria-label="Story views" data-testid="story-views">
+        <NavLink to={storyPath} end className="storyviews__link" data-testid="story-view-scenes">
+          Scenes
+        </NavLink>
+        <NavLink
+          to={`${storyPath}/plot`}
+          className="storyviews__link"
+          data-testid="story-view-plot"
+        >
+          Plot
+        </NavLink>
+      </nav>
+
+      {view === 'plot' ? (
+        <PlotPanel
+          universeId={universe.id}
+          story={story}
+          arcs={arcs}
+          onArcsChange={showArcs}
+          onReload={reload}
+          announce={setAnnouncement}
+        />
+      ) : (
+        <section className="story__scenes" aria-labelledby="story-scenes-heading">
+          <div className="story__sceneshead">
+            <h3 className="story__subtitle" id="story-scenes-heading">
+              Scenes
+            </h3>
+            <div className="story__sceneactions">
+              <button
+                className="button button--quiet button--icon"
+                type="button"
+                onClick={() => setChapterForm({ mode: 'new' })}
+                data-testid="new-chapter"
+              >
+                <ActionIcon icon={BookPlus} />
+                New chapter
+              </button>
+              <button
+                className="button button--icon"
+                type="button"
+                onClick={() => setSceneForm({ mode: 'new', chapterId: null })}
+                data-testid="new-scene"
+              >
+                <ActionIcon icon={Plus} />
+                New scene
+              </button>
+            </div>
           </div>
-        </div>
 
-        {scenes.length > 0 || hasChapters ? (
-          <p className="chron__aside">
-            {hasChapters
-              ? 'Chapters in order, and the scenes in each in the order they are told. When each happens in the world never moves it.'
-              : 'In the order they are told. When each happens in the world never moves it.'}
-          </p>
-        ) : null}
-
-        {message ? (
-          <p className="form__message" role="alert" data-testid="story-error">
-            {message}
-          </p>
-        ) : null}
-
-        {!hasChapters && scenes.length === 0 ? (
-          <div className="empty" data-testid="scenes-empty">
-            <p className="empty__line">No scenes yet.</p>
-            <p className="empty__hint">
-              Scenes are told in the order you set, whenever in the world each one happens. Group
-              them into chapters whenever you like, or never.
+          {scenes.length > 0 || hasChapters ? (
+            <p className="chron__aside">
+              {hasChapters
+                ? 'Chapters in order, and the scenes in each in the order they are told. When each happens in the world never moves it.'
+                : 'In the order they are told. When each happens in the world never moves it.'}
             </p>
-            <button
-              className="button button--icon empty__action"
-              type="button"
-              onClick={() => setSceneForm({ mode: 'new', chapterId: null })}
-              data-testid="empty-new-scene"
-            >
-              <ActionIcon icon={Plus} />
-              New scene
-            </button>
-          </div>
-        ) : null}
+          ) : null}
 
-        {!hasChapters && scenes.length > 0 ? (
-          <ol className="scenes" data-testid="scene-list">
-            {sceneCards(scenes, 4)}
-          </ol>
-        ) : null}
+          {message ? (
+            <p className="form__message" role="alert" data-testid="story-error">
+              {message}
+            </p>
+          ) : null}
 
-        {hasChapters && unchaptered.length > 0 ? (
-          <section
-            className="storygroup"
-            aria-labelledby="unchaptered-heading"
-            data-testid="unchaptered"
-          >
-            <header className="storygroup__head">
-              <h4 className="storygroup__title" id="unchaptered-heading">
-                {UNCHAPTERED}
-              </h4>
-              <p className="storygroup__hint">
-                {sceneCountLabel(unchaptered.length)} not in a chapter yet.
+          {!hasChapters && scenes.length === 0 ? (
+            <div className="empty" data-testid="scenes-empty">
+              <p className="empty__line">No scenes yet.</p>
+              <p className="empty__hint">
+                Scenes are told in the order you set, whenever in the world each one happens. Group
+                them into chapters whenever you like, or never.
               </p>
-            </header>
-            <ol className="scenes" data-testid="unchaptered-scenes">
-              {sceneCards(unchaptered, 5)}
-            </ol>
-          </section>
-        ) : null}
+              <button
+                className="button button--icon empty__action"
+                type="button"
+                onClick={() => setSceneForm({ mode: 'new', chapterId: null })}
+                data-testid="empty-new-scene"
+              >
+                <ActionIcon icon={Plus} />
+                New scene
+              </button>
+            </div>
+          ) : null}
 
-        {chapters.map((chapter, index) => {
-          const inside = scenesIn(scenes, chapter.id)
-          return (
-            <ChapterSection
-              key={chapter.id}
-              chapter={chapter}
-              index={index}
-              count={chapters.length}
-              sceneCount={inside.length}
-              onMove={(target, by) => void moveChapter(target, by)}
-              onAddScene={(target) => setSceneForm({ mode: 'new', chapterId: target.id })}
-              onEdit={(target, at) => setChapterForm({ mode: 'edit', chapter: target, index: at })}
-              onDelete={(target, at) => void removeChapter(target, at)}
-              controlRef={controlRef}
+          {!hasChapters && scenes.length > 0 ? (
+            <ol className="scenes" data-testid="scene-list">
+              {sceneCards(scenes, 4)}
+            </ol>
+          ) : null}
+
+          {hasChapters && unchaptered.length > 0 ? (
+            <section
+              className="storygroup"
+              aria-labelledby="unchaptered-heading"
+              data-testid="unchaptered"
             >
-              <ol className="scenes" data-testid="chapter-scenes">
-                {sceneCards(inside, 5)}
+              <header className="storygroup__head">
+                <h4 className="storygroup__title" id="unchaptered-heading">
+                  {UNCHAPTERED}
+                </h4>
+                <p className="storygroup__hint">
+                  {sceneCountLabel(unchaptered.length)} not in a chapter yet.
+                </p>
+              </header>
+              <ol className="scenes" data-testid="unchaptered-scenes">
+                {sceneCards(unchaptered, 5)}
               </ol>
-            </ChapterSection>
-          )
-        })}
-      </section>
+            </section>
+          ) : null}
+
+          {chapters.map((chapter, index) => {
+            const inside = scenesIn(scenes, chapter.id)
+            return (
+              <ChapterSection
+                key={chapter.id}
+                chapter={chapter}
+                index={index}
+                count={chapters.length}
+                sceneCount={inside.length}
+                onMove={(target, by) => void moveChapter(target, by)}
+                onAddScene={(target) => setSceneForm({ mode: 'new', chapterId: target.id })}
+                onEdit={(target, at) =>
+                  setChapterForm({ mode: 'edit', chapter: target, index: at })
+                }
+                onDelete={(target, at) => void removeChapter(target, at)}
+                controlRef={controlRef}
+              >
+                <ol className="scenes" data-testid="chapter-scenes">
+                  {sceneCards(inside, 5)}
+                </ol>
+              </ChapterSection>
+            )
+          })}
+        </section>
+      )}
 
       <p className="visually-hidden" role="status" aria-live="polite" data-testid="story-announcer">
         {announcement}

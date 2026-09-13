@@ -544,7 +544,9 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
     /// <summary>
     /// Every story by title, each with its chapters in story order, its scenes in reading order -
     /// Unchaptered first, then chapter by chapter, each by its own narrative order - and each scene's
-    /// links sorted by id. Only ids and authored text: a linked entry's name is in the entry, not here.
+    /// links sorted by id. Then its plot: arcs in order, beats in order inside each, and each beat's scene
+    /// and entry links sorted by id. Only ids and authored text: a linked entry's name is in the entry, and
+    /// a linked scene's title is in the scene, not here.
     /// </summary>
     private async Task<IReadOnlyList<BackupStory>> StoriesAsync(
         Guid universeId,
@@ -624,6 +626,8 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                             Utc(scene.UpdatedAt))),
                 ]);
 
+        var arcsByStory = await PlotArcsAsync(universeId, cancellationToken);
+
         return
         [
             .. stories
@@ -637,8 +641,87 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                     Utc(story.CreatedAt),
                     Utc(story.UpdatedAt),
                     chaptersByStory.GetValueOrDefault(story.Id, []),
-                    scenesByStory.GetValueOrDefault(story.Id, []))),
+                    scenesByStory.GetValueOrDefault(story.Id, []),
+                    arcsByStory.GetValueOrDefault(story.Id, []))),
         ];
+    }
+
+    /// <summary>
+    /// Every plot arc in the universe, by story: arcs by their order, beats by theirs inside each arc, and each
+    /// beat's links sorted by id. Four queries for the whole universe, whatever its stories hold.
+    /// </summary>
+    private async Task<Dictionary<Guid, IReadOnlyList<BackupPlotArc>>> PlotArcsAsync(
+        Guid universeId,
+        CancellationToken cancellationToken)
+    {
+        var arcs = await db.PlotArcs.AsNoTracking()
+            .Where(arc => arc.Story!.UniverseId == universeId)
+            .ToListAsync(cancellationToken);
+
+        var beats = await db.PlotBeats.AsNoTracking()
+            .Where(beat => beat.PlotArc!.Story!.UniverseId == universeId)
+            .ToListAsync(cancellationToken);
+
+        var sceneLinks = await db.PlotBeatScenes.AsNoTracking()
+            .Where(link => link.PlotBeat!.PlotArc!.Story!.UniverseId == universeId)
+            .ToListAsync(cancellationToken);
+
+        var entityLinks = await db.PlotBeatEntities.AsNoTracking()
+            .Where(link => link.PlotBeat!.PlotArc!.Story!.UniverseId == universeId)
+            .ToListAsync(cancellationToken);
+
+        var scenesByBeat = sceneLinks
+            .GroupBy(link => link.PlotBeatId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<Guid>)[.. group.Select(link => link.SceneId).OrderBy(Key, StringComparer.Ordinal)]);
+
+        var entitiesByBeat = entityLinks
+            .GroupBy(link => link.PlotBeatId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<Guid>)[.. group.Select(link => link.EntityId).OrderBy(Key, StringComparer.Ordinal)]);
+
+        var beatsByArc = beats
+            .GroupBy(beat => beat.PlotArcId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<BackupPlotBeat>)
+                [
+                    .. group
+                        .OrderBy(beat => beat.SortOrder)
+                        .ThenBy(beat => Key(beat.Id), StringComparer.Ordinal)
+                        .Select(beat => new BackupPlotBeat(
+                            beat.Id,
+                            beat.SortOrder,
+                            beat.Title,
+                            beat.Description,
+                            beat.Notes,
+                            scenesByBeat.GetValueOrDefault(beat.Id, []),
+                            entitiesByBeat.GetValueOrDefault(beat.Id, []),
+                            Utc(beat.CreatedAt),
+                            Utc(beat.UpdatedAt))),
+                ]);
+
+        return arcs
+            .GroupBy(arc => arc.StoryId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<BackupPlotArc>)
+                [
+                    .. group
+                        .OrderBy(arc => arc.SortOrder)
+                        .ThenBy(arc => Key(arc.Id), StringComparer.Ordinal)
+                        .Select(arc => new BackupPlotArc(
+                            arc.Id,
+                            arc.SortOrder,
+                            arc.Title,
+                            arc.Description,
+                            arc.Notes,
+                            Utc(arc.CreatedAt),
+                            Utc(arc.UpdatedAt),
+                            beatsByArc.GetValueOrDefault(arc.Id, []))),
+                ]);
     }
 
     // ---------- Canon lifecycle ----------

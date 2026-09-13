@@ -73,6 +73,14 @@ public class LorexDbContext(DbContextOptions<LorexDbContext> options)
 
     public DbSet<SceneEntityLink> SceneEntityLinks => Set<SceneEntityLink>();
 
+    public DbSet<PlotArc> PlotArcs => Set<PlotArc>();
+
+    public DbSet<PlotBeat> PlotBeats => Set<PlotBeat>();
+
+    public DbSet<PlotBeatScene> PlotBeatScenes => Set<PlotBeatScene>();
+
+    public DbSet<PlotBeatEntity> PlotBeatEntities => Set<PlotBeatEntity>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);

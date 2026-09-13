@@ -74,8 +74,15 @@ public sealed record UniverseBackup(
     /// reader would find several scenes claiming each place and flatten the story into a wrong order.
     /// A file at version 5 has no <c>chapters</c> and no <c>chapterId</c>; both read as null, every
     /// scene is Unchaptered, and its story-wide order is exactly its order there.
+    ///
+    /// 7 - A story may plan its plot as arcs of beats (ADR 0026). <see cref="BackupStory.PlotArcs"/> carries every
+    /// arc in order with its beats in order, each beat naming the scenes it plays out in and the entries it concerns
+    /// by id. The member is nullable, but it is not the "ignorable" case either: an arc's and a beat's title,
+    /// description and notes are authored, and so is every link, so a version 6 reader would restore each story
+    /// with its plot silently gone - the loss version 5 was bumped for. A file at version 6 or earlier has no
+    /// <c>plotArcs</c>; it reads as null, which means a story with no plot.
     /// </summary>
-    public const int CurrentVersion = 6;
+    public const int CurrentVersion = 7;
 
     public static UniverseBackup Of(UniverseBackupPayload payload, DateTime generatedAt) =>
         new(FormatName, CurrentVersion, generatedAt, payload);
@@ -390,6 +397,9 @@ public sealed record BackupTimelineEntry(
 ///
 /// <paramref name="Scenes"/> is every scene of the story in reading order: Unchaptered first, then chapter
 /// by chapter, each in its own narrative order.
+///
+/// <paramref name="PlotArcs"/> is the story's plot, arcs in order (since version 7). Empty means a story with no
+/// arcs; absent - null, in any earlier file - means the same thing.
 /// </summary>
 public sealed record BackupStory(
     Guid Id,
@@ -399,7 +409,8 @@ public sealed record BackupStory(
     DateTime CreatedAt,
     DateTime UpdatedAt,
     IReadOnlyList<BackupChapter>? Chapters,
-    IReadOnlyList<BackupScene> Scenes);
+    IReadOnlyList<BackupScene> Scenes,
+    IReadOnlyList<BackupPlotArc>? PlotArcs);
 
 /// <summary>
 /// One chapter (since version 6): its place in the story, from 0, and the author's title, summary and
@@ -438,6 +449,40 @@ public sealed record BackupScene(
     string? Notes,
     Guid? PovEntityId,
     BackupChronologyValue? Chronology,
+    IReadOnlyList<Guid> LinkedEntityIds,
+    DateTime CreatedAt,
+    DateTime UpdatedAt);
+
+/// <summary>
+/// One plot arc (since version 7): its place in the story's plot, from 0, the author's title, description and
+/// notes, and its beats in order. The number a reader sees - "Arc 2" - is <paramref name="SortOrder"/> plus one and
+/// is not carried.
+/// </summary>
+public sealed record BackupPlotArc(
+    Guid Id,
+    int SortOrder,
+    string Title,
+    string? Description,
+    string? Notes,
+    DateTime CreatedAt,
+    DateTime UpdatedAt,
+    IReadOnlyList<BackupPlotBeat> Beats);
+
+/// <summary>
+/// One beat (since version 7): its place in its arc, from 0, its text, and what it points at.
+///
+/// <paramref name="LinkedSceneIds"/> are scenes of this same story and <paramref name="LinkedEntityIds"/> entries
+/// in this same file, each list sorted by id so an unchanged plot writes the same bytes. Ids only: no scene title,
+/// chapter, entry name or number is carried, so a scene that moved chapter is still the scene the beat names. A
+/// trashed entry may be among them, and is in the file too. The beat's order has no bearing on any scene's.
+/// </summary>
+public sealed record BackupPlotBeat(
+    Guid Id,
+    int SortOrder,
+    string Title,
+    string? Description,
+    string? Notes,
+    IReadOnlyList<Guid> LinkedSceneIds,
     IReadOnlyList<Guid> LinkedEntityIds,
     DateTime CreatedAt,
     DateTime UpdatedAt);

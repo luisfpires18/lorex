@@ -52,6 +52,41 @@ public static class StoryValidation
         return errors.Count == 0 ? null : errors;
     }
 
+    /// <summary>An arc is plain planning text: a title it needs, and a description and notes it may have.</summary>
+    public static Dictionary<string, string[]>? ValidatePlotArc(PlotArcRequest request)
+    {
+        var errors = new Dictionary<string, string[]>();
+
+        ValidateTitle(request.Title, "Give the arc a title, like \"Fall of the King\".", errors);
+        ValidatePlotText(request.Description, request.Notes, errors);
+
+        return errors.Count == 0 ? null : errors;
+    }
+
+    /// <summary>
+    /// A beat's text and how many links it carries. Structural only: nothing compares a beat's order with its
+    /// scenes' order, their chapters or their chronology, and nothing reads its title for meaning.
+    /// </summary>
+    public static Dictionary<string, string[]>? ValidatePlotBeat(PlotBeatRequest request)
+    {
+        var errors = new Dictionary<string, string[]>();
+
+        ValidateTitle(request.Title, "Give the beat a title, like \"The capital is breached\".", errors);
+        ValidatePlotText(request.Description, request.Notes, errors);
+
+        if (request.SceneIds is { Count: > StoryLimits.MaxLinkedScenes })
+        {
+            errors["sceneIds"] = [$"Link at most {StoryLimits.MaxLinkedScenes} scenes to one beat."];
+        }
+
+        if (request.EntityIds is { Count: > StoryLimits.MaxLinkedEntities })
+        {
+            errors["entityIds"] = [$"Link at most {StoryLimits.MaxLinkedEntities} entries to one beat."];
+        }
+
+        return errors.Count == 0 ? null : errors;
+    }
+
     public static Dictionary<string, string[]>? ValidateScene(
         SceneRequest request,
         UniverseChronology chronology)
@@ -94,6 +129,19 @@ public static class StoryValidation
         else if (title.Length > StoryLimits.TitleMaxLength)
         {
             errors["title"] = [$"Keep the title under {StoryLimits.TitleMaxLength} characters."];
+        }
+    }
+
+    private static void ValidatePlotText(string? description, string? notes, Dictionary<string, string[]> errors)
+    {
+        if (description?.Trim() is { Length: > StoryLimits.PlotDescriptionMaxLength })
+        {
+            errors["description"] = [$"Keep the description under {StoryLimits.PlotDescriptionMaxLength} characters."];
+        }
+
+        if (notes?.Trim() is { Length: > StoryLimits.PlotNotesMaxLength })
+        {
+            errors["notes"] = [$"Keep the notes under {StoryLimits.PlotNotesMaxLength} characters."];
         }
     }
 

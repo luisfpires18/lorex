@@ -1,4 +1,3 @@
-using System.Linq.Expressions;
 using System.Security.Claims;
 using Lorex.Api.Data;
 using Lorex.Api.Features.Chronology;
@@ -604,35 +603,6 @@ public static class SceneEndpoints
         DateTime CreatedAt,
         DateTime UpdatedAt);
 
-    /// <summary>An entry as a scene shows it: what it is called, what it is, and its picture.</summary>
-    private static readonly Expression<Func<LoreEntity, SceneLoreReference>> ToReference =
-        entity => new SceneLoreReference(
-            entity.Id,
-            entity.Name,
-            entity.EntityTypeId,
-            entity.EntityType!.Name,
-            entity.EntityType.Icon,
-            entity.EntityType.AccentColor,
-            entity.DeletedAt != null,
-            entity.Image == null
-                ? null
-                : new EntityImageRef(
-                    entity.Image.AssetId,
-                    entity.Image.ThumbnailId,
-                    entity.Image.Width,
-                    entity.Image.Height,
-                    entity.Image.ContentType,
-                    entity.Image.FileName,
-                    entity.Image.ByteSize,
-                    entity.Image.UploadedAt,
-                    entity.Image.CropX == null
-                        ? null
-                        : new EntityImageCrop(
-                            entity.Image.CropX.Value,
-                            entity.Image.CropY!.Value,
-                            entity.Image.CropWidth!.Value,
-                            entity.Image.CropHeight!.Value)));
-
     private static async Task<SceneResponse?> LoadSceneAsync(
         LorexDbContext db,
         Guid universeId,
@@ -691,12 +661,7 @@ public static class SceneEndpoints
             .Distinct()
             .ToList();
 
-        var references = referenced.Count == 0
-            ? []
-            : await db.Entities.AsNoTracking()
-                .Where(entity => entity.UniverseId == universeId && referenced.Contains(entity.Id))
-                .Select(ToReference)
-                .ToDictionaryAsync(reference => reference.EntityId, cancellationToken);
+        var references = await StoryLoreReferences.LoadAsync(db, universeId, referenced, cancellationToken);
 
         return
         [
@@ -710,13 +675,7 @@ public static class SceneEndpoints
                 row.Notes,
                 row.PovEntityId is { } pov ? references.GetValueOrDefault(pov) : null,
                 row.Year is null ? null : new ChronologyValue(row.EraId, row.Year, row.Month, row.Day),
-                [
-                    .. row.EntityIds
-                        .Select(id => references.GetValueOrDefault(id))
-                        .OfType<SceneLoreReference>()
-                        .OrderBy(reference => reference.Name, StringComparer.Ordinal)
-                        .ThenBy(reference => reference.EntityId),
-                ],
+                StoryLoreReferences.Listed(row.EntityIds, references),
                 row.CreatedAt,
                 row.UpdatedAt)),
         ];

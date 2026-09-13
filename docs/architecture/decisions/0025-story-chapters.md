@@ -107,7 +107,7 @@ field. The delete confirmation says the chapter will be removed and its scenes m
 
 - Acts, parts, volumes and books; nested chapters. A chapter belongs to a story and nothing sits
   between them, so any of these is its own decision about a second grouping level.
-- Beats and plot arcs - the next Story-layer feature.
+- Beats and plot arcs - since decided in ADR 0026, which puts no arc on a chapter.
 - Manuscript prose for a scene, and anything like it for a chapter.
 - Drag-and-drop. The order and position routes already take what a drag would send.
 - Collapsing chapters on the page, and bulk moves of several scenes at once.

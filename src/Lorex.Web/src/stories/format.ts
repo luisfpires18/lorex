@@ -46,6 +46,34 @@ export function chapterLabel(index: number, title: string) {
   return `${chapterNumber(index)} — ${title}`
 }
 
+/** "Chapter 3", or "Unchaptered": where a scene sits, short enough for a chip. */
+export function containerNumber(chapters: { id: string }[], chapterId: string | null) {
+  if (chapterId === null) return UNCHAPTERED
+  const index = chapters.findIndex((chapter) => chapter.id === chapterId)
+  return index < 0 ? UNCHAPTERED : chapterNumber(index)
+}
+
+/**
+ * "Arc 2": presentation, from the arc's position in the story's plot. Never stored and never part of the title, so
+ * reordering renumbers every arc without touching a word the author wrote.
+ */
+export function arcNumber(index: number) {
+  return `Arc ${index + 1}`
+}
+
+/** "Arc 2 — Fall of the King". */
+export function arcLabel(index: number, title: string) {
+  return `${arcNumber(index)} — ${title}`
+}
+
+export function beatCountLabel(count: number) {
+  return count === 1 ? '1 beat' : `${count} beats`
+}
+
+export function arcCountLabel(count: number) {
+  return count === 1 ? '1 plot arc' : `${count} plot arcs`
+}
+
 /** The container a scene is in, named the way the page names it. */
 export function containerLabel(
   chapters: { id: string; title: string }[],
