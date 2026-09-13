@@ -294,7 +294,7 @@ test.describe('plot', () => {
     await page.waitForURL(/\/plot$/)
     await expect(page.getByTestId('story-view-plot')).toHaveAttribute('aria-current', 'page')
     await expect(page.getByTestId('story-title')).toHaveText('The Fall of Varn')
-    await expect(page.getByTestId('plot-empty')).toContainText('No plot arcs yet.')
+    await expect(page.getByTestId('plot-empty')).toContainText('No arcs yet.')
 
     // Two arcs, numbered by where they sit.
     await addArc(page, 'Fall of the King', 'The throne is lost.')
@@ -480,9 +480,9 @@ test.describe('plot', () => {
     const storyId = await seedStory(page, universeId, 'Not yet written')
 
     await page.goto(`/app/universes/${universeId}/stories/${storyId}/plot`)
-    await expect(page.getByTestId('plot-empty')).toContainText('No plot arcs yet.')
+    await expect(page.getByTestId('plot-empty')).toContainText('No arcs yet.')
 
-    await page.getByTestId('empty-new-plot-arc').click()
+    await page.getByTestId('plot-empty').getByTestId('new-plot-arc').click()
     await page.getByTestId('plot-arc-title-input').fill('Search for the Crown')
     await page.getByTestId('save-plot-arc').click()
     await expect(page.getByTestId('plot-arc-form')).toHaveCount(0)

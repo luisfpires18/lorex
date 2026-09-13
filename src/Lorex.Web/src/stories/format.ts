@@ -71,7 +71,7 @@ export function beatCountLabel(count: number) {
 }
 
 export function arcCountLabel(count: number) {
-  return count === 1 ? '1 plot arc' : `${count} plot arcs`
+  return count === 1 ? '1 arc' : `${count} arcs`
 }
 
 /** The container a scene is in, named the way the page names it. */

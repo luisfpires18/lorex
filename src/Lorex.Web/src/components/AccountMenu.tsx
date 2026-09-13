@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { LogOut, UserRound } from 'lucide-react'
 import { useAuth } from '../auth/useAuth'
+import { confirmLeaving } from '../lib/leaveGuard'
 import { useProfileImage } from '../profile/useProfileImage'
 import { ActionIcon } from './ActionIcon'
 import { Avatar } from './Avatar'
@@ -80,6 +81,9 @@ export function AccountMenu({ variant }: { variant: 'rail' | 'bar' }) {
   }, [open])
 
   async function signOut() {
+    // A way out of whatever is open, and a button rather than a link, so the leave guard's link check never sees it.
+    if (!confirmLeaving()) return
+
     setBusy(true)
     try {
       await logOut()

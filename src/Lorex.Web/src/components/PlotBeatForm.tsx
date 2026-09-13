@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { EntityMultiPicker, type EntityChoice } from './EntityPicker'
 import { SceneReferencePicker } from './SceneReferencePicker'
 import { ApiError } from '../lib/api'
+import { useReturnFocus } from '../lib/returnFocus'
 import { createPlotBeat, updatePlotBeat } from '../stories/api'
 import { arcLabel } from '../stories/format'
 import type { Chapter, PlotArc, PlotBeat, Scene, SceneLoreReference } from '../stories/types'
@@ -82,6 +83,8 @@ export function PlotBeatForm({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+
+  useReturnFocus()
 
   useEffect(() => {
     dialog.current?.showModal()

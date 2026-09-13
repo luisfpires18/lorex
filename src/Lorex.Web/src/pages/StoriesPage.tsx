@@ -9,19 +9,21 @@ import { STORY_STATUS_LABELS, type StorySummary } from '../stories/types'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
 type LoadState =
-  | { kind: 'loading' }
-  | { kind: 'ready'; stories: StorySummary[] }
-  | { kind: 'error'; message: string }
+  { kind: 'loading' } | { kind: 'ready'; stories: StorySummary[] } | { kind: 'error' }
 
 /**
  * The stories told in this universe. A story is narrative an author writes with the lore - it draws
  * on the lore and never changes it - so this list sits beside Lore and Timeline rather than inside
  * either.
+ *
+ * A list that cannot be read says so in the same words and with the same Try again as a story, a
+ * manuscript and the workspace itself, rather than passing on whatever the request failed with.
  */
 export default function StoriesPage() {
   const { universe } = useOutletContext<WorkspaceContext>()
   const navigate = useNavigate()
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
+  const [reads, setReads] = useState(0)
   const [isCreating, setIsCreating] = useState(false)
 
   useEffect(() => {
@@ -29,18 +31,15 @@ export default function StoriesPage() {
 
     listStories(universe.id, controller.signal)
       .then((stories) => setState({ kind: 'ready', stories }))
-      .catch((error: unknown) => {
+      .catch(() => {
         if (controller.signal.aborted) return
-        setState({
-          kind: 'error',
-          message: error instanceof Error ? error.message : 'Could not read the stories.',
-        })
+        setState({ kind: 'error' })
       })
 
     return () => {
       controller.abort()
     }
-  }, [universe.id])
+  }, [universe.id, reads])
 
   return (
     <article className="stories">
@@ -67,9 +66,19 @@ export default function StoriesPage() {
       ) : null}
 
       {state.kind === 'error' ? (
-        <p className="notice notice--error" role="alert">
-          {state.message}
-        </p>
+        <div className="notice notice--error" role="alert" data-testid="stories-load-error">
+          <p>The stories could not be read.</p>
+          <button
+            className="button button--quiet"
+            type="button"
+            onClick={() => {
+              setState({ kind: 'loading' })
+              setReads((count) => count + 1)
+            }}
+          >
+            Try again
+          </button>
+        </div>
       ) : null}
 
       {state.kind === 'ready' && state.stories.length > 0 ? (

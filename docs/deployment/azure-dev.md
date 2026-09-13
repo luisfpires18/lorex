@@ -213,3 +213,10 @@ rm -rf src/Lorex.Api/wwwroot && mkdir -p src/Lorex.Api/wwwroot && cp -r src/Lore
 `src/Lorex.Api/wwwroot` is build output and is gitignored. Set `ASPNETCORE_ENVIRONMENT`,
 `ConnectionStrings__LorexDb` and `DataProtection__KeyRingPath` to try the deployed
 configuration without writing to the paths App Service uses.
+
+A Release build made while `wwwroot` held a copied client leaves
+`bin/Release/net10.0/Lorex.Api.staticwebassets.runtime.json` naming that folder, and a later build does not remove
+it. Once `wwwroot` is gone, a local `dotnet ef migrations has-pending-model-changes --configuration Release` fails
+with `Error: ...\src\Lorex.Api\wwwroot\` and then cannot create `LorexDbContext`. It is a stale local file, not the
+repository - CI's clean checkout never has it. `dotnet clean src/Lorex.Api -c Release` (or deleting that file) clears
+it; nothing in hosting needs to change.

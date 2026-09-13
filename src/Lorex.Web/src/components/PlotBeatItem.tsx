@@ -31,6 +31,8 @@ interface PlotBeatItemProps {
  * Each scene is named from the story as it is now - its title, and its chapter when the story has chapters - and
  * links to that scene on the story's Scenes view; each entry links to its own page. The beat stores only ids, so a
  * scene moved to another chapter simply shows its new chapter here.
+ *
+ * The row takes the focus without being in the tab order, so a scene's plot chip can land a keyboard on it.
  */
 export function PlotBeatItem({
   universeId,
@@ -53,7 +55,13 @@ export function PlotBeatItem({
   const linkedScenes = scenes.filter((scene) => linked.has(scene.id))
 
   return (
-    <li className="beat" id={`beat-${beat.id}`} data-testid="plot-beat" data-title={beat.title}>
+    <li
+      className="beat"
+      id={`beat-${beat.id}`}
+      tabIndex={-1}
+      data-testid="plot-beat"
+      data-title={beat.title}
+    >
       <span className="beat__number" aria-hidden="true">
         {index + 1}
       </span>
@@ -145,7 +153,7 @@ export function PlotBeatItem({
             data-testid="plot-beat-edit"
           >
             <ActionIcon icon={Pencil} />
-            Edit
+            Edit beat
           </button>
           <button
             className="button button--quiet button--icon"
@@ -155,7 +163,7 @@ export function PlotBeatItem({
             data-testid="plot-beat-delete"
           >
             <ActionIcon icon={Trash} />
-            Delete
+            Delete beat
           </button>
         </div>
       </div>

@@ -161,14 +161,38 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - The gap is `UniverseChronology.YearsBetween`: the signed difference inside one era or the plain
     reckoning, `a + b - 1` from a countdown era into the ascending era after it, unknown otherwise.
   - Edited inside the relation kind form on the Types screen. Backup stays version 4, additively.
-- **Phase 2 - Story** (owner-sequenced, unnumbered branches). Core Story work first; the owner tests
-  all of Phase 2 by hand only at the end, so no feature below waits on a smoke test.
-  1. Story / Scene foundation - done, merged.
-  2. Story chapters - done, merged.
-  3. Plot arcs / beats - done, merged.
-  4. **Scene manuscript - done** (`feat/story-scene-manuscript`, committed, **not merged, not pushed**).
-  5. Story workspace integration / Phase 2 closeout - **next**.
-  6. Owner's full manual Phase 2 test.
+- **Phase 2 Story - COMPLETE** (owner-sequenced, unnumbered branches). Implemented scope: Stories, Chapters,
+  Scenes, Plot Arcs / Beats, Scene Manuscript. ADR 0024-0027. Deferred Story work is listed under Deferred, apart
+  from this: none of it is a Phase 2 gap.
+  1. Story / Scene foundation - merged.
+  2. Story chapters - merged.
+  3. Plot arcs / beats - merged.
+  4. Scene manuscript - merged.
+  5. Story workspace integration / Phase 2 closeout - done (`feat/story-phase2-closeout`, committed, **not merged,
+     not pushed**).
+  6. **Next: the owner's first full manual Phase 2 test**, once 5 is merged - `docs/testing/phase2-story-manual-test.md`.
+- **Story workspace integration / Phase 2 closeout** (`feat/story-phase2-closeout`). Polish and hardening across the
+  four features, reviewed as one product against a 24-scene story. No new subsystem, no API, schema or backup change.
+  - One short header for Scenes, Plot and Manuscript: title and facts, the premise on Scenes only, and one bar holding
+    the views and Edit/Delete story - icon-only below 640px, still named. At 390px the first scene and the manuscript
+    text box are on the first screen; before, the header filled it.
+  - Each view opens with its own tools, or with one empty state holding one way to begin: a new story leads to a scene,
+    and Plot points back to Scenes. A story or story list that cannot be read says so in one wording with Try again; a
+    failed re-read keeps the story on screen, marked stale, instead of unmounting prose being written.
+  - Write on every scene card opens its manuscript; Show in Scenes, the manuscript's new Lore row and the plot chips lead
+    back out. A link to a scene or beat scrolls to it, focuses it and marks it for a moment. Scene and beat tools say
+    whose they are; story drawers hand the focus back to their opener. `SceneContext` draws a scene's date, point of
+    view, lore and beats the same on its card and its manuscript page.
+  - The leave guard also asks on Sign out, the one in-app way out that is a button (`confirmLeaving`). Back/Forward is
+    still uncaught, deliberately: a pop can only be undone by moving the history again, and the tested way to do that
+    is a data router's blocker - an app-wide routing change, not closeout polish. ADR 0027 amendment.
+  - "Arc" everywhere; no "plot arc" left on screen.
+  - `StoryPhaseIntegrityTests` walks the whole ownership graph in one universe and proves a full story workflow changes
+    no lore, relationship, timeline, revision, Canon finding or search result. `story-workspace.spec.ts` covers the
+    cross-view journey, unsaved prose, deep links, focus and the first screen from 390px to 1920px.
+  - A local `has-pending-model-changes` that fails naming `wwwroot` is a stale `bin/Release` static web assets manifest
+    from a local publish rehearsal, not the repository: CI's clean checkout never has it. `dotnet clean -c Release`
+    clears it. Runbook troubleshooting.
 - **Story & Scene foundation** (`feat/story-scene-foundation`, merged into `dev`). The first
   Story-layer feature; owner-requested, unnumbered. Lore is what is true; a story is how an author tells
   something with it. ADR 0024.
@@ -220,7 +244,7 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     beat rows with wrapping Scenes/Lore chips, a scene picker grouped by chapter with a filter, and a read-only Plot
     row on each scene card linking back. No sidebar entry; the greyed "Plot" placeholder is gone from it.
   - Backup format version 7: a v6 reader would lose arc and beat text and every link. ADR 0014.
-- **Scene manuscript** (`feat/story-scene-manuscript`). The prose itself, apart from a scene's planning. ADR 0027.
+- **Scene manuscript** (`feat/story-scene-manuscript`, merged into `dev`). The prose itself, apart from a scene's planning. ADR 0027.
   - `SceneManuscripts`: `SceneId` key and FK (cascade), `Content` unbounded text, `UpdatedAt`. No column or navigation on
     `Scene`, so reorders, moves and the story read never load prose. No row until the first save; `""` is a valid save.
   - Plain text stored exactly - no trim, Markdown or HTML. `GET`/`PUT .../scenes/{id}/manuscript` is the only route that
@@ -235,7 +259,8 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 
 ## Baseline
 
-- **707 API integration tests, 103 Playwright tests**, green. No frontend unit runner exists;
+- **709 API integration tests, 106 Playwright tests**, green. The Phase 2 closeout full run lost one test, auth
+  "rejects a wrong password" (the known flake below); `auth.spec.ts` and `account-menu.spec.ts` were 10/10 alone. No frontend unit runner exists;
   the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
@@ -312,12 +337,12 @@ tool has changed the picture.
   dates moved first, with no reassignment tool. Month names, calendars and conversion: not started.
   ADR 0022.
 - **`Age`** is declarable but read by nothing until a structured reference year exists. ADR 0011.
-- **Stories beyond the manuscript.** Story workspace integration / Phase 2 closeout is next (sequence above); on a phone
-  the shared story header fills the first screen before the prose, worth a look there. Still deferred: acts/volumes,
-  story history, story search, a Trash for stories, drag-and-drop, collapsing chapters, bulk scene moves,
-  Story-vs-Lore checks, counting pre-era scene years in Settings; for plot, a status, beat chronology, editing
-  beats from a scene, and any board or graph view; for prose, formatting, revisions, autosave, word counts, export,
-  and catching Back/Forward with unsaved text. ADR 0024-0027.
+- **Story work deferred past Phase 2** - later work, not Phase 2 gaps: acts and volumes, rich text, revisions and
+  history, Story search, a Story Trash, drag-and-drop, collaboration, manuscript export, AI, and restoring a backup.
+  Also: collapsing chapters, bulk scene moves, Story-vs-Lore checks, pre-era scene years in Settings; a plot status,
+  beat chronology, editing beats from a scene, board or graph views; autosave, word counts, a "has prose" marker on
+  scene cards (it needs a flag the story read can give without reading prose), and catching Back/Forward with
+  unsaved text (needs a data router - ADR 0027 amendment). ADR 0024-0027.
 - **Relationship life-state constraints** (an end alive at the link's date) wait for dated
   relationships: `StartDate`/`EndDate` are real-world timestamps, not chronology points. A birth-year
   gap across eras of unrecorded length waits for era lengths. ADR 0023.

@@ -3711,23 +3711,97 @@ a {
   overflow: hidden;
 }
 
-.story__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem 2rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid var(--rule);
-}
-
-.story__heading {
-  flex: 1 1 20rem;
-  min-width: 0;
+/*
+ * A story's header is shared by its three views and kept short, because on a phone every line of it sits between the
+ * author and the scenes, the plot or the prose: the title, one line of facts, the premise on Scenes alone, and then one
+ * bar holding the views and the story's own tools, drawn on the rule the current view underlines.
+ */
+.story__crumbs {
+  margin-bottom: 1rem;
 }
 
 .story__title {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(1.35rem, 1rem + 1.6vw, 2.1rem);
+  line-height: 1.2;
   overflow-wrap: anywhere;
+}
+
+.story__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0 1.5rem;
+  margin-top: 1rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.story__stale {
+  margin: 1rem 0 0;
+}
+
+/* A view's own tools - New scene, New arc - beside the one line saying how that view is ordered. */
+.story__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  margin: 1.5rem 0 0.25rem;
+}
+
+.story__toolbaractions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.story__aside {
+  margin: 0;
+}
+
+.empty__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1.25rem;
+}
+
+/*
+ * A scene or beat reached by a link is marked for a moment - the surface behind it and the accent on its edge - so the
+ * eye can tell which row the link meant. The mark fades rather than vanishing, unless motion is reduced. The row holds
+ * the focus by then, and the mark is what shows it.
+ */
+.scene,
+.beat {
+  transition:
+    background-color 700ms ease,
+    box-shadow 700ms ease;
+}
+
+.scene[data-arrived],
+.beat[data-arrived] {
+  background: var(--surface);
+  box-shadow:
+    inset 2px 0 0 var(--accent),
+    0 0 0 0.6rem var(--surface);
+}
+
+.scene:focus,
+.beat:focus {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene,
+  .beat {
+    transition: none;
+  }
 }
 
 .story__meta {
@@ -3741,33 +3815,11 @@ a {
 }
 
 .story__premise {
-  margin: 0.9rem 0 0;
+  margin: 0.75rem 0 0;
   max-width: 62ch;
   line-height: 1.65;
   white-space: pre-line;
   overflow-wrap: anywhere;
-}
-
-.story__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-}
-
-.story__sceneshead {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-  margin: 2rem 0 0.6rem;
-}
-
-.story__subtitle {
-  margin: 0;
-  font-family: var(--display);
-  font-weight: 400;
-  font-size: 1.35rem;
 }
 
 .scenes {
@@ -4136,23 +4188,78 @@ a.lorechip--pov:focus-visible .lorechip__name {
   margin-top: 0.75rem;
 }
 
-/* ---------- A story's two views, and its plot ---------- */
+/* The story's own Edit and Delete: story tools like any other row of them, at the end of the bar. On a phone they are
+   their icons alone - the label is still each one's name - so the three views and both tools keep to one line. */
+.story__actions {
+  align-self: stretch;
+  margin-top: 0;
+  padding-bottom: 2px;
+}
 
-/* Scenes | Plot: two plain links under the story's heading, the current one underlined. Links, not tabs,
-   because each view has its own address. */
+/* Where the manuscript's outline folds into a disclosure, it sits directly under the story's bar, which already draws the
+   rule above it. */
+@media (max-width: 1100px) {
+  .story .manuscript {
+    margin-top: 0;
+  }
+
+  .story .msoutline {
+    border-top: 0;
+  }
+}
+
+/* A link among the quiet tools - Write, Show in Scenes - reads exactly like the buttons beside it. */
+.storytools a.button--quiet {
+  text-decoration: none;
+}
+
+@media (max-width: 640px) {
+  .story__actionlabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .story__actions {
+    column-gap: 0.9rem;
+  }
+}
+
+@media (max-width: 640px) and (pointer: coarse) {
+  .story__actions .button--quiet {
+    min-width: 2.75rem;
+  }
+}
+
+/* ---------- A story's views, and its plot ---------- */
+
+/* Scenes | Plot | Manuscript: plain links in the story's bar, the current one underlined on the bar's own rule. Links,
+   not tabs, because each view has its own address. */
 .storyviews {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 1.6rem;
-  margin: 0.9rem 0 0;
+  gap: 0 1.6rem;
 }
 
 .storyviews__link {
-  padding: 0.35rem 0.05rem;
+  margin-bottom: -1px;
+  padding: 0.45rem 0.05rem;
   border-bottom: 2px solid transparent;
   color: var(--muted);
   font-size: 0.9rem;
   text-decoration: none;
+}
+
+@media (max-width: 640px) {
+  .storyviews {
+    column-gap: 1.15rem;
+  }
 }
 
 .storyviews__link:hover,
@@ -4274,9 +4381,10 @@ a.lorechip--pov:focus-visible .lorechip__name {
   overflow-wrap: anywhere;
 }
 
-/* "Scenes" or "Lore", then its chips, wrapping under the label on a narrow screen. */
+/* "Scenes", "Lore" or "Plot", then its chips, wrapping under the label on a narrow screen - on a beat, and on a scene
+   wherever one is drawn. */
 .beat__refs,
-.scene__plot {
+.scene__refs {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -4294,7 +4402,7 @@ a.lorechip--pov:focus-visible .lorechip__name {
   letter-spacing: 0.12em;
 }
 
-.scene__plot .scene__label {
+.scene__refs .scene__label {
   flex: none;
 }
 
@@ -4313,7 +4421,7 @@ a.lorechip--pov:focus-visible .lorechip__name {
   max-width: 100%;
 }
 
-.scene__plot .scene__lore {
+.scene__refs .scene__lore {
   flex: 1 1 12rem;
   min-width: 0;
 }
@@ -4433,7 +4541,28 @@ a.lorechip--pov:focus-visible .lorechip__name {
  * width the entry page folds at, it becomes a disclosure above the sheet so the prose gets the whole column.
  */
 .manuscript {
-  margin-top: 1.75rem;
+  margin-top: 1.25rem;
+}
+
+/* On a phone the story's header and each view's tools give their height back to the work beneath them. */
+@media (max-width: 640px) {
+  .story__crumbs {
+    margin-bottom: 0.6rem;
+  }
+
+  .story__bar {
+    margin-top: 0.75rem;
+  }
+
+  .story__toolbar {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    margin-top: 1.1rem;
+  }
+
+  .manuscript {
+    margin-top: 1rem;
+  }
 }
 
 .manuscript__layout {

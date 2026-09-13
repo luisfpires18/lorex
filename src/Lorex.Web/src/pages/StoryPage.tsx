@@ -50,7 +50,7 @@ type LoadState =
   | { kind: 'loading' }
   | { kind: 'ready'; story: StoryDetail; arcs: PlotArc[] }
   | { kind: 'missing' }
-  | { kind: 'error'; message: string }
+  | { kind: 'error' }
 
 type SceneFormState =
   { mode: 'closed' } | { mode: 'new'; chapterId: string | null } | { mode: 'edit'; scene: Scene }
@@ -60,6 +60,9 @@ type ChapterFormState =
 
 /** The control that should hold the focus once a move has redrawn the page, and the one to use if it is disabled. */
 type FocusRequest = { key: string; fallback: string | null }
+
+/** How long a scene or beat reached by a link stays marked, so the eye can pick it out from its neighbours. */
+const ARRIVAL_MS = 2400
 
 /** "a", "a and b", "a, b and c". */
 function listed(parts: string[]) {
@@ -71,10 +74,15 @@ function listed(parts: string[]) {
 /**
  * One story, told in the order its author sets, and planned in the plot its author follows.
  *
- * The page has three views under one heading: Scenes, at the story's own address, Plot, at `/plot`, and Manuscript, at
+ * The page has three views under one header: Scenes, at the story's own address, Plot, at `/plot`, and Manuscript, at
  * `/manuscript/:sceneId`. All three read the same story and the same plot, once, so moving between them costs nothing
  * and the header never changes. Neither read carries prose: the Manuscript view reads one scene's text when that scene
  * is opened.
+ *
+ * The header is deliberately short, because on a phone every line of it stands between the author and the work: the
+ * title, one line of facts, the premise on Scenes alone - the story's home - and one bar holding the three views and the
+ * story's own Edit and Delete. Each view then opens with its own tools, or with one empty state holding the one way to
+ * begin.
  *
  * Chapters are optional. A story without any is one list of scenes, exactly as before chapters existed.
  * Once it has some, the page reads Unchaptered first - a holding area, shown only while it holds a scene -
@@ -97,12 +105,17 @@ export default function StoryPage({
   const location = useLocation()
 
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
+  const [stale, setStale] = useState(false)
   const [sceneForm, setSceneForm] = useState<SceneFormState>({ mode: 'closed' })
   const [chapterForm, setChapterForm] = useState<ChapterFormState>({ mode: 'closed' })
   const [isEditingStory, setIsEditingStory] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
   const [announcement, setAnnouncement] = useState('')
   const [reloads, setReloads] = useState(0)
+
+  // A refusal is held with the address it was raised on, like the manuscript outline's open state, so one raised on
+  // the Scenes view is not still standing when the author comes back to it from the Plot view.
+  const [raised, setRaised] = useState<{ at: string; text: string } | null>(null)
+  const message = raised?.at === location.pathname ? raised.text : null
 
   const isMoving = useRef(false)
   const controls = useRef(new Map<string, HTMLButtonElement>())
@@ -116,17 +129,21 @@ export default function StoryPage({
       getStory(universe.id, storyId, controller.signal),
       listPlotArcs(universe.id, storyId, controller.signal),
     ])
-      .then(([story, arcs]) => setState({ kind: 'ready', story, arcs }))
+      .then(([story, arcs]) => {
+        setState({ kind: 'ready', story, arcs })
+        setStale(false)
+      })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return
-        setState(
-          error instanceof ApiError && error.status === 404
-            ? { kind: 'missing' }
-            : {
-                kind: 'error',
-                message: error instanceof Error ? error.message : 'Could not open this story.',
-              },
-        )
+        if (error instanceof ApiError && error.status === 404) {
+          setState({ kind: 'missing' })
+          return
+        }
+
+        // A story already on screen stays there, marked as possibly out of date, rather than being taken away - and
+        // with it any prose being written beside it. Only a first read that fails has nothing to show.
+        setState((current) => (current.kind === 'ready' ? current : { kind: 'error' }))
+        setStale(true)
       })
 
     return () => {
@@ -146,14 +163,26 @@ export default function StoryPage({
     ;(first && !first.disabled ? first : second)?.focus()
   }, [state])
 
-  // A link to one scene or one beat - a beat's scene, or a scene's beat - lands on it, whichever view it opens.
+  // A link to one scene or one beat - a beat's scene, a scene's beat, or the manuscript's way back to its scene - lands
+  // on it, whichever view it opens: scrolled to, given the focus so a keyboard and a screen reader arrive there too, and
+  // marked for a moment so the eye can tell which of twenty rows it meant. The location's key runs it again when the
+  // same link is followed twice.
   const isReady = state.kind === 'ready'
   useEffect(() => {
     if (!isReady || location.hash.length < 2) return
-    document
-      .getElementById(decodeURIComponent(location.hash.slice(1)))
-      ?.scrollIntoView({ block: 'center' })
-  }, [isReady, view, location.hash])
+    const target = document.getElementById(decodeURIComponent(location.hash.slice(1)))
+    if (!target) return
+
+    target.scrollIntoView({ block: 'center' })
+    target.focus({ preventScroll: true })
+    target.setAttribute('data-arrived', 'true')
+    const timer = window.setTimeout(() => target.removeAttribute('data-arrived'), ARRIVAL_MS)
+
+    return () => {
+      window.clearTimeout(timer)
+      target.removeAttribute('data-arrived')
+    }
+  }, [isReady, view, location.hash, location.key])
 
   const controlRef = useCallback((key: string, element: HTMLButtonElement | null) => {
     if (element) controls.current.set(key, element)
@@ -161,6 +190,15 @@ export default function StoryPage({
   }, [])
 
   const reload = useCallback(() => setReloads((count) => count + 1), [])
+
+  const retry = useCallback(() => {
+    setState({ kind: 'loading' })
+    setReloads((count) => count + 1)
+  }, [])
+
+  function setMessage(text: string | null) {
+    setRaised(text === null ? null : { at: location.pathname, text })
+  }
 
   if (state.kind === 'loading') {
     return (
@@ -184,15 +222,19 @@ export default function StoryPage({
 
   if (state.kind === 'error') {
     return (
-      <p className="notice notice--error" role="alert">
-        {state.message}
-      </p>
+      <div className="notice notice--error" role="alert" data-testid="story-load-error">
+        <p>This story could not be opened.</p>
+        <button className="button button--quiet" type="button" onClick={retry}>
+          Try again
+        </button>
+      </div>
     )
   }
 
   const { story, arcs } = state
   const { chapters, scenes } = story
   const hasChapters = chapters.length > 0
+  const isEmpty = !hasChapters && scenes.length === 0
   const unchaptered = scenesIn(scenes, null)
   const sceneBeats = beatsByScene(arcs)
   const storyPath = `/app/universes/${universe.id}/stories/${story.id}`
@@ -358,8 +400,8 @@ export default function StoryPage({
     const beats = sceneBeats.get(scene.id)?.length ?? 0
     const stays =
       beats === 0
-        ? 'The lore it links stays.'
-        : `The lore it links stays, and so ${
+        ? 'Any manuscript written for it goes too. The lore it links stays.'
+        : `Any manuscript written for it goes too. The lore it links stays, and so ${
             beats === 1 ? 'does the plot beat' : `do the ${beats} plot beats`
           } that point at it.`
 
@@ -381,7 +423,7 @@ export default function StoryPage({
     const consequence =
       count === 0
         ? 'It holds no scenes.'
-        : `Its ${sceneCountLabel(count)} will be moved to Unchaptered. No scene is deleted.`
+        : `Its ${sceneCountLabel(count)} will be moved to Unchaptered. Their manuscripts and plot links go with them. No scene is deleted.`
 
     if (
       !window.confirm(
@@ -415,7 +457,7 @@ export default function StoryPage({
     ])
     if (
       !window.confirm(
-        `Delete “${story.title}” and its ${holds}? This cannot be undone. The lore it draws on stays.`,
+        `Delete “${story.title}” and its ${holds}, with every manuscript? This cannot be undone. The lore it draws on stays.`,
       )
     ) {
       return
@@ -451,34 +493,78 @@ export default function StoryPage({
     ))
   }
 
+  const newScene = (
+    <button
+      className="button button--icon"
+      type="button"
+      onClick={() => setSceneForm({ mode: 'new', chapterId: null })}
+      data-testid="new-scene"
+    >
+      <ActionIcon icon={Plus} />
+      New scene
+    </button>
+  )
+
+  const newChapter = (
+    <button
+      className="button button--quiet button--icon"
+      type="button"
+      onClick={() => setChapterForm({ mode: 'new' })}
+      data-testid="new-chapter"
+    >
+      <ActionIcon icon={BookPlus} />
+      New chapter
+    </button>
+  )
+
   return (
     <article className="story" data-testid="story-page">
-      <nav className="entry__crumbs" aria-label="Breadcrumb">
+      <nav className="entry__crumbs story__crumbs" aria-label="Breadcrumb">
         <Link to={`/app/universes/${universe.id}/stories`}>Stories</Link>
       </nav>
 
       <header className="story__head">
-        <div className="story__heading">
-          <h2 className="chron__title story__title" data-testid="story-title">
-            {story.title}
-          </h2>
-          <p className="story__meta">
-            <span className="chip" data-testid="story-status">
-              {STORY_STATUS_LABELS[story.status]}
-            </span>
-            {hasChapters ? (
-              <span data-testid="story-chapter-count">{chapterCountLabel(chapters.length)}</span>
-            ) : null}
-            <span>{sceneCountLabel(scenes.length)}</span>
-          </p>
-          {story.premise ? (
-            <p className="story__premise" data-testid="story-premise">
-              {story.premise}
-            </p>
+        <h2 className="story__title" data-testid="story-title">
+          {story.title}
+        </h2>
+        <p className="story__meta">
+          <span className="chip" data-testid="story-status">
+            {STORY_STATUS_LABELS[story.status]}
+          </span>
+          {hasChapters ? (
+            <span data-testid="story-chapter-count">{chapterCountLabel(chapters.length)}</span>
           ) : null}
-        </div>
+          <span>{sceneCountLabel(scenes.length)}</span>
+        </p>
+        {view === 'scenes' && story.premise ? (
+          <p className="story__premise" data-testid="story-premise">
+            {story.premise}
+          </p>
+        ) : null}
+      </header>
 
-        <div className="story__actions">
+      <div className="story__bar">
+        <nav className="storyviews" aria-label="Story views" data-testid="story-views">
+          <NavLink to={storyPath} end className="storyviews__link" data-testid="story-view-scenes">
+            Scenes
+          </NavLink>
+          <NavLink
+            to={`${storyPath}/plot`}
+            className="storyviews__link"
+            data-testid="story-view-plot"
+          >
+            Plot
+          </NavLink>
+          <NavLink
+            to={`${storyPath}/manuscript`}
+            className="storyviews__link"
+            data-testid="story-view-manuscript"
+          >
+            Manuscript
+          </NavLink>
+        </nav>
+
+        <div className="storytools story__actions">
           <button
             className="button button--quiet button--icon"
             type="button"
@@ -486,7 +572,7 @@ export default function StoryPage({
             data-testid="edit-story"
           >
             <ActionIcon icon={Pencil} />
-            Edit story
+            <span className="story__actionlabel">Edit story</span>
           </button>
           <button
             className="button button--quiet button--icon"
@@ -495,30 +581,19 @@ export default function StoryPage({
             data-testid="delete-story"
           >
             <ActionIcon icon={Trash} />
-            Delete story
+            <span className="story__actionlabel">Delete story</span>
           </button>
         </div>
-      </header>
+      </div>
 
-      <nav className="storyviews" aria-label="Story views" data-testid="story-views">
-        <NavLink to={storyPath} end className="storyviews__link" data-testid="story-view-scenes">
-          Scenes
-        </NavLink>
-        <NavLink
-          to={`${storyPath}/plot`}
-          className="storyviews__link"
-          data-testid="story-view-plot"
-        >
-          Plot
-        </NavLink>
-        <NavLink
-          to={`${storyPath}/manuscript`}
-          className="storyviews__link"
-          data-testid="story-view-manuscript"
-        >
-          Manuscript
-        </NavLink>
-      </nav>
+      {stale ? (
+        <div className="notice notice--error story__stale" role="alert" data-testid="story-stale">
+          <p>The story could not be read again, so what is shown may be out of date.</p>
+          <button className="button button--quiet" type="button" onClick={reload}>
+            Try again
+          </button>
+        </div>
+      ) : null}
 
       {view === 'plot' ? (
         <PlotPanel
@@ -540,39 +615,23 @@ export default function StoryPage({
         />
       ) : (
         <section className="story__scenes" aria-labelledby="story-scenes-heading">
-          <div className="story__sceneshead">
-            <h3 className="story__subtitle" id="story-scenes-heading">
-              Scenes
-            </h3>
-            <div className="story__sceneactions">
-              <button
-                className="button button--quiet button--icon"
-                type="button"
-                onClick={() => setChapterForm({ mode: 'new' })}
-                data-testid="new-chapter"
-              >
-                <ActionIcon icon={BookPlus} />
-                New chapter
-              </button>
-              <button
-                className="button button--icon"
-                type="button"
-                onClick={() => setSceneForm({ mode: 'new', chapterId: null })}
-                data-testid="new-scene"
-              >
-                <ActionIcon icon={Plus} />
-                New scene
-              </button>
-            </div>
-          </div>
+          <h3 className="visually-hidden" id="story-scenes-heading">
+            Scenes
+          </h3>
 
-          {scenes.length > 0 || hasChapters ? (
-            <p className="chron__aside">
-              {hasChapters
-                ? 'Chapters in order, and the scenes in each in the order they are told. When each happens in the world never moves it.'
-                : 'In the order they are told. When each happens in the world never moves it.'}
-            </p>
-          ) : null}
+          {isEmpty ? null : (
+            <div className="story__toolbar">
+              <p className="chron__aside story__aside">
+                {hasChapters
+                  ? 'Chapters in order, and the scenes in each in the order they are told. When each happens in the world never moves it.'
+                  : 'In the order they are told. When each happens in the world never moves it.'}
+              </p>
+              <div className="story__toolbaractions">
+                {newChapter}
+                {newScene}
+              </div>
+            </div>
+          )}
 
           {message ? (
             <p className="form__message" role="alert" data-testid="story-error">
@@ -580,22 +639,18 @@ export default function StoryPage({
             </p>
           ) : null}
 
-          {!hasChapters && scenes.length === 0 ? (
+          {isEmpty ? (
             <div className="empty" data-testid="scenes-empty">
               <p className="empty__line">No scenes yet.</p>
               <p className="empty__hint">
-                Scenes are told in the order you set, whenever in the world each one happens. Group
-                them into chapters whenever you like, or never.
+                Start with a scene: plot beats point at scenes, and the manuscript is written one
+                scene at a time. Scenes are told in the order you set, whenever in the world each
+                happens, and can be grouped into chapters whenever you like, or never.
               </p>
-              <button
-                className="button button--icon empty__action"
-                type="button"
-                onClick={() => setSceneForm({ mode: 'new', chapterId: null })}
-                data-testid="empty-new-scene"
-              >
-                <ActionIcon icon={Plus} />
-                New scene
-              </button>
+              <div className="empty__actions">
+                {newScene}
+                {newChapter}
+              </div>
             </div>
           ) : null}
 

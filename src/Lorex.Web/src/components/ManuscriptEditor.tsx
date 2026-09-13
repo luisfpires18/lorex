@@ -1,8 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { Pencil } from 'lucide-react'
+import { LocateFixed, Pencil } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ActionIcon } from './ActionIcon'
-import { LoreReference } from './LoreReference'
+import { SceneBeats, SceneLore, SceneStamp } from './SceneContext'
 import type { Chronology } from '../chronology/types'
 import { ApiError } from '../lib/api'
 import { useLeaveGuard } from '../lib/leaveGuard'
@@ -45,13 +45,18 @@ interface ManuscriptEditorProps {
  * One scene's prose, and nothing but: a plain text box that keeps every line break, blank line and character exactly as
  * typed. No formatting, no Markdown and no reading of the text - a name written here links to nothing.
  *
+ * Above it, read-only, the scene's planning as the Scenes view draws it - when and through whose eyes, its lore and its
+ * beats, each a link to where it is edited - with Edit scene, which opens the scene's own drawer in place, and Show in
+ * Scenes, which leads back to the scene's place in the story's structure.
+ *
  * Mounted once per scene - the panel keys it by the scene's id - so opening another scene starts from nothing and never
  * shows the last scene's prose under the new title while the new one loads.
  *
  * Saving is explicit: the Save button, or Ctrl+S / Cmd+S from anywhere on the page. The text is unsaved until the API
  * confirms it, so a failed save changes nothing on screen and can simply be tried again. A save over prose that was saved
  * from another tab or device since this one opened is refused by the API, and the author decides what happens next -
- * keep this text, or load that one. While anything is unsaved, following a link or leaving the page asks first.
+ * keep this text, or load that one. While anything is unsaved, following a link, signing out or leaving the page asks
+ * first.
  */
 export function ManuscriptEditor({
   universeId,
@@ -67,7 +72,6 @@ export function ManuscriptEditor({
   const editorId = useId()
   const statusId = useId()
   const tooLongId = useId()
-  const plotLabelId = useId()
 
   const [load, setLoad] = useState<LoadState>({ kind: 'loading' })
   const [reads, setReads] = useState(0)
@@ -190,7 +194,11 @@ export function ManuscriptEditor({
     reread()
   }
 
-  const when = sceneWhen(chronology, scene.chronology)
+  const hasContext =
+    sceneWhen(chronology, scene.chronology) !== null ||
+    scene.pov !== null ||
+    scene.entities.length > 0 ||
+    beats.length > 0
 
   const status = isSaving
     ? { state: 'saving', text: 'Saving…' }
@@ -216,54 +224,21 @@ export function ManuscriptEditor({
           {scene.title}
         </h4>
 
-        {when || scene.pov || beats.length > 0 ? (
+        {hasContext ? (
           <div className="manuscript__context">
-            {when || scene.pov ? (
-              <div className="scene__stamp">
-                {when ? (
-                  <span className="scene__when" data-testid="manuscript-when">
-                    {when.text}
-                    {when.placed ? null : <span className="scene__unplaced"> · no era yet</span>}
-                  </span>
-                ) : null}
-                {scene.pov ? (
-                  <span className="scene__pov" data-testid="manuscript-pov">
-                    <span className="scene__label">Point of view</span>
-                    <LoreReference universeId={universeId} reference={scene.pov} portrait />
-                  </span>
-                ) : null}
-              </div>
-            ) : null}
-
-            {beats.length > 0 ? (
-              <div className="scene__plot">
-                <span className="scene__label" id={plotLabelId}>
-                  Plot
-                </span>
-                <ul
-                  className="scene__lore"
-                  aria-labelledby={plotLabelId}
-                  data-testid="manuscript-plot"
-                >
-                  {beats.map((beat) => (
-                    <li key={beat.beatId}>
-                      <Link
-                        className="lorechip plotchip"
-                        to={`/app/universes/${universeId}/stories/${storyId}/plot#beat-${beat.beatId}`}
-                        aria-label={`${beat.arcTitle}: ${beat.beatTitle}`}
-                        data-testid="manuscript-plot-beat"
-                      >
-                        <span className="lorechip__name">
-                          {beat.arcTitle}
-                          <span className="plotchip__arrow"> → </span>
-                          {beat.beatTitle}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
+            <SceneStamp
+              universeId={universeId}
+              chronology={chronology}
+              scene={scene}
+              testId="manuscript"
+            />
+            <SceneLore universeId={universeId} scene={scene} testId="manuscript" />
+            <SceneBeats
+              universeId={universeId}
+              storyId={storyId}
+              beats={beats}
+              testId="manuscript"
+            />
           </div>
         ) : null}
 
@@ -278,6 +253,15 @@ export function ManuscriptEditor({
             <ActionIcon icon={Pencil} />
             Edit scene
           </button>
+          <Link
+            className="button button--quiet button--icon"
+            to={`/app/universes/${universeId}/stories/${storyId}#scene-${scene.id}`}
+            aria-describedby={titleId}
+            data-testid="manuscript-show-scene"
+          >
+            <ActionIcon icon={LocateFixed} />
+            Show in Scenes
+          </Link>
         </div>
       </header>
 
