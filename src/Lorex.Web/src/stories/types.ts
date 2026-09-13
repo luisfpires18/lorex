@@ -129,3 +129,60 @@ export interface ChapterInput {
   summary: string | null
   notes: string | null
 }
+
+/**
+ * One step inside a plot arc. `sortOrder` is its place in the arc's intended progression - never the order its
+ * scenes are told in, their chapters, or when they happen in the world.
+ *
+ * `sceneIds` are scenes of this story, in reading order, as ids only: the story read already carries each scene,
+ * and a scene that moves chapter is still the same id. `entities` are its lore, read from the entries, a trashed
+ * one marked rather than dropped.
+ */
+export interface PlotBeat {
+  id: string
+  plotArcId: string
+  sortOrder: number
+  title: string
+  description: string | null
+  notes: string | null
+  sceneIds: string[]
+  entities: SceneLoreReference[]
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * A named narrative thread the author follows across a story, with its beats in order. Plot is planning: it owns no
+ * scene and asserts nothing about the world. Its number - "Arc 2" - is its position, drawn and never stored.
+ */
+export interface PlotArc {
+  id: string
+  storyId: string
+  sortOrder: number
+  title: string
+  description: string | null
+  notes: string | null
+  beats: PlotBeat[]
+  createdAt: string
+  updatedAt: string
+}
+
+/** Everything a client may set on an arc. No number and no order. */
+export interface PlotArcInput {
+  title: string
+  description: string | null
+  notes: string | null
+}
+
+/**
+ * Everything a client may set on a beat. Both link lists are whole sets, replaced on every save. `plotArcId` is read
+ * by an update only: another arc of the story moves the beat there, last.
+ */
+export interface PlotBeatInput {
+  title: string
+  description: string | null
+  notes: string | null
+  sceneIds: string[]
+  entityIds: string[]
+  plotArcId: string | null
+}

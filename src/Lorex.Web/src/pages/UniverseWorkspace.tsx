@@ -25,7 +25,7 @@ const SECTIONS = [
  * Sections that exist in the plan but not yet in the product. They are shown so the shape
  * of a universe is legible, and disabled so nothing pretends to work.
  */
-const PLANNED = ['Plot', 'Ideas', 'Search']
+const PLANNED = ['Ideas', 'Search']
 
 type LoadState =
   | { kind: 'loading' }

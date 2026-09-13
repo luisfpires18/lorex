@@ -11,9 +11,14 @@ public static class StoryLimits
     public const int SceneNotesMaxLength = 10_000;
     public const int ChapterSummaryMaxLength = 2000;
     public const int ChapterNotesMaxLength = 10_000;
+    public const int PlotDescriptionMaxLength = 2000;
+    public const int PlotNotesMaxLength = 10_000;
 
     /// <summary>The same bound a timeline moment has: enough for a crowded scene, one request stays small.</summary>
     public const int MaxLinkedEntities = 100;
+
+    /// <summary>The same bound for the scenes one beat plays out in.</summary>
+    public const int MaxLinkedScenes = 100;
 }
 
 public sealed class ChapterConfiguration : IEntityTypeConfiguration<Chapter>

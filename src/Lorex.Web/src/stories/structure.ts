@@ -1,4 +1,4 @@
-import type { Chapter, Scene } from './types'
+import type { Chapter, PlotArc, Scene } from './types'
 
 /**
  * One container's scenes in the order they are told: the chapter `chapterId` names, or Unchaptered when
@@ -21,4 +21,41 @@ export function readingOrder(chapters: Chapter[], scenes: Scene[]) {
     scene.chapterId === null ? -1 : (rank.get(scene.chapterId) ?? chapters.length)
 
   return [...scenes].sort((a, b) => place(a) - place(b) || a.sortOrder - b.sortOrder)
+}
+
+/** A beat as a scene names it: which arc, which step, and where each sits. */
+export interface SceneBeatReference {
+  arcId: string
+  arcTitle: string
+  arcIndex: number
+  beatId: string
+  beatTitle: string
+  beatIndex: number
+}
+
+/**
+ * Which beats point at each scene, arc by arc and step by step. Read from the beats alone - a scene holds no beat,
+ * and this is only how the page draws what the beats already say.
+ */
+export function beatsByScene(arcs: PlotArc[]) {
+  const byScene = new Map<string, SceneBeatReference[]>()
+
+  arcs.forEach((arc, arcIndex) => {
+    arc.beats.forEach((beat, beatIndex) => {
+      for (const sceneId of beat.sceneIds) {
+        const references = byScene.get(sceneId) ?? []
+        references.push({
+          arcId: arc.id,
+          arcTitle: arc.title,
+          arcIndex,
+          beatId: beat.id,
+          beatTitle: beat.title,
+          beatIndex,
+        })
+        byScene.set(sceneId, references)
+      }
+    })
+  })
+
+  return byScene
 }

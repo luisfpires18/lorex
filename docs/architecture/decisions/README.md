@@ -29,8 +29,9 @@ One ADR per durable decision. Rationale lives in the ADR, never here.
 | 0023 | A relationship type may carry explicit Canon constraints, checked on the stored direction | [0023-relationship-canon-constraints.md](0023-relationship-canon-constraints.md) |
 | 0024 | A story is authored narrative that references lore, told in its own order | [0024-story-scene-foundation.md](0024-story-scene-foundation.md) |
 | 0025 | A chapter is optional structure; a scene's order is its place inside its chapter | [0025-story-chapters.md](0025-story-chapters.md) |
+| 0026 | Plot is planning: arcs of beats that point at scenes and lore and own neither | [0026-story-plot-arcs-beats.md](0026-story-plot-arcs-beats.md) |
 
-All accepted. Next number: `0026`.
+All accepted. Next number: `0027`.
 
 Known limitations are recorded in the ADR that owns them - cross-era ordering on the plain
 reckoning in 0009 and 0011, and years written before a universe named its eras, the listing's
@@ -44,4 +45,5 @@ in 0018, and what an entry's image costs a backup and a revision restore in 0019
 profile photo is deliberately left out of - a backup, a history and anyone else's view - in
 0021, and the deferred life-state constraints and the gap across eras of unrecorded length in 0023, and
 what stories deliberately do not have yet - prose, history, search, a Trash, Canon checks - in
-0024, and what chapters leave for later - acts and volumes, drag-and-drop, collapsing - in 0025.
+0024, and what chapters leave for later - acts and volumes, drag-and-drop, collapsing - in 0025, and what plot
+leaves for later - a status, beat chronology, visual planning, editing beats from a scene - in 0026.

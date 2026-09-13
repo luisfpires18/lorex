@@ -2,6 +2,10 @@ import { apiFetch } from '../lib/api'
 import type {
   Chapter,
   ChapterInput,
+  PlotArc,
+  PlotArcInput,
+  PlotBeat,
+  PlotBeatInput,
   Scene,
   SceneInput,
   StoryDetail,
@@ -19,6 +23,14 @@ function scenes(universeId: string, storyId: string) {
 
 function chapters(universeId: string, storyId: string) {
   return `${base(universeId)}/${storyId}/chapters`
+}
+
+function plotArcs(universeId: string, storyId: string) {
+  return `${base(universeId)}/${storyId}/plot-arcs`
+}
+
+function plotBeats(universeId: string, storyId: string) {
+  return `${base(universeId)}/${storyId}/plot-beats`
 }
 
 export function listStories(universeId: string, signal?: AbortSignal) {
@@ -115,6 +127,88 @@ export function reorderScenes(
   return apiFetch<Scene[]>(`${scenes(universeId, storyId)}/order`, {
     method: 'PUT',
     body: JSON.stringify({ chapterId, sceneIds }),
+  })
+}
+
+/** The story's whole plot: every arc in order, each with its beats in order and their links resolved. */
+export function listPlotArcs(universeId: string, storyId: string, signal?: AbortSignal) {
+  return apiFetch<PlotArc[]>(plotArcs(universeId, storyId), { signal })
+}
+
+/** Appended after every arc already in the story. */
+export function createPlotArc(universeId: string, storyId: string, input: PlotArcInput) {
+  return apiFetch<PlotArc>(plotArcs(universeId, storyId), {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export function updatePlotArc(
+  universeId: string,
+  storyId: string,
+  plotArcId: string,
+  input: PlotArcInput,
+) {
+  return apiFetch<PlotArc>(`${plotArcs(universeId, storyId)}/${plotArcId}`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  })
+}
+
+/** Permanent: the arc's beats and their links go with it. No scene, chapter or entry does. */
+export function deletePlotArc(universeId: string, storyId: string, plotArcId: string) {
+  return apiFetch<void>(`${plotArcs(universeId, storyId)}/${plotArcId}`, { method: 'DELETE' })
+}
+
+/** The story's whole arc order: every arc id, each once, first first. Answers with every arc. */
+export function reorderPlotArcs(universeId: string, storyId: string, plotArcIds: string[]) {
+  return apiFetch<PlotArc[]>(`${plotArcs(universeId, storyId)}/order`, {
+    method: 'PUT',
+    body: JSON.stringify({ plotArcIds }),
+  })
+}
+
+/** Appended after every beat already in the arc. */
+export function createPlotBeat(
+  universeId: string,
+  storyId: string,
+  plotArcId: string,
+  input: PlotBeatInput,
+) {
+  return apiFetch<PlotBeat>(`${plotArcs(universeId, storyId)}/${plotArcId}/beats`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+/** The whole beat. A different `plotArcId` moves it to the end of that arc. */
+export function updatePlotBeat(
+  universeId: string,
+  storyId: string,
+  plotBeatId: string,
+  input: PlotBeatInput,
+) {
+  return apiFetch<PlotBeat>(`${plotBeats(universeId, storyId)}/${plotBeatId}`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  })
+}
+
+/** Permanent: its links go with it. The scenes and lore it pointed at stay. */
+export function deletePlotBeat(universeId: string, storyId: string, plotBeatId: string) {
+  return apiFetch<void>(`${plotBeats(universeId, storyId)}/${plotBeatId}`, { method: 'DELETE' })
+}
+
+/** One arc's whole beat order: every beat id in it, each once. Answers with that arc's beats. */
+export function reorderPlotBeats(
+  universeId: string,
+  storyId: string,
+  plotArcId: string,
+  plotBeatIds: string[],
+) {
+  return apiFetch<PlotBeat[]>(`${plotArcs(universeId, storyId)}/${plotArcId}/beats/order`, {
+    method: 'PUT',
+    body: JSON.stringify({ plotBeatIds }),
   })
 }
 

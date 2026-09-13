@@ -12,7 +12,7 @@ using Lorex.Api.Features.Universes;
 namespace Lorex.Api.Tests;
 
 /// <summary>
-/// Stories in the universe backup (format version 6).
+/// Stories in the universe backup (format version 7; the plot that version added is <c>PlotBackupTests</c>).
 ///
 /// A story is authored work, so a backup that dropped it would not be a backup. What it carries is the
 /// author's structure - each story, its chapters in order, its scenes with the chapter each is told in and
@@ -36,7 +36,7 @@ public sealed class StoryBackupTests(LorexApiFactory factory) : IClassFixture<Lo
 
         var backup = await Backup(client, universe.Id);
 
-        Assert.Equal(6, backup.FormatVersion);
+        Assert.Equal(7, backup.FormatVersion);
         var stories = backup.Payload.Stories!;
 
         // By title, ordinally: "Aftermath" before "The Long Winter".
@@ -80,7 +80,7 @@ public sealed class StoryBackupTests(LorexApiFactory factory) : IClassFixture<Lo
 
         var backup = await Backup(client, universe.Id);
 
-        Assert.Equal(6, backup.FormatVersion);
+        Assert.Equal(7, backup.FormatVersion);
         var story = Assert.Single(backup.Payload.Stories!);
         var chapters = story.Chapters!;
 

@@ -3,7 +3,8 @@
 Status: accepted (2026-09-09), amended 2026-09-10 (version 3: the file became an archive),
 2026-09-11 (type icon keys, and a short-lived image framing member, both within version 3),
 2026-09-13 (version 4: a universe's eras), 2026-09-13 (relationship type Canon constraints,
-within version 4), 2026-09-13 (version 5: stories), and 2026-09-13 (version 6: chapters)
+within version 4), 2026-09-13 (version 5: stories), 2026-09-13 (version 6: chapters), and 2026-09-13
+(version 7: plot)
 
 ## Context
 
@@ -135,6 +136,15 @@ re-meaning clause, so it is a bump. No chapter number is carried: it is the posi
 has neither member; both read as null, every scene is Unchaptered, and its story-wide `sortOrder` is
 exactly its order there.
 
+**Version 7 (2026-09-13) carries plot** (ADR 0026). Each story gains `plotArcs` - id, `sortOrder`, title,
+description, notes, timestamps, in order - and each arc its `beats`: id, `sortOrder` inside the arc, title,
+description, notes, `linkedSceneIds`, `linkedEntityIds` and timestamps. Both link lists are sorted by id, and hold
+ids only: a linked scene's title or chapter and a linked entry's name are already in the file, and a scene that
+moved chapter is still the id a beat names. The test is the one version 5 failed: an arc's and a beat's text is
+authored, and so is each link, so a version 6 reader that skipped `plotArcs` would parse the file and restore every
+story with its plot silently gone. So it is a bump. No arc or beat number is carried. A file at version 6 or
+earlier has no `plotArcs`; it reads as null and means a story with no plot.
+
 **Only the authored data.** The test for inclusion is: did a person write this, or would
 Lorex produce it again from what a person wrote?
 
@@ -148,6 +158,7 @@ Lorex produce it again from what a person wrote?
 | The universe's eras: name, short label, order, direction, label position | Formatted dates and sort keys |
 | Timeline entries, their date components, era ids and era labels, participants | Derived date precision |
 | Stories; their chapters in order with title, summary and notes; their scenes with chapter, place in it, point of view, chronology and linked entry ids | Any name, type or formatted date of what a scene references, and any chapter number |
+| Each story's plot arcs in order with title, description and notes; their beats in order with text and linked scene and entry ids | Any arc or beat number, and any scene title, chapter or entry name a beat points at |
 | Every entry's revision history (ADR 0013) | - |
 | Each entry's primary image: the original bytes, its asset id, filename, content type, dimensions, chosen crop and archive path | The generated thumbnail and its id, and every R2 object key, bucket name, endpoint and URL |
 | Canon conflicts the author **dismissed** | Pending and resolved conflicts, and all conflict wording |
@@ -198,7 +209,7 @@ compare a parsed object with a hole in it. Enums are written as names, not numbe
 stays readable and a renumbered enum cannot silently re-mean an old backup. Nulls are written
 rather than omitted, because "never filled in" and "not in this format" are different facts.
 
-**One transaction for the whole read.** Assembling a backup is around eighteen queries, and
+**One transaction for the whole read.** Assembling a backup is around two dozen queries, and
 without a snapshot boundary each gap is a moment a concurrent write can land in - producing a
 file whose entry is from before an edit and whose history is from after it. The read runs
 inside one transaction and takes nothing wider: it writes nothing and locks nothing beyond

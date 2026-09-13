@@ -76,6 +76,8 @@ app.MapTimelineEndpoints();
 app.MapStoryEndpoints();
 app.MapChapterEndpoints();
 app.MapSceneEndpoints();
+app.MapPlotArcEndpoints();
+app.MapPlotBeatEndpoints();
 app.MapCanonIntegrityEndpoints();
 app.MapTrashEndpoints();
 app.MapUniverseExportEndpoints();

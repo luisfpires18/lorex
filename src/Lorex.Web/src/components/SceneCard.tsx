@@ -2,70 +2,16 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { ArrowDown, ArrowRightLeft, ArrowUp, Pencil, Trash } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ActionIcon } from './ActionIcon'
-import { EntityPortrait } from './EntityPortrait'
-import { TypeIcon } from './TypeIcon'
+import { LoreReference } from './LoreReference'
 import type { Chronology } from '../chronology/types'
 import { sceneWhen } from '../stories/format'
-import type { Scene, SceneLoreReference } from '../stories/types'
+import type { SceneBeatReference } from '../stories/structure'
+import type { Scene } from '../stories/types'
 
 /** A container a scene can be moved into: a chapter, or Unchaptered when `chapterId` is null. */
 export interface MoveTarget {
   chapterId: string | null
   label: string
-}
-
-/**
- * A lore reference, drawn from the lore: its type's icon, or for the point of view its portrait, and
- * its name - a real link to the entry's own page. An entry in the Trash is named but not linked,
- * because it has no page to open while it is there.
- */
-function LoreReference({
-  universeId,
-  reference,
-  portrait = false,
-}: {
-  universeId: string
-  reference: SceneLoreReference
-  portrait?: boolean
-}) {
-  const className = `lorechip${portrait ? ' lorechip--pov' : ''}`
-
-  const content = (
-    <>
-      {portrait ? (
-        <EntityPortrait
-          universeId={universeId}
-          entityId={reference.entityId}
-          name={reference.name}
-          // A trashed entry's picture is not served, so it is drawn as its initial instead.
-          image={reference.isTrashed ? null : reference.image}
-        />
-      ) : (
-        <TypeIcon iconKey={reference.entityTypeIcon} className="lorechip__icon" />
-      )}
-      <span className="lorechip__name">{reference.name}</span>
-    </>
-  )
-
-  if (reference.isTrashed) {
-    return (
-      <span className={`${className} lorechip--trashed`} data-testid="lore-reference-trashed">
-        {content}
-        <span className="lorechip__note">(in Trash)</span>
-      </span>
-    )
-  }
-
-  return (
-    <Link
-      className={className}
-      to={`/app/universes/${universeId}/lore/${reference.entityId}`}
-      title={reference.entityTypeName}
-      data-testid="lore-reference"
-    >
-      {content}
-    </Link>
-  )
 }
 
 /**
@@ -183,6 +129,8 @@ interface SceneCardProps {
   titleLevel: 4 | 5
   /** Every other container the scene could move to. Empty in a story with no chapters. */
   moveTargets: MoveTarget[]
+  /** The plot beats that point at this scene, arc by arc. Shown only: a scene holds no beat. */
+  beats: SceneBeatReference[]
   onMove: (scene: Scene, by: -1 | 1) => void
   onMoveTo: (scene: Scene, chapterId: string | null) => void
   onEdit: (scene: Scene) => void
@@ -193,7 +141,10 @@ interface SceneCardProps {
 
 /**
  * One scene in its container's list: number, where it happens, whose eyes, what happens, what lore it
- * draws on, and the tools. Notes stay in the form - the list is for scanning.
+ * draws on, which plot beats point at it, and the tools. Notes stay in the form - the list is for scanning.
+ *
+ * The plot row is read-only. The beats own those links, so each one is a way to the beat on the story's
+ * Plot view rather than something edited here.
  *
  * Reordering is plain buttons rather than a drag gesture, so it works from a keyboard, a screen reader
  * and a phone alike. Move up and Move down stay inside the scene's chapter; Move to… takes it to another
@@ -208,6 +159,7 @@ export function SceneCard({
   count,
   titleLevel,
   moveTargets,
+  beats,
   onMove,
   onMoveTo,
   onEdit,
@@ -215,11 +167,12 @@ export function SceneCard({
   controlRef,
 }: SceneCardProps) {
   const titleId = useId()
+  const plotLabelId = useId()
   const when = sceneWhen(chronology, scene.chronology)
   const Title = titleLevel === 5 ? 'h5' : 'h4'
 
   return (
-    <li className="scene" data-testid="scene" data-title={scene.title}>
+    <li className="scene" id={`scene-${scene.id}`} data-testid="scene" data-title={scene.title}>
       <span className="scene__number" aria-hidden="true">
         {index + 1}
       </span>
@@ -257,6 +210,32 @@ export function SceneCard({
               </li>
             ))}
           </ul>
+        ) : null}
+
+        {beats.length > 0 ? (
+          <div className="scene__plot">
+            <span className="scene__label" id={plotLabelId}>
+              Plot
+            </span>
+            <ul className="scene__lore" aria-labelledby={plotLabelId} data-testid="scene-plot">
+              {beats.map((beat) => (
+                <li key={beat.beatId}>
+                  <Link
+                    className="lorechip plotchip"
+                    to={`/app/universes/${universeId}/stories/${scene.storyId}/plot#beat-${beat.beatId}`}
+                    aria-label={`${beat.arcTitle}: ${beat.beatTitle}`}
+                    data-testid="scene-plot-beat"
+                  >
+                    <span className="lorechip__name">
+                      {beat.arcTitle}
+                      <span className="plotchip__arrow"> → </span>
+                      {beat.beatTitle}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : null}
 
         <div className="scene__tools storytools">

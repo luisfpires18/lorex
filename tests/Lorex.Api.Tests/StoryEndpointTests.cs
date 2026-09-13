@@ -1,5 +1,3 @@
-using System.Data.Common;
-using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using Lorex.Api.Data;
@@ -11,7 +9,6 @@ using Lorex.Api.Features.Stories;
 using Lorex.Api.Features.Timeline;
 using Lorex.Api.Features.Universes;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Lorex.Api.Tests;
@@ -327,86 +324,8 @@ public sealed class StoryEndpointTests(LorexApiFactory factory) : IClassFixture<
         return (await response.Content.ReadFromJsonAsync<SceneResponse>())!;
     }
 
-    private static async Task<(int Queries, T Result)> CountQueries<T>(IReadOnlyCollection<Guid> ids, Func<Task<T>> work)
-    {
-        using var counter = new CommandCounter(ids);
-        var result = await work();
-        return (counter.Count, result);
-    }
-
-    /// <summary>
-    /// Counts the database commands EF Core runs that carry one of the given ids as a parameter. Other test
-    /// classes run in parallel in the same process, and none of their commands carries this test's ids.
-    /// </summary>
-    private sealed class CommandCounter : IObserver<DiagnosticListener>, IObserver<KeyValuePair<string, object?>>, IDisposable
-    {
-        private readonly string[] _keys;
-        private readonly List<IDisposable> _subscriptions = [];
-        private int _count;
-
-        public CommandCounter(IReadOnlyCollection<Guid> ids)
-        {
-            _keys = [.. ids.Select(id => id.ToString())];
-            var all = DiagnosticListener.AllListeners.Subscribe(this);
-
-            lock (_subscriptions)
-            {
-                _subscriptions.Add(all);
-            }
-        }
-
-        public int Count => _count;
-
-        public void OnNext(DiagnosticListener value)
-        {
-            if (value.Name == DbLoggerCategory.Name)
-            {
-                lock (_subscriptions)
-                {
-                    _subscriptions.Add(value.Subscribe(this));
-                }
-            }
-        }
-
-        public void OnNext(KeyValuePair<string, object?> value)
-        {
-            if (value.Key != RelationalEventId.CommandExecuted.Name || value.Value is not CommandExecutedEventData executed)
-            {
-                return;
-            }
-
-            var carriesId = executed.Command.Parameters
-                .Cast<DbParameter>()
-                .Any(parameter => parameter.Value?.ToString() is { } text
-                    && _keys.Any(key => text.Contains(key, StringComparison.OrdinalIgnoreCase)));
-
-            if (carriesId)
-            {
-                Interlocked.Increment(ref _count);
-            }
-        }
-
-        public void OnCompleted()
-        {
-        }
-
-        public void OnError(Exception error)
-        {
-        }
-
-        public void Dispose()
-        {
-            lock (_subscriptions)
-            {
-                foreach (var subscription in _subscriptions)
-                {
-                    subscription.Dispose();
-                }
-
-                _subscriptions.Clear();
-            }
-        }
-    }
+    private static Task<(int Queries, T Result)> CountQueries<T>(IReadOnlyCollection<Guid> ids, Func<Task<T>> work) =>
+        CommandCounter.CountAsync(ids, work);
 
     private static async Task<EntityDetail> CreateEntity(HttpClient client, Guid universeId, string name)
     {

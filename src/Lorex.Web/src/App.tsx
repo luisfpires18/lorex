@@ -41,7 +41,8 @@ export default function App() {
                 <Route path="lore/:entityId" element={<EntityPage />} />
                 <Route path="timeline" element={<TimelinePage />} />
                 <Route path="stories" element={<StoriesPage />} />
-                <Route path="stories/:storyId" element={<StoryPage />} />
+                <Route path="stories/:storyId" element={<StoryPage view="scenes" />} />
+                <Route path="stories/:storyId/plot" element={<StoryPage view="plot" />} />
                 <Route path="canon" element={<CanonPage />} />
                 <Route path="types" element={<UniverseTypes />} />
                 <Route path="trash" element={<UniverseTrash />} />
