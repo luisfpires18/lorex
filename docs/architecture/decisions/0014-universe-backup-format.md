@@ -2,8 +2,8 @@
 
 Status: accepted (2026-09-09), amended 2026-09-10 (version 3: the file became an archive),
 2026-09-11 (type icon keys, and a short-lived image framing member, both within version 3),
-2026-09-13 (version 4: a universe's eras), and 2026-09-13 (relationship type Canon constraints,
-within version 4)
+2026-09-13 (version 4: a universe's eras), 2026-09-13 (relationship type Canon constraints,
+within version 4), and 2026-09-13 (version 5: stories)
 
 ## Context
 
@@ -113,6 +113,16 @@ with none. That is not a bump. The constraints are rules checked against the lor
 that ignores them loses the checks and misreads no year, link or entry. A version 4 file written before
 them lacks all three, and means no constraint.
 
+**Version 5 (2026-09-13) carries stories** (ADR 0024). `payload.stories` holds each story - title,
+premise, status - with its scenes nested inside it in narrative order: title, summary, notes,
+`sortOrder`, `povEntityId`, `chronology` (`eraId`, `year`, `month`, `day`, or null) and
+`linkedEntityIds`. References are ids into the same file, never names. The member is nullable, and
+that is the case the rule above calls ignorable only when ignoring it loses nothing an author wrote.
+The constraints passed that test - rules checked against lore. Stories fail it: a reader that knew
+only version 4 would parse the file and restore a world with every story silently gone, turning a
+complete backup into a lossy one. So it is a bump. A file at versions 1 to 4 has no `stories`, which
+reads as null and means none.
+
 **Only the authored data.** The test for inclusion is: did a person write this, or would
 Lorex produce it again from what a person wrote?
 
@@ -125,6 +135,7 @@ Lorex produce it again from what a person wrote?
 | Relationship types with their Canon constraints, and relationships | - |
 | The universe's eras: name, short label, order, direction, label position | Formatted dates and sort keys |
 | Timeline entries, their date components, era ids and era labels, participants | Derived date precision |
+| Stories, and their scenes in narrative order with point of view, chronology and linked entry ids | Any name, type or formatted date of what a scene references |
 | Every entry's revision history (ADR 0013) | - |
 | Each entry's primary image: the original bytes, its asset id, filename, content type, dimensions, chosen crop and archive path | The generated thumbnail and its id, and every R2 object key, bucket name, endpoint and URL |
 | Canon conflicts the author **dismissed** | Pending and resolved conflicts, and all conflict wording |

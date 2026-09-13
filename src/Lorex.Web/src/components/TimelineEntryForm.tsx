@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { ChronologyPointFields, type ChronologyPointPart } from './ChronologyPointFields'
 import { EntityMultiPicker, type EntityChoice } from './EntityPicker'
 import { CanonBlockNotice } from './CanonBlockNotice'
 import { blockingFindingsOf } from '../canon/blocked'
@@ -248,101 +249,31 @@ export function TimelineEntryForm({
       day: string | undefined
     },
   ) {
-    const year: ComponentKey = prefix === 'start' ? 'startYear' : 'endYear'
-    const month: ComponentKey = prefix === 'start' ? 'startMonth' : 'endMonth'
-    const day: ComponentKey = prefix === 'start' ? 'startDay' : 'endDay'
-    const era: EraKey = prefix === 'start' ? 'startEraId' : 'endEraId'
+    const keys: Record<ChronologyPointPart, ComponentKey | EraKey> =
+      prefix === 'start'
+        ? { eraId: 'startEraId', year: 'startYear', month: 'startMonth', day: 'startDay' }
+        : { eraId: 'endEraId', year: 'endYear', month: 'endMonth', day: 'endDay' }
 
     return (
-      <div
-        className={reckonsInEras ? 'momentform__point momentform__point--era' : 'momentform__point'}
-      >
-        {reckonsInEras ? (
-          <div className="field">
-            <label className="field__label" htmlFor={`moment-${era}`}>
-              {prefix === 'start' ? (isRange ? 'Starts in era' : 'Era') : 'Ends in era'}
-            </label>
-            <select
-              id={`moment-${era}`}
-              className="field__input field__input--select"
-              value={draft[era]}
-              onChange={(event) => setComponent(era, event.target.value)}
-              aria-invalid={errors.era ? true : undefined}
-              data-testid={`moment-${era}`}
-            >
-              <option value="">Choose an era</option>
-              {chronology.eras.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.abbreviation ? `${option.name} (${option.abbreviation})` : option.name}
-                </option>
-              ))}
-            </select>
-            {errors.era ? <p className="field__error">{errors.era}</p> : null}
-          </div>
-        ) : null}
-
-        <div className="field">
-          <label className="field__label" htmlFor={`moment-${year}`}>
-            {yearLabel}
-          </label>
-          <input
-            id={`moment-${year}`}
-            className="field__input"
-            type="number"
-            step="1"
-            min={reckonsInEras ? 1 : undefined}
-            inputMode="numeric"
-            placeholder={reckonsInEras ? '10' : '3018'}
-            value={draft[year]}
-            onChange={(event) => setComponent(year, event.target.value)}
-            aria-invalid={errors.year ? true : undefined}
-            data-testid={`moment-${year}`}
-          />
-          {errors.year ? <p className="field__error">{errors.year}</p> : null}
-        </div>
-
-        <div className="field">
-          <label className="field__label" htmlFor={`moment-${month}`}>
-            Month
-          </label>
-          <input
-            id={`moment-${month}`}
-            className="field__input"
-            type="number"
-            step="1"
-            min={1}
-            max={12}
-            inputMode="numeric"
-            placeholder="—"
-            value={draft[month]}
-            onChange={(event) => setComponent(month, event.target.value)}
-            aria-invalid={errors.month ? true : undefined}
-            data-testid={`moment-${month}`}
-          />
-          {errors.month ? <p className="field__error">{errors.month}</p> : null}
-        </div>
-
-        <div className="field">
-          <label className="field__label" htmlFor={`moment-${day}`}>
-            Day
-          </label>
-          <input
-            id={`moment-${day}`}
-            className="field__input"
-            type="number"
-            step="1"
-            min={1}
-            max={31}
-            inputMode="numeric"
-            placeholder="—"
-            value={draft[day]}
-            onChange={(event) => setComponent(day, event.target.value)}
-            aria-invalid={errors.day ? true : undefined}
-            data-testid={`moment-${day}`}
-          />
-          {errors.day ? <p className="field__error">{errors.day}</p> : null}
-        </div>
-      </div>
+      <ChronologyPointFields
+        chronology={chronology}
+        ids={{
+          eraId: `moment-${keys.eraId}`,
+          year: `moment-${keys.year}`,
+          month: `moment-${keys.month}`,
+          day: `moment-${keys.day}`,
+        }}
+        eraLabel={prefix === 'start' ? (isRange ? 'Starts in era' : 'Era') : 'Ends in era'}
+        yearLabel={yearLabel}
+        value={{
+          eraId: draft[keys.eraId],
+          year: draft[keys.year],
+          month: draft[keys.month],
+          day: draft[keys.day],
+        }}
+        onChange={(part, next) => setComponent(keys[part], next)}
+        errors={{ eraId: errors.era, year: errors.year, month: errors.month, day: errors.day }}
+      />
     )
   }
 

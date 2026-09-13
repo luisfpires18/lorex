@@ -1,0 +1,241 @@
+using System.Security.Claims;
+using Lorex.Api.Data;
+using Lorex.Api.Features.Lore;
+using Lorex.Api.Features.Universes;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace Lorex.Api.Features.Stories;
+
+/// <summary>
+/// The stories told inside one universe. Every route proves universe ownership first and then finds
+/// the story by its id and that universe together, so a story id from another world answers exactly
+/// as a missing one does.
+///
+/// Nothing here passes the Canon promotion gate or reconciles Canon Integrity, and that is the
+/// point rather than an omission: a story contributes no facts. Its scenes reference lore and never
+/// restate it, so no write to a story can make the world contradict itself or stop doing so
+/// (ADR 0024).
+/// </summary>
+public static class StoryEndpoints
+{
+    public static IEndpointRouteBuilder MapStoryEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var group = endpoints.MapGroup("/api/universes/{universeId:guid}/stories")
+            .WithTags("Stories")
+            .RequireAuthorization();
+
+        group.MapGet("/", ListAsync).WithName("ListStories");
+        group.MapPost("/", CreateAsync).WithName("CreateStory");
+        group.MapGet("/{storyId:guid}", GetAsync).WithName("GetStory");
+        group.MapPut("/{storyId:guid}", UpdateAsync).WithName("UpdateStory");
+        group.MapDelete("/{storyId:guid}", DeleteAsync).WithName("DeleteStory");
+
+        return endpoints;
+    }
+
+    /// <summary>
+    /// Every story in the universe, by title. Unpaged: a universe holds a handful of stories, not
+    /// thousands, and paging is the obvious first change if that ever stops being true.
+    /// </summary>
+    private static async Task<IResult> ListAsync(
+        Guid universeId,
+        ClaimsPrincipal principal,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
+        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        {
+            return Results.NotFound();
+        }
+
+        var stories = await db.Stories.AsNoTracking()
+            .Where(story => story.UniverseId == universeId)
+            .OrderBy(story => story.Title)
+            .ThenBy(story => story.Id)
+            .Select(story => new StorySummary(
+                story.Id,
+                story.Title,
+                story.Premise,
+                story.Status,
+                story.Scenes.Count,
+                story.CreatedAt,
+                story.UpdatedAt))
+            .ToListAsync(cancellationToken);
+
+        return Results.Ok(stories);
+    }
+
+    private static async Task<IResult> GetAsync(
+        Guid universeId,
+        Guid storyId,
+        ClaimsPrincipal principal,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
+        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        {
+            return Results.NotFound();
+        }
+
+        var story = await LoadDetailAsync(db, universeId, storyId, cancellationToken);
+        return story is null ? Results.NotFound() : Results.Ok(story);
+    }
+
+    private static async Task<IResult> CreateAsync(
+        Guid universeId,
+        [FromBody] StoryRequest request,
+        ClaimsPrincipal principal,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
+        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        {
+            return Results.NotFound();
+        }
+
+        if (StoryValidation.ValidateStory(request) is { } errors)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        var now = DateTime.UtcNow;
+        var story = new Story
+        {
+            Id = Guid.NewGuid(),
+            UniverseId = universeId,
+            Title = StoryValidation.Normalize(request.Title)!,
+            Premise = StoryValidation.Normalize(request.Premise),
+            Status = request.Status,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+
+        db.Stories.Add(story);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var created = await LoadDetailAsync(db, universeId, story.Id, cancellationToken);
+        return Results.Created($"/api/universes/{universeId}/stories/{story.Id}", created);
+    }
+
+    private static async Task<IResult> UpdateAsync(
+        Guid universeId,
+        Guid storyId,
+        [FromBody] StoryRequest request,
+        ClaimsPrincipal principal,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
+        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        {
+            return Results.NotFound();
+        }
+
+        var story = await FindAsync(db, universeId, storyId, cancellationToken);
+        if (story is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (StoryValidation.ValidateStory(request) is { } errors)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        story.Title = StoryValidation.Normalize(request.Title)!;
+        story.Premise = StoryValidation.Normalize(request.Premise);
+        story.Status = request.Status;
+        story.UpdatedAt = DateTime.UtcNow;
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        return Results.Ok(await LoadDetailAsync(db, universeId, storyId, cancellationToken));
+    }
+
+    /// <summary>
+    /// Permanent. The story's scenes and their links go with it, by the database's own cascade; the
+    /// lore they referenced is untouched. There is no Trash for stories - ADR 0015 keeps the Trash
+    /// for lore entries, whose removal used to destroy work other records depended on, and nothing
+    /// depends on a story.
+    /// </summary>
+    private static async Task<IResult> DeleteAsync(
+        Guid universeId,
+        Guid storyId,
+        ClaimsPrincipal principal,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
+        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        {
+            return Results.NotFound();
+        }
+
+        var story = await FindAsync(db, universeId, storyId, cancellationToken);
+        if (story is null)
+        {
+            return Results.NotFound();
+        }
+
+        db.Stories.Remove(story);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return Results.NoContent();
+    }
+
+    /// <summary>
+    /// The story, tracked, only if it belongs to this universe. The caller has already proved the
+    /// universe is the caller's; the story id alone is never trusted.
+    /// </summary>
+    internal static Task<Story?> FindAsync(
+        LorexDbContext db,
+        Guid universeId,
+        Guid storyId,
+        CancellationToken cancellationToken) =>
+        db.Stories.FirstOrDefaultAsync(
+            story => story.Id == storyId && story.UniverseId == universeId,
+            cancellationToken);
+
+    /// <summary>
+    /// The story and every scene in it. A fixed number of queries whatever the story holds: the
+    /// story, its scenes with their link ids, and one read of every entry any of them references.
+    /// </summary>
+    internal static async Task<StoryDetail?> LoadDetailAsync(
+        LorexDbContext db,
+        Guid universeId,
+        Guid storyId,
+        CancellationToken cancellationToken)
+    {
+        var story = await db.Stories.AsNoTracking()
+            .Where(candidate => candidate.Id == storyId && candidate.UniverseId == universeId)
+            .Select(candidate => new
+            {
+                candidate.Id,
+                candidate.Title,
+                candidate.Premise,
+                candidate.Status,
+                candidate.CreatedAt,
+                candidate.UpdatedAt,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (story is null)
+        {
+            return null;
+        }
+
+        var scenes = await SceneEndpoints.LoadScenesAsync(
+            db,
+            universeId,
+            db.Scenes.Where(scene => scene.StoryId == storyId),
+            cancellationToken);
+
+        return new StoryDetail(
+            story.Id,
+            story.Title,
+            story.Premise,
+            story.Status,
+            scenes,
+            story.CreatedAt,
+            story.UpdatedAt);
+    }
+}

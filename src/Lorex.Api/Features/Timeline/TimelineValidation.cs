@@ -13,6 +13,10 @@ namespace Lorex.Api.Features.Timeline;
 /// </summary>
 public static class TimelineValidation
 {
+    private static readonly ChronologyPointKeys StartKeys = ChronologyPointKeys.Prefixed("start");
+
+    private static readonly ChronologyPointKeys EndKeys = ChronologyPointKeys.Prefixed("end");
+
     public static Dictionary<string, string[]>? Validate(
         TimelineEntryRequest request,
         UniverseChronology chronology)
@@ -66,52 +70,17 @@ public static class TimelineValidation
     }
 
     /// <summary>
-    /// Shape of the components on their own, whatever the kind claims. Years are signed on
-    /// purpose; only months and days are bounded, and a day without a month is meaningless.
+    /// Shape of the components on their own, whatever the kind claims - the same checks every
+    /// stored point gets, once for each end.
     /// </summary>
     private static void ValidateComponents(
         TimelineEntryRequest request,
         Dictionary<string, string[]> errors)
     {
-        if (request.StartMonth is < 1 or > 12)
-        {
-            errors["startMonth"] = ["A month runs from 1 to 12."];
-        }
-
-        if (request.StartDay is < 1 or > 31)
-        {
-            errors["startDay"] = ["A day runs from 1 to 31."];
-        }
-
-        if (request.EndMonth is < 1 or > 12)
-        {
-            errors["endMonth"] = ["A month runs from 1 to 12."];
-        }
-
-        if (request.EndDay is < 1 or > 31)
-        {
-            errors["endDay"] = ["A day runs from 1 to 31."];
-        }
-
-        if (request.StartDay is not null && request.StartMonth is null)
-        {
-            errors["startMonth"] = ["Give the month as well when you give a day."];
-        }
-
-        if (request.EndDay is not null && request.EndMonth is null)
-        {
-            errors["endMonth"] = ["Give the month as well when you give a day."];
-        }
-
-        if (request.StartMonth is not null && request.StartYear is null)
-        {
-            errors["startYear"] = ["Give the year as well when you give a month."];
-        }
-
-        if (request.EndMonth is not null && request.EndYear is null)
-        {
-            errors["endYear"] = ["Give the year as well when you give a month."];
-        }
+        ChronologyPointValidation.ValidateParts(
+            request.StartYear, request.StartMonth, request.StartDay, StartKeys, errors);
+        ChronologyPointValidation.ValidateParts(
+            request.EndYear, request.EndMonth, request.EndDay, EndKeys, errors);
     }
 
     /// <summary>Which components each kind is allowed, and required, to carry.</summary>
@@ -190,17 +159,14 @@ public static class TimelineValidation
 
         if (!chronology.NamesEras)
         {
-            const string noEras =
-                "This universe does not name any eras. Add them in Settings, or leave the era out.";
-
             if (request.StartEraId is not null)
             {
-                errors.TryAdd("startEraId", [noEras]);
+                errors.TryAdd(StartKeys.Era, [ChronologyPointValidation.NoErasMessage]);
             }
 
             if (isRange && request.EndEraId is not null)
             {
-                errors.TryAdd("endEraId", [noEras]);
+                errors.TryAdd(EndKeys.Era, [ChronologyPointValidation.NoErasMessage]);
             }
         }
         else
@@ -211,11 +177,13 @@ public static class TimelineValidation
                     ["This universe names its eras. Choose one of those rather than writing a label."];
             }
 
-            ValidateEraYear(request.StartYear, request.StartEraId, "start", chronology, errors);
+            ChronologyPointValidation.ValidateEraYear(
+                request.StartYear, request.StartEraId, StartKeys, chronology, errors);
 
             if (isRange)
             {
-                ValidateEraYear(request.EndYear, request.EndEraId, "end", chronology, errors);
+                ChronologyPointValidation.ValidateEraYear(
+                    request.EndYear, request.EndEraId, EndKeys, chronology, errors);
             }
         }
 
@@ -227,35 +195,6 @@ public static class TimelineValidation
             && end < start)
         {
             errors["endYear"] = ["The span cannot end before it starts."];
-        }
-    }
-
-    private static void ValidateEraYear(
-        int? year,
-        Guid? eraId,
-        string prefix,
-        UniverseChronology chronology,
-        Dictionary<string, string[]> errors)
-    {
-        if (year is not { } value)
-        {
-            return;
-        }
-
-        if (eraId is null)
-        {
-            errors.TryAdd($"{prefix}EraId", ["Choose the era this year is counted in."]);
-        }
-        else if (chronology.Era(eraId) is null)
-        {
-            // Said the same way for an id that is not an era at all and for one from another
-            // universe, so the answer discloses nothing about the second.
-            errors.TryAdd($"{prefix}EraId", ["Choose an era this universe names."]);
-        }
-
-        if (!ChronologyPoint.IsEraYear(value))
-        {
-            errors.TryAdd($"{prefix}Year", ["Years inside an era count up from 1."]);
         }
     }
 

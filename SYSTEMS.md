@@ -60,6 +60,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Chronology/ChronologyEndpoints.cs` | Read and replace the eras; the gate, the in-use refusal, and the unplaced counts. |
 | `Features/Chronology/ChronologyContracts.cs` | Request and response records for the chronology. |
 | `Features/Chronology/ChronologyValidation.cs` | Era shape checks: names, labels, enums, the bound. |
+| `Features/Chronology/ChronologyPointValidation.cs` | Checks for one stored point - month and day shape, the era a year needs, years from 1 in an era. Shared by timeline entries and scenes. |
 | `Features/Lore/LoreModel.cs` | Entity, type, field, option, alias, value and tag entities, and `EntityFieldSemantic`. |
 | `Features/Lore/LoreConfiguration.cs` | Lore schema: keys, indexes and delete behaviour. |
 | `Features/Lore/LoreAccess.cs` | The universe-ownership gate every lore route passes. |
@@ -111,6 +112,12 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/CanonIntegrity/Rules/` | The eight production rules: three structural, three chronological, two relationship constraints. |
 | `Features/CanonIntegrity/Rules/CanonLifespan.cs` | Reads declared birth/death years and the moments comparable to them, placed as chronology points. |
 | `Features/CanonIntegrity/Rules/CanonRelationshipAge.cs` | Reads Canon relationships whose type carries an age constraint, with both ends' birth years placed. |
+| `Features/Stories/StoryModel.cs` | `Story`, `StoryStatus`, `Scene` (narrative order, point of view, chronology) and `SceneEntityLink`. Narrative, not lore. |
+| `Features/Stories/StoryConfiguration.cs` | Story schema: the unique per-story scene order and the delete actions of each reference. |
+| `Features/Stories/StoryContracts.cs` | Request and response records for stories, scenes, lore references and the order. |
+| `Features/Stories/StoryValidation.cs` | Story and scene input checks. Structural only; nothing compares a scene with the lore or another scene. |
+| `Features/Stories/StoryEndpoints.cs` | Story CRUD, owner-scoped, ungated; the story read with every scene. |
+| `Features/Stories/SceneEndpoints.cs` | Scene CRUD, append and gap-closing, the whole-order reorder, reference checks including the Trash, and the batched read. |
 | `Features/Trash/TrashEndpoints.cs` | The Trash listing and the gated restore. Entries only. |
 | `Features/Trash/TrashContracts.cs` | Response records for the Trash. |
 | `Features/Profile/ProfileImageModel.cs` | `ProfileImage`: the one photo an account may have, keyed by the account. |
@@ -150,11 +157,12 @@ Repository index. Paths and one-line responsibilities only.
 | `src/trash/` | Trash API client and DTO types. |
 | `src/relationships/` | Relationship API client, DTO types, and both-readings helper. |
 | `src/chronology/` | Chronology API client and types, and `format.ts`: the one formatter every date on screen is written through. |
+| `src/stories/` | Story and scene API client, DTO types, and the scene date and count labels on top of the chronology formatter. |
 | `src/timeline/` | Timeline API client, DTO types, date stamps and year grouping on top of the chronology formatter. |
 | `src/canon/` | Canon Integrity API client, DTO types, and the reader for the promotion gate's 409. |
 | `src/lib/dates.ts` | Timestamp formatting, date-input round trips, and spans. |
-| `src/components/` | `AuthLayout`, `Wordmark` (the drawn "Lore X", spoken "Lorex"), `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `EntityPortrait` (the card's picture, or its monogram), `EntityImageField` (pick, frame, replace, edit thumbnail, remove), `ImageCropDialog` (the cropper, and `CroppedPicture` for unsaved previews), `BrandMark` (the Lorex symbol, decorative, beside the wordmark), `Avatar` (the account's photo or its monogram, wherever one is drawn), `AccountMenu` (the one account dropdown: the rail's and the header's), `ProfileAvatar` (the Profile screen's circle, and upload, reframe, replace and remove), `TypeIcon`, `TypeIconPicker`, `TypeFilterBar` (the Lore browser's type chips), `ActionIcon` (the decorative icon beside an action's label), `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker` (single and multi, one shared search), `EntityHistory`, `RelationshipSection`, `RelationshipTypeManager`, `TimelineEntryForm`, `ChronologySettings` (name, order and turn a universe's eras, with a preview), `ConflictEntry`, `CanonBlockNotice` (the one refused-write presentation, shared by every gated form). |
-| `src/pages/` | Login, Register, Universes browser, Profile, and the workspace: Overview, Lore, entry page, Timeline, Canon, Types, Trash and Settings. `UniverseWorkspace` also owns the collapsing narrow-screen navigation, and lets the Lore browser alone fill the workspace column. |
+| `src/components/` | `AuthLayout`, `Wordmark` (the drawn "Lore X", spoken "Lorex"), `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `EntityPortrait` (the card's picture, or its monogram), `EntityImageField` (pick, frame, replace, edit thumbnail, remove), `ImageCropDialog` (the cropper, and `CroppedPicture` for unsaved previews), `BrandMark` (the Lorex symbol, decorative, beside the wordmark), `Avatar` (the account's photo or its monogram, wherever one is drawn), `AccountMenu` (the one account dropdown: the rail's and the header's), `ProfileAvatar` (the Profile screen's circle, and upload, reframe, replace and remove), `TypeIcon`, `TypeIconPicker`, `TypeFilterBar` (the Lore browser's type chips), `ActionIcon` (the decorative icon beside an action's label), `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker` (single and multi, one shared search), `EntityHistory`, `RelationshipSection`, `RelationshipTypeManager`, `TimelineEntryForm`, `ChronologyPointFields` (the one era, year, month and day row, shared by the timeline and scene forms), `StoryForm`, `SceneForm`, `SceneCard` (a scene, its lore references and its move controls), `ChronologySettings` (name, order and turn a universe's eras, with a preview), `ConflictEntry`, `CanonBlockNotice` (the one refused-write presentation, shared by every gated form). |
+| `src/pages/` | Login, Register, Universes browser, Profile, and the workspace: Overview, Lore, entry page, Timeline, Stories, a story, Canon, Types, Trash and Settings. `UniverseWorkspace` also owns the collapsing narrow-screen navigation, and lets the Lore browser alone fill the workspace column. |
 | `vite.config.ts` | Dev server port 5173, proxy to the API, build config. |
 
 ## `tests`
@@ -181,6 +189,10 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.Api.Tests/CanonChronologyRuleTests.cs` | Semantic field assignment, the three chronology rules and every case they must stay quiet on. |
 | `Lorex.Api.Tests/CanonPromotionGateTests.cs` | What the gate refuses, what a refusal leaves behind, and what it must never block. |
 | `Lorex.Api.Tests/UniverseExportTests.cs` | What a backup holds, what it must never hold, its coherence and its determinism. |
+| `Lorex.Api.Tests/StoryEndpointTests.cs` | Story CRUD, what deleting a story or a universe takes, ownership, and that a story changes no lore, timeline or Canon. |
+| `Lorex.Api.Tests/SceneEndpointTests.cs` | Narrative order against chronology, reorder refusals, scene chronology, lore references, the Trash, delete actions and ownership. |
+| `Lorex.Api.Tests/StoryBackupTests.cs` | Stories in a version 5 backup: order, references, no copied lore, determinism, and a version 4 file. |
+| `Lorex.Api.Tests/StoryMigrationTests.cs` | The story migration down and back up over real lore on a file, with the delete actions read back from SQLite. |
 | `Lorex.Api.Tests/TrashEndpointTests.cs` | What trashing hides, what it must not destroy, and what a restore may refuse. |
 | `Lorex.Api.Tests/TestMediaObjectStore.cs` | The object store the test host runs against, and its three failure hooks. |
 | `Lorex.Api.Tests/R2MediaObjectStoreTests.cs` | The R2 adapter alone: the upload flags on the request and on the wire, and SDK failures kept inside. |
@@ -196,6 +208,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.E2E/specs/relationship-constraints.spec.ts` | A kind's Canon constraints: configured, broken, reported, corrected, edited and cleared; the editor from 390px to 1920px, light and dark. |
 | `Lorex.E2E/specs/timeline.spec.ts` | Date kinds through the drawer, order, filters, paging, refusals, and the owner boundary. |
 | `Lorex.E2E/specs/chronology.spec.ts` | Eras named and ordered in Settings, a timeline across them, a relabel, a birth year in an era, and the screens from 390px to 1920px. |
+| `Lorex.E2E/specs/stories.spec.ts` | A story told out of chronological order and kept that way; reorder by keyboard; a trashed reference; the screens from 390px to 1920px, light and dark. |
 | `Lorex.E2E/specs/history.spec.ts` | One journey: versions accumulate, an old one is read in place and put back. |
 | `Lorex.E2E/specs/export.spec.ts` | One journey: the click produces a real archive on disk, named and readable. |
 | `Lorex.E2E/specs/support/account.ts` | Opening the account menu and signing out through it, wherever it is on screen. Not a spec. |

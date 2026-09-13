@@ -1,0 +1,99 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace Lorex.Api.Features.Stories;
+
+public static class StoryLimits
+{
+    public const int TitleMaxLength = 200;
+    public const int PremiseMaxLength = 2000;
+    public const int SceneSummaryMaxLength = 2000;
+    public const int SceneNotesMaxLength = 10_000;
+
+    /// <summary>The same bound a timeline moment has: enough for a crowded scene, one request stays small.</summary>
+    public const int MaxLinkedEntities = 100;
+}
+
+public sealed class StoryConfiguration : IEntityTypeConfiguration<Story>
+{
+    public void Configure(EntityTypeBuilder<Story> builder)
+    {
+        builder.ToTable("Stories");
+        builder.HasKey(story => story.Id);
+
+        builder.Property(story => story.Title).IsRequired().HasMaxLength(StoryLimits.TitleMaxLength);
+        builder.Property(story => story.Premise).HasMaxLength(StoryLimits.PremiseMaxLength);
+        builder.Property(story => story.Status).HasConversion<int>();
+
+        builder.HasOne(story => story.Universe)
+            .WithMany()
+            .HasForeignKey(story => story.UniverseId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // The listing: one universe's stories, by title.
+        builder.HasIndex(story => new { story.UniverseId, story.Title });
+    }
+}
+
+public sealed class SceneConfiguration : IEntityTypeConfiguration<Scene>
+{
+    public void Configure(EntityTypeBuilder<Scene> builder)
+    {
+        builder.ToTable("Scenes");
+        builder.HasKey(scene => scene.Id);
+
+        builder.Property(scene => scene.Title).IsRequired().HasMaxLength(StoryLimits.TitleMaxLength);
+        builder.Property(scene => scene.Summary).HasMaxLength(StoryLimits.SceneSummaryMaxLength);
+        builder.Property(scene => scene.Notes).HasMaxLength(StoryLimits.SceneNotesMaxLength);
+
+        // A scene belongs to its story, and goes with it.
+        builder.HasOne(scene => scene.Story)
+            .WithMany(story => story.Scenes)
+            .HasForeignKey(scene => scene.StoryId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // A reference, not ownership: an entry disappearing for good clears the point of view and
+        // leaves the scene exactly where it was - the same rule an entity-reference value on another
+        // entry follows. Trashing an entry deletes nothing, so today only deleting the whole universe
+        // reaches this, and the scene is going too.
+        builder.HasOne(scene => scene.PovEntity)
+            .WithMany()
+            .HasForeignKey(scene => scene.PovEntityId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // No action, as for every other year counted in an era (ADR 0022): the chronology route
+        // refuses to remove an era a scene is placed in, and this holds against a race. Checked at
+        // the end of the statement, so deleting a whole universe still cascades.
+        builder.HasOne(scene => scene.Era)
+            .WithMany()
+            .HasForeignKey(scene => scene.EraId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        // The narrative order is the only order a story is read in, and it is contiguous and unique
+        // per story. Unique, so two scenes can never claim the same place in the telling.
+        builder.HasIndex(scene => new { scene.StoryId, scene.SortOrder }).IsUnique();
+    }
+}
+
+public sealed class SceneEntityLinkConfiguration : IEntityTypeConfiguration<SceneEntityLink>
+{
+    public void Configure(EntityTypeBuilder<SceneEntityLink> builder)
+    {
+        builder.ToTable("SceneEntityLinks");
+        builder.HasKey(link => new { link.SceneId, link.EntityId });
+
+        builder.HasOne(link => link.Scene)
+            .WithMany(scene => scene.EntityLinks)
+            .HasForeignKey(link => link.SceneId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Like a timeline participation: the link means nothing once the entry is gone for good, and
+        // losing it never takes the scene with it. Trashing an entry deletes nothing.
+        builder.HasOne(link => link.Entity)
+            .WithMany()
+            .HasForeignKey(link => link.EntityId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasIndex(link => link.EntityId);
+    }
+}

@@ -47,6 +47,8 @@ because two eras must never read alike. Nothing about "before" or "after" is spe
 - Every foreign key to an era is `NO ACTION`: removing an era something is dated in is refused with
   a 409 naming what is dated there, and the key holds against a race. Nothing is cleared or
   reassigned on the author's behalf.
+- A story scene's position is a year in an era too (ADR 0024, amended 2026-09-13): the same rules, the
+  same `NO ACTION` key, and it counts as a use. It is display metadata on narrative and no rule reads it.
 
 **One comparison.** `ChronologyPoint` reduces a date to `(EraRank, Year, Month, Day)`: the era's
 `SortOrder`, the year negated when the era counts down, then month and day with an absent one as 0.

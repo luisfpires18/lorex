@@ -170,7 +170,7 @@ public static class ChronologyEndpoints
         return Results.Ok(await DescribeAsync(db, universeId, cancellationToken));
     }
 
-    private sealed record EraUse(Guid Id, string Name, int MomentCount, int YearCount);
+    private sealed record EraUse(Guid Id, string Name, int MomentCount, int YearCount, int SceneCount);
 
     /// <summary>Of the eras about to be removed, the ones something is still dated in.</summary>
     private static async Task<List<EraUse>> InUseAsync(
@@ -196,6 +196,13 @@ public static class ChronologyEndpoints
             .Select(value => value.EraId!.Value)
             .ToListAsync(cancellationToken);
 
+        // A scene's position is a year counted in an era like any other, even though a story is
+        // not lore: removing the era would leave that year floating in no era at all.
+        var scenes = await db.Scenes.AsNoTracking()
+            .Where(scene => scene.EraId != null && ids.Contains(scene.EraId.Value))
+            .Select(scene => scene.EraId!.Value)
+            .ToListAsync(cancellationToken);
+
         return
         [
             .. removed
@@ -204,8 +211,9 @@ public static class ChronologyEndpoints
                     era.Id,
                     era.Name,
                     moments.Count(moment => moment.StartEraId == era.Id || moment.EndEraId == era.Id),
-                    years.Count(id => id == era.Id)))
-                .Where(use => use.MomentCount > 0 || use.YearCount > 0),
+                    years.Count(id => id == era.Id),
+                    scenes.Count(id => id == era.Id)))
+                .Where(use => use.MomentCount > 0 || use.YearCount > 0 || use.SceneCount > 0),
         ];
     }
 
@@ -228,6 +236,11 @@ public static class ChronologyEndpoints
             if (use.YearCount > 0)
             {
                 parts.Add(use.YearCount == 1 ? "1 year on an entry" : $"{use.YearCount} years on entries");
+            }
+
+            if (use.SceneCount > 0)
+            {
+                parts.Add(use.SceneCount == 1 ? "1 scene" : $"{use.SceneCount} scenes");
             }
 
             return $"\"{use.Name}\" still dates {string.Join(" and ", parts)}";
@@ -261,7 +274,8 @@ public static class ChronologyEndpoints
                 era.Direction,
                 era.LabelPosition,
                 db.TimelineEntries.Count(entry => entry.StartEraId == era.Id || entry.EndEraId == era.Id),
-                db.EntityFieldValues.Count(value => value.EraId == era.Id)))
+                db.EntityFieldValues.Count(value => value.EraId == era.Id),
+                db.Scenes.Count(scene => scene.EraId == era.Id)))
             .ToListAsync(cancellationToken);
 
         var unplacedMoments = await db.TimelineEntries.AsNoTracking()

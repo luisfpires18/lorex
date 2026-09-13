@@ -69,6 +69,7 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
             await RelationshipTypesAsync(universeId, cancellationToken),
             await RelationshipsAsync(universeId, cancellationToken),
             await TimelineAsync(universeId, cancellationToken),
+            await StoriesAsync(universeId, cancellationToken),
             await DismissedConflictsAsync(universeId, cancellationToken));
 
         // Read-only, so there is nothing to commit; this just closes the snapshot.
@@ -535,6 +536,77 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                     Utc(entry.CreatedAt),
                     Utc(entry.UpdatedAt),
                     participantsByEntry.GetValueOrDefault(entry.Id, []))),
+        ];
+    }
+
+    // ---------- Stories ----------
+
+    /// <summary>
+    /// Every story by title, each with its scenes in narrative order and each scene's links sorted
+    /// by id. Only ids and authored text: a linked entry's name is in the entry, not here.
+    /// </summary>
+    private async Task<IReadOnlyList<BackupStory>> StoriesAsync(
+        Guid universeId,
+        CancellationToken cancellationToken)
+    {
+        var stories = await db.Stories.AsNoTracking()
+            .Where(story => story.UniverseId == universeId)
+            .ToListAsync(cancellationToken);
+
+        var scenes = await db.Scenes.AsNoTracking()
+            .Where(scene => scene.Story!.UniverseId == universeId)
+            .ToListAsync(cancellationToken);
+
+        var links = await db.SceneEntityLinks.AsNoTracking()
+            .Where(link => link.Scene!.Story!.UniverseId == universeId)
+            .ToListAsync(cancellationToken);
+
+        var linkedByScene = links
+            .GroupBy(link => link.SceneId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<Guid>)
+                [
+                    .. group.Select(link => link.EntityId).OrderBy(Key, StringComparer.Ordinal),
+                ]);
+
+        var scenesByStory = scenes
+            .GroupBy(scene => scene.StoryId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<BackupScene>)
+                [
+                    .. group
+                        .OrderBy(scene => scene.SortOrder)
+                        .ThenBy(scene => Key(scene.Id), StringComparer.Ordinal)
+                        .Select(scene => new BackupScene(
+                            scene.Id,
+                            scene.SortOrder,
+                            scene.Title,
+                            scene.Summary,
+                            scene.Notes,
+                            scene.PovEntityId,
+                            scene.Year is { } year
+                                ? new BackupChronologyValue(scene.EraId, year, scene.Month, scene.Day)
+                                : null,
+                            linkedByScene.GetValueOrDefault(scene.Id, []),
+                            Utc(scene.CreatedAt),
+                            Utc(scene.UpdatedAt))),
+                ]);
+
+        return
+        [
+            .. stories
+                .OrderBy(story => story.Title, StringComparer.Ordinal)
+                .ThenBy(story => Key(story.Id), StringComparer.Ordinal)
+                .Select(story => new BackupStory(
+                    story.Id,
+                    story.Title,
+                    story.Premise,
+                    story.Status,
+                    Utc(story.CreatedAt),
+                    Utc(story.UpdatedAt),
+                    scenesByStory.GetValueOrDefault(story.Id, []))),
         ];
     }
 
