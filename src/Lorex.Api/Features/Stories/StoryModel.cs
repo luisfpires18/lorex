@@ -45,7 +45,7 @@ public sealed class Story
 
     public DateTime CreatedAt { get; set; }
 
-    /// <summary>When the story, its chapters, any of its scenes or its plot was last written to.</summary>
+    /// <summary>When the story, its chapters, any of its scenes or their prose, or its plot was last written to.</summary>
     public DateTime UpdatedAt { get; set; }
 
     public ICollection<Chapter> Chapters { get; } = [];

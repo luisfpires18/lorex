@@ -23,8 +23,9 @@ public sealed class PlotBackupTests(LorexApiFactory factory) : IClassFixture<Lor
         var (client, universe) = await SignedInWithUniverse(_factory, "plotbackup");
         var world = await BuildPlot(client, universe.Id);
 
+        // Plot arrived in version 7; prose took the file to 8 without changing how plot travels.
         var backup = await Backup(client, universe.Id);
-        Assert.Equal(7, backup.FormatVersion);
+        Assert.Equal(8, backup.FormatVersion);
 
         var stories = backup.Payload.Stories!;
         Assert.Equal(["Plotted", "Unplotted"], stories.Select(story => story.Title));

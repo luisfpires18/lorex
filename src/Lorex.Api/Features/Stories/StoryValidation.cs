@@ -1,3 +1,4 @@
+using System.Globalization;
 using Lorex.Api.Features.Chronology;
 
 namespace Lorex.Api.Features.Stories;
@@ -116,6 +117,29 @@ public static class StoryValidation
         }
 
         return errors.Count == 0 ? null : errors;
+    }
+
+    /// <summary>
+    /// A manuscript save: the text must be sent, and fit the per-scene bound. Nothing else is checked. The text is never
+    /// trimmed, normalised or read for meaning, and an empty string is a valid manuscript.
+    /// </summary>
+    public static Dictionary<string, string[]>? ValidateManuscript(SceneManuscriptRequest request)
+    {
+        if (request.Content is null)
+        {
+            return new Dictionary<string, string[]> { ["content"] = ["Send the manuscript text, even when it is empty."] };
+        }
+
+        if (request.Content.Length > StoryLimits.ManuscriptMaxLength)
+        {
+            var limit = StoryLimits.ManuscriptMaxLength.ToString("N0", CultureInfo.InvariantCulture);
+            return new Dictionary<string, string[]>
+            {
+                ["content"] = [$"Keep one scene's manuscript under {limit} characters. Split it into more scenes."],
+            };
+        }
+
+        return null;
     }
 
     private static void ValidateTitle(string? value, string missing, Dictionary<string, string[]> errors)

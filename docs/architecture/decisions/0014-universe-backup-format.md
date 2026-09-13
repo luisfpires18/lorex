@@ -3,8 +3,8 @@
 Status: accepted (2026-09-09), amended 2026-09-10 (version 3: the file became an archive),
 2026-09-11 (type icon keys, and a short-lived image framing member, both within version 3),
 2026-09-13 (version 4: a universe's eras), 2026-09-13 (relationship type Canon constraints,
-within version 4), 2026-09-13 (version 5: stories), 2026-09-13 (version 6: chapters), and 2026-09-13
-(version 7: plot)
+within version 4), 2026-09-13 (version 5: stories), 2026-09-13 (version 6: chapters), 2026-09-13
+(version 7: plot), and 2026-09-13 (version 8: scene prose)
 
 ## Context
 
@@ -145,6 +145,14 @@ authored, and so is each link, so a version 6 reader that skipped `plotArcs` wou
 story with its plot silently gone. So it is a bump. No arc or beat number is carried. A file at version 6 or
 earlier has no `plotArcs`; it reads as null and means a story with no plot.
 
+**Version 8 (2026-09-13) carries scene prose** (ADR 0027). Each scene gains `manuscript`: `content`, the text exactly as
+stored, and `updatedAt`, or null for a scene nothing has been written for. It travels with its scene rather than in a file
+of its own: it is text, the archive already deflates the document, and a reader then never has to join prose back to the
+scene it belongs to. It is the least ignorable member any version has added - the writing itself - so a version 7 reader
+would parse the file and restore every scene with its prose silently gone. So it is a bump. Nothing derived from the text
+is carried: no word count, no rendering, no copy of the scene's planning. A file at version 7 or earlier has no
+`manuscript`; it reads as null and means a scene with nothing written.
+
 **Only the authored data.** The test for inclusion is: did a person write this, or would
 Lorex produce it again from what a person wrote?
 
@@ -159,6 +167,7 @@ Lorex produce it again from what a person wrote?
 | Timeline entries, their date components, era ids and era labels, participants | Derived date precision |
 | Stories; their chapters in order with title, summary and notes; their scenes with chapter, place in it, point of view, chronology and linked entry ids | Any name, type or formatted date of what a scene references, and any chapter number |
 | Each story's plot arcs in order with title, description and notes; their beats in order with text and linked scene and entry ids | Any arc or beat number, and any scene title, chapter or entry name a beat points at |
+| Each scene's manuscript: its plain text exactly as stored, and when it was last saved | Any word count, rendering or copy of the scene's planning |
 | Every entry's revision history (ADR 0013) | - |
 | Each entry's primary image: the original bytes, its asset id, filename, content type, dimensions, chosen crop and archive path | The generated thumbnail and its id, and every R2 object key, bucket name, endpoint and URL |
 | Canon conflicts the author **dismissed** | Pending and resolved conflicts, and all conflict wording |

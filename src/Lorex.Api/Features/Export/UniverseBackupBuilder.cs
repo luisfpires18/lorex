@@ -544,9 +544,9 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
     /// <summary>
     /// Every story by title, each with its chapters in story order, its scenes in reading order -
     /// Unchaptered first, then chapter by chapter, each by its own narrative order - and each scene's
-    /// links sorted by id. Then its plot: arcs in order, beats in order inside each, and each beat's scene
-    /// and entry links sorted by id. Only ids and authored text: a linked entry's name is in the entry, and
-    /// a linked scene's title is in the scene, not here.
+    /// links sorted by id and its prose beside it. Then its plot: arcs in order, beats in order inside each, and
+    /// each beat's scene and entry links sorted by id. Only ids and authored text: a linked entry's name is in
+    /// the entry, and a linked scene's title is in the scene, not here.
     /// </summary>
     private async Task<IReadOnlyList<BackupStory>> StoriesAsync(
         Guid universeId,
@@ -600,6 +600,11 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                     .. group.Select(link => link.EntityId).OrderBy(Key, StringComparer.Ordinal),
                 ]);
 
+        // The prose, verbatim: the exact string the column holds, with nothing trimmed or normalised.
+        var manuscripts = await db.SceneManuscripts.AsNoTracking()
+            .Where(manuscript => manuscript.Scene!.Story!.UniverseId == universeId)
+            .ToDictionaryAsync(manuscript => manuscript.SceneId, cancellationToken);
+
         var scenesByStory = scenes
             .GroupBy(scene => scene.StoryId)
             .ToDictionary(
@@ -622,6 +627,9 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                                 ? new BackupChronologyValue(scene.EraId, year, scene.Month, scene.Day)
                                 : null,
                             linkedByScene.GetValueOrDefault(scene.Id, []),
+                            manuscripts.TryGetValue(scene.Id, out var manuscript)
+                                ? new BackupSceneManuscript(manuscript.Content, Utc(manuscript.UpdatedAt))
+                                : null,
                             Utc(scene.CreatedAt),
                             Utc(scene.UpdatedAt))),
                 ]);

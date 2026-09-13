@@ -81,8 +81,13 @@ public sealed record UniverseBackup(
     /// description and notes are authored, and so is every link, so a version 6 reader would restore each story
     /// with its plot silently gone - the loss version 5 was bumped for. A file at version 6 or earlier has no
     /// <c>plotArcs</c>; it reads as null, which means a story with no plot.
+    ///
+    /// 8 - A scene may hold manuscript prose (ADR 0027). <see cref="BackupScene.Manuscript"/> carries it - the text exactly
+    /// as the author wrote it, and when it was last saved. Nullable, and the least ignorable member yet: it is the writing
+    /// itself, so a version 7 reader would restore every scene with its prose silently gone. A file at version 7 or earlier
+    /// has no <c>manuscript</c>; it reads as null, which means a scene with nothing written.
     /// </summary>
-    public const int CurrentVersion = 7;
+    public const int CurrentVersion = 8;
 
     public static UniverseBackup Of(UniverseBackupPayload payload, DateTime generatedAt) =>
         new(FormatName, CurrentVersion, generatedAt, payload);
@@ -439,6 +444,9 @@ public sealed record BackupChapter(
 /// this same file, never copies of them: no name, type or picture is carried here. An entry in the
 /// Trash may be among them, and is in the file too. <paramref name="Chronology"/> is where the scene
 /// happens in the world, or null; it has no bearing on the order.
+///
+/// <paramref name="Manuscript"/> is the scene's prose (since version 8), carried with the scene it belongs to rather than
+/// in a file of its own, or null when nothing has been written for it.
 /// </summary>
 public sealed record BackupScene(
     Guid Id,
@@ -450,8 +458,17 @@ public sealed record BackupScene(
     Guid? PovEntityId,
     BackupChronologyValue? Chronology,
     IReadOnlyList<Guid> LinkedEntityIds,
+    BackupSceneManuscript? Manuscript,
     DateTime CreatedAt,
     DateTime UpdatedAt);
+
+/// <summary>
+/// One scene's prose (since version 8), exactly as stored: the text with every line break, blank line and character the
+/// author wrote, and when it was last saved. Plain text - never HTML, Markdown or an editor's document - and never read
+/// for meaning. A scene saved and then emptied carries an empty <paramref name="Content"/>; a scene never written for
+/// carries no manuscript at all, and both read as nothing written.
+/// </summary>
+public sealed record BackupSceneManuscript(string Content, DateTime UpdatedAt);
 
 /// <summary>
 /// One plot arc (since version 7): its place in the story's plot, from 0, the author's title, description and

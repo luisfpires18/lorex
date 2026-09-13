@@ -11,6 +11,7 @@ import {
 import { ActionIcon } from '../components/ActionIcon'
 import { ChapterForm } from '../components/ChapterForm'
 import { ChapterSection } from '../components/ChapterSection'
+import { ManuscriptPanel } from '../components/ManuscriptPanel'
 import { PlotPanel } from '../components/PlotPanel'
 import { SceneCard, type MoveTarget } from '../components/SceneCard'
 import { SceneForm } from '../components/SceneForm'
@@ -70,8 +71,10 @@ function listed(parts: string[]) {
 /**
  * One story, told in the order its author sets, and planned in the plot its author follows.
  *
- * The page has two views under one heading: Scenes, at the story's own address, and Plot, at `/plot`. Both read the
- * same story and the same plot, once, so moving between them costs nothing and the header never changes.
+ * The page has three views under one heading: Scenes, at the story's own address, Plot, at `/plot`, and Manuscript, at
+ * `/manuscript/:sceneId`. All three read the same story and the same plot, once, so moving between them costs nothing
+ * and the header never changes. Neither read carries prose: the Manuscript view reads one scene's text when that scene
+ * is opened.
  *
  * Chapters are optional. A story without any is one list of scenes, exactly as before chapters existed.
  * Once it has some, the page reads Unchaptered first - a holding area, shown only while it holds a scene -
@@ -83,9 +86,13 @@ function listed(parts: string[]) {
  * flashes back to a childhood is exactly as valid as one told straight through. The plot is a third order of
  * its own - arcs, and the beats in each - which follows neither.
  */
-export default function StoryPage({ view = 'scenes' }: { view?: 'scenes' | 'plot' }) {
+export default function StoryPage({
+  view = 'scenes',
+}: {
+  view?: 'scenes' | 'plot' | 'manuscript'
+}) {
   const { universe, chronology } = useOutletContext<WorkspaceContext>()
-  const { storyId } = useParams<{ storyId: string }>()
+  const { storyId, sceneId } = useParams<{ storyId: string; sceneId?: string }>()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -504,6 +511,13 @@ export default function StoryPage({ view = 'scenes' }: { view?: 'scenes' | 'plot
         >
           Plot
         </NavLink>
+        <NavLink
+          to={`${storyPath}/manuscript`}
+          className="storyviews__link"
+          data-testid="story-view-manuscript"
+        >
+          Manuscript
+        </NavLink>
       </nav>
 
       {view === 'plot' ? (
@@ -514,6 +528,15 @@ export default function StoryPage({ view = 'scenes' }: { view?: 'scenes' | 'plot
           onArcsChange={showArcs}
           onReload={reload}
           announce={setAnnouncement}
+        />
+      ) : view === 'manuscript' ? (
+        <ManuscriptPanel
+          universeId={universe.id}
+          story={story}
+          arcs={arcs}
+          chronology={chronology}
+          sceneId={sceneId}
+          onEditScene={(scene) => setSceneForm({ mode: 'edit', scene })}
         />
       ) : (
         <section className="story__scenes" aria-labelledby="story-scenes-heading">

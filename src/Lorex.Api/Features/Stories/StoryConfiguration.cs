@@ -14,6 +14,13 @@ public static class StoryLimits
     public const int PlotDescriptionMaxLength = 2000;
     public const int PlotNotesMaxLength = 10_000;
 
+    /// <summary>
+    /// How long one scene's prose may be, in characters as .NET and JavaScript both count them (UTF-16 units). Generous on
+    /// purpose - a long chapter of a novel is a small fraction of it - and there only so one save stays a bounded request.
+    /// The column itself has no length. Mirrored by the web client, which says so before a save rather than after.
+    /// </summary>
+    public const int ManuscriptMaxLength = 1_000_000;
+
     /// <summary>The same bound a timeline moment has: enough for a crowded scene, one request stays small.</summary>
     public const int MaxLinkedEntities = 100;
 

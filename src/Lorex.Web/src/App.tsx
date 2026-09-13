@@ -43,6 +43,10 @@ export default function App() {
                 <Route path="stories" element={<StoriesPage />} />
                 <Route path="stories/:storyId" element={<StoryPage view="scenes" />} />
                 <Route path="stories/:storyId/plot" element={<StoryPage view="plot" />} />
+                <Route
+                  path="stories/:storyId/manuscript/:sceneId?"
+                  element={<StoryPage view="manuscript" />}
+                />
                 <Route path="canon" element={<CanonPage />} />
                 <Route path="types" element={<UniverseTypes />} />
                 <Route path="trash" element={<UniverseTrash />} />
