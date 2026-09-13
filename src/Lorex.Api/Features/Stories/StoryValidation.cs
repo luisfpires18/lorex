@@ -32,6 +32,26 @@ public static class StoryValidation
         return errors.Count == 0 ? null : errors;
     }
 
+    /// <summary>A chapter is plain planning text: a title it needs, and a summary and notes it may have.</summary>
+    public static Dictionary<string, string[]>? ValidateChapter(ChapterRequest request)
+    {
+        var errors = new Dictionary<string, string[]>();
+
+        ValidateTitle(request.Title, "Give the chapter a title, like \"Arrival\".", errors);
+
+        if (request.Summary?.Trim() is { Length: > StoryLimits.ChapterSummaryMaxLength })
+        {
+            errors["summary"] = [$"Keep the summary under {StoryLimits.ChapterSummaryMaxLength} characters."];
+        }
+
+        if (request.Notes?.Trim() is { Length: > StoryLimits.ChapterNotesMaxLength })
+        {
+            errors["notes"] = [$"Keep the notes under {StoryLimits.ChapterNotesMaxLength} characters."];
+        }
+
+        return errors.Count == 0 ? null : errors;
+    }
+
     public static Dictionary<string, string[]>? ValidateScene(
         SceneRequest request,
         UniverseChronology chronology)

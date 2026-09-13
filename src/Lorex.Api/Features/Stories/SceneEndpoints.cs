@@ -12,12 +12,15 @@ namespace Lorex.Api.Features.Stories;
 /// <summary>
 /// The scenes of one story. Every route proves universe ownership, then finds the story inside that
 /// universe, then the scene inside that story - so a scene id from another story, or a story id from
-/// another universe, answers exactly as a missing one does.
+/// another universe, answers exactly as a missing one does. A chapter id a request names is resolved
+/// inside the same story, never trusted.
 ///
-/// <b>Narrative order is the author's.</b> A scene is appended when it is created, the gap closes
-/// when one is deleted, and only <c>PUT .../scenes/order</c> moves one. Nothing reads a scene's
-/// chronology to decide where it sits, and nothing refuses a scene because it happens in the world
-/// before the scene told ahead of it: nonlinear stories are valid.
+/// <b>Narrative order is the author's, per container.</b> A scene is told in a chapter or in
+/// Unchaptered, and its order is its place there. It is appended to its container when created, the gap
+/// closes when it is deleted or moved out, <c>PUT .../scenes/order</c> reorders one container, and
+/// <c>PUT .../scenes/{id}/position</c> moves one scene - within its container or into another. Nothing
+/// reads a scene's chronology to decide where it sits, and nothing refuses a scene because it happens in
+/// the world before the scene told ahead of it: nonlinear stories are valid.
 ///
 /// <b>No Canon.</b> Like the stories around them, scene writes never pass the promotion gate and
 /// never reconcile findings. A scene references lore; it asserts nothing about it (ADR 0024).
@@ -38,12 +41,13 @@ public static class SceneEndpoints
         group.MapPut("/order", ReorderAsync).WithName("ReorderScenes");
         group.MapGet("/{sceneId:guid}", GetAsync).WithName("GetScene");
         group.MapPut("/{sceneId:guid}", UpdateAsync).WithName("UpdateScene");
+        group.MapPut("/{sceneId:guid}/position", MoveAsync).WithName("MoveScene");
         group.MapDelete("/{sceneId:guid}", DeleteAsync).WithName("DeleteScene");
 
         return endpoints;
     }
 
-    /// <summary>Every scene in the story, in the order it is told.</summary>
+    /// <summary>Every scene in the story: Unchaptered first, then chapter by chapter, each in the order it is told.</summary>
     private static async Task<IResult> ListAsync(
         Guid universeId,
         Guid storyId,
@@ -51,7 +55,7 @@ public static class SceneEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await OwnsStoryAsync(db, universeId, storyId, principal, cancellationToken))
+        if (!await StoryEndpoints.OwnsStoryAsync(db, universeId, storyId, principal, cancellationToken))
         {
             return Results.NotFound();
         }
@@ -71,7 +75,7 @@ public static class SceneEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await OwnsStoryAsync(db, universeId, storyId, principal, cancellationToken))
+        if (!await StoryEndpoints.OwnsStoryAsync(db, universeId, storyId, principal, cancellationToken))
         {
             return Results.NotFound();
         }
@@ -80,7 +84,7 @@ public static class SceneEndpoints
         return scene is null ? Results.NotFound() : Results.Ok(scene);
     }
 
-    /// <summary>Appended: a new scene is told after every scene already in the story.</summary>
+    /// <summary>Appended: a new scene is told after every scene already in its chapter, or in Unchaptered.</summary>
     private static async Task<IResult> CreateAsync(
         Guid universeId,
         Guid storyId,
@@ -107,6 +111,12 @@ public static class SceneEndpoints
             return Results.ValidationProblem(errors);
         }
 
+        if (request.ChapterId is { } chapterId
+            && !await ChapterEndpoints.BelongsToStoryAsync(db, storyId, chapterId, cancellationToken))
+        {
+            return Results.ValidationProblem(ChapterEndpoints.ForeignChapter());
+        }
+
         var entityIds = Requested(request);
 
         if (await CheckReferencesAsync(db, universeId, request.PovEntityId, entityIds, null, [], cancellationToken)
@@ -116,7 +126,7 @@ public static class SceneEndpoints
         }
 
         var last = await db.Scenes
-            .Where(scene => scene.StoryId == storyId)
+            .InContainer(storyId, request.ChapterId)
             .MaxAsync(scene => (int?)scene.SortOrder, cancellationToken);
 
         var now = DateTime.UtcNow;
@@ -124,6 +134,7 @@ public static class SceneEndpoints
         {
             Id = Guid.NewGuid(),
             StoryId = storyId,
+            ChapterId = request.ChapterId,
             Title = StoryValidation.Normalize(request.Title)!,
             SortOrder = (last ?? -1) + 1,
             CreatedAt = now,
@@ -146,8 +157,8 @@ public static class SceneEndpoints
         }
         catch (DbUpdateException)
         {
-            // Two scenes appended to one story at once both reached for the same place, and the
-            // unique order index held. Nothing was written.
+            // Two scenes appended to one container at once both reached for the same place, and the
+            // unique order index held - or the chapter was deleted in between. Nothing was written.
             return OrderChanged();
         }
 
@@ -156,8 +167,10 @@ public static class SceneEndpoints
     }
 
     /// <summary>
-    /// Everything but the scene's place in the telling, which only the order route moves. The point
-    /// of view and the linked lore arrive whole and replace what is stored.
+    /// The whole scene. The point of view and the linked lore arrive whole and replace what is stored, and
+    /// so does the chapter: naming a different one is a move, not a new value in a column - the scene
+    /// leaves its old container, which closes up behind it, and is told last in the new one, in the same
+    /// transaction. Naming the chapter it is already in leaves its place alone.
     /// </summary>
     private static async Task<IResult> UpdateAsync(
         Guid universeId,
@@ -172,6 +185,8 @@ public static class SceneEndpoints
         {
             return Results.NotFound();
         }
+
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
         var story = await StoryEndpoints.FindAsync(db, universeId, storyId, cancellationToken);
         if (story is null)
@@ -195,6 +210,13 @@ public static class SceneEndpoints
         if (StoryValidation.ValidateScene(request, chronology) is { } errors)
         {
             return Results.ValidationProblem(errors);
+        }
+
+        if (request.ChapterId is { } chapterId
+            && chapterId != scene.ChapterId
+            && !await ChapterEndpoints.BelongsToStoryAsync(db, storyId, chapterId, cancellationToken))
+        {
+            return Results.ValidationProblem(ChapterEndpoints.ForeignChapter());
         }
 
         var entityIds = Requested(request);
@@ -227,15 +249,125 @@ public static class SceneEndpoints
             scene.EntityLinks.Add(new SceneEntityLink { SceneId = scene.Id, EntityId = id });
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            if (request.ChapterId != scene.ChapterId)
+            {
+                var source = await StoryOrder.LoadContainerAsync(db, storyId, scene.ChapterId, cancellationToken);
+                var target = await StoryOrder.LoadContainerAsync(db, storyId, request.ChapterId, cancellationToken);
+
+                source.Remove(scene);
+                target.Add(scene);
+
+                await StoryOrder.PlaceScenesAsync(
+                    db,
+                    [new SceneContainer(scene.ChapterId, source), new SceneContainer(request.ChapterId, target)],
+                    cancellationToken);
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            return OrderChanged();
+        }
+
+        await transaction.CommitAsync(cancellationToken);
 
         return Results.Ok(await LoadSceneAsync(db, universeId, storyId, sceneId, cancellationToken));
     }
 
     /// <summary>
-    /// Permanent, and the scenes told after it each move up one place, so the order stays contiguous
-    /// and the next scene appended still lands last. The scene's links go with it; the lore they
-    /// pointed at does not.
+    /// Moves one scene to <see cref="ScenePositionRequest.Position"/> in the container
+    /// <see cref="ScenePositionRequest.ChapterId"/> names - its own, another chapter, or Unchaptered - and
+    /// renumbers both containers, in one transaction. The scene is not recreated: its id, text, point of
+    /// view, chronology and links are exactly as they were. Answers with the story's whole structure,
+    /// because two containers changed.
+    /// </summary>
+    private static async Task<IResult> MoveAsync(
+        Guid universeId,
+        Guid storyId,
+        Guid sceneId,
+        [FromBody] ScenePositionRequest request,
+        ClaimsPrincipal principal,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
+        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        {
+            return Results.NotFound();
+        }
+
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        var story = await StoryEndpoints.FindAsync(db, universeId, storyId, cancellationToken);
+        if (story is null)
+        {
+            return Results.NotFound();
+        }
+
+        var scene = await db.Scenes.FirstOrDefaultAsync(
+            candidate => candidate.Id == sceneId && candidate.StoryId == storyId,
+            cancellationToken);
+
+        if (scene is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (request.ChapterId is { } chapterId
+            && !await ChapterEndpoints.BelongsToStoryAsync(db, storyId, chapterId, cancellationToken))
+        {
+            return Results.ValidationProblem(ChapterEndpoints.ForeignChapter());
+        }
+
+        var sameContainer = request.ChapterId == scene.ChapterId;
+
+        var source = await StoryOrder.LoadContainerAsync(db, storyId, scene.ChapterId, cancellationToken);
+        source.Remove(scene);
+
+        var target = sameContainer
+            ? source
+            : await StoryOrder.LoadContainerAsync(db, storyId, request.ChapterId, cancellationToken);
+
+        var position = request.Position ?? target.Count;
+
+        if (position < 0 || position > target.Count)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["position"] = [$"Choose a position from 0 to {target.Count}."],
+            });
+        }
+
+        target.Insert(position, scene);
+
+        try
+        {
+            await StoryOrder.PlaceScenesAsync(
+                db,
+                sameContainer
+                    ? [new SceneContainer(request.ChapterId, target)]
+                    : [new SceneContainer(scene.ChapterId, source), new SceneContainer(request.ChapterId, target)],
+                cancellationToken);
+
+            story.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            return OrderChanged();
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+
+        return Results.Ok(await StoryEndpoints.LoadDetailAsync(db, universeId, storyId, cancellationToken));
+    }
+
+    /// <summary>
+    /// Permanent, and the scenes told after it in its container each move up one place, so the order
+    /// stays contiguous and the next scene appended there still lands last. The scene's links go with it;
+    /// the lore they pointed at does not.
     /// </summary>
     private static async Task<IResult> DeleteAsync(
         Guid universeId,
@@ -269,16 +401,13 @@ public static class SceneEndpoints
 
         try
         {
+            var chapterId = scene.ChapterId;
+
             db.Scenes.Remove(scene);
             await db.SaveChangesAsync(cancellationToken);
 
-            var remaining = await db.Scenes
-                .Where(candidate => candidate.StoryId == storyId)
-                .OrderBy(candidate => candidate.SortOrder)
-                .ThenBy(candidate => candidate.Id)
-                .ToListAsync(cancellationToken);
-
-            await RenumberAsync(db, remaining, cancellationToken);
+            var remaining = await StoryOrder.LoadContainerAsync(db, storyId, chapterId, cancellationToken);
+            await StoryOrder.PlaceScenesAsync(db, [new SceneContainer(chapterId, remaining)], cancellationToken);
 
             story.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
@@ -293,10 +422,11 @@ public static class SceneEndpoints
     }
 
     /// <summary>
-    /// Replaces the story's whole narrative order in one transaction. The request must name every
-    /// scene in this story exactly once - a partial list, a repeated id or an id from anywhere else is
+    /// Replaces one container's whole narrative order in one transaction: the chapter the request names,
+    /// or Unchaptered. The request must name every scene in that container exactly once - a partial list,
+    /// a repeated id, a scene from another chapter of the same story or an id from anywhere else is
     /// refused rather than guessed at, and the refusal says the same thing for a foreign id as for a
-    /// missing one. Chronology plays no part.
+    /// missing one. No other container is touched, and chronology plays no part.
     /// </summary>
     private static async Task<IResult> ReorderAsync(
         Guid universeId,
@@ -319,39 +449,36 @@ public static class SceneEndpoints
             return Results.NotFound();
         }
 
+        if (request.ChapterId is { } chapterId
+            && !await ChapterEndpoints.BelongsToStoryAsync(db, storyId, chapterId, cancellationToken))
+        {
+            return Results.ValidationProblem(ChapterEndpoints.ForeignChapter());
+        }
+
         if (request.SceneIds is not { } ids)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["sceneIds"] = ["List the story's scenes in the order they are told."],
-            });
+            return Refused("List the scenes in the order they are told.");
         }
 
         if (ids.Distinct().Count() != ids.Count)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["sceneIds"] = ["List each scene once."],
-            });
+            return Refused("List each scene once.");
         }
 
-        var scenes = await db.Scenes
-            .Where(scene => scene.StoryId == storyId)
-            .ToListAsync(cancellationToken);
-
+        var scenes = await StoryOrder.LoadContainerAsync(db, storyId, request.ChapterId, cancellationToken);
         var byId = scenes.ToDictionary(scene => scene.Id);
 
         if (ids.Count != scenes.Count || ids.Any(id => !byId.ContainsKey(id)))
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["sceneIds"] = ["List every scene in this story exactly once."],
-            });
+            return Refused(request.ChapterId is null
+                ? "List every Unchaptered scene in this story exactly once."
+                : "List every scene in this chapter exactly once.");
         }
 
         try
         {
-            await RenumberAsync(db, [.. ids.Select(id => byId[id])], cancellationToken);
+            await StoryOrder.PlaceScenesAsync(
+                db, [new SceneContainer(request.ChapterId, [.. ids.Select(id => byId[id])])], cancellationToken);
 
             story.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
@@ -366,13 +493,16 @@ public static class SceneEndpoints
         return Results.Ok(await LoadScenesAsync(
             db,
             universeId,
-            db.Scenes.Where(scene => scene.StoryId == storyId),
+            db.Scenes.InContainer(storyId, request.ChapterId),
             cancellationToken));
+
+        static IResult Refused(string message) =>
+            Results.ValidationProblem(new Dictionary<string, string[]> { ["sceneIds"] = [message] });
     }
 
     // ---------- Writing ----------
 
-    /// <summary>Copies everything but the title and the order across. The title is set by the caller.</summary>
+    /// <summary>Copies everything but the title, the chapter and the order across. The title is set by the caller.</summary>
     private static void Apply(Scene scene, SceneRequest request)
     {
         scene.Summary = StoryValidation.Normalize(request.Summary);
@@ -389,40 +519,6 @@ public static class SceneEndpoints
     /// <summary>The linked lore asked for, each entry once. Repeating an id links it once, as it does on a moment.</summary>
     private static List<Guid> Requested(SceneRequest request) =>
         request.EntityIds?.Distinct().ToList() ?? [];
-
-    /// <summary>
-    /// Gives <paramref name="ordered"/> the positions 0, 1, 2... in that order.
-    ///
-    /// Positions are unique per story and SQLite checks that row by row, so moving a scene up one
-    /// place would collide with the scene it passes halfway through the statement. Every scene
-    /// first steps aside to a negative position, inside the caller's transaction, and then lands on
-    /// its final one - the same move the chronology uses to reorder eras.
-    /// </summary>
-    private static async Task RenumberAsync(
-        LorexDbContext db,
-        List<Scene> ordered,
-        CancellationToken cancellationToken)
-    {
-        if (ordered.Select((scene, index) => scene.SortOrder == index).All(inPlace => inPlace))
-        {
-            return;
-        }
-
-        var parked = -1;
-        foreach (var scene in ordered)
-        {
-            scene.SortOrder = parked--;
-        }
-
-        await db.SaveChangesAsync(cancellationToken);
-
-        for (var index = 0; index < ordered.Count; index++)
-        {
-            ordered[index].SortOrder = index;
-        }
-
-        await db.SaveChangesAsync(cancellationToken);
-    }
 
     /// <summary>
     /// Re-resolves the point of view and every linked entry inside this universe. Returns the
@@ -488,23 +584,13 @@ public static class SceneEndpoints
             statusCode: StatusCodes.Status409Conflict,
             extensions: new Dictionary<string, object?> { ["code"] = OrderChangedCode });
 
-    private static async Task<bool> OwnsStoryAsync(
-        LorexDbContext db,
-        Guid universeId,
-        Guid storyId,
-        ClaimsPrincipal principal,
-        CancellationToken cancellationToken) =>
-        await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken)
-        && await db.Stories.AnyAsync(
-            story => story.Id == storyId && story.UniverseId == universeId,
-            cancellationToken);
-
     // ---------- Reading ----------
 
     /// <summary>A scene as it is stored, flat, with its links as ids.</summary>
     private sealed record SceneRow(
         Guid Id,
         Guid StoryId,
+        Guid? ChapterId,
         int SortOrder,
         string Title,
         string? Summary,
@@ -561,7 +647,11 @@ public static class SceneEndpoints
         .FirstOrDefault();
 
     /// <summary>
-    /// The scenes <paramref name="query"/> selects, in narrative order, with every reference resolved.
+    /// The scenes <paramref name="query"/> selects, in reading order, with every reference resolved.
+    ///
+    /// Reading order is Unchaptered first, then each chapter in the story's chapter order, and inside
+    /// each of those the scenes' own narrative order. The chapter's position comes from a join in the
+    /// same query, so no chapter is read per scene.
     ///
     /// Two queries however many scenes there are: the scenes with their link ids, then every entry
     /// any of them names, read once. The entries are read from the lore each time - a scene holds
@@ -575,11 +665,13 @@ public static class SceneEndpoints
         CancellationToken cancellationToken)
     {
         var rows = await query.AsNoTracking()
-            .OrderBy(scene => scene.SortOrder)
+            .OrderBy(scene => scene.ChapterId == null ? -1 : scene.Chapter!.SortOrder)
+            .ThenBy(scene => scene.SortOrder)
             .ThenBy(scene => scene.Id)
             .Select(scene => new SceneRow(
                 scene.Id,
                 scene.StoryId,
+                scene.ChapterId,
                 scene.SortOrder,
                 scene.Title,
                 scene.Summary,
@@ -611,6 +703,7 @@ public static class SceneEndpoints
             .. rows.Select(row => new SceneResponse(
                 row.Id,
                 row.StoryId,
+                row.ChapterId,
                 row.SortOrder,
                 row.Title,
                 row.Summary,

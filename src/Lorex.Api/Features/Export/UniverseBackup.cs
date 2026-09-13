@@ -64,8 +64,18 @@ public sealed record UniverseBackup(
     /// one. So it is a bump: a reader that knows only version 4 is told it is holding something it
     /// cannot carry. A file at versions 1 to 4 holds no stories - <c>stories</c> is absent and reads
     /// as null.
+    ///
+    /// 6 - A story may group its scenes into chapters (ADR 0025). <see cref="BackupStory.Chapters"/>
+    /// carries them, and <see cref="BackupScene.ChapterId"/> says which one each scene is told in - null
+    /// for Unchaptered. Both fail the "ignorable" test twice over. A chapter's title, summary and notes
+    /// are authored, so a reader that skipped them would lose writing. And the chapter id re-means
+    /// <see cref="BackupScene.SortOrder"/>: from this version it is a scene's place inside its chapter or
+    /// inside Unchaptered, not in the whole story, so every chapter starts again from 0. A version 5
+    /// reader would find several scenes claiming each place and flatten the story into a wrong order.
+    /// A file at version 5 has no <c>chapters</c> and no <c>chapterId</c>; both read as null, every
+    /// scene is Unchaptered, and its story-wide order is exactly its order there.
     /// </summary>
-    public const int CurrentVersion = 5;
+    public const int CurrentVersion = 6;
 
     public static UniverseBackup Of(UniverseBackupPayload payload, DateTime generatedAt) =>
         new(FormatName, CurrentVersion, generatedAt, payload);
@@ -372,8 +382,14 @@ public sealed record BackupTimelineEntry(
     IReadOnlyList<Guid> ParticipantEntityIds);
 
 /// <summary>
-/// One story, with its scenes alongside it so a scene never travels apart from the story it is told
-/// in (since version 5). Authored narrative, not lore: nothing in it is a fact about the world.
+/// One story, with its chapters and scenes alongside it so neither travels apart from the story it is
+/// told in (since version 5). Authored narrative, not lore: nothing in it is a fact about the world.
+///
+/// <paramref name="Chapters"/> are in story order (since version 6). Empty means a story with no
+/// chapters; absent - null, in a version 5 file - means the same thing.
+///
+/// <paramref name="Scenes"/> is every scene of the story in reading order: Unchaptered first, then chapter
+/// by chapter, each in its own narrative order.
 /// </summary>
 public sealed record BackupStory(
     Guid Id,
@@ -382,11 +398,31 @@ public sealed record BackupStory(
     StoryStatus Status,
     DateTime CreatedAt,
     DateTime UpdatedAt,
+    IReadOnlyList<BackupChapter>? Chapters,
     IReadOnlyList<BackupScene> Scenes);
 
 /// <summary>
-/// One scene, in the story's narrative order - the list is sorted by <paramref name="SortOrder"/>,
-/// and the number itself is carried so the order is explicit rather than implied by position.
+/// One chapter (since version 6): its place in the story, from 0, and the author's title, summary and
+/// notes. The number a reader sees - "Chapter 3" - is <paramref name="SortOrder"/> plus one and is not
+/// carried; neither is anything the chapter holds, because each scene names its chapter itself.
+/// </summary>
+public sealed record BackupChapter(
+    Guid Id,
+    int SortOrder,
+    string Title,
+    string? Summary,
+    string? Notes,
+    DateTime CreatedAt,
+    DateTime UpdatedAt);
+
+/// <summary>
+/// One scene, carried with its container and its place in it.
+///
+/// <paramref name="ChapterId"/> is the chapter of this same story the scene is told in, or null for
+/// Unchaptered - and null too in a version 5 file, where every scene was. <paramref name="SortOrder"/> is
+/// the scene's place inside that container, from 0 (story-wide before version 6, which is the same thing
+/// when every scene is Unchaptered). The number is carried so the order is explicit rather than implied by
+/// position.
 ///
 /// <paramref name="PovEntityId"/> and <paramref name="LinkedEntityIds"/> are references to entries in
 /// this same file, never copies of them: no name, type or picture is carried here. An entry in the
@@ -395,6 +431,7 @@ public sealed record BackupStory(
 /// </summary>
 public sealed record BackupScene(
     Guid Id,
+    Guid? ChapterId,
     int SortOrder,
     string Title,
     string? Summary,

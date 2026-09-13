@@ -3,7 +3,7 @@
 Status: accepted (2026-09-09), amended 2026-09-10 (version 3: the file became an archive),
 2026-09-11 (type icon keys, and a short-lived image framing member, both within version 3),
 2026-09-13 (version 4: a universe's eras), 2026-09-13 (relationship type Canon constraints,
-within version 4), and 2026-09-13 (version 5: stories)
+within version 4), 2026-09-13 (version 5: stories), and 2026-09-13 (version 6: chapters)
 
 ## Context
 
@@ -123,6 +123,18 @@ only version 4 would parse the file and restore a world with every story silentl
 complete backup into a lossy one. So it is a bump. A file at versions 1 to 4 has no `stories`, which
 reads as null and means none.
 
+**Version 6 (2026-09-13) carries chapters** (ADR 0025). Each story gains `chapters` - id, `sortOrder`,
+title, summary, notes, timestamps, in story order - and each scene gains `chapterId`, null for
+Unchaptered. Scenes stay one list per story, in reading order: Unchaptered first, then chapter by
+chapter. Whether this could stay within version 5 was the question, and it fails the test twice. A
+chapter's title, summary and notes are authored, so a version 5 reader skipping `chapters` would lose
+writing, as it would have lost stories. And `chapterId` re-means `sortOrder`: it is now a scene's place
+inside its chapter or inside Unchaptered, so every chapter numbers from 0 again, and a version 5 reader
+would find several scenes claiming each place and flatten the story into a wrong order. That is the
+re-meaning clause, so it is a bump. No chapter number is carried: it is the position. A version 5 file
+has neither member; both read as null, every scene is Unchaptered, and its story-wide `sortOrder` is
+exactly its order there.
+
 **Only the authored data.** The test for inclusion is: did a person write this, or would
 Lorex produce it again from what a person wrote?
 
@@ -135,7 +147,7 @@ Lorex produce it again from what a person wrote?
 | Relationship types with their Canon constraints, and relationships | - |
 | The universe's eras: name, short label, order, direction, label position | Formatted dates and sort keys |
 | Timeline entries, their date components, era ids and era labels, participants | Derived date precision |
-| Stories, and their scenes in narrative order with point of view, chronology and linked entry ids | Any name, type or formatted date of what a scene references |
+| Stories; their chapters in order with title, summary and notes; their scenes with chapter, place in it, point of view, chronology and linked entry ids | Any name, type or formatted date of what a scene references, and any chapter number |
 | Every entry's revision history (ADR 0013) | - |
 | Each entry's primary image: the original bytes, its asset id, filename, content type, dimensions, chosen crop and archive path | The generated thumbnail and its id, and every R2 object key, bucket name, endpoint and URL |
 | Canon conflicts the author **dismissed** | Pending and resolved conflicts, and all conflict wording |

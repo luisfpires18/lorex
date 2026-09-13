@@ -542,8 +542,9 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
     // ---------- Stories ----------
 
     /// <summary>
-    /// Every story by title, each with its scenes in narrative order and each scene's links sorted
-    /// by id. Only ids and authored text: a linked entry's name is in the entry, not here.
+    /// Every story by title, each with its chapters in story order, its scenes in reading order -
+    /// Unchaptered first, then chapter by chapter, each by its own narrative order - and each scene's
+    /// links sorted by id. Only ids and authored text: a linked entry's name is in the entry, not here.
     /// </summary>
     private async Task<IReadOnlyList<BackupStory>> StoriesAsync(
         Guid universeId,
@@ -552,6 +553,33 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
         var stories = await db.Stories.AsNoTracking()
             .Where(story => story.UniverseId == universeId)
             .ToListAsync(cancellationToken);
+
+        var chapters = await db.Chapters.AsNoTracking()
+            .Where(chapter => chapter.Story!.UniverseId == universeId)
+            .ToListAsync(cancellationToken);
+
+        // Unchaptered reads before the first chapter. Chapter positions are unique per story, so this
+        // rank alone separates every container of one story.
+        var chapterRank = chapters.ToDictionary(chapter => chapter.Id, chapter => chapter.SortOrder);
+
+        var chaptersByStory = chapters
+            .GroupBy(chapter => chapter.StoryId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<BackupChapter>)
+                [
+                    .. group
+                        .OrderBy(chapter => chapter.SortOrder)
+                        .ThenBy(chapter => Key(chapter.Id), StringComparer.Ordinal)
+                        .Select(chapter => new BackupChapter(
+                            chapter.Id,
+                            chapter.SortOrder,
+                            chapter.Title,
+                            chapter.Summary,
+                            chapter.Notes,
+                            Utc(chapter.CreatedAt),
+                            Utc(chapter.UpdatedAt))),
+                ]);
 
         var scenes = await db.Scenes.AsNoTracking()
             .Where(scene => scene.Story!.UniverseId == universeId)
@@ -577,10 +605,12 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                 group => (IReadOnlyList<BackupScene>)
                 [
                     .. group
-                        .OrderBy(scene => scene.SortOrder)
+                        .OrderBy(scene => scene.ChapterId is { } chapterId ? chapterRank[chapterId] : -1)
+                        .ThenBy(scene => scene.SortOrder)
                         .ThenBy(scene => Key(scene.Id), StringComparer.Ordinal)
                         .Select(scene => new BackupScene(
                             scene.Id,
+                            scene.ChapterId,
                             scene.SortOrder,
                             scene.Title,
                             scene.Summary,
@@ -606,6 +636,7 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                     story.Status,
                     Utc(story.CreatedAt),
                     Utc(story.UpdatedAt),
+                    chaptersByStory.GetValueOrDefault(story.Id, []),
                     scenesByStory.GetValueOrDefault(story.Id, []))),
         ];
     }

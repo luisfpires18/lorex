@@ -161,7 +161,15 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - The gap is `UniverseChronology.YearsBetween`: the signed difference inside one era or the plain
     reckoning, `a + b - 1` from a countdown era into the ascending era after it, unknown otherwise.
   - Edited inside the relation kind form on the Types screen. Backup stays version 4, additively.
-- **Story & Scene foundation** (`feat/story-scene-foundation`, **not merged, not pushed**). The first
+- **Phase 2 - Story** (owner-sequenced, unnumbered branches). Core Story work first; the owner tests
+  all of Phase 2 by hand only at the end, so no feature below waits on a smoke test.
+  1. Story / Scene foundation - done, merged.
+  2. **Story chapters - done** (`feat/story-chapters`, committed, **not merged, not pushed**).
+  3. Plot arcs / beats - **next**.
+  4. Scene manuscript.
+  5. Story workspace integration / Phase 2 closeout.
+  6. Owner's full manual Phase 2 test.
+- **Story & Scene foundation** (`feat/story-scene-foundation`, merged into `dev`). The first
   Story-layer feature; owner-requested, unnumbered. Lore is what is true; a story is how an author tells
   something with it. ADR 0024.
   - Universe -> Story (title, premise, status `Planning|Drafting|Complete`) -> Scene (title, summary,
@@ -179,10 +187,29 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     (`ChronologyPointValidation`, `ChronologyPointFields`); an era a scene uses cannot be removed.
   - Backup format version 5 carries stories: a version 4 reader would drop them silently. ADR 0014.
   - The sidebar stays text-only: the Lucide icon asked for would have been the only one in it.
+- **Story chapters** (`feat/story-chapters`). Optional structure between story and scene. ADR 0025.
+  - `Chapters` (title, summary, notes, order) owned by the story. `Scenes.ChapterId` nullable: null is
+    Unchaptered, never a fake chapter row. Scenes stay the unit; a move keeps the same row and everything
+    on it.
+  - Scene order is now per container - one chapter, or Unchaptered - via two filtered unique indexes
+    (a unique index treats nulls as distinct, so one index would not guard Unchaptered). No story-wide
+    scene order once chapters exist. Chronology still orders nothing.
+  - Chapter order: append, `PUT .../chapters/order`. Scenes: `PUT .../scenes/order` names its container;
+    `PUT .../scenes/{id}/position` moves within or across; an edit naming another chapter moves it last
+    there. All one transaction, park-then-place.
+  - Deleting a chapter moves its scenes, in order, to the end of Unchaptered, then deletes it. FK is
+    `NO ACTION`, so a delete that skipped the move is refused rather than corrupting order.
+  - The number ("Chapter 3") is the position, never stored. Story read is still a fixed query count,
+    pinned by a test at 10 chapters x 100 scenes.
+  - Migration `AddStoryChapters`: every existing scene Unchaptered with its order untouched; rollback
+    flattens into reading order and discards chapters. Backup format version 6: a v5 reader would lose
+    chapter text and misread per-chapter `sortOrder`. ADR 0014.
+  - Story page: Unchaptered shown only while it holds a scene; modest chapter headings; Move up/down stay
+    in the container; "Move to…" disclosure; Chapter field in the scene form. No drag, no collapse.
 
 ## Baseline
 
-- **624 API integration tests, 93 Playwright tests**, green. No frontend unit runner exists;
+- **658 API integration tests, 95 Playwright tests**, green. No frontend unit runner exists;
   the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
@@ -196,9 +223,13 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   account menu, and a full run now usually loses one or two - a rotating pick of canon, type-filter,
   mobile, universes or account-menu, each green on its own. It is contention on the one SQLite
   writer, not the specs. The story run lost one account-menu, one canon and one type-filter test,
-  each green alone.
-- 21 migrations, latest `AddStories` - three new tables and nothing else, walked down and back up over
-  real lore by `StoryMigrationTests`, which reads each delete action back from SQLite.
+  each green alone. The chapters run lost one canon and one type-filter test; canon passed alone, and
+  type-filter failed again only when re-run beside canon, then passed three times running on its own.
+- 22 migrations, latest `AddStoryChapters` - a table, a nullable column (SQLite rebuilds `Scenes` for
+  its foreign key) and the order index swap, walked down and up over real stories by
+  `ChapterMigrationTests`, which proves both filtered indexes refuse a clash.
+  `AddStories` is three new tables, walked by `StoryMigrationTests`, which reads each delete action back
+  from SQLite.
   `AddRelationshipTypeCanonConstraints` is three plain columns, walked down (a table rebuild) and back
   up by `RelationshipConstraintMigrationTests`.
   `AddUniverseChronology` creates `ChronologyEras` and adds era references,
@@ -250,9 +281,10 @@ tool has changed the picture.
   dates moved first, with no reassignment tool. Month names, calendars and conversion: not started.
   ADR 0022.
 - **`Age`** is declarable but read by nothing until a structured reference year exists. ADR 0011.
-- **Stories beyond the foundation.** Chapters/acts/beats, prose, story history, story search, a Trash
-  for stories, drag-and-drop, Story-vs-Lore checks, and counting pre-era scene years in Settings are all
-  deferred. ADR 0024.
+- **Stories beyond chapters.** Beats/arcs are next and scene manuscript after (Phase 2 sequence above).
+  Still deferred: acts/volumes, prose, story history, story search, a Trash for stories, drag-and-drop,
+  collapsing chapters, bulk scene moves, Story-vs-Lore checks, counting pre-era scene years in Settings.
+  ADR 0024, ADR 0025.
 - **Relationship life-state constraints** (an end alive at the link's date) wait for dated
   relationships: `StartDate`/`EndDate` are real-world timestamps, not chronology points. A birth-year
   gap across eras of unrecorded length waits for era lengths. ADR 0023.

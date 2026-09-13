@@ -1,12 +1,13 @@
 import { expect, test, type Page } from '@playwright/test'
 
 /**
- * Stories and their scenes, end to end. Each test registers its own account and builds its own
- * universe, so nothing depends on data another test left behind.
+ * Stories, their chapters and their scenes, end to end. Each test registers its own account and builds
+ * its own universe, so nothing depends on data another test left behind.
  *
- * The invariant under test throughout: a story is read in the order its author tells it. Where each
- * scene happens in the world is shown on the scene - written by the universe's own chronology - and
- * never moves it.
+ * The invariants under test throughout: a story is read in the order its author tells it - chapters in
+ * their order, scenes in theirs inside each chapter or in Unchaptered - and where each scene happens in
+ * the world is shown on the scene, written by the universe's own chronology, and never moves it. A scene
+ * moved between chapters is the same scene, holding everything it held.
  */
 const PASSWORD = 'Test-password-123!'
 
@@ -91,6 +92,34 @@ async function seedEntities(page: Page, universeId: string, names: string[]) {
   return ids
 }
 
+interface SceneSeed {
+  title: string
+  summary?: string
+  pov?: string
+  entities?: string[]
+  chronology?: { eraId: string | null; year: number; month: number | null; day: number | null }
+  /** The chapter's id; left out for Unchaptered. */
+  chapter?: string
+}
+
+async function seedScene(page: Page, universeId: string, storyId: string, scene: SceneSeed) {
+  const created = await page.request.post(
+    `/api/universes/${universeId}/stories/${storyId}/scenes`,
+    {
+      data: {
+        title: scene.title,
+        summary: scene.summary ?? null,
+        notes: null,
+        povEntityId: scene.pov ?? null,
+        chronology: scene.chronology ?? null,
+        entityIds: scene.entities ?? [],
+        chapterId: scene.chapter ?? null,
+      },
+    },
+  )
+  expect(created.status()).toBe(201)
+}
+
 async function seedStory(page: Page, universeId: string, title: string, scenes: SceneSeed[]) {
   const story = await page.request.post(`/api/universes/${universeId}/stories`, {
     data: { title, premise: null, status: 0 },
@@ -98,32 +127,24 @@ async function seedStory(page: Page, universeId: string, title: string, scenes: 
   expect(story.status()).toBe(201)
   const storyId = (await story.json()).id as string
 
-  for (const scene of scenes) {
-    const created = await page.request.post(
-      `/api/universes/${universeId}/stories/${storyId}/scenes`,
-      {
-        data: {
-          title: scene.title,
-          summary: scene.summary ?? null,
-          notes: null,
-          povEntityId: scene.pov ?? null,
-          chronology: scene.chronology ?? null,
-          entityIds: scene.entities ?? [],
-        },
-      },
-    )
-    expect(created.status()).toBe(201)
-  }
+  for (const scene of scenes) await seedScene(page, universeId, storyId, scene)
 
   return storyId
 }
 
-interface SceneSeed {
-  title: string
-  summary?: string
-  pov?: string
-  entities?: string[]
-  chronology?: { eraId: string | null; year: number; month: number | null; day: number | null }
+async function seedChapter(
+  page: Page,
+  universeId: string,
+  storyId: string,
+  title: string,
+  summary: string | null = null,
+) {
+  const created = await page.request.post(
+    `/api/universes/${universeId}/stories/${storyId}/chapters`,
+    { data: { title, summary, notes: null } },
+  )
+  expect(created.status()).toBe(201)
+  return (await created.json()).id as string
 }
 
 interface SceneInput {
@@ -135,9 +156,17 @@ interface SceneInput {
   lore?: string[]
 }
 
-/** Writes one scene through the drawer, the way an author would. */
-async function addScene(page: Page, input: SceneInput) {
-  await page.getByTestId('new-scene').click()
+/**
+ * Writes one scene through the drawer, the way an author would: from the story's own "New scene", or
+ * from a chapter's "Add scene" when `chapterTitle` names one.
+ */
+async function addScene(page: Page, input: SceneInput, chapterTitle?: string) {
+  if (chapterTitle) {
+    await chapter(page, chapterTitle).getByTestId('chapter-new-scene').click()
+  } else {
+    await page.getByTestId('new-scene').click()
+  }
+
   const form = page.getByTestId('scene-form')
   await expect(form).toBeVisible()
 
@@ -162,8 +191,26 @@ async function addScene(page: Page, input: SceneInput) {
   await expect(form).toHaveCount(0)
 }
 
+/** Writes one chapter through the drawer. */
+async function addChapter(page: Page, title: string, summary?: string) {
+  await page.getByTestId('new-chapter').click()
+  const form = page.getByTestId('chapter-form')
+  await expect(form).toBeVisible()
+
+  await page.getByTestId('chapter-title-input').fill(title)
+  if (summary) await page.getByTestId('chapter-summary-input').fill(summary)
+
+  await page.getByTestId('save-chapter').click()
+  await expect(form).toHaveCount(0)
+  await expect(chapter(page, title)).toBeVisible()
+}
+
 function scene(page: Page, title: string) {
   return page.locator(`[data-testid="scene"][data-title="${title}"]`)
+}
+
+function chapter(page: Page, title: string) {
+  return page.locator(`[data-testid="chapter"][data-title="${title}"]`)
 }
 
 /** The scene titles, top to bottom, as the page lists them. */
@@ -174,18 +221,77 @@ function sceneOrder(page: Page) {
 }
 
 /**
- * Uses a move control and waits for the order to be saved, not only redrawn. The page announces the
- * new position once the save has landed, which is also when it will take the next move.
+ * The story's structure as the page draws it, one line per group: "Unchaptered | a | b" while Unchaptered
+ * is shown, then "Chapter 1 — Arrival | c" for each chapter, top to bottom.
  */
-async function moveAndSave(page: Page, action: () => Promise<void>, announcement: string) {
+function structure(page: Page) {
+  return page.getByTestId('story-page').evaluate((root) => {
+    const titles = (group: Element) =>
+      [...group.querySelectorAll('[data-testid="scene"]')].map(
+        (node) => node.getAttribute('data-title') ?? '',
+      )
+    const lines: string[] = []
+
+    const unchaptered = root.querySelector('[data-testid="unchaptered"]')
+    if (unchaptered) lines.push(['Unchaptered', ...titles(unchaptered)].join(' | '))
+
+    for (const group of root.querySelectorAll('[data-testid="chapter"]')) {
+      const heading = group.querySelector('[data-testid="chapter-heading"]')?.textContent ?? ''
+      lines.push([heading, ...titles(group)].join(' | '))
+    }
+
+    return lines
+  })
+}
+
+/**
+ * Uses a control and waits for its write to be saved, not only redrawn. The page announces the result
+ * once the save has landed, which is also when it will take the next move.
+ */
+async function saveAndAnnounce(
+  page: Page,
+  route: string,
+  action: () => Promise<void>,
+  announcement: string,
+) {
   await Promise.all([
     page.waitForResponse(
-      (response) =>
-        response.url().endsWith('/scenes/order') && response.request().method() === 'PUT',
+      (response) => response.url().endsWith(route) && response.request().method() === 'PUT',
     ),
     action(),
   ])
   await expect(page.getByTestId('story-announcer')).toHaveText(announcement)
+}
+
+function moveAndSave(page: Page, action: () => Promise<void>, announcement: string) {
+  return saveAndAnnounce(page, '/scenes/order', action, announcement)
+}
+
+/** "Move to…" on one scene, then the named container. */
+async function moveSceneTo(page: Page, title: string, target: string, announcement: string) {
+  await saveAndAnnounce(
+    page,
+    '/position',
+    async () => {
+      await scene(page, title).getByTestId('scene-move-to').click()
+      await scene(page, title)
+        .locator(`[data-testid="scene-move-to-option"][data-target="${target}"]`)
+        .click()
+    },
+    announcement,
+  )
+}
+
+/** What the element holding the focus is, and which scene and chapter it belongs to. */
+function focused(page: Page) {
+  return page.evaluate(() => {
+    const element = document.activeElement
+    return {
+      control: element?.getAttribute('data-testid') ?? null,
+      scene: element?.closest('[data-testid="scene"]')?.getAttribute('data-title') ?? null,
+      chapter: element?.closest('[data-testid="chapter"]')?.getAttribute('data-title') ?? null,
+    }
+  })
 }
 
 /** Whether the page can be scrolled sideways, which no screen in Lorex may allow. */
@@ -241,6 +347,10 @@ test.describe('stories', () => {
 
     const told = ['Aftermath', 'The Battle', 'Childhood']
     await expect.poll(() => sceneOrder(page)).toEqual(told)
+
+    // A story with no chapters is one plain list: no Unchaptered heading, no chapter to move to.
+    await expect(page.getByTestId('unchaptered')).toHaveCount(0)
+    await expect(page.getByTestId('scene-move-to')).toHaveCount(0)
 
     // Every date is written by the universe's chronology, and none of them moved anything.
     await expect(scene(page, 'Aftermath').getByTestId('scene-when')).toHaveText('AF 30')
@@ -306,6 +416,169 @@ test.describe('stories', () => {
     await expect(row.getByTestId('story-scene-count')).toHaveText('2 scenes')
   })
 
+  test('an author groups a story into chapters, moves scenes between them, and loses nothing', async ({
+    page,
+  }) => {
+    await signUp(page)
+    const universeId = await newUniverse(page, unique('Chapter Reach '))
+    await seedEntities(page, universeId, ['Arlen', 'White Tower'])
+
+    await page.goto(`/app/universes/${universeId}/stories`)
+    await page.getByTestId('new-story').click()
+    await page.getByTestId('story-title-input').fill('The Ashen Road')
+    await page.getByTestId('save-story').click()
+    await page.waitForURL(/\/stories\/[0-9a-f-]+$/)
+
+    // Two chapters, numbered by where they sit and titled as written.
+    await addChapter(page, 'Arrival', 'They reach the gate.')
+    await addChapter(page, 'Ashes')
+    await expect(chapter(page, 'Arrival').getByTestId('chapter-heading')).toHaveText(
+      'Chapter 1 — Arrival',
+    )
+    await expect(chapter(page, 'Ashes').getByTestId('chapter-heading')).toHaveText(
+      'Chapter 2 — Ashes',
+    )
+    await expect(chapter(page, 'Arrival').getByTestId('chapter-summary')).toHaveText(
+      'They reach the gate.',
+    )
+    await expect(chapter(page, 'Ashes').getByTestId('chapter-empty')).toBeVisible()
+
+    // Unchaptered appears only once it holds a scene.
+    await expect(page.getByTestId('unchaptered')).toHaveCount(0)
+    await addScene(page, { title: 'Loose thread', pov: 'Arlen', lore: ['White Tower'] })
+    await expect(page.getByTestId('unchaptered')).toBeVisible()
+
+    // "Add scene" on a chapter starts the scene in that chapter.
+    await chapter(page, 'Arrival').getByTestId('chapter-new-scene').click()
+    await expect(page.getByTestId('scene-chapter-select').locator('option:checked')).toHaveText(
+      'Chapter 1 — Arrival',
+    )
+    await page.getByTestId('cancel-scene').click()
+
+    await addScene(page, { title: 'At the gate', pov: 'Arlen', lore: ['White Tower'] }, 'Arrival')
+    await addScene(page, { title: 'Inside the walls' }, 'Arrival')
+    await addScene(page, { title: 'Embers' }, 'Ashes')
+
+    await expect
+      .poll(() => structure(page))
+      .toEqual([
+        'Unchaptered | Loose thread',
+        'Chapter 1 — Arrival | At the gate | Inside the walls',
+        'Chapter 2 — Ashes | Embers',
+      ])
+
+    // Between chapters, without opening a form.
+    await moveSceneTo(
+      page,
+      'Inside the walls',
+      'Chapter 2 — Ashes',
+      '“Inside the walls” moved to Chapter 2 — Ashes, scene 2 of 2.',
+    )
+    await expect
+      .poll(() => structure(page))
+      .toEqual([
+        'Unchaptered | Loose thread',
+        'Chapter 1 — Arrival | At the gate',
+        'Chapter 2 — Ashes | Embers | Inside the walls',
+      ])
+
+    // Out to Unchaptered.
+    await moveSceneTo(page, 'Embers', 'Unchaptered', '“Embers” moved to Unchaptered, scene 2 of 2.')
+    await expect
+      .poll(() => structure(page))
+      .toEqual([
+        'Unchaptered | Loose thread | Embers',
+        'Chapter 1 — Arrival | At the gate',
+        'Chapter 2 — Ashes | Inside the walls',
+      ])
+
+    // The chapters swap places, and renumber themselves.
+    await saveAndAnnounce(
+      page,
+      '/chapters/order',
+      () => chapter(page, 'Ashes').getByTestId('chapter-move-up').click(),
+      '“Ashes” is now chapter 1 of 2.',
+    )
+    await expect
+      .poll(() => structure(page))
+      .toEqual([
+        'Unchaptered | Loose thread | Embers',
+        'Chapter 1 — Ashes | Inside the walls',
+        'Chapter 2 — Arrival | At the gate',
+      ])
+
+    // Back into a chapter, then reordered inside it.
+    await moveSceneTo(
+      page,
+      'Embers',
+      'Chapter 1 — Ashes',
+      '“Embers” moved to Chapter 1 — Ashes, scene 2 of 2.',
+    )
+    await moveAndSave(
+      page,
+      () => scene(page, 'Embers').getByTestId('scene-move-up').click(),
+      '“Embers” is now scene 1 of 2 in Chapter 1 — Ashes.',
+    )
+
+    // And from the scene's own form: another chapter puts it last there.
+    await scene(page, 'Loose thread').getByTestId('scene-edit').click()
+    await page.getByTestId('scene-chapter-select').selectOption({ label: 'Chapter 2 — Arrival' })
+    await page.getByTestId('save-scene').click()
+    await expect(page.getByTestId('scene-form')).toHaveCount(0)
+
+    const arranged = [
+      'Chapter 1 — Ashes | Embers | Inside the walls',
+      'Chapter 2 — Arrival | At the gate | Loose thread',
+    ]
+    await expect.poll(() => structure(page)).toEqual(arranged)
+
+    await page.reload()
+    await expect.poll(() => structure(page)).toEqual(arranged)
+    await expect(page.getByTestId('story-chapter-count')).toHaveText('2 chapters')
+
+    // Deleting a chapter says plainly what happens to its scenes, and does exactly that.
+    let confirmation = ''
+    page.once('dialog', (dialog) => {
+      confirmation = dialog.message()
+      void dialog.accept()
+    })
+    await chapter(page, 'Arrival').getByTestId('chapter-delete').click()
+    await expect
+      .poll(() => structure(page))
+      .toEqual([
+        'Unchaptered | At the gate | Loose thread',
+        'Chapter 1 — Ashes | Embers | Inside the walls',
+      ])
+    expect(confirmation).toContain('The chapter will be removed.')
+    expect(confirmation).toContain('Its 2 scenes will be moved to Unchaptered.')
+    expect(confirmation).not.toMatch(/scenes will be deleted/i)
+
+    await page.reload()
+    await expect
+      .poll(() => structure(page))
+      .toEqual([
+        'Unchaptered | At the gate | Loose thread',
+        'Chapter 1 — Ashes | Embers | Inside the walls',
+      ])
+
+    // The scenes that moved twice still hold their point of view and their lore, as real links.
+    for (const title of ['At the gate', 'Loose thread']) {
+      await expect(scene(page, title).getByTestId('scene-pov')).toContainText('Arlen')
+      await expect(
+        scene(page, title).getByTestId('scene-lore').getByRole('link', { name: 'White Tower' }),
+      ).toBeVisible()
+    }
+
+    await scene(page, 'At the gate').getByTestId('scene-pov').getByRole('link').click()
+    await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
+    await expect(page.getByText('Arlen').first()).toBeVisible()
+
+    await page.getByTestId('workspace-stories').click()
+    await page.waitForURL(/\/stories$/)
+    const row = page.locator('[data-testid="story-row"][data-title="The Ashen Road"]')
+    await expect(row.getByTestId('story-scene-count')).toHaveText('4 scenes')
+  })
+
   test('scenes are reordered from the keyboard alone, and the focus follows the scene', async ({
     page,
   }) => {
@@ -320,15 +593,6 @@ test.describe('stories', () => {
     await page.goto(`/app/universes/${universeId}/stories/${storyId}`)
     await expect.poll(() => sceneOrder(page)).toEqual(['A', 'B', 'C'])
 
-    const focused = () =>
-      page.evaluate(() => {
-        const element = document.activeElement
-        return {
-          control: element?.getAttribute('data-testid') ?? null,
-          scene: element?.closest('[data-testid="scene"]')?.getAttribute('data-title') ?? null,
-        }
-      })
-
     // The control's name is its label, and the scene it moves describes it.
     const up = scene(page, 'C').getByRole('button', { name: 'Move up' })
     await expect(up).toHaveAccessibleDescription(/C/)
@@ -336,19 +600,104 @@ test.describe('stories', () => {
 
     await moveAndSave(page, () => page.keyboard.press('Enter'), '“C” is now scene 2 of 3.')
     await expect.poll(() => sceneOrder(page)).toEqual(['A', 'C', 'B'])
-    await expect.poll(focused).toEqual({ control: 'scene-move-up', scene: 'C' })
+    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-move-up', scene: 'C' })
 
     // At the top, "Move up" can go no further, so the focus lands on "Move down" rather than nowhere.
     await moveAndSave(page, () => page.keyboard.press('Enter'), '“C” is now scene 1 of 3.')
     await expect.poll(() => sceneOrder(page)).toEqual(['C', 'A', 'B'])
     await expect(scene(page, 'C').getByTestId('scene-move-up')).toBeDisabled()
-    await expect.poll(focused).toEqual({ control: 'scene-move-down', scene: 'C' })
+    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-move-down', scene: 'C' })
 
     await moveAndSave(page, () => page.keyboard.press('Space'), '“C” is now scene 2 of 3.')
     await expect.poll(() => sceneOrder(page)).toEqual(['A', 'C', 'B'])
 
     await page.reload()
     await expect.poll(() => sceneOrder(page)).toEqual(['A', 'C', 'B'])
+  })
+
+  test('chapters and their scenes are rearranged from the keyboard alone', async ({ page }) => {
+    await signUp(page)
+    const universeId = await newUniverse(page, unique('Chapter Keys '))
+    const storyId = await seedStory(page, universeId, 'Three chapters', [])
+    const one = await seedChapter(page, universeId, storyId, 'One')
+    const two = await seedChapter(page, universeId, storyId, 'Two')
+    await seedChapter(page, universeId, storyId, 'Three')
+    await seedScene(page, universeId, storyId, { title: 'a', chapter: one })
+    await seedScene(page, universeId, storyId, { title: 'b', chapter: one })
+    await seedScene(page, universeId, storyId, { title: 'c', chapter: two })
+
+    await page.goto(`/app/universes/${universeId}/stories/${storyId}`)
+    await expect
+      .poll(() => structure(page))
+      .toEqual(['Chapter 1 — One | a | b', 'Chapter 2 — Two | c', 'Chapter 3 — Three'])
+
+    // A chapter's tool is named by its label and described by the chapter's heading.
+    const up = chapter(page, 'Three').getByRole('button', { name: 'Move up' })
+    await expect(up).toHaveAccessibleDescription('Chapter 3 — Three')
+    await up.focus()
+
+    await saveAndAnnounce(
+      page,
+      '/chapters/order',
+      () => page.keyboard.press('Enter'),
+      '“Three” is now chapter 2 of 3.',
+    )
+    await expect
+      .poll(() => focused(page))
+      .toMatchObject({ control: 'chapter-move-up', chapter: 'Three' })
+
+    await saveAndAnnounce(
+      page,
+      '/chapters/order',
+      () => page.keyboard.press('Enter'),
+      '“Three” is now chapter 1 of 3.',
+    )
+    await expect(chapter(page, 'Three').getByTestId('chapter-move-up')).toBeDisabled()
+    await expect
+      .poll(() => focused(page))
+      .toMatchObject({ control: 'chapter-move-down', chapter: 'Three' })
+
+    // Inside a chapter, a scene's move stays inside it. At the chapter's top the focus lands on
+    // "Move down", as it does in a story with no chapters.
+    await scene(page, 'b').getByTestId('scene-move-up').focus()
+    await moveAndSave(
+      page,
+      () => page.keyboard.press('Enter'),
+      '“b” is now scene 1 of 2 in Chapter 2 — One.',
+    )
+    await expect(scene(page, 'b').getByTestId('scene-move-up')).toBeDisabled()
+    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-move-down', scene: 'b' })
+
+    // "Move to…" opens onto its choices, Escape puts the focus back, and a choice moves the scene.
+    const moveTo = scene(page, 'c').getByTestId('scene-move-to')
+    await expect(moveTo).toHaveAccessibleName('Move to…')
+    await moveTo.focus()
+    await page.keyboard.press('Enter')
+    await expect(scene(page, 'c').getByTestId('scene-move-to-panel')).toBeVisible()
+    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-move-to-option' })
+    await page.keyboard.press('Escape')
+    await expect(scene(page, 'c').getByTestId('scene-move-to-panel')).toHaveCount(0)
+    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-move-to', scene: 'c' })
+
+    await page.keyboard.press('Enter')
+    const options = scene(page, 'c').getByTestId('scene-move-to-option')
+    await expect(options).toHaveText(['Unchaptered', 'Chapter 1 — Three', 'Chapter 2 — One'])
+    await page.keyboard.press('Tab')
+    await page.keyboard.press('Tab')
+    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-move-to-option' })
+    await saveAndAnnounce(
+      page,
+      '/position',
+      () => page.keyboard.press('Enter'),
+      '“c” moved to Chapter 2 — One, scene 3 of 3.',
+    )
+    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-move-to', scene: 'c' })
+
+    const moved = ['Chapter 1 — Three', 'Chapter 2 — One | b | a | c', 'Chapter 3 — Two']
+    await expect.poll(() => structure(page)).toEqual(moved)
+
+    await page.reload()
+    await expect.poll(() => structure(page)).toEqual(moved)
   })
 
   test('an entry thrown in the Trash stays on its scene, named but not linked', async ({
@@ -410,10 +759,22 @@ test.describe('stories', () => {
           entities: lore,
           chronology: { eraId: eras[1].id, year: 1200, month: 11, day: 30 },
         },
-        { title: 'Second', entities: lore.slice(0, 2) },
-        { title: 'Third' },
       ],
     )
+    const long = await seedChapter(
+      page,
+      universeId,
+      storyId,
+      'A chapter whose title also runs on past where any sensible heading would stop',
+      'Its summary runs on as well, long enough to wrap on a phone and hold a measure on a desktop.',
+    )
+    const short = await seedChapter(page, universeId, storyId, 'Ashes')
+    await seedScene(page, universeId, storyId, {
+      title: 'Second',
+      entities: lore.slice(0, 2),
+      chapter: long,
+    })
+    await seedScene(page, universeId, storyId, { title: 'Third', chapter: short })
 
     for (const [width, colorScheme] of [
       [390, 'dark'],
@@ -439,6 +800,7 @@ test.describe('stories', () => {
 
       await page.goto(`/app/universes/${universeId}/stories/${storyId}`)
       await expect(page.getByTestId('scene')).toHaveCount(3)
+      await expect(page.getByTestId('chapter')).toHaveCount(2)
       expect(await scrollsSideways(page), `story at ${width}px`).toBe(false)
 
       if (colorScheme === 'dark') {
@@ -448,7 +810,7 @@ test.describe('stories', () => {
 
       // Every reorder control and every linked entry is on screen, not pushed off its edge.
       const first = page.getByTestId('scene').first()
-      for (const control of ['scene-move-down', 'scene-edit', 'scene-delete']) {
+      for (const control of ['scene-move-down', 'scene-move-to', 'scene-edit', 'scene-delete']) {
         const box = await first.getByTestId(control).boundingBox()
         expect(box, `${control} at ${width}px`).not.toBeNull()
         expect(box!.x + box!.width, `${control} at ${width}px`).toBeLessThanOrEqual(edge)
@@ -458,7 +820,33 @@ test.describe('stories', () => {
         expect(box!.x + box!.width, `lore chip at ${width}px`).toBeLessThanOrEqual(edge)
       }
 
-      // The drawer keeps a form's measure on a wide screen and folds its date row on a narrow one.
+      // A chapter's heading and every one of its tools fit too.
+      const heading = page.getByTestId('chapter').first()
+      for (const control of [
+        'chapter-heading',
+        'chapter-move-down',
+        'chapter-new-scene',
+        'chapter-edit',
+        'chapter-delete',
+      ]) {
+        const box = await heading.getByTestId(control).boundingBox()
+        expect(box, `${control} at ${width}px`).not.toBeNull()
+        expect(box!.x + box!.width, `${control} at ${width}px`).toBeLessThanOrEqual(edge)
+      }
+
+      // "Move to…" opens inside the screen, wherever its button wrapped to.
+      const second = scene(page, 'Second')
+      await second.getByTestId('scene-move-to').click()
+      const panel = second.getByTestId('scene-move-to-panel')
+      await expect(panel).toBeVisible()
+      const panelBox = await panel.boundingBox()
+      expect(panelBox!.x, `move menu at ${width}px`).toBeGreaterThanOrEqual(-1)
+      expect(panelBox!.x + panelBox!.width, `move menu at ${width}px`).toBeLessThanOrEqual(edge)
+      expect(await scrollsSideways(page), `move menu at ${width}px`).toBe(false)
+      await page.keyboard.press('Escape')
+      await expect(panel).toHaveCount(0)
+
+      // The drawers keep a form's measure on a wide screen and fold their rows on a narrow one.
       await first.getByTestId('scene-edit').click()
       const form = page.getByTestId('scene-form')
       await expect(form).toBeVisible()
@@ -466,6 +854,18 @@ test.describe('stories', () => {
       expect(formBox!.width, `scene form at ${width}px`).toBeLessThanOrEqual(
         Math.min(width, 560) + 1,
       )
+
+      // Polled: the drawer slides in, and a box read mid-slide sits off to the right of where it lands.
+      const chapterSelect = page.getByTestId('scene-chapter-select')
+      await expect
+        .poll(
+          async () => {
+            const box = await chapterSelect.boundingBox()
+            return box ? box.x + box.width : Number.POSITIVE_INFINITY
+          },
+          { message: `chapter select at ${width}px` },
+        )
+        .toBeLessThanOrEqual(edge)
 
       const era = page.getByTestId('scene-eraId')
       await era.scrollIntoViewIfNeeded()
@@ -479,6 +879,17 @@ test.describe('stories', () => {
 
       await page.getByTestId('cancel-scene').click()
       await expect(form).toHaveCount(0)
+
+      await heading.getByTestId('chapter-edit').click()
+      const chapterForm = page.getByTestId('chapter-form')
+      await expect(chapterForm).toBeVisible()
+      const chapterFormBox = await chapterForm.boundingBox()
+      expect(chapterFormBox!.width, `chapter form at ${width}px`).toBeLessThanOrEqual(
+        Math.min(width, 560) + 1,
+      )
+      expect(await scrollsSideways(page), `chapter form at ${width}px`).toBe(false)
+      await page.getByTestId('cancel-chapter').click()
+      await expect(chapterForm).toHaveCount(0)
     }
   })
 })

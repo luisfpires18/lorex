@@ -1,3 +1,5 @@
+using System.Data.Common;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using Lorex.Api.Data;
@@ -9,6 +11,7 @@ using Lorex.Api.Features.Stories;
 using Lorex.Api.Features.Timeline;
 using Lorex.Api.Features.Universes;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Lorex.Api.Tests;
@@ -99,6 +102,57 @@ public sealed class StoryEndpointTests(LorexApiFactory factory) : IClassFixture<
         Assert.Equal(["Autumn", "Winter"], listed.Select(story => story.Title));
         Assert.Equal([0, 2], listed.Select(story => story.SceneCount));
         _ = autumn;
+    }
+
+    [Fact]
+    public async Task A_story_is_read_in_the_same_few_queries_however_many_chapters_and_scenes_it_holds()
+    {
+        var (client, universe) = await SignedInWithUniverse("storyqueries");
+
+        var lore = new List<Guid>();
+        for (var index = 0; index < 5; index++)
+        {
+            lore.Add((await CreateEntity(client, universe.Id, $"Entry {index}")).Id);
+        }
+
+        var small = await CreateStory(client, universe.Id, new StoryRequest("Small", null, StoryStatus.Planning));
+        await AddScene(client, universe.Id, small.Id, "Alone", pov: lore[0], entities: [lore[1]]);
+
+        var large = await CreateStory(client, universe.Id, new StoryRequest("Large", null, StoryStatus.Planning));
+        for (var chapterIndex = 0; chapterIndex < 10; chapterIndex++)
+        {
+            var created = await client.PostAsJsonAsync(
+                $"{Story(universe.Id, large.Id)}/chapters", new ChapterRequest($"Chapter {chapterIndex}", null, null));
+            Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+            var chapter = (await created.Content.ReadFromJsonAsync<ChapterResponse>())!;
+
+            for (var sceneIndex = 0; sceneIndex < 10; sceneIndex++)
+            {
+                await AddScene(
+                    client, universe.Id, large.Id, $"Scene {chapterIndex}.{sceneIndex}",
+                    pov: lore[sceneIndex % 5],
+                    entities: [lore[(sceneIndex + 1) % 5], lore[(sceneIndex + 2) % 5]],
+                    chapterId: chapter.Id);
+            }
+        }
+
+        var (smallQueries, _) = await CountQueries(
+            [universe.Id, small.Id], () => client.GetFromJsonAsync<StoryDetail>(Story(universe.Id, small.Id)));
+        var (largeQueries, detail) = await CountQueries(
+            [universe.Id, large.Id], () => client.GetFromJsonAsync<StoryDetail>(Story(universe.Id, large.Id)));
+
+        Assert.Equal(10, detail!.Chapters.Count);
+        Assert.Equal(100, detail.Scenes.Count);
+        Assert.All(detail.Scenes, scene =>
+        {
+            Assert.NotNull(scene.Pov);
+            Assert.Equal(2, scene.Entities.Count);
+        });
+
+        // One scene or a hundred in ten chapters, the same queries: nothing is read per chapter, per scene
+        // or per reference - ownership, the story, its chapters, its scenes and the lore they name.
+        Assert.Equal(smallQueries, largeQueries);
+        Assert.InRange(largeQueries, 1, 5);
     }
 
     // ---------- What deleting takes with it ----------
@@ -263,13 +317,95 @@ public sealed class StoryEndpointTests(LorexApiFactory factory) : IClassFixture<
         Guid? pov = null,
         IReadOnlyList<Guid>? entities = null,
         ChronologyValue? chronology = null,
-        string? summary = null)
+        string? summary = null,
+        Guid? chapterId = null)
     {
         var response = await client.PostAsJsonAsync(
             Scenes(universeId, storyId),
-            new SceneRequest(title, summary, null, pov, chronology, entities));
+            new SceneRequest(title, summary, null, pov, chronology, entities, chapterId));
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         return (await response.Content.ReadFromJsonAsync<SceneResponse>())!;
+    }
+
+    private static async Task<(int Queries, T Result)> CountQueries<T>(IReadOnlyCollection<Guid> ids, Func<Task<T>> work)
+    {
+        using var counter = new CommandCounter(ids);
+        var result = await work();
+        return (counter.Count, result);
+    }
+
+    /// <summary>
+    /// Counts the database commands EF Core runs that carry one of the given ids as a parameter. Other test
+    /// classes run in parallel in the same process, and none of their commands carries this test's ids.
+    /// </summary>
+    private sealed class CommandCounter : IObserver<DiagnosticListener>, IObserver<KeyValuePair<string, object?>>, IDisposable
+    {
+        private readonly string[] _keys;
+        private readonly List<IDisposable> _subscriptions = [];
+        private int _count;
+
+        public CommandCounter(IReadOnlyCollection<Guid> ids)
+        {
+            _keys = [.. ids.Select(id => id.ToString())];
+            var all = DiagnosticListener.AllListeners.Subscribe(this);
+
+            lock (_subscriptions)
+            {
+                _subscriptions.Add(all);
+            }
+        }
+
+        public int Count => _count;
+
+        public void OnNext(DiagnosticListener value)
+        {
+            if (value.Name == DbLoggerCategory.Name)
+            {
+                lock (_subscriptions)
+                {
+                    _subscriptions.Add(value.Subscribe(this));
+                }
+            }
+        }
+
+        public void OnNext(KeyValuePair<string, object?> value)
+        {
+            if (value.Key != RelationalEventId.CommandExecuted.Name || value.Value is not CommandExecutedEventData executed)
+            {
+                return;
+            }
+
+            var carriesId = executed.Command.Parameters
+                .Cast<DbParameter>()
+                .Any(parameter => parameter.Value?.ToString() is { } text
+                    && _keys.Any(key => text.Contains(key, StringComparison.OrdinalIgnoreCase)));
+
+            if (carriesId)
+            {
+                Interlocked.Increment(ref _count);
+            }
+        }
+
+        public void OnCompleted()
+        {
+        }
+
+        public void OnError(Exception error)
+        {
+        }
+
+        public void Dispose()
+        {
+            lock (_subscriptions)
+            {
+                foreach (var subscription in _subscriptions)
+                {
+                    subscription.Dispose();
+                }
+
+                _subscriptions.Clear();
+            }
+        }
     }
 
     private static async Task<EntityDetail> CreateEntity(HttpClient client, Guid universeId, string name)

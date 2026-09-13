@@ -25,3 +25,33 @@ export function sceneWhen(chronology: Chronology, value: ChronologyValue | null)
 export function sceneCountLabel(count: number) {
   return count === 1 ? '1 scene' : `${count} scenes`
 }
+
+export function chapterCountLabel(count: number) {
+  return count === 1 ? '1 chapter' : `${count} chapters`
+}
+
+/** What a scene that belongs to no chapter is said to be in. A place on screen, not a chapter. */
+export const UNCHAPTERED = 'Unchaptered'
+
+/**
+ * "Chapter 3": presentation, from the chapter's position in the list. Never stored and never part of
+ * the title, so reordering renumbers every chapter without touching a word the author wrote.
+ */
+export function chapterNumber(index: number) {
+  return `Chapter ${index + 1}`
+}
+
+/** "Chapter 3 — The Fall". */
+export function chapterLabel(index: number, title: string) {
+  return `${chapterNumber(index)} — ${title}`
+}
+
+/** The container a scene is in, named the way the page names it. */
+export function containerLabel(
+  chapters: { id: string; title: string }[],
+  chapterId: string | null,
+) {
+  if (chapterId === null) return UNCHAPTERED
+  const index = chapters.findIndex((chapter) => chapter.id === chapterId)
+  return index < 0 ? UNCHAPTERED : chapterLabel(index, chapters[index].title)
+}
