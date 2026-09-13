@@ -8,6 +8,8 @@ import LorePage from './pages/LorePage'
 import ProfilePage from './pages/ProfilePage'
 import { ProfileImageProvider } from './profile/ProfileImageProvider'
 import RegisterPage from './pages/RegisterPage'
+import StoriesPage from './pages/StoriesPage'
+import StoryPage from './pages/StoryPage'
 import TimelinePage from './pages/TimelinePage'
 import UniverseOverview from './pages/UniverseOverview'
 import UniverseSettings from './pages/UniverseSettings'
@@ -38,6 +40,8 @@ export default function App() {
                 <Route path="lore/new" element={<EntityPage />} />
                 <Route path="lore/:entityId" element={<EntityPage />} />
                 <Route path="timeline" element={<TimelinePage />} />
+                <Route path="stories" element={<StoriesPage />} />
+                <Route path="stories/:storyId" element={<StoryPage />} />
                 <Route path="canon" element={<CanonPage />} />
                 <Route path="types" element={<UniverseTypes />} />
                 <Route path="trash" element={<UniverseTrash />} />

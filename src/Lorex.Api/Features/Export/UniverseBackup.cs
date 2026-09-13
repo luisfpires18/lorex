@@ -2,6 +2,7 @@ using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Chronology;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Relationships;
+using Lorex.Api.Features.Stories;
 using Lorex.Api.Features.Timeline;
 
 namespace Lorex.Api.Features.Export;
@@ -53,8 +54,18 @@ public sealed record UniverseBackup(
     /// ends, not the signed year 10. A reader that ignored them would put every such year on the
     /// wrong line - the re-meaning case above, so it is a bump. A file at versions 1 to 3 names no
     /// eras, and every year in it is a plain signed year.
+    ///
+    /// 5 - A universe may hold stories (ADR 0024). <see cref="UniverseBackupPayload.Stories"/> carries
+    /// every story with its scenes, their narrative order, point of view, chronology and linked lore.
+    /// The member is nullable, but it is not the "ignorable" case above: that case is for members a
+    /// reader can skip without losing anything an author wrote, which is why relationship constraints -
+    /// rules checked against the lore - were added within version 4. A reader that skipped this one
+    /// would restore a world with every story silently missing, turning a complete backup into a lossy
+    /// one. So it is a bump: a reader that knows only version 4 is told it is holding something it
+    /// cannot carry. A file at versions 1 to 4 holds no stories - <c>stories</c> is absent and reads
+    /// as null.
     /// </summary>
-    public const int CurrentVersion = 4;
+    public const int CurrentVersion = 5;
 
     public static UniverseBackup Of(UniverseBackupPayload payload, DateTime generatedAt) =>
         new(FormatName, CurrentVersion, generatedAt, payload);
@@ -68,6 +79,9 @@ public sealed record UniverseBackup(
 ///
 /// <paramref name="ChronologyEras"/> is the universe's reckoning, earliest era first. Empty means
 /// plain signed years; absent - null, in any file before version 4 - means the same thing.
+///
+/// <paramref name="Stories"/> is every story told in the universe, by title. Empty means none;
+/// absent - null, in any file before version 5 - means the same thing.
 /// </summary>
 public sealed record UniverseBackupPayload(
     BackupUniverse Universe,
@@ -78,6 +92,7 @@ public sealed record UniverseBackupPayload(
     IReadOnlyList<BackupRelationshipType> RelationshipTypes,
     IReadOnlyList<BackupRelationship> Relationships,
     IReadOnlyList<BackupTimelineEntry> TimelineEntries,
+    IReadOnlyList<BackupStory>? Stories,
     IReadOnlyList<BackupDismissedConflict> DismissedConflicts);
 
 /// <summary>
@@ -355,6 +370,46 @@ public sealed record BackupTimelineEntry(
     DateTime CreatedAt,
     DateTime UpdatedAt,
     IReadOnlyList<Guid> ParticipantEntityIds);
+
+/// <summary>
+/// One story, with its scenes alongside it so a scene never travels apart from the story it is told
+/// in (since version 5). Authored narrative, not lore: nothing in it is a fact about the world.
+/// </summary>
+public sealed record BackupStory(
+    Guid Id,
+    string Title,
+    string? Premise,
+    StoryStatus Status,
+    DateTime CreatedAt,
+    DateTime UpdatedAt,
+    IReadOnlyList<BackupScene> Scenes);
+
+/// <summary>
+/// One scene, in the story's narrative order - the list is sorted by <paramref name="SortOrder"/>,
+/// and the number itself is carried so the order is explicit rather than implied by position.
+///
+/// <paramref name="PovEntityId"/> and <paramref name="LinkedEntityIds"/> are references to entries in
+/// this same file, never copies of them: no name, type or picture is carried here. An entry in the
+/// Trash may be among them, and is in the file too. <paramref name="Chronology"/> is where the scene
+/// happens in the world, or null; it has no bearing on the order.
+/// </summary>
+public sealed record BackupScene(
+    Guid Id,
+    int SortOrder,
+    string Title,
+    string? Summary,
+    string? Notes,
+    Guid? PovEntityId,
+    BackupChronologyValue? Chronology,
+    IReadOnlyList<Guid> LinkedEntityIds,
+    DateTime CreatedAt,
+    DateTime UpdatedAt);
+
+/// <summary>
+/// A position on the universe's line: the era the year is counted in - null on the plain reckoning -
+/// and the numbers. Nothing formatted is carried; the eras in the same file say how to write it.
+/// </summary>
+public sealed record BackupChronologyValue(Guid? EraId, int Year, int? Month, int? Day);
 
 /// <summary>
 /// The one piece of Canon Integrity that is not rebuildable: the author's decision to live

@@ -25,6 +25,7 @@ interface EraDraft {
   labelPosition: EraLabelPositionValue
   momentCount: number
   yearCount: number
+  sceneCount: number
 }
 
 function draftsFrom(chronology: Chronology): EraDraft[] {
@@ -37,6 +38,7 @@ function draftsFrom(chronology: Chronology): EraDraft[] {
     labelPosition: era.labelPosition,
     momentCount: era.momentCount,
     yearCount: era.yearCount,
+    sceneCount: era.sceneCount,
   }))
 }
 
@@ -60,6 +62,7 @@ function usageOf(era: EraDraft) {
   const parts: string[] = []
   if (era.momentCount > 0) parts.push(plural(era.momentCount, 'timeline entry', 'timeline entries'))
   if (era.yearCount > 0) parts.push(plural(era.yearCount, 'year on an entry', 'years on entries'))
+  if (era.sceneCount > 0) parts.push(plural(era.sceneCount, 'scene', 'scenes'))
   return parts.length === 0 ? null : `Dates ${parts.join(' and ')}`
 }
 
@@ -140,6 +143,7 @@ export function ChronologySettings({ universeId, chronology, onSaved }: Chronolo
         labelPosition: EraLabelPosition.BeforeYear,
         momentCount: 0,
         yearCount: 0,
+        sceneCount: 0,
       },
     ])
   }

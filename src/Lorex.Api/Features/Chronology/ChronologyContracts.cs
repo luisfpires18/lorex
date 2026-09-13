@@ -22,8 +22,9 @@ public sealed record ChronologyEraRequest(
 
 /// <summary>
 /// One era, with how much is dated in it. <paramref name="MomentCount"/> counts timeline
-/// entries that start or end in it and <paramref name="YearCount"/> counts years on entries,
-/// the Trash included - either keeps the era from being removed.
+/// entries that start or end in it, <paramref name="YearCount"/> counts years on entries, the
+/// Trash included, and <paramref name="SceneCount"/> counts story scenes placed in it - any of
+/// them keeps the era from being removed.
 /// </summary>
 public sealed record ChronologyEraResponse(
     Guid Id,
@@ -33,7 +34,20 @@ public sealed record ChronologyEraResponse(
     ChronologyEraDirection Direction,
     ChronologyLabelPosition LabelPosition,
     int MomentCount,
-    int YearCount);
+    int YearCount,
+    int SceneCount);
+
+/// <summary>
+/// One point on a universe's line that is not a timeline moment: the era its year is counted in -
+/// null on the plain reckoning - the year, and optionally a month and a day.
+///
+/// A scene carries one (ADR 0024). It is a position and nothing more: no date kind, no range and
+/// no free-text era label, which are what a timeline moment claims about itself. Null as a whole
+/// means the record is not placed in time, which is ordinary. It is validated by
+/// <see cref="ChronologyPointValidation.ValidatePoint"/> and compared, where anything compares it,
+/// as a <see cref="ChronologyPoint"/>.
+/// </summary>
+public sealed record ChronologyValue(Guid? EraId, int? Year, int? Month, int? Day);
 
 /// <summary>
 /// The reckoning, earliest era first.

@@ -15,6 +15,7 @@ const SECTIONS = [
   { segment: '', label: 'Overview', testId: 'workspace-overview' },
   { segment: 'lore', label: 'Lore', testId: 'workspace-lore' },
   { segment: 'timeline', label: 'Timeline', testId: 'workspace-timeline' },
+  { segment: 'stories', label: 'Stories', testId: 'workspace-stories' },
   { segment: 'canon', label: 'Canon', testId: 'workspace-canon' },
   { segment: 'types', label: 'Types', testId: 'workspace-types' },
   { segment: 'trash', label: 'Trash', testId: 'workspace-trash' },
@@ -24,7 +25,7 @@ const SECTIONS = [
  * Sections that exist in the plan but not yet in the product. They are shown so the shape
  * of a universe is legible, and disabled so nothing pretends to work.
  */
-const PLANNED = ['Stories', 'Plot', 'Ideas', 'Search']
+const PLANNED = ['Plot', 'Ideas', 'Search']
 
 type LoadState =
   | { kind: 'loading' }

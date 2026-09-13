@@ -49,6 +49,7 @@ be silently right in one place and silently wrong in another. Every read states 
 | Relationships (either end) | Stored; hidden from every read, and refused for edit and delete | Reappear, both readings intact |
 | Timeline participation | Stored; **shown** on the moment, flagged `isTrashed` | Flag clears |
 | An entity-reference value on another entry | Stored; **shown** on that entry, flagged `referencedEntityIsTrashed` | Flag clears |
+| A scene's point of view or linked lore (ADR 0024, amended 2026-09-13) | Stored; **shown** on the scene, flagged `isTrashed`; kept on save, refused if newly chosen | Flag clears |
 | Aliases, tags, values, article | Stored, unreachable | Come back whole |
 | Revision history | Stored, unreachable | Readable again, unchanged |
 

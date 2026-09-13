@@ -4,6 +4,7 @@ using Lorex.Api.Features.Chronology;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Profile;
 using Lorex.Api.Features.Relationships;
+using Lorex.Api.Features.Stories;
 using Lorex.Api.Features.Timeline;
 using Lorex.Api.Features.Universes;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -63,6 +64,12 @@ public class LorexDbContext(DbContextOptions<LorexDbContext> options)
     public DbSet<ProfileImage> ProfileImages => Set<ProfileImage>();
 
     public DbSet<ChronologyEra> ChronologyEras => Set<ChronologyEra>();
+
+    public DbSet<Story> Stories => Set<Story>();
+
+    public DbSet<Scene> Scenes => Set<Scene>();
+
+    public DbSet<SceneEntityLink> SceneEntityLinks => Set<SceneEntityLink>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

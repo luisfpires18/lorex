@@ -3632,6 +3632,366 @@ a {
   align-items: end;
 }
 
+/* ---------- Stories ----------
+
+   A story is narrative, not lore, so it borrows the timeline's typography without its spine: a
+   ruled list, read top to bottom in the order the author tells it. The scene's number carries that
+   order; where the scene happens in the world is a small stamp above its title and never a heading,
+   because nothing on the page is arranged by it. */
+
+/* Read by assistive technology, not drawn. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.empty__action {
+  margin-top: 1.25rem;
+}
+
+.storylist {
+  list-style: none;
+  margin: 2rem 0 0;
+  padding: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.storyrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.3rem 1.5rem;
+  align-items: baseline;
+  padding: 1.1rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.storyrow__title {
+  font-family: var(--display);
+  font-size: clamp(1.1rem, 1.7vw, 1.3rem);
+  color: var(--ink);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.storyrow__title:hover,
+.storyrow__title:focus-visible {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.storyrow__meta {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.storyrow__premise {
+  grid-column: 1 / -1;
+  margin: 0;
+  max-width: 62ch;
+  font-size: 0.9rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.story__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.story__heading {
+  flex: 1 1 20rem;
+  min-width: 0;
+}
+
+.story__title {
+  overflow-wrap: anywhere;
+}
+
+.story__meta {
+  margin: 0.5rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.75rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.story__premise {
+  margin: 0.9rem 0 0;
+  max-width: 62ch;
+  line-height: 1.65;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.story__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.story__sceneshead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 2rem 0 0.6rem;
+}
+
+.story__subtitle {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 1.35rem;
+}
+
+.scenes {
+  list-style: none;
+  margin: 1.25rem 0 0;
+  padding: 0;
+}
+
+.scene {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  column-gap: 1rem;
+  padding: 1.1rem 0;
+  border-top: 1px solid var(--rule);
+}
+
+.scene:last-child {
+  border-bottom: 1px solid var(--rule);
+}
+
+.scene__number {
+  font-family: var(--display);
+  font-size: 1.5rem;
+  line-height: 1.15;
+  color: var(--muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.scene__body {
+  min-width: 0;
+}
+
+.scene__stamp {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 1.1rem;
+  margin: 0 0 0.25rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.scene__when {
+  font-family: var(--display);
+  font-size: 0.95rem;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.scene__unplaced {
+  font-family: var(--ui);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.scene__pov {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+  min-width: 0;
+}
+
+.scene__label {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.scene__title {
+  margin: 0.1rem 0 0.3rem;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(1.05rem, 1.6vw, 1.25rem);
+  overflow-wrap: anywhere;
+}
+
+.scene__summary {
+  margin: 0 0 0.6rem;
+  max-width: 62ch;
+  font-size: 0.95rem;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.scene__lore {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  margin: 0;
+  padding: 0;
+}
+
+.scene__lore li {
+  max-width: 100%;
+}
+
+/* A lore reference: the type's icon and the entry's name, a real link to its page. */
+.lorechip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--rule);
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+a.lorechip:hover,
+a.lorechip:focus-visible {
+  color: var(--ink);
+  border-color: var(--rule-strong);
+}
+
+.lorechip__icon {
+  flex: none;
+  width: 0.95em;
+  height: 0.95em;
+}
+
+.lorechip__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Named, so the author sees the scene still holds it; not emphasised, so it does not read as a link. */
+.lorechip--trashed {
+  color: var(--rule-strong);
+  font-style: italic;
+  border-style: dashed;
+}
+
+.lorechip__note {
+  flex: none;
+}
+
+/* The point of view is a person-sized reference: its portrait, small, and its name. */
+.lorechip--pov {
+  padding: 0;
+  border: 0;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+a.lorechip--pov:hover .lorechip__name,
+a.lorechip--pov:focus-visible .lorechip__name {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.lorechip--pov .portrait {
+  width: 1.6rem;
+  height: 1.6rem;
+  font-size: 0.85rem;
+}
+
+.scene__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 1.1rem;
+  margin-top: 0.75rem;
+}
+
+.scene__tools .button--quiet {
+  padding: 0.15rem 0;
+  border: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.scene__tools .button--quiet:hover:not(:disabled) {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.scene__tools .button--quiet:disabled {
+  opacity: 0.35;
+}
+
+/* A touch screen gets targets a thumb can hit, not the pointer's hairline links. */
+@media (pointer: coarse) {
+  .scene__tools .button--quiet {
+    min-height: 2.75rem;
+    padding: 0 0.2rem;
+  }
+}
+
+.scenechron {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.scenechron__clear {
+  margin-top: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .storyrow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .storyrow__meta {
+    justify-content: flex-start;
+  }
+
+  .scene {
+    grid-template-columns: 1.6rem minmax(0, 1fr);
+    column-gap: 0.6rem;
+  }
+
+  .scene__number {
+    font-size: 1.2rem;
+  }
+}
+
 /* ---------- Chronology on a narrow screen ---------- */
 
 @media (max-width: 700px) {

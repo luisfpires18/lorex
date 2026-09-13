@@ -34,6 +34,20 @@ export interface ChronologyEra extends EraWriting {
 
   /** Years on entries counted in this era, the Trash included. */
   yearCount: number
+
+  /** Story scenes placed in this era. */
+  sceneCount: number
+}
+
+/**
+ * One point on a universe's line that is not a timeline moment - a scene's position. The era is
+ * null on the plain reckoning. Null as a whole means not placed in time, which is ordinary.
+ */
+export interface ChronologyValue {
+  eraId: string | null
+  year: number | null
+  month: number | null
+  day: number | null
 }
 
 /**

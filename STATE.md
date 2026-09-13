@@ -147,8 +147,8 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - Years written before a universe named eras are never reinterpreted: listed apart as having no
     era yet, ignored by Canon, and given one on their next save.
   - Backup format version 4 carries the eras and every era reference. ADR 0014.
-- **Relationship Canon constraints** (`feat/relationship-canon-constraints`, **not merged, not
-  pushed**). Owner-requested, unnumbered. A relation kind may say which end must be older and bound
+- **Relationship Canon constraints** (`feat/relationship-canon-constraints`, merged into `dev`).
+  Owner-requested, unnumbered. A relation kind may say which end must be older and bound
   the gap between the two birth years; Canon Integrity checks Canon links against that. Nothing is
   inferred from a kind's name. ADR 0023.
   - Typed columns on `RelationshipTypes` - `AgeOrder`, `MinAgeDifferenceYears`,
@@ -161,10 +161,28 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - The gap is `UniverseChronology.YearsBetween`: the signed difference inside one era or the plain
     reckoning, `a + b - 1` from a countdown era into the ascending era after it, unknown otherwise.
   - Edited inside the relation kind form on the Types screen. Backup stays version 4, additively.
+- **Story & Scene foundation** (`feat/story-scene-foundation`, **not merged, not pushed**). The first
+  Story-layer feature; owner-requested, unnumbered. Lore is what is true; a story is how an author tells
+  something with it. ADR 0024.
+  - Universe -> Story (title, premise, status `Planning|Drafting|Complete`) -> Scene (title, summary,
+    notes, narrative `SortOrder`, optional point of view, optional position in the world, linked
+    entries through `SceneEntityLinks`). Stories sit in the universe sidebar after Timeline.
+  - **Narrative order is not chronology.** Order is contiguous and unique per story: appended on
+    create, closed on delete, moved only by a whole-order `PUT .../scenes/order`. A scene's
+    `ChronologyValue` (era, year, month, day) is shown on it and never orders, groups or refuses
+    anything. The story page reorders with Move up / Move down; focus follows the scene.
+  - References, not copies: names, types and portraits are read from the lore on every request, two
+    queries per story. A trashed entry stays on its scene, marked, and cannot be newly chosen. An entry
+    row deleted for good clears the point of view and drops the link; nothing deletes a scene.
+  - No Canon finding, timeline entry, relationship, search hit or revision comes from a story. Deleting
+    a story or scene is permanent. Year checks and the era row are now shared with the timeline
+    (`ChronologyPointValidation`, `ChronologyPointFields`); an era a scene uses cannot be removed.
+  - Backup format version 5 carries stories: a version 4 reader would drop them silently. ADR 0014.
+  - The sidebar stays text-only: the Lucide icon asked for would have been the only one in it.
 
 ## Baseline
 
-- **582 API integration tests, 89 Playwright tests**, green. No frontend unit runner exists;
+- **624 API integration tests, 93 Playwright tests**, green. No frontend unit runner exists;
   the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
@@ -177,10 +195,12 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   the whole file green on its own, in parallel and serially. Eight more tests arrived with the
   account menu, and a full run now usually loses one or two - a rotating pick of canon, type-filter,
   mobile, universes or account-menu, each green on its own. It is contention on the one SQLite
-  writer, not the specs. The relationship-constraints run lost one canon and one type-filter test,
-  both green alone.
-- 20 migrations, latest `AddRelationshipTypeCanonConstraints` - three plain columns, walked down (a
-  table rebuild) and back up over real lore by `RelationshipConstraintMigrationTests`.
+  writer, not the specs. The story run lost one account-menu, one canon and one type-filter test,
+  each green alone.
+- 21 migrations, latest `AddStories` - three new tables and nothing else, walked down and back up over
+  real lore by `StoryMigrationTests`, which reads each delete action back from SQLite.
+  `AddRelationshipTypeCanonConstraints` is three plain columns, walked down (a table rebuild) and back
+  up by `RelationshipConstraintMigrationTests`.
   `AddUniverseChronology` creates `ChronologyEras` and adds era references,
   rebuilding `TimelineEntries` and `EntityFieldValues` as SQLite requires for a foreign key. Walked
   down and back up over real lore on a file by `ChronologyMigrationTests`; rolling back discards the
@@ -230,6 +250,9 @@ tool has changed the picture.
   dates moved first, with no reassignment tool. Month names, calendars and conversion: not started.
   ADR 0022.
 - **`Age`** is declarable but read by nothing until a structured reference year exists. ADR 0011.
+- **Stories beyond the foundation.** Chapters/acts/beats, prose, story history, story search, a Trash
+  for stories, drag-and-drop, Story-vs-Lore checks, and counting pre-era scene years in Settings are all
+  deferred. ADR 0024.
 - **Relationship life-state constraints** (an end alive at the link's date) wait for dated
   relationships: `StartDate`/`EndDate` are real-world timestamps, not chronology points. A birth-year
   gap across eras of unrecorded length waits for era lengths. ADR 0023.
