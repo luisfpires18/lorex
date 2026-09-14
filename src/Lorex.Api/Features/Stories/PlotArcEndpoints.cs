@@ -16,7 +16,9 @@ namespace Lorex.Api.Features.Stories;
 /// <c>PUT .../plot-arcs/order</c>. No arc number is stored, and nothing about a scene - its order, its
 /// chapter or its chronology - decides where an arc sits.
 ///
-/// Deleting an arc deletes its beats and their links, and never a scene, a chapter or an entry.
+/// Deleting an arc moves it to the Trash with its beats and their links, and never touches a scene, a chapter
+/// or an entry. An arc in the Trash answers every route here, and its beats every beat route, as missing ones
+/// do; restoring it is the Trash's work (ADR 0029).
 ///
 /// <b>No Canon.</b> Plot is planning. Nothing here passes the promotion gate or reconciles findings, and a beat
 /// called "The King dies" gives no entry a death year (ADR 0026).
@@ -101,7 +103,7 @@ public static class PlotArcEndpoints
         }
 
         var last = await db.PlotArcs
-            .Where(arc => arc.StoryId == storyId)
+            .Where(arc => arc.StoryId == storyId && arc.DeletedAt == null)
             .MaxAsync(arc => (int?)arc.SortOrder, cancellationToken);
 
         var now = DateTime.UtcNow;
@@ -159,7 +161,7 @@ public static class PlotArcEndpoints
         }
 
         var arc = await db.PlotArcs.FirstOrDefaultAsync(
-            candidate => candidate.Id == plotArcId && candidate.StoryId == storyId,
+            candidate => candidate.Id == plotArcId && candidate.StoryId == storyId && candidate.DeletedAt == null,
             cancellationToken);
 
         if (arc is null)
@@ -185,9 +187,9 @@ public static class PlotArcEndpoints
     }
 
     /// <summary>
-    /// Permanent. The arc's beats and every link they hold go with it, by the database's own cascade; the scenes,
-    /// chapters and entries those links pointed at are untouched. The arcs after it each move up one place. One
-    /// transaction.
+    /// Moves the arc to the Trash. Only the arc is marked: its beats keep their order and every link they hold, out of
+    /// reach while it is there and back with it on restore; the scenes, chapters and entries those links point at are
+    /// untouched. The arcs after it each move up one place. One transaction.
     /// </summary>
     private static async Task<IResult> DeleteAsync(
         Guid universeId,
@@ -211,7 +213,7 @@ public static class PlotArcEndpoints
         }
 
         var arc = await db.PlotArcs.FirstOrDefaultAsync(
-            candidate => candidate.Id == plotArcId && candidate.StoryId == storyId,
+            candidate => candidate.Id == plotArcId && candidate.StoryId == storyId && candidate.DeletedAt == null,
             cancellationToken);
 
         if (arc is null)
@@ -221,11 +223,11 @@ public static class PlotArcEndpoints
 
         try
         {
-            db.PlotArcs.Remove(arc);
+            arc.DeletedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
 
             var remaining = await db.PlotArcs
-                .Where(candidate => candidate.StoryId == storyId)
+                .Where(candidate => candidate.StoryId == storyId && candidate.DeletedAt == null)
                 .OrderBy(candidate => candidate.SortOrder)
                 .ThenBy(candidate => candidate.Id)
                 .ToListAsync(cancellationToken);
@@ -281,7 +283,7 @@ public static class PlotArcEndpoints
         }
 
         var arcs = await db.PlotArcs
-            .Where(arc => arc.StoryId == storyId)
+            .Where(arc => arc.StoryId == storyId && arc.DeletedAt == null)
             .ToListAsync(cancellationToken);
 
         var byId = arcs.ToDictionary(arc => arc.Id);
@@ -314,15 +316,18 @@ public static class PlotArcEndpoints
     // ---------- Shared ----------
 
     /// <summary>
-    /// Whether <paramref name="plotArcId"/> is an arc of this story. The caller has already proved the story is the
-    /// caller's; an arc id a client sends is never trusted on its own.
+    /// Whether <paramref name="plotArcId"/> is a live arc of this story. The caller has already proved the story is the
+    /// caller's; an arc id a client sends is never trusted on its own, and one in the Trash is refused like any other
+    /// that is not there.
     /// </summary>
     internal static Task<bool> BelongsToStoryAsync(
         LorexDbContext db,
         Guid storyId,
         Guid plotArcId,
         CancellationToken cancellationToken) =>
-        db.PlotArcs.AnyAsync(arc => arc.Id == plotArcId && arc.StoryId == storyId, cancellationToken);
+        db.PlotArcs.AnyAsync(
+            arc => arc.Id == plotArcId && arc.StoryId == storyId && arc.DeletedAt == null,
+            cancellationToken);
 
     /// <summary>The refusal for an arc id that is not one of this story's, worded the same whoever's it is.</summary>
     internal static Dictionary<string, string[]> ForeignArc() =>
@@ -347,8 +352,9 @@ public static class PlotArcEndpoints
         Guid? plotArcId,
         CancellationToken cancellationToken)
     {
-        var arcs = db.PlotArcs.AsNoTracking().Where(arc => arc.StoryId == storyId);
-        var beats = db.PlotBeats.Where(beat => beat.PlotArc!.StoryId == storyId);
+        var arcs = db.PlotArcs.AsNoTracking().Where(arc => arc.StoryId == storyId && arc.DeletedAt == null);
+        var beats = db.PlotBeats.Where(beat =>
+            beat.PlotArc!.StoryId == storyId && beat.PlotArc.DeletedAt == null && beat.DeletedAt == null);
 
         if (plotArcId is { } id)
         {

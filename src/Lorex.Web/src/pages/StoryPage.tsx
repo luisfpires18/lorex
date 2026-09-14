@@ -400,17 +400,23 @@ export default function StoryPage({
     const beats = sceneBeats.get(scene.id)?.length ?? 0
     const stays =
       beats === 0
-        ? 'Any manuscript written for it goes too. The lore it links stays.'
-        : `Any manuscript written for it goes too. The lore it links stays, and so ${
+        ? 'Its manuscript and saved versions go with it. The lore it links stays.'
+        : `Its manuscript and saved versions go with it. The lore it links stays, and so ${
             beats === 1 ? 'does the plot beat' : `do the ${beats} plot beats`
           } that point at it.`
 
-    if (!window.confirm(`Delete the scene “${scene.title}”? ${stays}`)) return
+    if (
+      !window.confirm(
+        `Move the scene “${scene.title}” to the Trash? ${stays} You can restore it from the Trash.`,
+      )
+    ) {
+      return
+    }
 
     setMessage(null)
     try {
       await deleteScene(universe.id, story.id, scene.id)
-      setAnnouncement(`Deleted “${scene.title}”.`)
+      setAnnouncement(`Moved “${scene.title}” to the Trash.`)
       reload()
     } catch (error: unknown) {
       setMessage(error instanceof ApiError ? error.message : 'That scene could not be deleted.')
@@ -427,7 +433,7 @@ export default function StoryPage({
 
     if (
       !window.confirm(
-        `Delete ${chapterLabel(index, chapter.title)}? The chapter will be removed. ${consequence}`,
+        `Delete ${chapterLabel(index, chapter.title)}? The chapter will be removed. ${consequence} The chapter goes to the Trash, and restoring it brings it back without moving any scene.`,
       )
     ) {
       return
@@ -438,8 +444,8 @@ export default function StoryPage({
       await deleteChapter(universe.id, story.id, chapter.id)
       setAnnouncement(
         count === 0
-          ? `Deleted the chapter “${chapter.title}”.`
-          : `Deleted the chapter “${chapter.title}”. Its ${sceneCountLabel(count)} ${
+          ? `Moved the chapter “${chapter.title}” to the Trash.`
+          : `Moved the chapter “${chapter.title}” to the Trash. Its ${sceneCountLabel(count)} ${
               count === 1 ? 'is' : 'are'
             } now in Unchaptered.`,
       )
@@ -457,7 +463,7 @@ export default function StoryPage({
     ])
     if (
       !window.confirm(
-        `Delete “${story.title}” and its ${holds}, with every manuscript? This cannot be undone. The lore it draws on stays.`,
+        `Move “${story.title}” and its ${holds}, with every manuscript, to the Trash? You can restore the whole story from the Trash. The lore it draws on stays.`,
       )
     ) {
       return

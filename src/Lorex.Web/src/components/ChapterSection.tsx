@@ -45,6 +45,8 @@ export function ChapterSection({
   return (
     <section
       className="chapter"
+      id={`chapter-${chapter.id}`}
+      tabIndex={-1}
       aria-labelledby={headingId}
       data-testid="chapter"
       data-title={chapter.title}

@@ -133,10 +133,12 @@ public sealed class PlotBeatEndpointTests(LorexApiFactory factory) : IClassFixtu
             new (Guid, int)[] { (a.Id, 0), (c.Id, 1) },
             Assert.Single(await Plot(client, universe.Id, story)).Beats.Select(beat => (beat.Id, beat.SortOrder)));
 
+        // The beat waits in the Trash with its links, for a restore (ADR 0029).
         await WithDb(_factory, async db =>
         {
-            Assert.False(await db.PlotBeatScenes.AnyAsync(link => link.PlotBeatId == b.Id));
-            Assert.False(await db.PlotBeatEntities.AnyAsync(link => link.PlotBeatId == b.Id));
+            Assert.True(await db.PlotBeats.AnyAsync(beat => beat.Id == b.Id && beat.DeletedAt != null));
+            Assert.True(await db.PlotBeatScenes.AnyAsync(link => link.PlotBeatId == b.Id));
+            Assert.True(await db.PlotBeatEntities.AnyAsync(link => link.PlotBeatId == b.Id));
         });
 
         Assert.Equal([council], (await ReadStory(client, universe.Id, story)).Scenes.Select(scene => scene.Id));
@@ -323,7 +325,7 @@ public sealed class PlotBeatEndpointTests(LorexApiFactory factory) : IClassFixtu
     }
 
     [Fact]
-    public async Task Deleting_a_scene_takes_only_its_links_and_every_beat_stays_in_place()
+    public async Task Deleting_a_scene_hides_only_its_links_and_every_beat_stays_in_place()
     {
         var (client, universe) = await SignedInWithUniverse(_factory, "beatscenedelete");
         var story = await CreateStory(client, universe.Id, "Cut scenes");
@@ -342,7 +344,8 @@ public sealed class PlotBeatEndpointTests(LorexApiFactory factory) : IClassFixtu
         Assert.Empty(beats[0].SceneIds);
         Assert.Equal([siege], beats[1].SceneIds);
 
-        await WithDb(_factory, async db => Assert.False(await db.PlotBeatScenes.AnyAsync(link => link.SceneId == council)));
+        // Hidden, not removed: the scene is in the Trash, and its links come back with it (ADR 0029).
+        await WithDb(_factory, async db => Assert.Equal(2, await db.PlotBeatScenes.CountAsync(link => link.SceneId == council)));
     }
 
     // ---------- Lore links ----------

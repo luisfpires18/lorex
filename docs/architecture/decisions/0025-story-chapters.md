@@ -1,6 +1,6 @@
 # ADR 0025 - A chapter is optional structure; a scene's order is its place inside its chapter
 
-Status: accepted (2026-09-13)
+Status: accepted (2026-09-13), amended 2026-09-14 (a chapter goes to the Trash holding no scene - ADR 0029)
 
 ## Context
 
@@ -132,3 +132,11 @@ field. The delete confirmation says the chapter will be removed and its scenes m
 - A move or reorder updates the story's `UpdatedAt`, not the scene's: where a scene is told is the
   story's structure, as ADR 0024's reorder already treated it. Editing a scene into another chapter is an
   edit, and updates both.
+
+## Amendment - the Trash (2026-09-14)
+
+Deleting a chapter still never deletes a scene, and still moves every live scene, in order, to the end of Unchaptered first.
+The chapter is then marked and goes to the Trash (ADR 0029) instead of being removed. A scene already in the Trash leaves the
+chapter too, so a chapter in the Trash holds no scene; restoring it brings back its title, summary and notes, last among the
+story's chapters, and moves no scene back into it - its scenes stay wherever the author has put them since. Chapter order is
+unique among live chapters. `Scenes.ChapterId` stays `NO ACTION`.

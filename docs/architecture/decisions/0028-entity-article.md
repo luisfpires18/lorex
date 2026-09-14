@@ -1,7 +1,7 @@
 # ADR 0028 - An entry's article lives in a row of its own, with its own history, saved on its own route
 
 Status: accepted (2026-09-13), amended 2026-09-14 (merge readiness: an entry write carrying the article is refused, and
-Back and Forward ask)
+Back and Forward ask), amended 2026-09-14 (recovered drafts - ADR 0029)
 
 ## Context
 
@@ -165,3 +165,12 @@ uses `useBlocker` for history moves only, while a `useLeaveGuard` question is st
   never held as well: every action asks once.
 - A move to a page from before Lorex loaded leaves the document, and the browser's own prompt asks about that.
 - The manuscript editor shares the guard and asks the same way. That supersedes ADR 0027's decision.
+
+## Amendment - recovered drafts (2026-09-14)
+
+The deferred "local draft recovery" is done (ADR 0029); autosave is still not. While the article is written with unsaved
+changes, the browser keeps a recovery copy of the document; when the entry opens with a copy that differs from what is saved,
+the saved article is shown and "Recovered draft" is offered above it - read it, recover it into the editor as unsaved changes,
+or discard it. Edit article waits for that choice. Done without saving, Load the saved version, and answering "leave" to the
+leave guard let the copy go, through `useLeaveGuard`'s new `onLeave`; a failed, stale or orphaned save keeps it. The article's
+route, history, stale-save refusal and search are unchanged, and no copy ever reaches them.

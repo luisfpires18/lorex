@@ -457,8 +457,9 @@ test.describe('plot', () => {
     await expect
       .poll(() => plotStructure(page))
       .toEqual(['Arc 1 — Fall of the King | Capital is breached | Accepts exile'])
-    expect(confirmation).toContain('Its 1 beat will be deleted too.')
+    expect(confirmation).toContain('Its 1 beat will go with it.')
     expect(confirmation).toContain('No scene, chapter or lore is deleted.')
+    expect(confirmation).toContain('restore the arc from the Trash')
 
     await page.reload()
     await expect

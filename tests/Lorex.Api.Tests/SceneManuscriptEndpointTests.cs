@@ -295,7 +295,7 @@ public sealed class SceneManuscriptEndpointTests(LorexApiFactory factory) : ICla
     }
 
     [Fact]
-    public async Task Deleting_a_scene_deletes_its_manuscript_and_no_other()
+    public async Task Deleting_a_scene_puts_its_manuscript_out_of_reach_with_it_and_touches_no_other()
     {
         var (client, universe) = await SignedInWithUniverse(_factory, "msscenedelete");
         var story = await CreateStory(client, universe.Id, "Cut");
@@ -307,12 +307,18 @@ public sealed class SceneManuscriptEndpointTests(LorexApiFactory factory) : ICla
         (await client.DeleteAsync($"{Story(universe.Id, story)}/scenes/{doomed}")).EnsureSuccessStatusCode();
 
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(Manuscript(universe.Id, story, doomed))).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.NotFound,
+            (await PutManuscript(client, universe.Id, story, doomed, "Written into the Trash.", DateTime.UtcNow)).StatusCode);
         Assert.Equal("Kept prose.", (await ReadManuscript(client, universe.Id, story, kept)).Content);
-        await WithDb(_factory, async db => Assert.False(await db.SceneManuscripts.AnyAsync(row => row.SceneId == doomed)));
+
+        // Kept, word for word, for the scene's restore (ADR 0029).
+        await WithDb(_factory, async db =>
+            Assert.Equal("Cut prose.", (await db.SceneManuscripts.SingleAsync(row => row.SceneId == doomed)).Content));
     }
 
     [Fact]
-    public async Task Deleting_a_story_or_a_universe_takes_its_manuscripts_with_it()
+    public async Task A_story_in_the_trash_keeps_its_manuscripts_and_deleting_the_universe_takes_them_for_good()
     {
         var (client, universe) = await SignedInWithUniverse(_factory, "msstorydelete");
         var doomedStory = await CreateStory(client, universe.Id, "Abandoned");
@@ -324,16 +330,26 @@ public sealed class SceneManuscriptEndpointTests(LorexApiFactory factory) : ICla
 
         (await client.DeleteAsync(Story(universe.Id, doomedStory))).EnsureSuccessStatusCode();
 
+        Assert.Equal(
+            HttpStatusCode.NotFound,
+            (await client.GetAsync(Manuscript(universe.Id, doomedStory, doomedScene))).StatusCode);
+        Assert.Equal("Kept prose.", (await ReadManuscript(client, universe.Id, keptStory, keptScene)).Content);
+
         await WithDb(_factory, async db =>
         {
-            Assert.False(await db.SceneManuscripts.AnyAsync(row => row.SceneId == doomedScene));
+            Assert.True(await db.SceneManuscripts.AnyAsync(row => row.SceneId == doomedScene));
+            Assert.True(await db.SceneManuscriptRevisions.AnyAsync(row => row.SceneId == doomedScene));
             Assert.True(await db.SceneManuscripts.AnyAsync(row => row.SceneId == keptScene));
         });
 
         (await client.PostAsync($"/api/universes/{universe.Id}/archive", content: null)).EnsureSuccessStatusCode();
         Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/universes/{universe.Id}")).StatusCode);
 
-        await WithDb(_factory, async db => Assert.False(await db.SceneManuscripts.AnyAsync(row => row.SceneId == keptScene)));
+        await WithDb(_factory, async db =>
+        {
+            Assert.False(await db.SceneManuscripts.AnyAsync(row => row.SceneId == keptScene || row.SceneId == doomedScene));
+            Assert.False(await db.SceneManuscriptRevisions.AnyAsync(row => row.SceneId == keptScene || row.SceneId == doomedScene));
+        });
     }
 
     [Fact]

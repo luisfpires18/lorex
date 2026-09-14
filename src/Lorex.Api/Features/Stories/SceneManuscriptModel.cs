@@ -16,8 +16,9 @@ namespace Lorex.Api.Features.Stories;
 /// link, plot link or search hit comes from a sentence in it.
 ///
 /// At most one per scene, keyed by the scene and deleted with it. A scene with no row has an empty manuscript; the row
-/// appears on the first save and stays, even when a later save empties it. See
-/// <c>docs/architecture/decisions/0027-scene-manuscript.md</c>.
+/// appears on the first save that writes something and stays, even when a later save empties it. Every such save also
+/// records a <see cref="SceneManuscriptRevision"/>. See <c>docs/architecture/decisions/0027-scene-manuscript.md</c> and
+/// <c>docs/architecture/decisions/0029-content-recovery.md</c>.
 /// </summary>
 public sealed class SceneManuscript
 {
@@ -30,4 +31,43 @@ public sealed class SceneManuscript
 
     /// <summary>When the prose was last saved - and what a save names to show it was written over the latest text.</summary>
     public DateTime UpdatedAt { get; set; }
+}
+
+/// <summary>What a saved version of a manuscript was: the first one, an ordinary save, or an earlier version put back.</summary>
+public enum SceneManuscriptRevisionKind
+{
+    Created = 0,
+    Edited = 1,
+    Restored = 2,
+}
+
+/// <summary>
+/// One saved version of a scene's manuscript, exactly as it stood after a save that changed it.
+///
+/// Every save that changes the prose records the next version, so the newest is the manuscript as it stands, and each
+/// holds the whole text: any one is readable and restorable on its own, with no chain to replay. A save that changes
+/// nothing records nothing. Immutable once written. Only the scene is a real key;
+/// <see cref="RestoredFromRevisionId"/> is a raw id into this same history, which dies with the scene.
+///
+/// Read only on the manuscript's own history routes - never with the manuscript, the story or anything else.
+/// </summary>
+public sealed class SceneManuscriptRevision
+{
+    public Guid Id { get; set; }
+
+    public Guid SceneId { get; set; }
+
+    public Scene? Scene { get; set; }
+
+    /// <summary>1 for the first version, incrementing per scene.</summary>
+    public int Number { get; set; }
+
+    public SceneManuscriptRevisionKind Kind { get; set; }
+
+    public Guid? RestoredFromRevisionId { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    /// <summary>The prose as it was saved, or <c>""</c> for a save that emptied it.</summary>
+    public required string Content { get; set; }
 }

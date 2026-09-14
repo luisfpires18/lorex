@@ -155,7 +155,7 @@ public sealed class StoryEndpointTests(LorexApiFactory factory) : IClassFixture<
     // ---------- What deleting takes with it ----------
 
     [Fact]
-    public async Task Deleting_a_story_removes_its_scenes_and_their_links_and_no_lore()
+    public async Task Deleting_a_story_moves_it_to_the_trash_with_its_scenes_and_links_and_no_lore()
     {
         var (client, universe) = await SignedInWithUniverse("storydelete");
         var arlen = await CreateEntity(client, universe.Id, "Arlen");
@@ -166,12 +166,21 @@ public sealed class StoryEndpointTests(LorexApiFactory factory) : IClassFixture<
         var response = await client.DeleteAsync(Story(universe.Id, story.Id));
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
+        // Gone from the story, the list and every write, and a second delete finds nothing to delete.
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(Story(universe.Id, story.Id))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.DeleteAsync(Story(universe.Id, story.Id))).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.NotFound,
+            (await client.PutAsJsonAsync(Story(universe.Id, story.Id), new StoryRequest("Back", null, StoryStatus.Planning))).StatusCode);
+        Assert.DoesNotContain(
+            "Doomed", await client.GetStringAsync($"/api/universes/{universe.Id}/stories"), StringComparison.Ordinal);
 
+        // Nothing is erased: the story is marked, and what it holds waits with it (ADR 0029).
         await WithDb(async db =>
         {
-            Assert.False(await db.Scenes.AnyAsync(candidate => candidate.Id == scene.Id));
-            Assert.False(await db.SceneEntityLinks.AnyAsync(link => link.SceneId == scene.Id));
+            Assert.True(await db.Stories.AnyAsync(candidate => candidate.Id == story.Id && candidate.DeletedAt != null));
+            Assert.True(await db.Scenes.AnyAsync(candidate => candidate.Id == scene.Id && candidate.DeletedAt == null));
+            Assert.True(await db.SceneEntityLinks.AnyAsync(link => link.SceneId == scene.Id));
             Assert.True(await db.Entities.AnyAsync(entity => entity.Id == arlen.Id && entity.DeletedAt == null));
         });
     }

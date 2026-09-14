@@ -10,6 +10,8 @@ import type {
   SceneInput,
   SceneManuscript,
   SceneManuscriptInput,
+  ManuscriptRevisionDetail,
+  ManuscriptRevisionSummary,
   StoryDetail,
   StoryInput,
   StorySummary,
@@ -54,7 +56,7 @@ export function updateStory(universeId: string, storyId: string, input: StoryInp
   })
 }
 
-/** Permanent: the story's chapters and scenes go with it. The lore they referenced stays. */
+/** To the Trash: the story's chapters, scenes, prose and plot go with it, and come back with it. The lore stays. */
 export function deleteStory(universeId: string, storyId: string) {
   return apiFetch<void>(`${base(universeId)}/${storyId}`, { method: 'DELETE' })
 }
@@ -79,7 +81,7 @@ export function updateChapter(
   })
 }
 
-/** Removes the chapter only: its scenes move, in order, to the end of Unchaptered. */
+/** Moves the chapter only to the Trash: its scenes move, in order, to the end of Unchaptered. */
 export function deleteChapter(universeId: string, storyId: string, chapterId: string) {
   return apiFetch<void>(`${chapters(universeId, storyId)}/${chapterId}`, { method: 'DELETE' })
 }
@@ -112,6 +114,7 @@ export function updateScene(
   })
 }
 
+/** To the Trash, with its prose, saved versions and links. The rest of its container closes up. */
 export function deleteScene(universeId: string, storyId: string, sceneId: string) {
   return apiFetch<void>(`${scenes(universeId, storyId)}/${sceneId}`, { method: 'DELETE' })
 }
@@ -162,6 +165,45 @@ export function saveSceneManuscript(
   })
 }
 
+/** The manuscript's saved versions, newest first, with no text. Read when its history is opened - never with the prose. */
+export function listManuscriptRevisions(
+  universeId: string,
+  storyId: string,
+  sceneId: string,
+  signal?: AbortSignal,
+) {
+  return apiFetch<ManuscriptRevisionSummary[]>(
+    `${manuscript(universeId, storyId, sceneId)}/revisions`,
+    { signal },
+  )
+}
+
+/** One saved version, whole. */
+export function getManuscriptRevision(
+  universeId: string,
+  storyId: string,
+  sceneId: string,
+  revisionId: string,
+) {
+  return apiFetch<ManuscriptRevisionDetail>(
+    `${manuscript(universeId, storyId, sceneId)}/revisions/${revisionId}`,
+  )
+}
+
+/** Puts a saved version back as the newest, refused like a stale save if the prose moved on since it was read. */
+export function restoreManuscriptRevision(
+  universeId: string,
+  storyId: string,
+  sceneId: string,
+  revisionId: string,
+  expectedUpdatedAt: string | null,
+) {
+  return apiFetch<SceneManuscript>(
+    `${manuscript(universeId, storyId, sceneId)}/revisions/${revisionId}/restore`,
+    { method: 'POST', body: JSON.stringify({ expectedUpdatedAt }) },
+  )
+}
+
 /** The story's whole plot: every arc in order, each with its beats in order and their links resolved. */
 export function listPlotArcs(universeId: string, storyId: string, signal?: AbortSignal) {
   return apiFetch<PlotArc[]>(plotArcs(universeId, storyId), { signal })
@@ -187,7 +229,7 @@ export function updatePlotArc(
   })
 }
 
-/** Permanent: the arc's beats and their links go with it. No scene, chapter or entry does. */
+/** To the Trash: the arc's beats and their links go with it, and come back with it. No scene, chapter or entry moves. */
 export function deletePlotArc(universeId: string, storyId: string, plotArcId: string) {
   return apiFetch<void>(`${plotArcs(universeId, storyId)}/${plotArcId}`, { method: 'DELETE' })
 }
@@ -226,7 +268,7 @@ export function updatePlotBeat(
   })
 }
 
-/** Permanent: its links go with it. The scenes and lore it pointed at stay. */
+/** To the Trash, with its links. The scenes and lore it points at stay. */
 export function deletePlotBeat(universeId: string, storyId: string, plotBeatId: string) {
   return apiFetch<void>(`${plotBeats(universeId, storyId)}/${plotBeatId}`, { method: 'DELETE' })
 }

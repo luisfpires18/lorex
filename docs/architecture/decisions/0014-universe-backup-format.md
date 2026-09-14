@@ -4,8 +4,8 @@ Status: accepted (2026-09-09), amended 2026-09-10 (version 3: the file became an
 2026-09-11 (type icon keys, and a short-lived image framing member, both within version 3),
 2026-09-13 (version 4: a universe's eras), 2026-09-13 (relationship type Canon constraints,
 within version 4), 2026-09-13 (version 5: stories), 2026-09-13 (version 6: chapters), 2026-09-13
-(version 7: plot), 2026-09-13 (version 8: scene prose), and 2026-09-13 (version 9: entry articles and their
-history)
+(version 7: plot), 2026-09-13 (version 8: scene prose), 2026-09-13 (version 9: entry articles and their
+history), and 2026-09-14 (version 10: story content in the Trash, and a manuscript's saved versions)
 
 ## Context
 
@@ -170,6 +170,17 @@ importing account - ownership is never in the file. It validates each document a
 with their ids and numbers, writes no entry revision for any of it, and reindexes search. It never applies a revision's
 `content` to the article.
 
+**Version 10 (2026-09-14) carries story content in the Trash and a manuscript's saved versions** (ADR 0029). Story, chapter,
+scene, arc and beat gain `deletedAt`, null while live; each scene's `manuscript` gains `revisions`, every saved version oldest
+first (`id`, `number`, `kind`, `restoredFromRevisionId`, `createdAt`, the whole text). Inside each ordered collection the live
+rows come first in their order, then the marked ones. It fails the test twice, as versions 2 and 9 did: the markers re-mean
+every collection in a story - membership no longer implies live, and a marked row's `sortOrder` is the place it had and holds
+none, so a version 9 reader would restore the Trash into the story with two scenes claiming one place - and the versions are
+authored text a version 9 reader would drop silently. A file at version 9 or earlier has none of these members: everything in
+it is live, and a manuscript has no versions but its text. A future importer restores each marker as it is, places no marked
+row in a live order, and re-creates the versions with their ids and numbers without ever applying one. A browser's recovery copy
+of unsaved writing is never in a backup: it was never saved.
+
 **Only the authored data.** The test for inclusion is: did a person write this, or would
 Lorex produce it again from what a person wrote?
 
@@ -183,9 +194,9 @@ Lorex produce it again from what a person wrote?
 | Relationship types with their Canon constraints, and relationships | - |
 | The universe's eras: name, short label, order, direction, label position | Formatted dates and sort keys |
 | Timeline entries, their date components, era ids and era labels, participants | Derived date precision |
-| Stories; their chapters in order with title, summary and notes; their scenes with chapter, place in it, point of view, chronology and linked entry ids | Any name, type or formatted date of what a scene references, and any chapter number |
+| Stories; their chapters in order with title, summary and notes; their scenes with chapter, place in it, point of view, chronology and linked entry ids; the Trash among all of them, marked | Any name, type or formatted date of what a scene references, and any chapter number |
 | Each story's plot arcs in order with title, description and notes; their beats in order with text and linked scene and entry ids | Any arc or beat number, and any scene title, chapter or entry name a beat points at |
-| Each scene's manuscript: its plain text exactly as stored, and when it was last saved | Any word count, rendering or copy of the scene's planning |
+| Each scene's manuscript: its plain text exactly as stored, when it was last saved, and every saved version of it | Any word count, rendering or copy of the scene's planning, and any unsaved recovery copy a browser kept |
 | Every entry's revision history (ADR 0013); versions recorded since version 9 hold no copy of the article | - |
 | Each entry's primary image: the original bytes, its asset id, filename, content type, dimensions, chosen crop and archive path | The generated thumbnail and its id, and every R2 object key, bucket name, endpoint and URL |
 | Canon conflicts the author **dismissed** | Pending and resolved conflicts, and all conflict wording |

@@ -37,7 +37,7 @@ public sealed class StoryBackupTests(LorexApiFactory factory) : IClassFixture<Lo
 
         var backup = await Backup(client, universe.Id);
 
-        Assert.Equal(9, backup.FormatVersion);
+        Assert.Equal(10, backup.FormatVersion);
         var stories = backup.Payload.Stories!;
 
         // By title, ordinally: "Aftermath" before "The Long Winter".
@@ -81,7 +81,7 @@ public sealed class StoryBackupTests(LorexApiFactory factory) : IClassFixture<Lo
 
         var backup = await Backup(client, universe.Id);
 
-        Assert.Equal(9, backup.FormatVersion);
+        Assert.Equal(10, backup.FormatVersion);
         var story = Assert.Single(backup.Payload.Stories!);
         var chapters = story.Chapters!;
 
@@ -131,9 +131,9 @@ public sealed class StoryBackupTests(LorexApiFactory factory) : IClassFixture<Lo
         var chapter = document.RootElement
             .GetProperty("payload").GetProperty("stories")[0].GetProperty("chapters")[0];
 
-        // No number, no count, no copy of the scenes: each scene names its chapter itself.
+        // No number, no count, no copy of the scenes: each scene names its chapter itself. Only whether it is in the Trash.
         Assert.Equal(
-            ["createdAt", "id", "notes", "sortOrder", "summary", "title", "updatedAt"],
+            ["createdAt", "deletedAt", "id", "notes", "sortOrder", "summary", "title", "updatedAt"],
             chapter.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal));
     }
 

@@ -1,6 +1,6 @@
 # ADR 0026 - Plot is planning: arcs of beats that point at scenes and lore and own neither
 
-Status: accepted (2026-09-13)
+Status: accepted (2026-09-13), amended 2026-09-14 (arcs and beats go to the Trash - ADR 0029)
 
 ## Context
 
@@ -116,3 +116,11 @@ chapter with a title filter - and the existing entry picker. No drag-and-drop, b
   fails its foreign key and is the same 409.
 - A plot write updates the story's `UpdatedAt`, and editing an arc or a beat updates its own too. A reorder or a
   move updates only the story's, as ADR 0025 already treats a move.
+
+## Amendment - the Trash (2026-09-14)
+
+Deleting an arc or a beat is no longer permanent (ADR 0029). An arc is marked and goes to the Trash with its beats and links
+untouched beneath it; a beat goes with its links. Each comes back last in its order, and a beat waits while its arc or story is
+in the Trash. Arc and beat order are unique among live rows. A beat's link to a scene in the Trash is kept and hidden - the plot
+read leaves it out, a beat save keeps it whatever it sends, and it returns with the scene - and a scene in the Trash cannot be
+newly linked. Still no plot delete reaches a scene, a chapter or an entry.

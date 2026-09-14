@@ -121,7 +121,7 @@ public sealed class PlotArcEndpointTests(LorexApiFactory factory) : IClassFixtur
     // ---------- What deleting takes, and never takes ----------
 
     [Fact]
-    public async Task Deleting_an_arc_closes_the_gap_and_takes_its_beats_and_links_but_no_scene_chapter_or_entry()
+    public async Task Deleting_an_arc_closes_the_gap_and_puts_its_beats_and_links_in_the_trash_with_it_but_no_scene_chapter_or_entry()
     {
         var (client, universe) = await SignedInWithUniverse(_factory, "arcdelete");
         var arlen = await CreateEntity(client, universe.Id, "Arlen");
@@ -150,11 +150,13 @@ public sealed class PlotArcEndpointTests(LorexApiFactory factory) : IClassFixtur
             plot.Select(arc => (arc.Id, arc.SortOrder)));
         Assert.Equal([siege], Assert.Single(plot[1].Beats).SceneIds);
 
+        // Only the arc is marked: its beats keep their order and every link, out of every read, for a restore (ADR 0029).
         await WithDb(_factory, async db =>
         {
-            Assert.False(await db.PlotBeats.AnyAsync(beat => beat.PlotArcId == doomed.Id));
-            Assert.False(await db.PlotBeatScenes.AnyAsync(link => link.PlotBeatId == breach.Id));
-            Assert.False(await db.PlotBeatEntities.AnyAsync(link => link.PlotBeatId == breach.Id));
+            Assert.True(await db.PlotArcs.AnyAsync(arc => arc.Id == doomed.Id && arc.DeletedAt != null));
+            Assert.Equal(2, await db.PlotBeats.CountAsync(beat => beat.PlotArcId == doomed.Id && beat.DeletedAt == null));
+            Assert.True(await db.PlotBeatScenes.AnyAsync(link => link.PlotBeatId == breach.Id));
+            Assert.True(await db.PlotBeatEntities.AnyAsync(link => link.PlotBeatId == breach.Id));
             Assert.True(await db.PlotBeatScenes.AnyAsync(link => link.PlotBeatId == kept.Id && link.SceneId == siege));
             Assert.True(await db.PlotBeatEntities.AnyAsync(link => link.PlotBeatId == kept.Id && link.EntityId == arlen));
         });
@@ -170,7 +172,7 @@ public sealed class PlotArcEndpointTests(LorexApiFactory factory) : IClassFixtur
     }
 
     [Fact]
-    public async Task Deleting_a_story_or_its_universe_takes_the_plot_with_it_and_no_lore()
+    public async Task A_story_in_the_trash_keeps_its_plot_out_of_reach_and_deleting_its_universe_takes_it_for_good()
     {
         var (client, universe) = await SignedInWithUniverse(_factory, "arcstorydelete");
         var arlen = await CreateEntity(client, universe.Id, "Arlen");
@@ -186,24 +188,30 @@ public sealed class PlotArcEndpointTests(LorexApiFactory factory) : IClassFixtur
 
         Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync(Story(universe.Id, doomed))).StatusCode);
 
+        // Out of reach through the story, and kept whole beneath it (ADR 0029).
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(Arcs(universe.Id, doomed))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(Beat(universe.Id, doomed, beat.Id))).StatusCode);
+
         await WithDb(_factory, async db =>
         {
-            Assert.False(await db.PlotArcs.AnyAsync(candidate => candidate.StoryId == doomed));
-            Assert.False(await db.PlotBeats.AnyAsync(candidate => candidate.Id == beat.Id));
-            Assert.False(await db.PlotBeatScenes.AnyAsync(link => link.PlotBeatId == beat.Id));
-            Assert.False(await db.PlotBeatEntities.AnyAsync(link => link.PlotBeatId == beat.Id));
+            Assert.True(await db.PlotArcs.AnyAsync(candidate => candidate.StoryId == doomed && candidate.DeletedAt == null));
+            Assert.True(await db.PlotBeats.AnyAsync(candidate => candidate.Id == beat.Id && candidate.DeletedAt == null));
+            Assert.True(await db.PlotBeatScenes.AnyAsync(link => link.PlotBeatId == beat.Id));
+            Assert.True(await db.PlotBeatEntities.AnyAsync(link => link.PlotBeatId == beat.Id));
             Assert.True(await db.Entities.AnyAsync(entity => entity.Id == arlen && entity.DeletedAt == null));
         });
 
         Assert.Single(await Plot(client, universe.Id, survivor));
 
-        // The universe's own cascade meets the plot from both sides - through its stories and through its entries.
+        // The universe's own cascade meets the plot from both sides - through its stories and through its entries - and
+        // takes the Trash with it.
         (await client.PostAsync($"/api/universes/{universe.Id}/archive", content: null)).EnsureSuccessStatusCode();
         Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/universes/{universe.Id}")).StatusCode);
 
         await WithDb(_factory, async db =>
         {
-            Assert.False(await db.PlotArcs.AnyAsync(candidate => candidate.StoryId == survivor));
+            Assert.False(await db.PlotArcs.AnyAsync(candidate => candidate.StoryId == survivor || candidate.StoryId == doomed));
+            Assert.False(await db.PlotBeats.AnyAsync(candidate => candidate.Id == beat.Id));
             Assert.False(await db.PlotBeatEntities.AnyAsync(link => link.EntityId == arlen));
         });
     }

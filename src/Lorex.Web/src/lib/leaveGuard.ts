@@ -1,19 +1,29 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { NavigationType, useBlocker } from 'react-router-dom'
 
+/** One editor's unsaved work: the question it asks, and what it lets go of when the author leaves it anyway. */
+interface Question {
+  message: string
+  leave: () => void
+}
+
 /** Every leave question standing right now, newest last: one per editor holding unsaved work. */
-const standing: string[] = []
+const standing: Question[] = []
 
 /**
  * Asks the newest standing leave question, if there is one, and says whether to go ahead.
  *
  * For an in-app way out that is a button rather than a link - signing out - which the link check in `useLeaveGuard`
  * cannot see, and for the browser's Back and Forward through `HistoryLeaveGuard`. With nothing unsaved anywhere it asks
- * nothing and answers yes.
+ * nothing and answers yes. When the author chooses to leave, every editor being left lets its recovery copy go.
  */
 export function confirmLeaving() {
-  const message = standing[standing.length - 1]
-  return message === undefined || window.confirm(message)
+  const newest = standing[standing.length - 1]
+  if (newest === undefined) return true
+  if (!window.confirm(newest.message)) return false
+
+  for (const question of [...standing]) question.leave()
+  return true
 }
 
 /**
@@ -27,12 +37,24 @@ export function confirmLeaving() {
  * The link check listens on the document in the capture phase, so it runs before React Router's own click handler and
  * can cancel the click outright when the author chooses to stay. The question is the browser's own dialog, which a
  * keyboard and a screen reader already know how to answer.
+ *
+ * `onLeave` runs when the author answers that they do mean to leave without saving - a choice made in the app, so the
+ * editor's recovery copy goes with the writing rather than coming back next time as something to recover. Leaving the
+ * page itself is not that choice: the browser's own prompt cannot say what was answered, and a closed tab is exactly
+ * what a recovery copy is for, so it stays (ADR 0029).
  */
-export function useLeaveGuard(message: string | null) {
+export function useLeaveGuard(message: string | null, onLeave?: () => void) {
+  const leave = useRef(onLeave)
+
+  useEffect(() => {
+    leave.current = onLeave
+  })
+
   useEffect(() => {
     if (message === null) return
 
-    standing.push(message)
+    const question: Question = { message, leave: () => leave.current?.() }
+    standing.push(question)
 
     function onClick(event: MouseEvent) {
       // A modified click opens a new tab or window, which leaves nothing behind.
@@ -61,7 +83,9 @@ export function useLeaveGuard(message: string | null) {
         return
       }
 
-      if (!window.confirm(message ?? '')) {
+      if (window.confirm(question.message)) {
+        question.leave()
+      } else {
         event.preventDefault()
         event.stopPropagation()
       }
@@ -77,7 +101,7 @@ export function useLeaveGuard(message: string | null) {
     window.addEventListener('beforeunload', onBeforeUnload)
 
     return () => {
-      const at = standing.lastIndexOf(message)
+      const at = standing.indexOf(question)
       if (at >= 0) standing.splice(at, 1)
       document.removeEventListener('click', onClick, true)
       window.removeEventListener('beforeunload', onBeforeUnload)

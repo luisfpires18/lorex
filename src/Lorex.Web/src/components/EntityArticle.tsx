@@ -3,9 +3,12 @@ import type { Editor } from '@tiptap/react'
 import { Check, History, Pencil, X } from 'lucide-react'
 import { ActionIcon } from './ActionIcon'
 import { LoreArticle, LoreEditor } from './LoreEditor'
+import { RecoveredDraft } from './RecoveredDraft'
+import { useAuth } from '../auth/useAuth'
 import { ApiError } from '../lib/api'
 import { formatDateTime } from '../lib/dates'
 import { useLeaveGuard } from '../lib/leaveGuard'
+import { useLocalDraft } from '../lib/useLocalDraft'
 import {
   ARTICLE_CHANGED,
   ARTICLE_MAX_LENGTH,
@@ -64,6 +67,10 @@ interface EntityArticleSectionProps {
  * author chooses - keep this text, or load that one. While anything is unsaved, following a link, signing out or leaving
  * the page asks first.
  *
+ * Unsaved writing is also kept on this device as a recovery copy, never sent anywhere (ADR 0029). When the entry opens
+ * with a copy that differs from what is saved, the saved article is shown and the copy is offered beside it: recovering
+ * puts it in the editor as unsaved changes, and discarding lets it go.
+ *
  * The article has no status of its own: it is as settled as its entry, whose Canon control sits above it. And it is
  * never read for meaning - a year written here is a word, not a field.
  *
@@ -82,17 +89,24 @@ export function EntityArticleSection({
   const tooLongId = useId()
   const noteId = useId()
 
+  const { user } = useAuth()
+  const { found, keep, forget, discard, settle, failed } = useLocalDraft(
+    user ? { accountId: user.id, universeId, kind: 'article', contentId: entityId } : null,
+  )
+
   const [load, setLoad] = useState<LoadState>({ kind: 'loading' })
   const [reads, setReads] = useState(0)
   const [stored, setStored] = useState<Stored>({ content: '', updatedAt: null })
   const [isEditing, setIsEditing] = useState(false)
   const [editorKey, setEditorKey] = useState(0)
+  const [openingWith, setOpeningWith] = useState<string | null>(null)
   const [draft, setDraft] = useState<string | null>(null)
   const [baseline, setBaseline] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
   const [conflict, setConflict] = useState<{ updatedAt: string | null } | null>(null)
   const [historyKey, setHistoryKey] = useState(0)
+  const [announcement, setAnnouncement] = useState('')
   const inFlight = useRef(false)
   const section = useRef<HTMLElement>(null)
   const startButton = useRef<HTMLButtonElement>(null)
@@ -139,10 +153,34 @@ export function EntityArticleSection({
     isReady && isEditing && draft !== null && outgoing !== comparable(baseline ?? stored.content)
   const isTooLong = outgoing.length > ARTICLE_MAX_LENGTH
 
+  // A recovery copy that differs from what is saved is offered. Writing waits for the author's choice - and, for the
+  // moment it takes, for the copy to be looked for - so nothing typed can overwrite a copy nobody has seen yet.
+  const offer =
+    isReady && !isEditing && found && comparable(found.content) !== comparable(stored.content)
+      ? found
+      : null
+  const isHeld = isReady && !isEditing && (offer !== null || found === undefined)
+
+  // A copy identical to what is saved is nothing to recover: it goes without a word.
+  useEffect(() => {
+    if (isReady && found && comparable(found.content) === comparable(stored.content)) discard()
+  }, [isReady, found, stored.content, discard])
+
+  // The recovery copy follows the writing: kept while it differs from what is saved, let go once it does not.
+  useEffect(() => {
+    if (!isEditing || draft === null) return
+    if (isDirty) {
+      keep(outgoing, stored.updatedAt)
+    } else {
+      forget()
+    }
+  }, [isEditing, draft, isDirty, outgoing, stored.updatedAt, keep, forget])
+
   useLeaveGuard(
     isDirty
       ? `The article for “${entityName}” has unsaved changes. Leave without saving them?`
       : null,
+    discard,
   )
 
   /** Saves the document as it stands, naming the stored article it was written over. */
@@ -223,11 +261,13 @@ export function EntityArticleSection({
     }
   }, [isEditing])
 
-  function startEditing() {
+  /** Opens the writing on the saved article - or, when recovering, on the recovery copy, unsaved against it. */
+  function startEditing(recovered: string | null = null) {
     setFailure(null)
     setConflict(null)
     setDraft(null)
     setBaseline(null)
+    setOpeningWith(recovered)
     setEditorKey((key) => key + 1)
     setIsEditing(true)
   }
@@ -240,7 +280,11 @@ export function EntityArticleSection({
       return
     }
 
+    // The author chose to let the unsaved text go, so its recovery copy goes with it.
+    if (isDirty) discard()
+
     setIsEditing(false)
+    setOpeningWith(null)
     setDraft(null)
     setBaseline(null)
     setFailure(null)
@@ -254,6 +298,7 @@ export function EntityArticleSection({
     setFailure(null)
     setDraft(null)
     setBaseline(null)
+    setOpeningWith(null)
     setLoad({ kind: 'loading' })
     setEditorKey((key) => key + 1)
     setReads((current) => current + 1)
@@ -269,7 +314,22 @@ export function EntityArticleSection({
     ) {
       return
     }
+    discard()
     reread()
+  }
+
+  /** Puts the recovery copy in the editor as unsaved changes. Saving it is still the author's to do. */
+  function recoverDraft() {
+    if (!offer) return
+    settle()
+    startEditing(offer.content)
+    setAnnouncement('The recovered draft is in the editor. It is not saved yet.')
+  }
+
+  function discardDraft() {
+    discard()
+    setAnnouncement('The recovered draft was discarded. The saved article is unchanged.')
+    requestAnimationFrame(() => startButton.current?.focus())
   }
 
   const status = isSaving
@@ -279,6 +339,13 @@ export function EntityArticleSection({
       : stored.updatedAt === null
         ? { state: 'empty', text: 'Nothing saved yet' }
         : { state: 'saved', text: 'Saved' }
+
+  const canStart = canEdit && !isHeld
+  const note = !canEdit
+    ? 'Save or cancel the changes to this entry first, then edit its article.'
+    : offer
+      ? 'Recover or discard the recovered draft first, then edit the article.'
+      : null
 
   return (
     <section
@@ -297,9 +364,9 @@ export function EntityArticleSection({
             ref={startButton}
             className="button button--quiet button--icon"
             type="button"
-            onClick={startEditing}
-            disabled={!canEdit}
-            aria-describedby={canEdit ? undefined : noteId}
+            onClick={() => startEditing()}
+            disabled={!canStart}
+            aria-describedby={note ? noteId : undefined}
             data-testid="article-edit"
           >
             <ActionIcon icon={Pencil} />
@@ -309,9 +376,9 @@ export function EntityArticleSection({
       </div>
 
       {/* Beside the control it explains, not after the whole article. */}
-      {isReady && !isEditing && !canEdit ? (
+      {isReady && !isEditing && note ? (
         <p className="article__note" id={noteId} data-testid="article-note">
-          Save or cancel the changes to this entry first, then edit its article.
+          {note}
         </p>
       ) : null}
 
@@ -341,6 +408,24 @@ export function EntityArticleSection({
         </div>
       ) : null}
 
+      {offer ? (
+        <RecoveredDraft
+          what="this article"
+          draft={offer}
+          savedUpdatedAt={stored.updatedAt}
+          preview={
+            isEmptyDocument(offer.content) ? (
+              <p className="entry__blank">No text in this draft.</p>
+            ) : (
+              <LoreArticle content={offer.content} />
+            )
+          }
+          onRecover={recoverDraft}
+          onDiscard={discardDraft}
+          testId="article-recovery"
+        />
+      ) : null}
+
       {isReady && !isEditing ? (
         hasArticle ? (
           <LoreArticle content={stored.content} />
@@ -351,9 +436,9 @@ export function EntityArticleSection({
               ref={startButton}
               className="button button--icon"
               type="button"
-              onClick={startEditing}
-              disabled={!canEdit}
-              aria-describedby={canEdit ? undefined : noteId}
+              onClick={() => startEditing()}
+              disabled={!canStart}
+              aria-describedby={note ? noteId : undefined}
               data-testid="article-write"
             >
               <ActionIcon icon={Pencil} />
@@ -402,13 +487,14 @@ export function EntityArticleSection({
 
           <LoreEditor
             key={editorKey}
-            value={stored.content || null}
+            value={openingWith ?? (stored.content || null)}
             autofocus
             onChange={setDraft}
             onReady={(created) => {
               editor.current = created
               const written = JSON.stringify(created.getJSON())
-              setBaseline(written)
+              // A recovered copy is measured against what is saved, so it opens as the unsaved changes it is.
+              setBaseline(openingWith === null ? written : stored.content)
               setDraft(written)
             }}
             describedBy={`${statusId} ${tooLongId}`}
@@ -432,6 +518,11 @@ export function EntityArticleSection({
                 data-testid="article-too-long"
               >
                 This article is too long to save. Shorten it, or move part of it into another entry.
+              </p>
+            ) : null}
+            {failed && isDirty ? (
+              <p className="recovery__warning" role="status" data-testid="article-recovery-warning">
+                This device could not keep a recovery copy of these changes. Save to keep them.
               </p>
             ) : null}
             <div className="article__actions">
@@ -476,6 +567,10 @@ export function EntityArticleSection({
           onStale={() => setReads((current) => current + 1)}
         />
       ) : null}
+
+      <p className="visually-hidden" role="status" data-testid="article-announcer">
+        {announcement}
+      </p>
     </section>
   )
 }

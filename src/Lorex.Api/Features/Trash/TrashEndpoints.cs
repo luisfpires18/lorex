@@ -9,21 +9,18 @@ using Microsoft.EntityFrameworkCore;
 namespace Lorex.Api.Features.Trash;
 
 /// <summary>
-/// The Trash of one universe: what the author threw away, and the one action that brings it
-/// back.
+/// The Trash of one universe: what the author threw away, and the one action that brings each thing back.
 ///
-/// Only lore entries are trashable. Everything else the API deletes is either one small row a
-/// deliberate action removed (a relationship, a moment), a derived record nothing authors (a
-/// Canon conflict), or a configuration object whose deletion is already refused while anything
-/// depends on it (a type, a field, an option, a relationship type). An entry is the one thing
-/// whose deletion used to destroy a large amount of authored work at once - its article, its
-/// values, its aliases, its whole history, and every relationship and timeline appearance that
-/// rested on it - which is exactly why it is the one thing with a Trash. See
-/// <c>docs/architecture/decisions/0015-entity-trash-and-restore.md</c>.
+/// Two kinds of authored work are trashable, each where its removal used to destroy a large amount of writing at once. A
+/// lore entry, whose deletion took its article, values, aliases, history and every relationship and timeline appearance
+/// that rested on it (ADR 0015). And a story's content - a story, a chapter, a scene, an arc or a beat - whose deletion took
+/// prose, planning and every link inside it (ADR 0029). Everything else the API deletes is one small row a deliberate
+/// action removed (a relationship, a moment), a derived record nothing authors (a Canon conflict), or a configuration
+/// object whose deletion is already refused while anything depends on it.
 ///
-/// Universe-scoped and owner-gated on every route, through the same
-/// <see cref="LoreAccess"/> check as the rest of the lore surface, so another author's Trash
-/// answers 404 and stays indistinguishable from a universe that does not exist.
+/// Universe-scoped and owner-gated on every route, through the same <see cref="LoreAccess"/> check as the rest of the
+/// workspace, so another author's Trash answers 404 and stays indistinguishable from a universe that does not exist. Every
+/// restore finds its row through its own universe, so an id from another world answers as missing.
 /// </summary>
 public static class TrashEndpoints
 {
@@ -38,14 +35,31 @@ public static class TrashEndpoints
 
         group.MapGet("/", ListAsync).WithName("ListTrash");
         group.MapPost("/{entityId:guid}/restore", RestoreAsync).WithName("RestoreTrashedEntity");
+        group.MapPost("/stories/{storyId:guid}/restore", StoryContentRestore.RestoreStoryAsync)
+            .WithName("RestoreTrashedStory");
+        group.MapPost("/chapters/{chapterId:guid}/restore", StoryContentRestore.RestoreChapterAsync)
+            .WithName("RestoreTrashedChapter");
+        group.MapPost("/scenes/{sceneId:guid}/restore", StoryContentRestore.RestoreSceneAsync)
+            .WithName("RestoreTrashedScene");
+        group.MapPost("/plot-arcs/{plotArcId:guid}/restore", StoryContentRestore.RestorePlotArcAsync)
+            .WithName("RestoreTrashedPlotArc");
+        group.MapPost("/plot-beats/{plotBeatId:guid}/restore", StoryContentRestore.RestorePlotBeatAsync)
+            .WithName("RestoreTrashedPlotBeat");
 
         return endpoints;
     }
 
     /// <summary>
-    /// Most recently thrown away first, which is the order a Trash is read in - the thing you
-    /// regret is almost always the last thing you did. Id breaks the tie so two entries binned
-    /// in the same tick never swap places between one page and the next.
+    /// Everything in the universe's Trash, most recently thrown away first, which is the order a Trash is read in - the
+    /// thing you regret is almost always the last thing you did. Kind, then id, break a tie, so two rows binned in the same
+    /// tick never swap places between one page and the next.
+    ///
+    /// Only what was itself thrown away is listed. What sits inside a story in the Trash is not a row of its own, because
+    /// it comes back with the story; a scene thrown away before its story was is, and says it must wait for the story.
+    ///
+    /// Six compact reads - one per kind, names and places only, never an article, prose or notes - merged and paged here. A
+    /// Trash is thrown away by hand, so it stays small next to what a page of it costs; a union across six tables in SQL
+    /// is the first change if one ever does not.
     /// </summary>
     private static async Task<IResult> ListAsync(
         Guid universeId,
@@ -63,27 +77,137 @@ public static class TrashEndpoints
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
-        var query = db.Entities.AsNoTracking()
-            .Where(entity => entity.UniverseId == universeId && entity.DeletedAt != null);
+        var rows = new List<TrashItem>();
 
-        var totalCount = await query.CountAsync(cancellationToken);
-        var skip = (int)Math.Min((long)(page - 1) * pageSize, int.MaxValue);
-
-        var items = await query
-            .OrderByDescending(entity => entity.DeletedAt)
-            .ThenBy(entity => entity.Id)
-            .Skip(skip)
-            .Take(pageSize)
-            .Select(entity => new TrashedEntity(
+        rows.AddRange(await db.Entities.AsNoTracking()
+            .Where(entity => entity.UniverseId == universeId && entity.DeletedAt != null)
+            .Select(entity => new TrashItem(
+                TrashItemKind.Entry,
                 entity.Id,
                 entity.Name,
+                entity.DeletedAt!.Value,
                 entity.EntityTypeId,
                 entity.EntityType!.Name,
                 entity.EntityType.Icon,
                 entity.EntityType.AccentColor,
                 entity.CanonStatus,
-                entity.DeletedAt!.Value))
-            .ToListAsync(cancellationToken);
+                null,
+                null,
+                null,
+                null,
+                TrashRestoreBlock.None))
+            .ToListAsync(cancellationToken));
+
+        rows.AddRange(await db.Stories.AsNoTracking()
+            .Where(story => story.UniverseId == universeId && story.DeletedAt != null)
+            .Select(story => new TrashItem(
+                TrashItemKind.Story,
+                story.Id,
+                story.Title,
+                story.DeletedAt!.Value,
+                null,
+                null,
+                null,
+                null,
+                null,
+                story.Id,
+                null,
+                null,
+                null,
+                TrashRestoreBlock.None))
+            .ToListAsync(cancellationToken));
+
+        rows.AddRange(await db.Chapters.AsNoTracking()
+            .Where(chapter => chapter.Story!.UniverseId == universeId && chapter.DeletedAt != null)
+            .Select(chapter => new TrashItem(
+                TrashItemKind.Chapter,
+                chapter.Id,
+                chapter.Title,
+                chapter.DeletedAt!.Value,
+                null,
+                null,
+                null,
+                null,
+                null,
+                chapter.StoryId,
+                chapter.Story!.Title,
+                null,
+                null,
+                chapter.Story.DeletedAt != null ? TrashRestoreBlock.StoryInTrash : TrashRestoreBlock.None))
+            .ToListAsync(cancellationToken));
+
+        rows.AddRange(await db.Scenes.AsNoTracking()
+            .Where(scene => scene.Story!.UniverseId == universeId && scene.DeletedAt != null)
+            .Select(scene => new TrashItem(
+                TrashItemKind.Scene,
+                scene.Id,
+                scene.Title,
+                scene.DeletedAt!.Value,
+                null,
+                null,
+                null,
+                null,
+                null,
+                scene.StoryId,
+                scene.Story!.Title,
+                null,
+                null,
+                scene.Story.DeletedAt != null ? TrashRestoreBlock.StoryInTrash : TrashRestoreBlock.None))
+            .ToListAsync(cancellationToken));
+
+        rows.AddRange(await db.PlotArcs.AsNoTracking()
+            .Where(arc => arc.Story!.UniverseId == universeId && arc.DeletedAt != null)
+            .Select(arc => new TrashItem(
+                TrashItemKind.PlotArc,
+                arc.Id,
+                arc.Title,
+                arc.DeletedAt!.Value,
+                null,
+                null,
+                null,
+                null,
+                null,
+                arc.StoryId,
+                arc.Story!.Title,
+                null,
+                null,
+                arc.Story.DeletedAt != null ? TrashRestoreBlock.StoryInTrash : TrashRestoreBlock.None))
+            .ToListAsync(cancellationToken));
+
+        rows.AddRange(await db.PlotBeats.AsNoTracking()
+            .Where(beat => beat.PlotArc!.Story!.UniverseId == universeId && beat.DeletedAt != null)
+            .Select(beat => new TrashItem(
+                TrashItemKind.PlotBeat,
+                beat.Id,
+                beat.Title,
+                beat.DeletedAt!.Value,
+                null,
+                null,
+                null,
+                null,
+                null,
+                beat.PlotArc!.StoryId,
+                beat.PlotArc.Story!.Title,
+                beat.PlotArcId,
+                beat.PlotArc.Title,
+                beat.PlotArc.Story.DeletedAt != null
+                    ? TrashRestoreBlock.StoryInTrash
+                    : beat.PlotArc.DeletedAt != null
+                        ? TrashRestoreBlock.ArcInTrash
+                        : TrashRestoreBlock.None))
+            .ToListAsync(cancellationToken));
+
+        var totalCount = rows.Count;
+        var skip = (int)Math.Min((long)(page - 1) * pageSize, int.MaxValue);
+
+        var items = rows
+            .OrderByDescending(row => row.TrashedAt.Ticks)
+            .ThenBy(row => row.Kind)
+            .ThenBy(row => row.Id.ToString(), StringComparer.Ordinal)
+            .Skip(skip)
+            .Take(pageSize)
+            .Select(row => row with { TrashedAt = DateTime.SpecifyKind(row.TrashedAt, DateTimeKind.Utc) })
+            .ToList();
 
         var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize);
 

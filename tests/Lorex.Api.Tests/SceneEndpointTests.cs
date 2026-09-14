@@ -423,7 +423,7 @@ public sealed class SceneEndpointTests(LorexApiFactory factory) : IClassFixture<
     // ---------- What deleting takes with it ----------
 
     [Fact]
-    public async Task Deleting_a_scene_removes_its_links_and_no_lore()
+    public async Task Deleting_a_scene_moves_it_to_the_trash_with_its_links_and_no_lore()
     {
         var (client, universe, story) = await WithStory("scenedeletelinks");
         var arlen = await CreateEntity(client, universe.Id, "Arlen");
@@ -431,10 +431,16 @@ public sealed class SceneEndpointTests(LorexApiFactory factory) : IClassFixture<
 
         Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync(Scene(universe.Id, story.Id, scene.Id))).StatusCode);
 
+        // Out of every read, and a second delete finds nothing to delete.
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(Scene(universe.Id, story.Id, scene.Id))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.DeleteAsync(Scene(universe.Id, story.Id, scene.Id))).StatusCode);
+        Assert.Empty((await Detail(client, universe.Id, story.Id)).Scenes);
+
+        // Nothing is erased: the scene and its links wait in the Trash, and the lore is untouched (ADR 0029).
         await WithDb(async db =>
         {
-            Assert.False(await db.SceneEntityLinks.AnyAsync(link => link.SceneId == scene.Id));
+            Assert.True(await db.Scenes.AnyAsync(candidate => candidate.Id == scene.Id && candidate.DeletedAt != null));
+            Assert.True(await db.SceneEntityLinks.AnyAsync(link => link.SceneId == scene.Id));
             Assert.True(await db.Entities.AnyAsync(entity => entity.Id == arlen.Id && entity.DeletedAt == null));
         });
     }

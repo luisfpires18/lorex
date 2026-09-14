@@ -96,8 +96,18 @@ public sealed record UniverseBackup(
     /// version 9 an entry revision recorded after the move holds no copy of the article at all, so a version 8 reader
     /// restoring one would wipe an article that exists. A file at version 8 or earlier has neither new member; both read as
     /// null, and each revision's <c>content</c> is the article as it read then.
+    ///
+    /// 10 - A story's content may sit in the Trash, and a scene's manuscript keeps its saved versions (ADR 0029).
+    /// <see cref="BackupStory.DeletedAt"/>, <see cref="BackupChapter.DeletedAt"/>, <see cref="BackupScene.DeletedAt"/>,
+    /// <see cref="BackupPlotArc.DeletedAt"/> and <see cref="BackupPlotBeat.DeletedAt"/> say what is in it, and
+    /// <see cref="BackupSceneManuscript.Revisions"/> carries every saved version of the prose. It fails the "ignorable" test
+    /// twice, as versions 2 and 9 did. The markers re-mean <c>stories</c> and every collection inside a story: membership no
+    /// longer implies something is live, and the <c>sortOrder</c> of a row in the Trash holds no place - so a version 9 reader
+    /// would restore the Trash into the story as ordinary content, with two scenes claiming one place. And the versions are
+    /// authored text a version 9 reader would drop silently. A file at version 9 or earlier has none of these members: each
+    /// reads as null, everything in it is live, and a manuscript has no versions but its text.
     /// </summary>
-    public const int CurrentVersion = 9;
+    public const int CurrentVersion = 10;
 
     public static UniverseBackup Of(UniverseBackupPayload payload, DateTime generatedAt) =>
         new(FormatName, CurrentVersion, generatedAt, payload);
@@ -446,6 +456,14 @@ public sealed record BackupTimelineEntry(
 ///
 /// <paramref name="PlotArcs"/> is the story's plot, arcs in order (since version 7). Empty means a story with no
 /// arcs; absent - null, in any earlier file - means the same thing.
+///
+/// <paramref name="DeletedAt"/> is when the story was moved to the Trash, or null while it is live (since version 10).
+/// A story in the Trash travels whole - it is authored work its owner can still restore - and what it holds is exactly
+/// what it held: nothing inside it is marked on its account.
+///
+/// A future importer restores every row with its marker, and puts nothing in the Trash into a live order: in each
+/// collection below, a row carrying <c>deletedAt</c> is listed after the live ones and its <c>sortOrder</c> is the place
+/// it had, which it no longer holds.
 /// </summary>
 public sealed record BackupStory(
     Guid Id,
@@ -454,6 +472,7 @@ public sealed record BackupStory(
     StoryStatus Status,
     DateTime CreatedAt,
     DateTime UpdatedAt,
+    DateTime? DeletedAt,
     IReadOnlyList<BackupChapter>? Chapters,
     IReadOnlyList<BackupScene> Scenes,
     IReadOnlyList<BackupPlotArc>? PlotArcs);
@@ -462,6 +481,7 @@ public sealed record BackupStory(
 /// One chapter (since version 6): its place in the story, from 0, and the author's title, summary and
 /// notes. The number a reader sees - "Chapter 3" - is <paramref name="SortOrder"/> plus one and is not
 /// carried; neither is anything the chapter holds, because each scene names its chapter itself.
+/// <paramref name="DeletedAt"/> is when it went to the Trash (since version 10); a chapter there holds no scene.
 /// </summary>
 public sealed record BackupChapter(
     Guid Id,
@@ -470,7 +490,8 @@ public sealed record BackupChapter(
     string? Summary,
     string? Notes,
     DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    DateTime? DeletedAt);
 
 /// <summary>
 /// One scene, carried with its container and its place in it.
@@ -488,6 +509,10 @@ public sealed record BackupChapter(
 ///
 /// <paramref name="Manuscript"/> is the scene's prose (since version 8), carried with the scene it belongs to rather than
 /// in a file of its own, or null when nothing has been written for it.
+///
+/// <paramref name="DeletedAt"/> is when the scene was moved to the Trash, or null while it is live (since version 10). A
+/// scene in the Trash carries its prose, versions and links like any other, and its <paramref name="SortOrder"/> holds no
+/// place in its container.
 /// </summary>
 public sealed record BackupScene(
     Guid Id,
@@ -501,20 +526,42 @@ public sealed record BackupScene(
     IReadOnlyList<Guid> LinkedEntityIds,
     BackupSceneManuscript? Manuscript,
     DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    DateTime? DeletedAt);
 
 /// <summary>
 /// One scene's prose (since version 8), exactly as stored: the text with every line break, blank line and character the
 /// author wrote, and when it was last saved. Plain text - never HTML, Markdown or an editor's document - and never read
 /// for meaning. A scene saved and then emptied carries an empty <paramref name="Content"/>; a scene never written for
 /// carries no manuscript at all, and both read as nothing written.
+///
+/// <paramref name="Revisions"/> is every saved version of the prose, oldest first, the newest being
+/// <paramref name="Content"/> (since version 10). A future importer re-creates them with their ids and numbers and never
+/// applies one to the prose. A browser's unsaved recovery copy is never in a backup: it was never saved.
 /// </summary>
-public sealed record BackupSceneManuscript(string Content, DateTime UpdatedAt);
+public sealed record BackupSceneManuscript(
+    string Content,
+    DateTime UpdatedAt,
+    IReadOnlyList<BackupManuscriptRevision>? Revisions);
+
+/// <summary>
+/// One saved version of a scene's manuscript (since version 10): the whole text exactly as saved, or <c>""</c> for a save
+/// that emptied it. <paramref name="Kind"/> is <c>Created</c> for the first version, <c>Edited</c> for a save and
+/// <c>Restored</c> for a version put back, which names it in <paramref name="RestoredFromRevisionId"/>.
+/// </summary>
+public sealed record BackupManuscriptRevision(
+    Guid Id,
+    int Number,
+    SceneManuscriptRevisionKind Kind,
+    Guid? RestoredFromRevisionId,
+    DateTime CreatedAt,
+    string Content);
 
 /// <summary>
 /// One plot arc (since version 7): its place in the story's plot, from 0, the author's title, description and
 /// notes, and its beats in order. The number a reader sees - "Arc 2" - is <paramref name="SortOrder"/> plus one and
-/// is not carried.
+/// is not carried. <paramref name="DeletedAt"/> is when it went to the Trash (since version 10); its beats are
+/// carried as they stood, and come back with it.
 /// </summary>
 public sealed record BackupPlotArc(
     Guid Id,
@@ -524,6 +571,7 @@ public sealed record BackupPlotArc(
     string? Notes,
     DateTime CreatedAt,
     DateTime UpdatedAt,
+    DateTime? DeletedAt,
     IReadOnlyList<BackupPlotBeat> Beats);
 
 /// <summary>
@@ -532,7 +580,8 @@ public sealed record BackupPlotArc(
 /// <paramref name="LinkedSceneIds"/> are scenes of this same story and <paramref name="LinkedEntityIds"/> entries
 /// in this same file, each list sorted by id so an unchanged plot writes the same bytes. Ids only: no scene title,
 /// chapter, entry name or number is carried, so a scene that moved chapter is still the scene the beat names. A
-/// trashed entry may be among them, and is in the file too. The beat's order has no bearing on any scene's.
+/// trashed entry may be among them, and is in the file too, and so may a scene in the Trash. The beat's order has no
+/// bearing on any scene's. <paramref name="DeletedAt"/> is when the beat went to the Trash (since version 10).
 /// </summary>
 public sealed record BackupPlotBeat(
     Guid Id,
@@ -543,7 +592,8 @@ public sealed record BackupPlotBeat(
     IReadOnlyList<Guid> LinkedSceneIds,
     IReadOnlyList<Guid> LinkedEntityIds,
     DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    DateTime? DeletedAt);
 
 /// <summary>
 /// A position on the universe's line: the era the year is counted in - null on the plain reckoning -

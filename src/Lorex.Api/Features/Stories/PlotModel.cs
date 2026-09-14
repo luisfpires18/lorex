@@ -15,8 +15,10 @@ namespace Lorex.Api.Features.Stories;
 /// not by its first scene, a chapter, a date or its title. The number shown ("Arc 2") is that position plus
 /// one, worked out when it is drawn and never stored.
 ///
-/// Owned by the story and deleted with it. Deleting an arc deletes its beats and their links, and never a
-/// scene, a chapter or an entry. See <c>docs/architecture/decisions/0026-story-plot-arcs-beats.md</c>.
+/// Owned by the story and deleted with it. Deleting an arc moves it to the Trash with its beats and their
+/// links, and never touches a scene, a chapter or an entry. See
+/// <c>docs/architecture/decisions/0026-story-plot-arcs-beats.md</c> and
+/// <c>docs/architecture/decisions/0029-content-recovery.md</c>.
 /// </summary>
 public sealed class PlotArc
 {
@@ -35,14 +37,21 @@ public sealed class PlotArc
     public string? Notes { get; set; }
 
     /// <summary>
-    /// The arc's place in its story's plot, from 0. Contiguous and unique per story: creating appends,
-    /// deleting closes the gap, and only the arc order route moves one.
+    /// The arc's place in its story's plot, from 0. Contiguous and unique among the story's live arcs:
+    /// creating appends, deleting closes the gap, and only the arc order route moves one. An arc in the
+    /// Trash holds no place, and a restore appends it.
     /// </summary>
     public int SortOrder { get; set; }
 
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
+
+    /// <summary>
+    /// When the arc was moved to the Trash, or null while it is live. Only the arc is marked: its beats keep
+    /// their order and links and come back with it.
+    /// </summary>
+    public DateTime? DeletedAt { get; set; }
 
     public ICollection<PlotBeat> Beats { get; } = [];
 }
@@ -78,14 +87,18 @@ public sealed class PlotBeat
     public string? Notes { get; set; }
 
     /// <summary>
-    /// The beat's place in its arc, from 0. Contiguous and unique per arc: creating appends, deleting or
-    /// moving out closes the gap, and reordering rewrites one arc in one transaction.
+    /// The beat's place in its arc, from 0. Contiguous and unique among the arc's live beats: creating
+    /// appends, deleting or moving out closes the gap, and reordering rewrites one arc in one transaction.
+    /// A beat in the Trash holds no place, and a restore appends it.
     /// </summary>
     public int SortOrder { get; set; }
 
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
+
+    /// <summary>When the beat was moved to the Trash, or null while it is live. Its links are kept and come back with it.</summary>
+    public DateTime? DeletedAt { get; set; }
 
     public ICollection<PlotBeatScene> SceneLinks { get; } = [];
 

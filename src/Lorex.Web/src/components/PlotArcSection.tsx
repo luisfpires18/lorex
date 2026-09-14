@@ -44,6 +44,7 @@ export function PlotArcSection({
     <section
       className="plotarc"
       id={`arc-${arc.id}`}
+      tabIndex={-1}
       aria-labelledby={headingId}
       data-testid="plot-arc"
       data-title={arc.title}

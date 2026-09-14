@@ -20,6 +20,10 @@ namespace Lorex.Api.Features.Stories;
 ///
 /// <b>Links are references.</b> A beat's scenes and lore arrive whole on every save and replace what is stored.
 /// No link deletes, moves or changes a scene or an entry, and no write here passes the Canon gate (ADR 0026).
+///
+/// <b>The Trash.</b> A beat in the Trash, or in an arc there, answers every route here as a missing one does. A
+/// link to a scene in the Trash is hidden from every read, so no client can send it back - and so a save keeps it
+/// whatever it sends, and it returns with its scene. A scene in the Trash cannot be newly linked (ADR 0029).
 /// </summary>
 public static class PlotBeatEndpoints
 {
@@ -98,7 +102,7 @@ public static class PlotBeatEndpoints
         }
 
         var last = await db.PlotBeats
-            .Where(beat => beat.PlotArcId == plotArcId)
+            .Where(beat => beat.PlotArcId == plotArcId && beat.DeletedAt == null)
             .MaxAsync(beat => (int?)beat.SortOrder, cancellationToken);
 
         var now = DateTime.UtcNow;
@@ -143,9 +147,10 @@ public static class PlotBeatEndpoints
     }
 
     /// <summary>
-    /// The whole beat. Its scenes and lore arrive whole and replace what is stored. Naming another arc of the same
-    /// story moves the beat there, last, and closes the gap it leaves - the same beat, with its id and every link,
-    /// in one transaction. Leaving the arc out, or naming the one it is in, leaves its place alone.
+    /// The whole beat. Its scenes and lore arrive whole and replace what is stored - apart from its links to scenes in
+    /// the Trash, which no read shows and so no request can carry, and which are kept. Naming another arc of the same
+    /// story moves the beat there, last, and closes the gap it leaves - the same beat, with its id and every link, in
+    /// one transaction. Leaving the arc out, or naming the one it is in, leaves its place alone.
     /// </summary>
     private static async Task<IResult> UpdateAsync(
         Guid universeId,
@@ -174,7 +179,10 @@ public static class PlotBeatEndpoints
             .Include(candidate => candidate.EntityLinks)
             .AsSplitQuery()
             .FirstOrDefaultAsync(
-                candidate => candidate.Id == plotBeatId && candidate.PlotArc!.StoryId == storyId,
+                candidate => candidate.Id == plotBeatId
+                    && candidate.PlotArc!.StoryId == storyId
+                    && candidate.PlotArc.DeletedAt == null
+                    && candidate.DeletedAt == null,
                 cancellationToken);
 
         if (beat is null)
@@ -196,7 +204,18 @@ public static class PlotBeatEndpoints
             return Results.ValidationProblem(PlotArcEndpoints.ForeignArc());
         }
 
-        var sceneIds = Requested(request.SceneIds);
+        // The scenes this beat points at that are in the Trash. Every read hides them, so no request can name them: they
+        // stay linked whatever it sends, and come back with their scene.
+        var storedScenes = beat.SceneLinks.Select(link => link.SceneId).ToList();
+        var trashedScenes = storedScenes.Count == 0
+            ? []
+            : (await db.Scenes.AsNoTracking()
+                .Where(scene => storedScenes.Contains(scene.Id) && scene.DeletedAt != null)
+                .Select(scene => scene.Id)
+                .ToListAsync(cancellationToken))
+            .ToHashSet();
+
+        var sceneIds = Requested(request.SceneIds).Where(id => !trashedScenes.Contains(id)).ToList();
         var entityIds = Requested(request.EntityIds);
         var storedEntities = beat.EntityLinks.Select(link => link.EntityId).ToHashSet();
 
@@ -205,6 +224,8 @@ public static class PlotBeatEndpoints
         {
             return Results.ValidationProblem(refused);
         }
+
+        sceneIds.AddRange(trashedScenes);
 
         var now = DateTime.UtcNow;
         beat.Title = StoryValidation.Normalize(request.Title)!;
@@ -253,8 +274,8 @@ public static class PlotBeatEndpoints
     }
 
     /// <summary>
-    /// Permanent, and the beats after it in its arc each move up one place. Its links go with it; the scenes and
-    /// entries they pointed at do not.
+    /// Moves the beat to the Trash, and the beats after it in its arc each move up one place. Its links are kept, out of
+    /// reach, and come back with it; the scenes and entries they point at are untouched.
     /// </summary>
     private static async Task<IResult> DeleteAsync(
         Guid universeId,
@@ -278,7 +299,10 @@ public static class PlotBeatEndpoints
         }
 
         var beat = await db.PlotBeats.FirstOrDefaultAsync(
-            candidate => candidate.Id == plotBeatId && candidate.PlotArc!.StoryId == storyId,
+            candidate => candidate.Id == plotBeatId
+                && candidate.PlotArc!.StoryId == storyId
+                && candidate.PlotArc.DeletedAt == null
+                && candidate.DeletedAt == null,
             cancellationToken);
 
         if (beat is null)
@@ -290,7 +314,7 @@ public static class PlotBeatEndpoints
         {
             var plotArcId = beat.PlotArcId;
 
-            db.PlotBeats.Remove(beat);
+            beat.DeletedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
 
             var remaining = await PlotOrder.LoadBeatsAsync(db, plotArcId, cancellationToken);
@@ -371,7 +395,7 @@ public static class PlotBeatEndpoints
         return Results.Ok(await LoadBeatsAsync(
             db,
             universeId,
-            db.PlotBeats.Where(beat => beat.PlotArcId == plotArcId),
+            db.PlotBeats.Where(beat => beat.PlotArcId == plotArcId && beat.DeletedAt == null),
             cancellationToken));
 
         static IResult Refused(string message) =>
@@ -414,7 +438,8 @@ public static class PlotBeatEndpoints
     /// A scene of another story - in this universe or any other - is refused in the same words as an id that is
     /// nothing at all, and so is an entry from another universe, so a refusal says nothing about where a foreign
     /// id lives. An entry in the Trash already linked stays, because the form sends the whole beat back on every
-    /// save; one newly chosen is refused (ADR 0015).
+    /// save; one newly chosen is refused (ADR 0015). A scene in the Trash is refused like one that is not there;
+    /// the caller has already set aside the ones this beat already links, which are kept (ADR 0029).
     /// </summary>
     private static async Task<Dictionary<string, string[]>?> CheckReferencesAsync(
         LorexDbContext db,
@@ -430,7 +455,9 @@ public static class PlotBeatEndpoints
         if (sceneIds.Count > 0)
         {
             var found = await db.Scenes.AsNoTracking()
-                .CountAsync(scene => scene.StoryId == storyId && sceneIds.Contains(scene.Id), cancellationToken);
+                .CountAsync(
+                    scene => scene.StoryId == storyId && scene.DeletedAt == null && sceneIds.Contains(scene.Id),
+                    cancellationToken);
 
             if (found != sceneIds.Count)
             {
@@ -480,7 +507,10 @@ public static class PlotBeatEndpoints
         (await LoadBeatsAsync(
             db,
             universeId,
-            db.PlotBeats.Where(beat => beat.Id == plotBeatId && beat.PlotArc!.StoryId == storyId),
+            db.PlotBeats.Where(beat => beat.Id == plotBeatId
+                && beat.PlotArc!.StoryId == storyId
+                && beat.PlotArc.DeletedAt == null
+                && beat.DeletedAt == null),
             cancellationToken))
         .FirstOrDefault();
 
@@ -521,8 +551,10 @@ public static class PlotBeatEndpoints
             return [];
         }
 
+        // A link to a scene in the Trash is kept and not shown: the scene is nowhere a client could open it.
         var scenes = (await query
                 .SelectMany(beat => beat.SceneLinks)
+                .Where(link => link.Scene!.DeletedAt == null)
                 .OrderBy(link => link.Scene!.ChapterId == null ? -1 : link.Scene.Chapter!.SortOrder)
                 .ThenBy(link => link.Scene!.SortOrder)
                 .ThenBy(link => link.SceneId)

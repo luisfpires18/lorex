@@ -23,3 +23,27 @@ public sealed class SceneManuscriptConfiguration : IEntityTypeConfiguration<Scen
             .OnDelete(DeleteBehavior.Cascade);
     }
 }
+
+public sealed class SceneManuscriptRevisionConfiguration : IEntityTypeConfiguration<SceneManuscriptRevision>
+{
+    public void Configure(EntityTypeBuilder<SceneManuscriptRevision> builder)
+    {
+        builder.ToTable("SceneManuscriptRevisions");
+        builder.HasKey(revision => revision.Id);
+
+        // Long text, like the manuscript itself: a version is bounded by the save that wrote it.
+        builder.Property(revision => revision.Content).IsRequired();
+        builder.Property(revision => revision.Kind).HasConversion<int>();
+
+        // A manuscript's history belongs to its scene and is deleted with it - with its story or universe, since nothing
+        // else deletes a scene for good. Moving the scene to the Trash deletes nothing, so its history waits there too.
+        builder.HasOne(revision => revision.Scene)
+            .WithMany()
+            .HasForeignKey(revision => revision.SceneId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Two versions of one manuscript never share a number, which is what makes the next number safe to derive from
+        // the highest one on record.
+        builder.HasIndex(revision => new { revision.SceneId, revision.Number }).IsUnique();
+    }
+}

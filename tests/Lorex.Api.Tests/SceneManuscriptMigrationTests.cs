@@ -165,7 +165,7 @@ public sealed class SceneManuscriptMigrationTests : IDisposable
             SameMoment(gateSaved.UpdatedAt, gateKept.UpdatedAt);
             SameMoment(insideSaved.UpdatedAt, (await ReadManuscript(client, universeId, storyId, inside)).UpdatedAt);
 
-            // A scene deleted takes its prose, and only its own.
+            // A scene moved to the Trash takes its prose out of reach, and only its own.
             (await client.DeleteAsync($"{story}/scenes/{loose}")).EnsureSuccessStatusCode();
             Assert.Equal(
                 HttpStatusCode.NotFound,
@@ -182,7 +182,8 @@ public sealed class SceneManuscriptMigrationTests : IDisposable
         // The database itself holds what the API never sends.
         await using (var db = Context())
         {
-            Assert.Equal(3, await db.SceneManuscripts.CountAsync());
+            // The scene in the Trash keeps its prose (ADR 0029).
+            Assert.Equal(4, await db.SceneManuscripts.CountAsync());
 
             var orphan = await Assert.ThrowsAsync<SqliteException>(() => db.Database.ExecuteSqlRawAsync(
                 """INSERT INTO "SceneManuscripts" ("SceneId", "Content", "UpdatedAt") VALUES ('7F1D6C0A-0000-4000-8000-000000000001', 'orphan', '2026-09-13 00:00:00')"""));
@@ -195,19 +196,22 @@ public sealed class SceneManuscriptMigrationTests : IDisposable
             // A story row deleted cascades through its scenes to their prose, and to no other story's.
             await db.Stories.Where(story => story.Title == "Second").ExecuteDeleteAsync();
 
-            Assert.Equal(2, await db.SceneManuscripts.CountAsync());
+            Assert.Equal(3, await db.SceneManuscripts.CountAsync());
             Assert.Equal(
-                new[] { gate, inside }.Order(),
+                new[] { gate, inside, loose }.Order(),
                 (await db.SceneManuscripts.Select(row => row.SceneId).ToListAsync()).Order());
             Assert.Empty(await ForeignKeyViolations(db));
         }
 
         SqliteConnection.ClearAllPools();
 
-        // Down again with prose in the file - the prose goes, every scene stays - and up once more to none.
+        // Down again with prose in the file - the prose goes, every live scene stays - and up once more to none. The schema
+        // before content recovery had no Trash, so rolling past it discards the scene that was in it.
         await using (var db = Context())
         {
-            var before = await SceneRows(db);
+            var before = (await SceneRows(db))
+                .Where(row => !row.Contains(loose.ToString(), StringComparison.OrdinalIgnoreCase))
+                .ToList();
 
             await db.GetService<IMigrator>().MigrateAsync(BeforeManuscripts);
 

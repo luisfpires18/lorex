@@ -161,7 +161,24 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - The gap is `UniverseChronology.YearsBetween`: the signed difference inside one era or the plain
     reckoning, `a + b - 1` from a countdown era into the ascending era after it, unknown otherwise.
   - Edited inside the relation kind form on the Types screen. Backup stays version 4, additively.
-- **Phase 3 - Lore articles** (`feat/lore-articles`, committed, **not merged, not pushed**). The owner authorized Phase 3;
+- **Phase 3 - Authoring, Ideas & Recovery** (owner-sequenced, unnumbered branches): 1. Lore articles - merged. 2. Content
+  recovery - committed, **not merged, not pushed**. 3. Ideas. 4. Persistent top search bar. 5. Backup Import / Restore - last.
+- **Phase 3 - Content recovery** (`feat/content-recovery` from `dev` `0784fac`, committed, **not merged, not pushed**). Three
+  recoveries kept apart - saved versions, a Trash for story content, recovered drafts of unsaved writing. ADR 0029.
+  - Manuscript versions: `SceneManuscriptRevisions`, the whole text per changing save (`Created|Edited|Restored`); a save that
+    changes nothing writes nothing (ADR 0027 amended). `.../manuscript/revisions`, `/{id}`, `/{id}/restore` naming
+    `expectedUpdatedAt`, stale 409 `scene_manuscript_changed`. The migration makes each manuscript its version 1.
+  - Story Trash: `DeletedAt` on stories, chapters, scenes, arcs, beats - deleting marks, superseding ADR 0024-0026's permanent
+    deletes. Order indexes are partial on live rows. A chapter delete still moves its scenes to Unchaptered; a trashed chapter
+    holds none and restores empty and last. Restores append; a parent in the Trash refuses with 409 `trash_parent_in_trash`,
+    never attaching elsewhere. A beat keeps its hidden link to a trashed scene. One Trash lists six kinds, typed restores.
+  - Recovered drafts: IndexedDB `lorex-recovery`, keyed account/universe/kind/id, article and manuscript editors only; never
+    sent to the API or a backup, never destroyed by sign-out, never offered to another account. Recover loads it as unsaved
+    (Save still required, stale check intact); a failed, stale or orphaned save and a closed tab keep it; a matching save,
+    Discard, Done, Load the saved version and leaving by choice let it go.
+  - Backup format version 10: `deletedAt` markers and `manuscript.revisions`. ADR 0014.
+  - Owner manual pass: `docs/testing/phase3-content-recovery-manual-test.md`.
+- **Phase 3 - Lore articles** (`feat/lore-articles`, merged into `dev` at `0784fac`). The owner authorized Phase 3;
   this is its first feature. Entries already had a Tiptap article; the owner kept that format (no plain-text conversion,
   2026-09-13) and it gained everything else. ADR 0028.
   - `EntityArticles` (one per entry; `Entities.Content` dropped) and `EntityArticleRevisions`, its own history. Own route
@@ -228,8 +245,9 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     queries per story. A trashed entry stays on its scene, marked, and cannot be newly chosen. An entry
     row deleted for good clears the point of view and drops the link; nothing deletes a scene.
   - No Canon finding, timeline entry, relationship, search hit or revision comes from a story. Deleting
-    a story or scene is permanent. Year checks and the era row are now shared with the timeline
-    (`ChronologyPointValidation`, `ChronologyPointFields`); an era a scene uses cannot be removed.
+    a story or scene was permanent; content recovery sends it to the Trash (ADR 0029). Year checks and the era row are
+    now shared with the timeline (`ChronologyPointValidation`, `ChronologyPointFields`); an era a scene uses cannot be
+    removed.
   - Backup format version 5 carries stories: a version 4 reader would drop them silently. ADR 0014.
   - The sidebar stays text-only: the Lucide icon asked for would have been the only one in it.
 - **Story chapters** (`feat/story-chapters`, merged into `dev`). Optional structure between story and scene. ADR 0025.
@@ -242,8 +260,9 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - Chapter order: append, `PUT .../chapters/order`. Scenes: `PUT .../scenes/order` names its container;
     `PUT .../scenes/{id}/position` moves within or across; an edit naming another chapter moves it last
     there. All one transaction, park-then-place.
-  - Deleting a chapter moves its scenes, in order, to the end of Unchaptered, then deletes it. FK is
-    `NO ACTION`, so a delete that skipped the move is refused rather than corrupting order.
+  - Deleting a chapter moves its scenes, in order, to the end of Unchaptered, then deletes it - since content recovery,
+    into the Trash (ADR 0029). FK is `NO ACTION`, so a delete that skipped the move is refused rather than corrupting
+    order.
   - The number ("Chapter 3") is the position, never stored. Story read is still a fixed query count,
     pinned by a test at 10 chapters x 100 scenes.
   - Migration `AddStoryChapters`: every existing scene Unchaptered with its order untouched; rollback
@@ -280,29 +299,26 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 
 ## Baseline
 
-- **735 API integration tests, 110 Playwright tests**, green. The lore articles full Playwright runs each lost one or two
-  tests to the known contention below - `canon.spec.ts` (a 30 s timeout), `account-menu.spec.ts` (the avatar read-back,
-  more than once) and, after the data-router fix, `universes.spec.ts` (a settings "saved" read) - and every file was green
-  alone (6/6, 15/15 over three repeats, 15/15 over three repeats). No frontend unit runner exists;
+- **756 API integration tests, 117 Playwright tests**, green. The content recovery full Playwright run lost four tests to
+  the known contention below - account-menu, canon, relationships, type-filter - and each file was green alone (5/5, 6/6,
+  6/6, 4/4); `content-recovery.spec.ts` was 28/28 over four parallel repeats. No frontend unit runner exists;
   the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
   format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
 - The test host no longer migrates itself, so every API test boots through the same startup path a
   deployment uses.
 - Under a full parallel Playwright run, `auth.spec.ts` "rejects a wrong password" intermittently
-  times out (it navigates to `/login` without awaiting sign-out), and a relationships, canon or
-  universes spec can time out once; each passes alone. Known, not fixed. The five profile tests
-  added load, so it now shows on most full runs - a different `canon.spec.ts` test each time, with
-  the whole file green on its own, in parallel and serially. Eight more tests arrived with the
-  account menu, and a full run now usually loses one or two - a rotating pick of canon, type-filter,
-  mobile, universes or account-menu, each green on its own. It is contention on the one SQLite
-  writer, not the specs. The story, chapters and plot runs each lost one to three of canon, account-menu
-  or type-filter, every one green alone; the plot run lost a single type-filter icon read-back, 4/4 alone; the
-  manuscript run lost one canon and one universes test, each file green alone (6/6, 5/5).
-- 25 migrations, latest `AddEntityArticles` - two tables, every article moved byte for byte with a first version, and
-  `Entities.Content` dropped with SQLite's native `DROP COLUMN`: EF Core's rebuild of `Entities` would drop the FTS delete
-  trigger it cannot see. `EntityArticleMigrationTests` walks it down and up over lore on a file and reads keys, cascades,
-  every dependant's foreign keys and the trigger back; rolling back puts each article on its entry and drops the history.
+  times out (it navigates to `/login` without awaiting sign-out), and a full run loses one to four of a rotating pick of
+  canon, type-filter, mobile, universes, relationships or account-menu, each file green on its own. Known, not fixed. It
+  is contention on the one SQLite writer, not the specs, and the content recovery run's API log shows how: a write's commit
+  throws `SQLite Error 5: 'database is locked'` at once, not after the provider's retry, and is answered as a 500 - or as a
+  false 409 where an endpoint maps every `DbUpdateException` to a conflict (entity type update: "name taken").
+- 26 migrations, latest `AddContentRecovery` - `DeletedAt` on five story tables, their order indexes recreated partial on
+  live rows, and `SceneManuscriptRevisions` with each manuscript as its version 1. Its rollback drops the columns with
+  SQLite's native `DROP COLUMN`, as `AddEntityArticles` did for `Entities.Content` (EF Core's table rebuild loses what it
+  cannot see, such as the FTS delete trigger), and discards the Trash, what is in it and every manuscript's history.
+  `ContentRecoveryMigrationTests` walks it down and up over stories on a file; `EntityArticleMigrationTests` still walks
+  the articles move.
   Every migration since `AddUniverseChronology` has a `*MigrationTests` walk on a file. `has-pending-model-changes` reports
   none. `AddEntitySearchIndex` is raw SQL - an FTS5 table and its trigger - invisible to the pending check either way.
 - No automated test reaches Cloudflare and none can: the API host registers an in-process object
@@ -348,14 +364,15 @@ tool has changed the picture.
   dates moved first, with no reassignment tool. Month names, calendars and conversion: not started.
   ADR 0022.
 - **`Age`** is declarable but read by nothing until a structured reference year exists. ADR 0011.
-- **Story work deferred past Phase 2** - later work, not Phase 2 gaps: acts and volumes, rich text, revisions and
-  history, Story search, a Story Trash, drag-and-drop, collaboration, manuscript export, AI, and restoring a backup.
-  Also: collapsing chapters, bulk scene moves, Story-vs-Lore checks, pre-era scene years in Settings; a plot status,
-  beat chronology, editing beats from a scene, board or graph views; autosave, word counts, a "has prose" marker on
-  scene cards (it needs a flag the story read can give without reading prose). ADR 0024-0027.
+- **Story work deferred past Phase 2** - later work, not Phase 2 gaps: acts and volumes, rich text, saved versions of
+  anything in a story but its manuscript, Story search, drag-and-drop, collaboration, manuscript export, AI, and restoring
+  a backup. Also: collapsing chapters, bulk scene moves, Story-vs-Lore checks, pre-era scene years in Settings; a plot
+  status, beat chronology, editing beats from a scene, board or graph views; autosave, word counts, a "has prose" marker on
+  scene cards (it needs a flag the story read can give without reading prose). ADR 0024-0027, 0029.
 - **Lore article work deferred** - later, not gaps: plain text or Markdown, wiki links and backlinks, version diffs and
-  pruning, restoring article text held in pre-ADR-0028 entry versions from the screen, autosave and local draft recovery
-  (Content Recovery), word counts. Backup Import / Restore is the last Phase 3 feature. ADR 0028.
+  pruning, restoring article text held in pre-ADR-0028 entry versions from the screen, autosave, word counts. ADR 0028.
+- **Content recovery deferred** - not gaps: recovered drafts for forms, drafts synced across browsers or devices, merging a
+  draft into a newer save, a restored chapter taking back the scenes it held. ADR 0029.
 - **Relationship life-state constraints** (an end alive at the link's date) wait for dated
   relationships: `StartDate`/`EndDate` are real-world timestamps, not chronology points. A birth-year
   gap across eras of unrecorded length waits for era lengths. ADR 0023.
@@ -364,10 +381,10 @@ tool has changed the picture.
 - **ImageSharp's licence.** `SixLabors.ImageSharp` is under the Six Labors Split License - free
   for personal use and for organisations under $1M revenue, which is true of Lorex today. Worth
   revisiting if that ever stops being true. ADR 0019.
-- **Permanent deletion.** Deferred by Phase 019, so nothing removes an entry for good short of
-  deleting the universe. One consequence is a dead end: a type used only by trashed entries
-  cannot be deleted, and the only way to free it is to restore the entry, move it to another type
-  and trash it again. ADR 0015 records the tradeoff.
+- **Permanent deletion.** Deferred by Phase 019, so nothing removes an entry - or, since content recovery, a story,
+  chapter, scene, arc or beat - for good short of deleting the universe. Two dead ends follow: a type used only by trashed
+  entries cannot be deleted until the entry is restored, moved to another type and trashed again (ADR 0015), and an era a
+  trashed scene is dated in cannot be removed until the scene is restored and re-dated (ADR 0029).
 
 ## Blockers
 

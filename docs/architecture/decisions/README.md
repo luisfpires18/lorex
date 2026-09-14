@@ -32,8 +32,9 @@ One ADR per durable decision. Rationale lives in the ADR, never here.
 | 0026 | Plot is planning: arcs of beats that point at scenes and lore and own neither | [0026-story-plot-arcs-beats.md](0026-story-plot-arcs-beats.md) |
 | 0027 | A scene's manuscript is plain prose in a row of its own, read and written on its own route | [0027-scene-manuscript.md](0027-scene-manuscript.md) |
 | 0028 | An entry's article lives in a row of its own, with its own history, saved on its own route | [0028-entity-article.md](0028-entity-article.md) |
+| 0029 | Content recovery: saved versions, a Trash for story content, and recovery copies of unsaved writing | [0029-content-recovery.md](0029-content-recovery.md) |
 
-All accepted. Next number: `0029`.
+All accepted. Next number: `0030`.
 
 Known limitations are recorded in the ADR that owns them - cross-era ordering on the plain
 reckoning in 0009 and 0011, and years written before a universe named its eras, the listing's
@@ -51,4 +52,6 @@ what stories deliberately do not have yet - prose, history, search, a Trash, Can
 leaves for later - a status, beat chronology, visual planning, editing beats from a scene - in 0026, and what a manuscript
 leaves for later - formatting, revisions, autosave, search - and what a whole-text save costs, in
 0027, and what an entry article's history costs and leaves for later - plain text, diffs, pruning, restoring article text
-from entry versions recorded before it - and the excerpt's marker characters, in 0028.
+from entry versions recorded before it - and the excerpt's marker characters, in 0028, and what content recovery deliberately
+does not do - permanent deletion, versions of short text and structure, drafts for forms, syncing drafts between devices, and
+restoring a chapter with the scenes it once held - in 0029.

@@ -1,7 +1,8 @@
 # ADR 0027 - A scene's manuscript is plain prose in a row of its own, read and written on its own route
 
 Status: accepted (2026-09-13), amended 2026-09-13 (Phase 2 closeout: the shared header, Write and Show in Scenes,
-Sign out asks, Back and Forward decided), amended 2026-09-14 (Back and Forward caught - ADR 0028)
+Sign out asks, Back and Forward decided), amended 2026-09-14 (Back and Forward caught - ADR 0028), amended 2026-09-14 (saved
+versions, recovered drafts and the Trash - ADR 0029)
 
 ## Context
 
@@ -142,3 +143,17 @@ The closeout decision to leave the browser's Back and Forward uncaught is supers
 moved the app onto a data router - one catch-all route around the existing routes - and mounted `HistoryLeaveGuard`, so a
 history move with unsaved prose asks the same question a link does, once, and staying keeps the scene and its text. The
 deferred item it named is done.
+
+## Amendment - content recovery (2026-09-14)
+
+ADR 0029 changes four things here, and leaves the storage, route, bound and stale-save comparison as they are.
+
+- **Saved versions.** Every save that changes the prose records the whole text in `SceneManuscriptRevisions`; history is read
+  and restored on `.../manuscript/revisions` routes of its own, never with the prose, and a restore is the same write, refused
+  when stale. The deferred "Manuscript revisions and history" is done; track changes, merging and collaboration stay deferred.
+- **A save that changes nothing writes nothing** - no row, no version and no timestamp, where it used to write and move both
+  timestamps. Saving `""` over nothing therefore creates no row. Clearing a written manuscript is still a save like any other.
+- **Recovered drafts, not autosave.** Unsaved prose is kept as a recovery copy in the browser and offered the next time the
+  scene opens; nothing is saved without Save. The deferred "Autosave and offline drafts" is done only as far as that.
+- **Deleting a scene** moves it to the Trash with its prose and versions instead of deleting them; a story deleted keeps every
+  manuscript beneath it. Only deleting the universe deletes prose for good.
