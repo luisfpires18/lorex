@@ -5,7 +5,8 @@ Status: accepted (2026-09-09), amended 2026-09-10 (version 3: the file became an
 2026-09-13 (version 4: a universe's eras), 2026-09-13 (relationship type Canon constraints,
 within version 4), 2026-09-13 (version 5: stories), 2026-09-13 (version 6: chapters), 2026-09-13
 (version 7: plot), 2026-09-13 (version 8: scene prose), 2026-09-13 (version 9: entry articles and their
-history), and 2026-09-14 (version 10: story content in the Trash, and a manuscript's saved versions)
+history), 2026-09-14 (version 10: story content in the Trash, and a manuscript's saved versions), and 2026-09-14 (version 11:
+the ideas that belong to a universe)
 
 ## Context
 
@@ -181,6 +182,16 @@ it is live, and a manuscript has no versions but its text. A future importer res
 row in a live order, and re-creates the versions with their ids and numbers without ever applying one. A browser's recovery copy
 of unsaved writing is never in a backup: it was never saved.
 
+**Version 11 (2026-09-14) carries the ideas that belong to the universe** (ADR 0030). `payload.ideas` holds each idea whose
+universe is this one - `id`, `title`, `body` exactly as stored, `createdAt`, `updatedAt`, `deletedAt`, and `references` as
+`{ kind, id }` sorted by kind then id, pointing at entries, stories, scenes, arcs and beats in the same file - live ideas
+first, then deleted ones, each by title then id. It fails the test the way stories did at version 5: an idea's text is
+authored, so a version 10 reader would parse the file and restore the universe with every idea about it silently gone. A file
+at version 10 or earlier has no `ideas`; it reads as null and means none. **An idea that belongs to no universe is in no
+universe backup**: it is the account's, and this file is one world, not an account export - carrying it in one arbitrary
+universe's file would be false. A future importer gives each idea to the importing account and the universe being restored,
+re-creates the references whose targets are in the file, keeps `deletedAt`, and never turns an idea into lore.
+
 **Only the authored data.** The test for inclusion is: did a person write this, or would
 Lorex produce it again from what a person wrote?
 
@@ -198,6 +209,7 @@ Lorex produce it again from what a person wrote?
 | Each story's plot arcs in order with title, description and notes; their beats in order with text and linked scene and entry ids | Any arc or beat number, and any scene title, chapter or entry name a beat points at |
 | Each scene's manuscript: its plain text exactly as stored, when it was last saved, and every saved version of it | Any word count, rendering or copy of the scene's planning, and any unsaved recovery copy a browser kept |
 | Every entry's revision history (ADR 0013); versions recorded since version 9 hold no copy of the article | - |
+| The ideas that belong to this universe: title, body, deleted marker, and references by kind and id | Ideas that belong to no universe or to another universe, any owner id, and any unsaved recovery copy |
 | Each entry's primary image: the original bytes, its asset id, filename, content type, dimensions, chosen crop and archive path | The generated thumbnail and its id, and every R2 object key, bucket name, endpoint and URL |
 | Canon conflicts the author **dismissed** | Pending and resolved conflicts, and all conflict wording |
 | | Tag `Slug` |

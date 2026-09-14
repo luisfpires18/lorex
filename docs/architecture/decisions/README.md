@@ -33,8 +33,9 @@ One ADR per durable decision. Rationale lives in the ADR, never here.
 | 0027 | A scene's manuscript is plain prose in a row of its own, read and written on its own route | [0027-scene-manuscript.md](0027-scene-manuscript.md) |
 | 0028 | An entry's article lives in a row of its own, with its own history, saved on its own route | [0028-entity-article.md](0028-entity-article.md) |
 | 0029 | Content recovery: saved versions, a Trash for story content, and recovery copies of unsaved writing | [0029-content-recovery.md](0029-content-recovery.md) |
+| 0030 | Ideas are account-owned possibilities, optionally about one universe, and never lore | [0030-ideas.md](0030-ideas.md) |
 
-All accepted. Next number: `0030`.
+All accepted. Next number: `0031`.
 
 Known limitations are recorded in the ADR that owns them - cross-era ordering on the plain
 reckoning in 0009 and 0011, and years written before a universe named its eras, the listing's
@@ -54,4 +55,5 @@ leaves for later - formatting, revisions, autosave, search - and what a whole-te
 0027, and what an entry article's history costs and leaves for later - plain text, diffs, pruning, restoring article text
 from entry versions recorded before it - and the excerpt's marker characters, in 0028, and what content recovery deliberately
 does not do - permanent deletion, versions of short text and structure, drafts for forms, syncing drafts between devices, and
-restoring a chapter with the scenes it once held - in 0029.
+restoring a chapter with the scenes it once held - in 0029, and what ideas deliberately do not have - promotion into lore, statuses,
+versions, cross-universe references - and the unassigned ideas no universe backup can hold, in 0030.

@@ -1,5 +1,6 @@
 using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Chronology;
+using Lorex.Api.Features.Ideas;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.Stories;
@@ -106,8 +107,15 @@ public sealed record UniverseBackup(
     /// would restore the Trash into the story as ordinary content, with two scenes claiming one place. And the versions are
     /// authored text a version 9 reader would drop silently. A file at version 9 or earlier has none of these members: each
     /// reads as null, everything in it is live, and a manuscript has no versions but its text.
+    ///
+    /// 11 - An account may keep ideas, and an idea may belong to a universe and reference its content (ADR 0030).
+    /// <see cref="UniverseBackupPayload.Ideas"/> carries every idea that belongs to this universe - its title and body, its
+    /// deleted marker and its references by kind and id. Nullable, but not ignorable: an idea's text is authored, so a version
+    /// 10 reader would parse the file and restore the universe with every idea about it silently gone. An idea that belongs
+    /// to no universe is an account's, not a world's, and is in no universe backup. A file at version 10 or earlier has no
+    /// <c>ideas</c>; it reads as null, which means none.
     /// </summary>
-    public const int CurrentVersion = 10;
+    public const int CurrentVersion = 11;
 
     public static UniverseBackup Of(UniverseBackupPayload payload, DateTime generatedAt) =>
         new(FormatName, CurrentVersion, generatedAt, payload);
@@ -124,6 +132,9 @@ public sealed record UniverseBackup(
 ///
 /// <paramref name="Stories"/> is every story told in the universe, by title. Empty means none;
 /// absent - null, in any file before version 5 - means the same thing.
+///
+/// <paramref name="Ideas"/> is every idea that belongs to the universe, live ones first (since version 11). Empty means
+/// none; absent - null, in any earlier file - means the same thing. Ideas that belong to no universe are never here.
 /// </summary>
 public sealed record UniverseBackupPayload(
     BackupUniverse Universe,
@@ -135,7 +146,8 @@ public sealed record UniverseBackupPayload(
     IReadOnlyList<BackupRelationship> Relationships,
     IReadOnlyList<BackupTimelineEntry> TimelineEntries,
     IReadOnlyList<BackupStory>? Stories,
-    IReadOnlyList<BackupDismissedConflict> DismissedConflicts);
+    IReadOnlyList<BackupDismissedConflict> DismissedConflicts,
+    IReadOnlyList<BackupIdea>? Ideas);
 
 /// <summary>
 /// The universe itself. <c>OwnerId</c> is deliberately absent: it names an Identity row that
@@ -594,6 +606,30 @@ public sealed record BackupPlotBeat(
     DateTime CreatedAt,
     DateTime UpdatedAt,
     DateTime? DeletedAt);
+
+/// <summary>
+/// One idea that belongs to this universe (since version 11): a possibility the author kept, never lore. Nothing in it is a
+/// fact about the world, and a reader must never turn it into an entry, a relationship, a moment or Canon.
+///
+/// <paramref name="Body"/> is plain text exactly as stored, <c>""</c> when there is none. <paramref name="DeletedAt"/> is when
+/// it was deleted, or null while it is live; a deleted idea travels whole, because it can still be restored.
+///
+/// <paramref name="References"/> point at content in this same file by kind and id, sorted by kind and then id; no name is
+/// carried. The owning account is not in the file: an importer gives the idea to the importing account and associates it
+/// with the universe being restored, re-creates each reference whose target is in the file, and never attaches the idea to
+/// any other universe. A browser's unsaved recovery copy of an idea is never in a backup: it was never saved.
+/// </summary>
+public sealed record BackupIdea(
+    Guid Id,
+    string Title,
+    string Body,
+    DateTime CreatedAt,
+    DateTime UpdatedAt,
+    DateTime? DeletedAt,
+    IReadOnlyList<BackupIdeaReference> References);
+
+/// <summary>One reference of an idea: what the target is, stated explicitly, and its id.</summary>
+public sealed record BackupIdeaReference(IdeaReferenceKind Kind, Guid Id);
 
 /// <summary>
 /// A position on the universe's line: the era the year is counted in - null on the plain reckoning -

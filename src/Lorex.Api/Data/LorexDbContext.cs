@@ -1,6 +1,7 @@
 using Lorex.Api.Features.Auth;
 using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Chronology;
+using Lorex.Api.Features.Ideas;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Profile;
 using Lorex.Api.Features.Relationships;
@@ -88,6 +89,18 @@ public class LorexDbContext(DbContextOptions<LorexDbContext> options)
     public DbSet<PlotBeatScene> PlotBeatScenes => Set<PlotBeatScene>();
 
     public DbSet<PlotBeatEntity> PlotBeatEntities => Set<PlotBeatEntity>();
+
+    public DbSet<Idea> Ideas => Set<Idea>();
+
+    public DbSet<IdeaEntityReference> IdeaEntityReferences => Set<IdeaEntityReference>();
+
+    public DbSet<IdeaStoryReference> IdeaStoryReferences => Set<IdeaStoryReference>();
+
+    public DbSet<IdeaSceneReference> IdeaSceneReferences => Set<IdeaSceneReference>();
+
+    public DbSet<IdeaPlotArcReference> IdeaPlotArcReferences => Set<IdeaPlotArcReference>();
+
+    public DbSet<IdeaPlotBeatReference> IdeaPlotBeatReferences => Set<IdeaPlotBeatReference>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

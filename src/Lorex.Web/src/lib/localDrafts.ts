@@ -18,12 +18,17 @@
  * editor can carry on writing and saving without it.
  */
 
-export type DraftKind = 'article' | 'manuscript'
+export type DraftKind = 'article' | 'manuscript' | 'idea'
 
-/** Which recovery copy: whose, in which universe, of what, and of which article or scene. */
+/**
+ * Which recovery copy: whose, in which universe, of what, and of which article, scene or idea.
+ *
+ * `universeId` is null for writing that belongs to the account rather than to a universe - an idea, which outlives any
+ * universe it is associated with (ADR 0030). A copy with no universe is never let go with a deleted universe's copies.
+ */
 export interface DraftScope {
   accountId: string
-  universeId: string
+  universeId: string | null
   kind: DraftKind
   contentId: string
 }
@@ -31,7 +36,7 @@ export interface DraftScope {
 export interface LocalDraft extends DraftScope {
   key: string
 
-  /** The unsaved text: the article's document, or the manuscript's prose, exactly as the editor held it. */
+  /** The unsaved text: the article's document, the manuscript's prose, or an idea's fields, exactly as the editor held it. */
   content: string
 
   /** The `updatedAt` of the saved text this copy was written over, as the API gave it - null when nothing was saved. */
@@ -46,8 +51,11 @@ const VERSION = 1
 const STORE = 'drafts'
 const BY_UNIVERSE = 'account-universe'
 
+/** Stands in a key for "no universe". Never an id: universe ids are GUIDs. */
+const NO_UNIVERSE = '~'
+
 export function draftKey(scope: DraftScope) {
-  return [scope.accountId, scope.universeId, scope.kind, scope.contentId]
+  return [scope.accountId, scope.universeId ?? NO_UNIVERSE, scope.kind, scope.contentId]
     .map((part) => encodeURIComponent(part))
     .join('/')
 }
@@ -166,7 +174,11 @@ export function discardDraft(scope: DraftScope) {
   })
 }
 
-/** Lets every copy an account kept in one universe go - for a universe that has been deleted, and so has nothing left to recover into. */
+/**
+ * Lets every copy an account kept in one universe go - for a universe that has been deleted, and so has nothing left to
+ * recover into. A copy kept with no universe is not in the index this walks - IndexedDB leaves a record whose key would
+ * hold a null out of it - so an idea's copy is never among them.
+ */
 export function discardUniverseDrafts(accountId: string, universeId: string) {
   return transact('readwrite', (store) => {
     const cursor = store.index(BY_UNIVERSE).openCursor(IDBKeyRange.only([accountId, universeId]))

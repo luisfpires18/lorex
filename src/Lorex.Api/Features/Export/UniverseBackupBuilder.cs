@@ -1,5 +1,6 @@
 using Lorex.Api.Data;
 using Lorex.Api.Features.CanonIntegrity;
+using Lorex.Api.Features.Ideas;
 using Lorex.Api.Features.Lore;
 using Microsoft.EntityFrameworkCore;
 
@@ -70,7 +71,8 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
             await RelationshipsAsync(universeId, cancellationToken),
             await TimelineAsync(universeId, cancellationToken),
             await StoriesAsync(universeId, cancellationToken),
-            await DismissedConflictsAsync(universeId, cancellationToken));
+            await DismissedConflictsAsync(universeId, cancellationToken),
+            await IdeasAsync(universe.Id, universe.OwnerId, cancellationToken));
 
         // Read-only, so there is nothing to commit; this just closes the snapshot.
         await transaction.CommitAsync(cancellationToken);
@@ -820,6 +822,87 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                             Utc(arc.DeletedAt),
                             beatsByArc.GetValueOrDefault(arc.Id, []))),
                 ]);
+    }
+
+    // ---------- Ideas ----------
+
+    /// <summary>
+    /// Every idea that belongs to this universe, live ones first and deleted ones after, each group by title and then id, with
+    /// its references sorted by kind and then id (ADR 0030). Only ideas assigned here: an idea that belongs to no universe is
+    /// the account's, and a universe backup is not an account export. Never a browser's unsaved recovery copy.
+    ///
+    /// The owner filter restates what association already guarantees - only the universe's owner can assign an idea to it -
+    /// so no other account's idea could reach this file even through a row that broke that rule.
+    /// </summary>
+    private async Task<IReadOnlyList<BackupIdea>> IdeasAsync(
+        Guid universeId,
+        string ownerId,
+        CancellationToken cancellationToken)
+    {
+        var ideas = await db.Ideas.AsNoTracking()
+            .Where(idea => idea.UniverseId == universeId && idea.OwnerId == ownerId)
+            .ToListAsync(cancellationToken);
+
+        if (ideas.Count == 0)
+        {
+            return [];
+        }
+
+        var references = new List<(Guid IdeaId, BackupIdeaReference Reference)>();
+
+        references.AddRange((await db.IdeaEntityReferences.AsNoTracking()
+                .Where(reference => reference.Idea!.UniverseId == universeId && reference.Idea.OwnerId == ownerId)
+                .Select(reference => new { reference.IdeaId, reference.EntityId })
+                .ToListAsync(cancellationToken))
+            .Select(row => (row.IdeaId, new BackupIdeaReference(IdeaReferenceKind.Entity, row.EntityId))));
+        references.AddRange((await db.IdeaStoryReferences.AsNoTracking()
+                .Where(reference => reference.Idea!.UniverseId == universeId && reference.Idea.OwnerId == ownerId)
+                .Select(reference => new { reference.IdeaId, reference.StoryId })
+                .ToListAsync(cancellationToken))
+            .Select(row => (row.IdeaId, new BackupIdeaReference(IdeaReferenceKind.Story, row.StoryId))));
+        references.AddRange((await db.IdeaSceneReferences.AsNoTracking()
+                .Where(reference => reference.Idea!.UniverseId == universeId && reference.Idea.OwnerId == ownerId)
+                .Select(reference => new { reference.IdeaId, reference.SceneId })
+                .ToListAsync(cancellationToken))
+            .Select(row => (row.IdeaId, new BackupIdeaReference(IdeaReferenceKind.Scene, row.SceneId))));
+        references.AddRange((await db.IdeaPlotArcReferences.AsNoTracking()
+                .Where(reference => reference.Idea!.UniverseId == universeId && reference.Idea.OwnerId == ownerId)
+                .Select(reference => new { reference.IdeaId, reference.PlotArcId })
+                .ToListAsync(cancellationToken))
+            .Select(row => (row.IdeaId, new BackupIdeaReference(IdeaReferenceKind.PlotArc, row.PlotArcId))));
+        references.AddRange((await db.IdeaPlotBeatReferences.AsNoTracking()
+                .Where(reference => reference.Idea!.UniverseId == universeId && reference.Idea.OwnerId == ownerId)
+                .Select(reference => new { reference.IdeaId, reference.PlotBeatId })
+                .ToListAsync(cancellationToken))
+            .Select(row => (row.IdeaId, new BackupIdeaReference(IdeaReferenceKind.PlotBeat, row.PlotBeatId))));
+
+        var referencesByIdea = references
+            .GroupBy(row => row.IdeaId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<BackupIdeaReference>)
+                [
+                    .. group
+                        .Select(row => row.Reference)
+                        .OrderBy(reference => reference.Kind)
+                        .ThenBy(reference => Key(reference.Id), StringComparer.Ordinal),
+                ]);
+
+        return
+        [
+            .. ideas
+                .OrderBy(idea => idea.DeletedAt is not null)
+                .ThenBy(idea => idea.Title, StringComparer.Ordinal)
+                .ThenBy(idea => Key(idea.Id), StringComparer.Ordinal)
+                .Select(idea => new BackupIdea(
+                    idea.Id,
+                    idea.Title,
+                    idea.Body,
+                    Utc(idea.CreatedAt),
+                    Utc(idea.UpdatedAt),
+                    Utc(idea.DeletedAt),
+                    referencesByIdea.GetValueOrDefault(idea.Id, []))),
+        ];
     }
 
     // ---------- Canon lifecycle ----------

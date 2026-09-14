@@ -170,6 +170,13 @@ export default function UniverseTrash() {
           and connections; a scene&rsquo;s manuscript and its saved versions; a story&rsquo;s
           chapters, scenes and plot.
         </p>
+        <p className="trash__lede" data-testid="trash-ideas-pointer">
+          Deleted ideas are not here: they belong to your account, and wait in{' '}
+          <Link to={`/app/universes/${universe.id}/ideas?view=deleted`}>
+            Ideas, under Recently deleted
+          </Link>
+          .
+        </p>
       </header>
 
       {blocked ? (

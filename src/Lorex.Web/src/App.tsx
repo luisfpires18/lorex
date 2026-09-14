@@ -4,6 +4,8 @@ import { RequireAuth, RequireGuest } from './auth/routes'
 import { HistoryLeaveGuard } from './lib/leaveGuard'
 import CanonPage from './pages/CanonPage'
 import EntityPage from './pages/EntityPage'
+import IdeaPage from './pages/IdeaPage'
+import IdeasPage from './pages/IdeasPage'
 import LoginPage from './pages/LoginPage'
 import LorePage from './pages/LorePage'
 import ProfilePage from './pages/ProfilePage'
@@ -36,6 +38,9 @@ function Root() {
           <Route element={<RequireAuth />}>
             <Route path="/app" element={<UniversesPage />} />
             <Route path="/app/profile" element={<ProfilePage />} />
+            <Route path="/app/ideas" element={<IdeasPage />} />
+            <Route path="/app/ideas/new" element={<IdeaPage isNew />} />
+            <Route path="/app/ideas/:ideaId" element={<IdeaPage />} />
             <Route path="/app/universes/:id" element={<UniverseWorkspace />}>
               <Route index element={<UniverseOverview />} />
               <Route path="lore" element={<LorePage />} />
@@ -49,6 +54,9 @@ function Root() {
                 path="stories/:storyId/manuscript/:sceneId?"
                 element={<StoryPage view="manuscript" />}
               />
+              <Route path="ideas" element={<IdeasPage inUniverse />} />
+              <Route path="ideas/new" element={<IdeaPage inUniverse isNew />} />
+              <Route path="ideas/:ideaId" element={<IdeaPage inUniverse />} />
               <Route path="canon" element={<CanonPage />} />
               <Route path="types" element={<UniverseTypes />} />
               <Route path="trash" element={<UniverseTrash />} />
