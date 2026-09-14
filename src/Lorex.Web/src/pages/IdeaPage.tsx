@@ -29,7 +29,16 @@ export default function IdeaPage({ inUniverse = false, isNew = false }: IdeaPage
       contextUniverse={universe ? { id: universe.id, name: universe.name } : null}
       listPath={listPath}
       listLabel={universe ? `Ideas in “${universe.name}”` : 'All ideas'}
-      onCreated={(idea) => void navigate(`${listPath}/${idea.id}`, { replace: true })}
+      // A new idea opens where it lives: in this universe when it is this universe's, otherwise among all ideas - a universe's
+      // Ideas only open its own.
+      onCreated={(idea) =>
+        void navigate(
+          universe && idea.universe?.id !== universe.id
+            ? `/app/ideas/${idea.id}`
+            : `${listPath}/${idea.id}`,
+          { replace: true },
+        )
+      }
       onDeleted={(idea) =>
         void navigate(listPath, { state: { deleted: idea } satisfies IdeasListNotice })
       }

@@ -183,3 +183,8 @@ deleted idea are never results, and a recovery copy is never searched. Saving an
 `IdeaSearchIndex` - through a trigger, a derived copy, never read back as the idea - so "never ... the search index" above
 holds for lore's index and not for this one. Still no lore, story, Canon or revision is touched. The global Ideas list
 keeps its own filter; account-wide search is not settled.
+
+A universe's Ideas open only that universe's ideas. An address `/app/universes/{u}/ideas/{id}` naming one of the account's
+ideas that belongs to another universe, or to none, shows nothing of it - "This idea is not in …" with a link to open it in
+all ideas; another account's idea, or none, is the existing "not here". An idea moved out while open keeps its notice, and a
+new idea started in a universe but saved to another, or to none, opens among all ideas.

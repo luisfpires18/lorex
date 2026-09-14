@@ -420,6 +420,47 @@ test.describe('ideas', () => {
     await expect(page.getByTestId('idea-elsewhere')).toContainText('belongs to no universe')
   })
 
+  test('a universe’s Ideas open only its own ideas: one started there but saved elsewhere opens among all ideas', async ({
+    page,
+  }) => {
+    await signUp(page)
+    const home = await seedUniverse(page, unique('Home World '))
+    const other = await seedUniverse(page, unique('Other World '))
+
+    // Started here and kept here: it opens here, as it always has.
+    await page.goto(`/app/universes/${home}/ideas/new`)
+    await page.getByTestId('idea-title').fill('A thought that stays')
+    await saveWith(page, () => page.getByTestId('idea-save').click())
+    await page.waitForURL(new RegExp(`/app/universes/${home}/ideas/[0-9a-f-]+$`))
+    await expect(page.getByTestId('idea-heading')).toHaveText('A thought that stays')
+
+    // Started here but given no universe, or another one: each opens where it lives, among all ideas.
+    const moved: [string, string][] = []
+    for (const [title, universe] of [
+      ['A thought for nowhere', ''],
+      ['A thought for elsewhere', other],
+    ] as const) {
+      await page.goto(`/app/universes/${home}/ideas/new`)
+      await page.getByTestId('idea-title').fill(title)
+      await page.getByTestId('idea-universe').selectOption(universe)
+      await saveWith(page, () => page.getByTestId('idea-save').click())
+      await page.waitForURL(/\/app\/ideas\/[0-9a-f-]+$/)
+      await expect(page.getByTestId('idea-heading')).toHaveText(title)
+      moved.push([page.url().split('/').pop()!, title])
+    }
+
+    // Neither opens at this universe's address: nothing of it shows, and a link leads to where it does.
+    for (const [id, title] of moved) {
+      await page.goto(`/app/universes/${home}/ideas/${id}`)
+      await expect(page.getByTestId('idea-not-in-universe')).toContainText('does not open here')
+      await expect(page.getByTestId('idea-editor')).toHaveCount(0)
+      await expect(page.locator('main')).not.toContainText(title)
+    }
+    await page.getByRole('link', { name: 'Open it in all ideas' }).click()
+    await page.waitForURL(`/app/ideas/${moved[1][0]}`)
+    await expect(page.getByTestId('idea-heading')).toHaveText('A thought for elsewhere')
+  })
+
   test('unsaved idea writing comes back as a recovered draft, is kept by failed and refused saves, and is never offered to another account', async ({
     page,
   }) => {

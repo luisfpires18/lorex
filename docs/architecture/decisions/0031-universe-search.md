@@ -130,7 +130,7 @@ removes lore index rows that held either character, and the startup backfill wri
 | Chapter, Scene | the Scenes view at `#chapter-{id}` / `#scene-{id}`: scrolled to, focused, marked |
 | Arc, Beat | the Plot view at `#arc-{id}` / `#beat-{id}` |
 | Manuscript | the scene's writing, `stories/{s}/manuscript/{scene}` |
-| Idea | the idea in the universe's Ideas, `ideas/{id}` |
+| Idea | that idea, open in the universe's Ideas editor at `ideas/{id}` - an address that reloads to it |
 
 Existing places only - no search-detail page. The story page is now one per story (keyed by its id), so a result in another
 story lands once that story is on screen instead of racing the previous story's page.

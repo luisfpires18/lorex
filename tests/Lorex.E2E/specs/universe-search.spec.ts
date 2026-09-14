@@ -56,6 +56,8 @@ interface World {
   arcId: string
   beatId: string
   ideaId: string
+  unassignedIdeaId: string
+  elsewhereIdeaId: string
 }
 
 /**
@@ -145,7 +147,7 @@ async function seedWorld(page: Page): Promise<World> {
   })
 
   // The same words where the bar must never look.
-  await api(page, 'POST', '/api/ideas', {
+  const unassignedIdea = await api<{ id: string }>(page, 'POST', '/api/ideas', {
     title: 'Vesperine, unassigned',
     body: 'Quennell Tarrowmere Hollowmere',
     universeId: null,
@@ -157,7 +159,7 @@ async function seedWorld(page: Page): Promise<World> {
     description: null,
     accentColor: null,
   })
-  await api(page, 'POST', '/api/ideas', {
+  const elsewhereIdea = await api<{ id: string }>(page, 'POST', '/api/ideas', {
     title: 'Vesperine elsewhere',
     body: 'Quennell',
     universeId: elsewhere.id,
@@ -176,6 +178,8 @@ async function seedWorld(page: Page): Promise<World> {
     arcId: arc.id,
     beatId: beat.id,
     ideaId: idea.id,
+    unassignedIdeaId: unassignedIdea.id,
+    elsewhereIdeaId: elsewhereIdea.id,
   }
 }
 
@@ -365,6 +369,146 @@ test.describe('universe search', () => {
     await page.waitForURL(`${story}/manuscript/${world.proseSceneId}`)
     await page.goBack()
     await page.waitForURL(`${story}/plot#beat-${world.beatId}`)
+  })
+
+  test('an idea result opens that very idea in the universe’s Ideas, at an address that reloads, by pointer and keyboard, on a phone', async ({
+    page,
+  }) => {
+    await signUp(page)
+    const world = await seedWorld(page)
+    const base = `/app/universes/${world.universeId}`
+
+    // A second idea of this universe answering the same word, with a long title in several scripts.
+    const long =
+      'Ærendel’s floating 北の門 over المدينة — what if Vesperine’s tower was never on the ground at all, and every map of it lied 🐉'
+    const other = await api<{ id: string }>(page, 'POST', '/api/ideas', {
+      title: long,
+      body: 'Maps lie.',
+      universeId: world.universeId,
+      references: [],
+      expectedUpdatedAt: null,
+    })
+
+    // Both of this universe's ideas are offered; the unassigned one and the other universe's are not.
+    await page.goto(`${base}/timeline`)
+    await search(page, 'Vesperine')
+    await expect(results(page)).toHaveCount(2)
+
+    // By pointer: that idea, in the existing editor - its own title and body - and not the list of ideas.
+    await result(page, 'Idea', long).click()
+    await page.waitForURL(`${base}/ideas/${other.id}`)
+    await expect(page.getByTestId('idea-editor')).toBeVisible()
+    await expect(page.getByTestId('idea-heading')).toHaveText(long)
+    await expect(page.getByTestId('idea-title')).toHaveValue(long)
+    await expect(page.getByTestId('idea-body')).toHaveValue('Maps lie.')
+    await expect(page.getByTestId('idea-row')).toHaveCount(0)
+    await expect(page.getByTestId('workspace-ideas')).toHaveAttribute('aria-current', 'page')
+
+    // The address is the destination: a reload opens the same idea, and Back returns to where the search was made.
+    await page.reload()
+    await expect(page.getByTestId('idea-title')).toHaveValue(long)
+    await page.goBack()
+    await page.waitForURL(`${base}/timeline`)
+
+    // By keyboard: the other idea, opened with Enter and said so.
+    await search(page, 'Vesperine floats')
+    await expect(results(page)).toHaveCount(1)
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('Enter')
+    await page.waitForURL(`${base}/ideas/${world.ideaId}`)
+    await expect(page.getByTestId('idea-title')).toHaveValue('What if Vesperine floats?')
+    await expect(page.getByTestId('idea-body')).toHaveValue('Maybe.')
+    await expect(page.getByTestId('universe-search-announcer')).toHaveText(
+      'Opened Idea “What if Vesperine floats?”.',
+    )
+    await page.goBack()
+    await page.waitForURL(`${base}/timeline`)
+
+    // On a phone: the same, the long title wrapping inside the screen.
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto(`${base}/stories/${world.storyId}`)
+    await search(page, 'Vesperine')
+    await result(page, 'Idea', long).click()
+    await page.waitForURL(`${base}/ideas/${other.id}`)
+    await expect(page.getByTestId('idea-heading')).toHaveText(long)
+    const heading = (await page.getByTestId('idea-heading').boundingBox())!
+    expect(heading.x + heading.width).toBeLessThanOrEqual(391)
+    expect(await scrollsSideways(page)).toBe(false)
+  })
+
+  test('no other idea opens under a universe’s address, and unsaved writing is asked about before an idea result leaves it', async ({
+    page,
+    browser,
+  }, testInfo) => {
+    await signUp(page)
+    const world = await seedWorld(page)
+    const base = `/app/universes/${world.universeId}`
+
+    // The account's own ideas from another universe, or from none: nothing of them here, and a way to where they open.
+    for (const [id, title] of [
+      [world.elsewhereIdeaId, 'Vesperine elsewhere'],
+      [world.unassignedIdeaId, 'Vesperine, unassigned'],
+    ] as const) {
+      await page.goto(`${base}/ideas/${id}`)
+      await expect(page.getByTestId('idea-not-in-universe')).toBeVisible()
+      await expect(page.getByTestId('idea-editor')).toHaveCount(0)
+      await expect(page.locator('main')).not.toContainText(title)
+    }
+    await page.getByRole('link', { name: 'Open it in all ideas' }).click()
+    await page.waitForURL(`/app/ideas/${world.unassignedIdeaId}`)
+    await expect(page.getByTestId('idea-title')).toHaveValue('Vesperine, unassigned')
+
+    // An idea that does not exist, and another account's: not here, and nothing of it.
+    const strangerContext = await browser.newContext({ baseURL: testInfo.project.use.baseURL })
+    const stranger = await strangerContext.newPage()
+    await signUp(stranger)
+    const theirs = await api<{ id: string }>(stranger, 'POST', '/api/ideas', {
+      title: 'A stranger’s secret idea',
+      body: 'Not for anyone else.',
+      universeId: null,
+      references: [],
+      expectedUpdatedAt: null,
+    })
+    await strangerContext.close()
+
+    for (const id of [theirs.id, '00000000-0000-4000-8000-000000000000']) {
+      await page.goto(`${base}/ideas/${id}`)
+      await expect(page.getByTestId('idea-missing')).toBeVisible()
+      await expect(page.locator('main')).not.toContainText('secret')
+    }
+
+    // Unsaved writing in one idea: an idea result elsewhere asks first, staying keeps everything, leaving opens it.
+    const questions: string[] = []
+    let answer: 'stay' | 'leave' = 'stay'
+    page.on('dialog', (dialog) => {
+      questions.push(dialog.message())
+      void (answer === 'leave' ? dialog.accept() : dialog.dismiss())
+    })
+
+    const second = await api<{ id: string }>(page, 'POST', '/api/ideas', {
+      title: 'Glassmere drowns',
+      body: 'A second thought.',
+      universeId: world.universeId,
+      references: [],
+      expectedUpdatedAt: null,
+    })
+
+    await page.goto(`${base}/ideas/${world.ideaId}`)
+    await page.getByTestId('idea-body').fill('Maybe - unsaved.')
+    await expect(page.getByTestId('idea-status')).toHaveText('Unsaved changes')
+
+    await search(page, 'Glassmere')
+    await result(page, 'Idea', 'Glassmere drowns').click()
+    await expect.poll(() => questions.length).toBe(1)
+    expect(questions[0]).toContain('unsaved')
+    await expect(page).toHaveURL(`${base}/ideas/${world.ideaId}`)
+    await expect(page.getByTestId('idea-body')).toHaveValue('Maybe - unsaved.')
+
+    answer = 'leave'
+    await searchBox(page).press('Enter')
+    await expect.poll(() => questions.length).toBe(2)
+    await page.waitForURL(`${base}/ideas/${second.id}`)
+    await expect(page.getByTestId('idea-title')).toHaveValue('Glassmere drowns')
   })
 
   test('the keyboard reaches, walks and opens the results, and Escape and Tab close them', async ({

@@ -30,7 +30,11 @@ import { useLocalDraft } from '../lib/useLocalDraft'
 import type { UniverseSummary } from '../universes/types'
 
 type LoadState =
-  { kind: 'loading' } | { kind: 'ready' } | { kind: 'missing' } | { kind: 'error'; message: string }
+  | { kind: 'loading' }
+  | { kind: 'ready' }
+  | { kind: 'missing' }
+  | { kind: 'elsewhere' }
+  | { kind: 'error'; message: string }
 
 /** What an author edits, and exactly what a recovery copy holds. */
 interface Fields {
@@ -118,7 +122,10 @@ interface IdeaEditorProps {
   ideaId: string | null
   /** The universe a new idea starts in - the one it was started from - or null. */
   defaultUniverseId: string | null
-  /** The universe this screen is inside, if any, so an idea that belongs elsewhere can say so. */
+  /**
+   * The universe this screen is inside, if any. Only its ideas open here: another idea named by the address shows nothing of
+   * itself and points to all ideas, and one moved out while open says so.
+   */
   contextUniverse: { id: string; name: string } | null
   /** Where this idea's list is, for the way back. */
   listPath: string
@@ -203,6 +210,7 @@ export function IdeaEditor({
   const titleInput = useRef<HTMLInputElement>(null)
   const addButton = useRef<HTMLButtonElement>(null)
   const shortcut = useRef<() => void>(() => {})
+  const contextUniverseId = contextUniverse?.id ?? null
 
   useEffect(() => {
     if (isNew) return
@@ -210,6 +218,13 @@ export function IdeaEditor({
 
     getIdea(ideaId, controller.signal)
       .then((idea) => {
+        // Inside a universe only that universe's ideas open. An address naming one of the account's ideas that belongs to
+        // another universe, or to none, shows nothing of it here and points to where it does open. An idea moved out while
+        // it is open here stays on screen, saying so - that was the author's own save, not an address.
+        if (contextUniverseId !== null && idea.universe?.id !== contextUniverseId) {
+          setLoad({ kind: 'elsewhere' })
+          return
+        }
         const next = storedFrom(idea)
         setStored(next)
         setDraft(fieldsOf(next))
@@ -227,7 +242,7 @@ export function IdeaEditor({
     return () => {
       controller.abort()
     }
-  }, [isNew, ideaId, reads])
+  }, [isNew, ideaId, reads, contextUniverseId])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -496,6 +511,19 @@ export function IdeaEditor({
         <p className="empty__hint">
           It may have been deleted, or it belongs to someone else. Deleted ideas wait in{' '}
           <Link to={`${listPath}?view=deleted`}>Recently deleted</Link>.
+        </p>
+      </div>
+    )
+  }
+
+  if (load.kind === 'elsewhere') {
+    return (
+      <div className="empty" data-testid="idea-not-in-universe">
+        <p className="empty__line">This idea is not in “{contextUniverse?.name}”.</p>
+        <p className="empty__hint">
+          It belongs to another universe, or to none, so it does not open here.{' '}
+          <Link to={`/app/ideas/${ideaId}`}>Open it in all ideas</Link>, or go back to{' '}
+          <Link to={listPath}>{listLabel}</Link>.
         </p>
       </div>
     )
