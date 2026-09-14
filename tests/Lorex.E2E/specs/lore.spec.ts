@@ -112,14 +112,14 @@ test.describe('lore', () => {
     await page.waitForURL(/\/lore$/)
     await expect(card(page, name)).toBeVisible()
 
-    await page.getByLabel('Search').fill('Grey Bird')
+    await page.getByLabel('Search', { exact: true }).fill('Grey Bird')
     await expect(card(page, name)).toBeVisible()
 
     // Words that appear nowhere but inside the article body find it too.
-    await page.getByLabel('Search').fill('built for running')
+    await page.getByLabel('Search', { exact: true }).fill('built for running')
     await expect(card(page, name)).toBeVisible()
 
-    await page.getByLabel('Search').fill('nothing-matches-this')
+    await page.getByLabel('Search', { exact: true }).fill('nothing-matches-this')
     await expect(page.getByTestId('entity-empty')).toBeVisible()
   })
 

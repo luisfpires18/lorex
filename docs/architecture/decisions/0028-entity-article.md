@@ -1,7 +1,7 @@
 # ADR 0028 - An entry's article lives in a row of its own, with its own history, saved on its own route
 
 Status: accepted (2026-09-13), amended 2026-09-14 (merge readiness: an entry write carrying the article is refused, and
-Back and Forward ask), amended 2026-09-14 (recovered drafts - ADR 0029)
+Back and Forward ask), amended 2026-09-14 (recovered drafts - ADR 0029), amended 2026-09-14 (universe search - ADR 0031)
 
 ## Context
 
@@ -174,3 +174,11 @@ the saved article is shown and "Recovered draft" is offered above it - read it, 
 or discard it. Edit article waits for that choice. Done without saving, Load the saved version, and answering "leave" to the
 leave guard let the copy go, through `useLeaveGuard`'s new `onLeave`; a failed, stale or orphaned save keeps it. The article's
 route, history, stale-save refusal and search are unchanged, and no copy ever reaches them.
+
+## Amendment - universe search (2026-09-14)
+
+An article's words are also found by the universe's search bar (ADR 0031): one result per entry, saying "In the article"
+with the excerpt, opening the entry at `#article` with the focus on the Article heading. The consequence above - an
+article holding U+E000 or U+E001 could mark the wrong words - is closed: the index writes those two characters as spaces,
+so no author's text can be read back as a marker. "Story and manuscript text are still never indexed" is superseded for
+the universe search; the Lore search is unchanged.

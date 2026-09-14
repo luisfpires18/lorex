@@ -72,6 +72,21 @@ function listed(parts: string[]) {
 }
 
 /**
+ * A story's page, one per story. Moving between its three views keeps the page and everything read for it; moving to
+ * another story - a search result in another story, say - starts a new page, so nothing on screen for one story (the
+ * story itself while the next is read, a message, a pending focus) is ever shown under the other's address, and a link
+ * that lands on a scene or a beat lands once the story it is in is on screen.
+ */
+export default function StoryPage({
+  view = 'scenes',
+}: {
+  view?: 'scenes' | 'plot' | 'manuscript'
+}) {
+  const { storyId } = useParams<{ storyId: string }>()
+  return <StoryView key={storyId} view={view} />
+}
+
+/**
  * One story, told in the order its author sets, and planned in the plot its author follows.
  *
  * The page has three views under one header: Scenes, at the story's own address, Plot, at `/plot`, and Manuscript, at
@@ -94,11 +109,7 @@ function listed(parts: string[]) {
  * flashes back to a childhood is exactly as valid as one told straight through. The plot is a third order of
  * its own - arcs, and the beats in each - which follows neither.
  */
-export default function StoryPage({
-  view = 'scenes',
-}: {
-  view?: 'scenes' | 'plot' | 'manuscript'
-}) {
+function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
   const { universe, chronology } = useOutletContext<WorkspaceContext>()
   const { storyId, sceneId } = useParams<{ storyId: string; sceneId?: string }>()
   const navigate = useNavigate()

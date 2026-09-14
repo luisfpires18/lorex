@@ -270,7 +270,7 @@ test.describe('the type bar', () => {
 
     // ---------- Search and type narrow each other, as they always did ----------
 
-    await page.getByLabel('Search').fill('warden')
+    await page.getByLabel('Search', { exact: true }).fill('warden')
     await expect(page.getByTestId('entity-card')).toHaveCount(1)
     await expect(card(page, 'Alenna Vance')).toBeVisible()
 
@@ -286,7 +286,7 @@ test.describe('the type bar', () => {
     // A type with nothing matching says so, rather than quietly showing everything.
     await chip(page, 'Kingdom').click()
     await expect(page.getByTestId('entity-empty')).toBeVisible()
-    await page.getByLabel('Search').fill('')
+    await page.getByLabel('Search', { exact: true }).fill('')
     await expect(page.getByTestId('entity-card')).toHaveCount(1)
     await expect(card(page, 'Drowned Coast')).toBeVisible()
 
@@ -433,7 +433,7 @@ test.describe('the type bar', () => {
     // Heading, search, status, type chips and grid share one content area: the same left edge,
     // and the chips, the status filter and the cards end at the same right edge.
     const heading = (await page.getByRole('heading', { name: 'Lore', exact: true }).boundingBox())!
-    const search = (await page.getByLabel('Search').boundingBox())!
+    const search = (await page.getByLabel('Search', { exact: true }).boundingBox())!
     const status = (await page.getByLabel('Status').boundingBox())!
     const chips = (await page.getByTestId('type-filter').boundingBox())!
     const cards = (await grid.boundingBox())!

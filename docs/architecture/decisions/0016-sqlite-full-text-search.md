@@ -1,6 +1,7 @@
 # ADR 0016 - Lore is searched by a SQLite FTS5 index the write path keeps in step
 
-Status: accepted (2026-09-10), amended 2026-09-13 (the article's own row, and excerpts - ADR 0028)
+Status: accepted (2026-09-10), amended 2026-09-13 (the article's own row, and excerpts - ADR 0028), amended 2026-09-14
+(the universe search - ADR 0031)
 
 ## Context
 
@@ -133,3 +134,14 @@ the ids already on the page and only when the article itself matched. It travels
 plain text with the matched words flagged, never as markup, and is drawn as text. The markers
 FTS5 inserts are U+E000 and U+E001. That is a third query per search page; browsing is still
 one.
+
+## Amendment - the universe search (2026-09-14)
+
+ADR 0031 searches a whole universe from a persistent bar. This index, its four columns, weights, tokenizer, query semantics
+and the lore listing's search are unchanged; the file gains what that search asks of lore - `MatchByField`, the same rows
+and scores with where the words were found (name, aliases, summary or article, by the same question with a column filter),
+and `FieldExcerptsAsync`. Stories, manuscripts and ideas get indexes of their own in `Features/Search`, kept in step by
+triggers because their text needs no C# extraction; lore keeps the explicit calls above.
+
+`ReindexAsync` now writes U+E000 and U+E001 into the index as spaces, so an author's own cannot be read back out of an
+excerpt as a match marker. `AddUniverseSearchIndex` removes index rows holding either, and the backfill rewrites them.

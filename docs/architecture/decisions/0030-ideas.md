@@ -1,6 +1,6 @@
 # ADR 0030 - Ideas are account-owned possibilities, optionally about one universe, and never lore
 
-Status: accepted (2026-09-14)
+Status: accepted (2026-09-14), amended 2026-09-14 (universe search - ADR 0031)
 
 ## Context
 
@@ -174,3 +174,17 @@ and body. No cross-domain index is built here, and account-wide search is not pl
 - Unassigned ideas have no file-level backup until an account export exists.
 - A reference to content deleted for good disappears without a trace on the idea; today only a universe deletion does that.
 - Two tabs writing the same unsaved idea share one recovery copy; the last to keep it wins, as ADR 0029 accepted.
+
+## Amendment - universe search (2026-09-14)
+
+"Search, later" is done (ADR 0031). The universe's search bar finds the account's live ideas that belong to that universe,
+by title or body, as Idea results opening the idea in the universe's Ideas. An unassigned idea, another universe's idea and a
+deleted idea are never results, and a recovery copy is never searched. Saving an idea now also writes its words to
+`IdeaSearchIndex` - through a trigger, a derived copy, never read back as the idea - so "never ... the search index" above
+holds for lore's index and not for this one. Still no lore, story, Canon or revision is touched. The global Ideas list
+keeps its own filter; account-wide search is not settled.
+
+A universe's Ideas open only that universe's ideas. An address `/app/universes/{u}/ideas/{id}` naming one of the account's
+ideas that belongs to another universe, or to none, shows nothing of it - "This idea is not in …" with a link to open it in
+all ideas; another account's idea, or none, is the existing "not here". An idea moved out while open keeps its notice, and a
+new idea started in a universe but saved to another, or to none, opens among all ideas.

@@ -1,7 +1,7 @@
 # ADR 0024 - A story is authored narrative that references lore, told in its own order
 
 Status: accepted (2026-09-13), amended 2026-09-13 (chapters, ADR 0025: scene order is now per chapter or
-Unchaptered), amended 2026-09-14 (deleting moves to the Trash - ADR 0029)
+Unchaptered), amended 2026-09-14 (deleting moves to the Trash - ADR 0029), amended 2026-09-14 (universe search - ADR 0031)
 
 ## Context
 
@@ -119,3 +119,10 @@ part. ADR 0029: deleting a story or a scene marks it (`DeletedAt`) and moves it 
 chapters, scenes, prose and plot untouched beneath it, a scene with its prose, saved versions and links - and one restore
 brings either back whole. Scene order is unique among live scenes; a restored scene is appended to its container. Only deleting
 the universe removes a story for good. Lore is untouched either way, as before.
+
+## Amendment - universe search (2026-09-14)
+
+The deferred "Story search" is done, and the rule that no search hit comes from a story is superseded for the universe's
+search bar only (ADR 0031): a story's title and premise, and a scene's title, summary and notes, are searched there, over an
+index of their own kept in step by triggers. The Lore search still means lore and finds nothing a story holds. A story is
+still never Canon, a moment or a relationship, and nothing reads its words for meaning.

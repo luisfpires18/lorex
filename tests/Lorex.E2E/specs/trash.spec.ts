@@ -94,7 +94,7 @@ test.describe('trash', () => {
     await expect(page.getByTestId('entity-grid')).toContainText('Gatewarden')
     await expect(page.getByTestId('entity-grid')).not.toContainText('Northern Gate')
 
-    await page.getByLabel('Search').fill('Northern')
+    await page.getByLabel('Search', { exact: true }).fill('Northern')
     await expect(page.getByTestId('entity-empty')).toBeVisible()
 
     await page.goto(`/app/universes/${universeId}/lore/${gate}`)
