@@ -9,9 +9,9 @@ using Lorex.Api.Features.Timeline;
 namespace Lorex.Api.Features.Export;
 
 /// <summary>
-/// The whole export format, as records. This file *is* the contract: a future import reads
-/// these shapes and nothing else, so a change here is a format change and owes a
-/// <see cref="UniverseBackup.FormatVersion"/> bump.
+/// The whole export format, as records. This file *is* the contract: the restore
+/// (<c>Features/Restore</c>, ADR 0032) reads these shapes and nothing else, so a change here is a format
+/// change and owes a <see cref="UniverseBackup.FormatVersion"/> bump - and the importer must be taught it.
 ///
 /// Since version 3 a backup is an archive rather than one file, and these records describe
 /// the <c>backup.json</c> inside it. The media beside it is addressed by
@@ -225,9 +225,9 @@ public sealed record BackupTag(Guid Id, string Name);
 /// <paramref name="Content"/>. Each is the whole document, or <c>""</c> for a save that cleared it. Its ids are preserved,
 /// and a version's <c>restoredFromRevisionId</c> names another version of the same entry's article (since version 9).
 ///
-/// A future importer restores the article to the entry of the same id, in the universe being restored and owned by the
+/// The importer (ADR 0032) restores the article to the entry it belongs to, in the universe being restored and owned by the
 /// importing account - nothing about ownership is in the file. It validates each document as a save does, re-creates the
-/// versions with their ids and numbers, writes no entry revision for any of it, and reindexes search. It never applies a
+/// versions with their numbers under new ids, writes no entry revision for any of it, and reindexes search. It never applies a
 /// <see cref="BackupRevision.Content"/> to the article.
 ///
 /// <paramref name="DeletedAt"/> is when the entry was moved to the Trash, or null while it is
@@ -473,7 +473,7 @@ public sealed record BackupTimelineEntry(
 /// A story in the Trash travels whole - it is authored work its owner can still restore - and what it holds is exactly
 /// what it held: nothing inside it is marked on its account.
 ///
-/// A future importer restores every row with its marker, and puts nothing in the Trash into a live order: in each
+/// The importer (ADR 0032) restores every row with its marker, and puts nothing in the Trash into a live order: in each
 /// collection below, a row carrying <c>deletedAt</c> is listed after the live ones and its <c>sortOrder</c> is the place
 /// it had, which it no longer holds.
 /// </summary>
@@ -548,7 +548,7 @@ public sealed record BackupScene(
 /// carries no manuscript at all, and both read as nothing written.
 ///
 /// <paramref name="Revisions"/> is every saved version of the prose, oldest first, the newest being
-/// <paramref name="Content"/> (since version 10). A future importer re-creates them with their ids and numbers and never
+/// <paramref name="Content"/> (since version 10). The importer re-creates them with their numbers, under new ids, and never
 /// applies one to the prose. A browser's unsaved recovery copy is never in a backup: it was never saved.
 /// </summary>
 public sealed record BackupSceneManuscript(

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, useOutletContext } from 'react-router-dom'
+import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { ChronologySettings } from '../components/ChronologySettings'
 import { UniverseForm } from '../components/UniverseForm'
@@ -104,8 +104,13 @@ export default function UniverseSettings() {
           fields, tags, relationships, the timeline, every entry&rsquo;s history, and the full-size
           image of every entry that has one, and the ideas that belong to this universe. Nothing
           about your account is in it - so ideas that belong to no universe are in no
-          universe&rsquo;s backup. Lorex cannot read a backup back in yet, so keep the file
-          somewhere you trust.
+          universe&rsquo;s backup. Keep the file somewhere you trust.
+        </p>
+        <p className="settings__note">
+          A backup is restored as a new universe beside this one - never over it.{' '}
+          <Link to="/app?restore" data-testid="settings-restore-link">
+            Restore a backup
+          </Link>
         </p>
         <button
           className="button button--quiet"

@@ -1,6 +1,6 @@
 # ADR 0010 - Canon conflicts are derived findings keyed by a fingerprint
 
-Status: accepted (2026-09-08)
+Status: accepted (2026-09-08), amended 2026-09-14 (a finding carries the ids its fingerprint hashes - ADR 0032)
 
 ## Context
 
@@ -94,3 +94,7 @@ the target lives in one of several tables. Only kinds the current rules produce 
   is live because it is listed, not because it happens to implement the interface.
 - Evaluation is only ever triggered by an explicit request. Nothing runs it on write, so a
   conflict list is as fresh as the last evaluation and no more.
+- **A finding carries the ids its fingerprint hashes** (2026-09-14, ADR 0032). `CanonFinding.FingerprintIds` holds them in
+  the rule's order and `Fingerprint` is derived from them, byte for byte the hash it always was, so no stored conflict changes.
+  A restore gives every record a new id, and re-applies a backup's dismissals by hashing each restored finding's ids translated
+  back to the ones the backup used - which needs the ids, not just the hash.

@@ -9,6 +9,7 @@ using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Media;
 using Lorex.Api.Features.Profile;
 using Lorex.Api.Features.Relationships;
+using Lorex.Api.Features.Restore;
 using Lorex.Api.Features.Search;
 using Lorex.Api.Features.Stories;
 using Lorex.Api.Features.Timeline;
@@ -28,6 +29,7 @@ builder.Services.AddLorexAuth(builder.Environment);
 builder.Services.AddCanonIntegrity();
 builder.Services.AddLoreSearch();
 builder.Services.AddLorexMedia(builder.Configuration);
+builder.Services.AddBackupRestore();
 
 var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 if (corsOrigins.Length > 0)
@@ -87,6 +89,7 @@ app.MapTrashEndpoints();
 app.MapIdeaEndpoints();
 app.MapUniverseSearchEndpoints();
 app.MapUniverseExportEndpoints();
+app.MapBackupRestoreEndpoints();
 
 // Last: the client-side routing fallback only answers what no route above claimed.
 app.MapLorexFrontendFallback();

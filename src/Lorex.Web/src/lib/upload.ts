@@ -14,8 +14,11 @@ export interface UploadProgress {
  * `fetch` has no upload-progress event. A request body can be a stream whose pulls are countable,
  * but that is not wired to `FormData`, needs HTTP/2 and duplex support, and is not something to
  * build the only upload in the product on. `XMLHttpRequest` has had `upload.onprogress` for
- * fifteen years, so this is the one place Lorex uses it - a focused helper for the one endpoint
- * that sends a photo, not a replacement for `apiFetch`.
+ * fifteen years, so this is the one place Lorex uses it - a focused helper for the endpoints
+ * that send a file, not a replacement for `apiFetch`.
+ *
+ * The body is a form for a picture and the file itself for a backup, which the server reads as a
+ * raw stream. A `Blob` carries the browser's guess at its type; the server ignores it either way.
  *
  * Everything else is deliberately identical to `apiFetch`: same-origin, the session cookie the
  * browser already holds, `Accept: application/json`, no `Content-Type` (the FormData boundary is
@@ -29,7 +32,7 @@ export interface UploadProgress {
  */
 export function apiUpload<T>(
   path: string,
-  body: FormData,
+  body: FormData | Blob,
   {
     method = 'PUT',
     onProgress,

@@ -162,9 +162,34 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     reckoning, `a + b - 1` from a countdown era into the ascending era after it, unknown otherwise.
   - Edited inside the relation kind form on the Types screen. Backup stays version 4, additively.
 - **Phase 3 - Authoring, Ideas & Recovery** (owner-sequenced, unnumbered branches): 1. Lore articles - merged. 2. Content
-  recovery - merged. 3. Ideas - merged. 4. Persistent top search bar - committed, **not merged, not pushed**. 5. Backup
-  Import / Restore - next, and last.
-- **Phase 3 - Universe search** (`feat/universe-search` from `dev` `95687ba`, committed, **not merged, not pushed**). "A search
+  recovery - merged. 3. Ideas - merged. 4. Persistent top search bar - merged. 5. Backup Import / Restore - committed,
+  **not merged, not pushed**. That is the last Phase 3 feature: Phase 3 is complete once it merges.
+- **Phase 3 - Backup restore** (`feat/backup-restore` from `dev` `2f3d1c5`, committed, **not merged, not pushed**). Backup ->
+  validate -> restore as a **new** universe; no overwrite, no merge. ADR 0032 (ADR 0014, 0010 amended).
+  - `PUT /api/backups/validate` streams the raw file to a staging folder, validates, answers a preview (server-counted) and a
+    256-bit token; `POST /api/backups/restore` takes token + name, validates the kept file again, restores; `DELETE` discards.
+    Token per account (another account's = unknown = expired, one 404), one waiting upload per account, 16 / 2 GB total, 30 min,
+    in-memory map (restart = choose file again). Double submit 409.
+  - Hostile archive: never extracted; unsafe/absolute/`..`/backslash/link/duplicate entries refused; end record counted before
+    ZipArchive; exact-size bounded reads (bombs, lying headers); 512 MB file, 1 GB decompressed, 128 MB document, 8 MB picture,
+    5,001 entries, 1M rows, depth 32, no duplicate JSON properties. Version read before shape: newer = `backup_version_unsupported`.
+  - Structural validation only: unique ids, references in the file by explicit kind, enums, column bounds, unique indexes, live
+    orders, semantic on Number, relation constraints, era years, article documents (no `javascript:` links), colours, pictures at
+    Lorex's own path decoded by the upload gate, no unnamed files. 20 issues listed, rest counted. No semantic inference.
+  - Versions 1-11 restore (1-2 bare JSON, 3+ zip): project by version, then normalize as the migrations did (article -> row + v1,
+    manuscript v1, icons, Unchaptered, live orders renumbered). `BackupFormatSupport.MaxVersion` test-held to `CurrentVersion`.
+    **Format stays version 11.** No export gap found; `EntityImage.UploadedAt` is not authored and becomes restore time.
+  - Every id new (`RestoreIdentity`); history's recorded ids translated consistently. Universe and ideas owned by the restoring
+    account; no account data. Rows written directly, not replayed: no fabricated versions; Trash markers, history, ideas (deleted
+    kept, references rewritten) exactly as backed up; unassigned ideas and drafts never.
+  - Pictures first under new-universe keys (original + thumbnail recut from its crop), then one transaction (rows, lore index,
+    Canon); any failure rolls back and sweeps only attempted keys; upload waits for retry. `CanonFinding.FingerprintIds`: dismissals
+    re-applied by fingerprinting restored findings over their backup ids. Story/manuscript/idea indexes by triggers.
+  - Web: Restore backup beside New universe (`?restore`), linked from Settings; `RestoreBackup` panel - file, upload %, checking,
+    preview with counts and name, refusal with issues, restoring; focus to headings/name, status/alert regions.
+  - Measured worst case (78 MB document, ~145k rows, 30 pictures): validate ~4.5 s, restore ~20 s, ~15 s of it the SQLite write.
+  - Owner manual pass: `docs/testing/phase3-backup-restore-manual-test.md`.
+- **Phase 3 - Universe search** (`feat/universe-search` from `dev` `95687ba`, merged into `dev` at `2f3d1c5`). "A search
   bar on top that allows to enter anything", scoped to the current universe. ADR 0031.
   - Searches lore (name, aliases, summary, article), stories (title, premise), chapters, scenes, arcs, beats (title, summary or
     description, notes), saved manuscripts, and the account's live ideas of that universe (title, body). Live content only - a
@@ -338,14 +363,12 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 
 ## Baseline
 
-- **798 API integration tests, 131 Playwright tests**, green. Universe search full Playwright runs (dev database grown to
-  31 MB): 129/131 - the story first-screen test was a real regression from the new phone row, fixed before the next run - then
-  126/131 and 128/131. Every other failure was the known contention below, `database is locked` on a commit in
-  `CanonIntegrityEndpoints.TransitionAsync`, `UniverseEndpoints.SetArchivedAsync`, `StoryEndpoints.UpdateAsync`/`DeleteAsync`,
-  `StoryContentRestore.RestoreStoryAsync` or `ProfileImageEndpoints.RemoveAsync` - no write the search triggers touch - and
-  each passed alone (ideas: three parallel file runs 7/7). Measured trigger cost: 1-2 ms on a title or body write, ~5 ms on a
-  53,000-character manuscript save. Canon alone also flakes on a large dev database (Ideas phase: `dev` failed 3 of 8 parallel
-  runs on a 25 MB copy, 4 of 4 green on a fresh one). No frontend unit runner exists; the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E
+- **869 API integration tests, 137 Playwright tests**, green. Backup restore full Playwright runs on the 36 MB dev database:
+  134/137 twice - canon (Dismiss/Reopen answered "Something went wrong", the `TransitionAsync` commit), profile, ideas, and
+  universes (a rename answered a false "name taken": `UpdateAsync` maps a locked commit's `DbUpdateException` to it). Each
+  passed alone; canon + universes failed a parallel repeat on that database, then passed it 22/22 serially and 22/22 in parallel
+  on a fresh one. The whole suite against a fresh database: 137/137, no `database is locked` in the API log. So the known
+  contention below, growing with the dev database, not the restore. Universe search's runs saw the same pattern at 31 MB. No frontend unit runner exists; the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E
   project has no format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
 - The test host no longer migrates itself, so every API test boots through the same startup path a
@@ -411,18 +434,19 @@ tool has changed the picture.
   ADR 0022.
 - **`Age`** is declarable but read by nothing until a structured reference year exists. ADR 0011.
 - **Story work deferred past Phase 2** - later work, not Phase 2 gaps: acts and volumes, rich text, saved versions of
-  anything in a story but its manuscript, drag-and-drop, collaboration, manuscript export, AI, and restoring
-  a backup. Also: collapsing chapters, bulk scene moves, Story-vs-Lore checks, pre-era scene years in Settings; a plot
+  anything in a story but its manuscript, drag-and-drop, collaboration, manuscript export, and AI. Also: collapsing chapters, bulk scene moves, Story-vs-Lore checks, pre-era scene years in Settings; a plot
   status, beat chronology, editing beats from a scene, board or graph views; autosave, word counts, a "has prose" marker on
   scene cards (it needs a flag the story read can give without reading prose). ADR 0024-0027, 0029.
 - **Lore article work deferred** - later, not gaps: plain text or Markdown, wiki links and backlinks, version diffs and
   pruning, restoring article text held in pre-ADR-0028 entry versions from the screen, autosave, word counts. ADR 0028.
 - **Ideas deferred** - not gaps: promoting an idea (AI proposals are Phase 5), statuses, tags, collections, rich text, wiki
-  links, saved versions, cross-universe references, permanent delete, an account export for unassigned ideas, importing ideas
-  (Backup Import / Restore). ADR 0030.
+  links, saved versions, cross-universe references, permanent delete, an account export for unassigned ideas. ADR 0030.
 - **Universe search deferred** - not gaps: **account-wide search is an unsettled owner decision**; unassigned ideas in any bar;
   AI, semantic or fuzzy search, substring matching; a command palette, results page, filters, saved searches, history; timeline,
   Canon, types and Trash search; highlighting the match inside an opened article or manuscript; a pinned bar. ADR 0031.
+- **Backup restore deferred** - not gaps: restoring over or merging into a universe, partial/selective restore, account-wide
+  backup, scheduled/cloud backups, encryption, import from other tools, repair by hand or AI, a background job or resumable
+  upload. ADR 0032.
 - **Content recovery deferred** - not gaps: recovered drafts for forms, drafts synced across browsers or devices, merging a
   draft into a newer save, a restored chapter taking back the scenes it held. ADR 0029.
 - **Relationship life-state constraints** (an end alive at the link's date) wait for dated
@@ -451,6 +475,8 @@ None. Follow-ups, not blocking:
   correct either way. ADR 0019 argues the trade.
 - Ideas with no universe have no file-level backup: a universe backup cannot truthfully hold them and no account export
   exists. The database is their only copy. ADR 0030.
+- A very large restore holds SQLite's one writer for its write (~15 s at ~145k rows), so saves in that moment meet the known
+  contention. Realistic universes write in well under a second. ADR 0032.
 - A backup archive is assembled whole in memory before it is sent, so that a missing image can be
   refused rather than truncated. Bounded by 8 MB per picture; worth revisiting only if a world
   ever holds enough media to matter. ADR 0014.

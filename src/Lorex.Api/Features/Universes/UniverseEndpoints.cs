@@ -303,24 +303,35 @@ public static partial class UniverseEndpoints
         new(universe.Id, universe.Name, universe.Description, universe.AccentColor,
             universe.IsArchived, universe.CreatedAt, universe.UpdatedAt);
 
-    private static IResult NameTakenProblem() =>
+    /// <summary>Also answered by a restore, which creates a universe under the same rule (ADR 0032).</summary>
+    internal static IResult NameTakenProblem() =>
         Results.ValidationProblem(new Dictionary<string, string[]>
         {
             ["name"] = ["You already have a universe with that name."],
         });
 
+    /// <summary>Why a universe cannot be given this name, or null. Measured after trimming, which is what is stored.</summary>
+    internal static string? NameError(string? name)
+    {
+        var trimmedName = name?.Trim();
+
+        if (string.IsNullOrWhiteSpace(trimmedName))
+        {
+            return "Give the universe a name.";
+        }
+
+        return trimmedName.Length > UniverseConfiguration.NameMaxLength
+            ? $"Keep the name under {UniverseConfiguration.NameMaxLength} characters."
+            : null;
+    }
+
     private static Dictionary<string, string[]>? Validate(string? name, string? description, string? accentColor)
     {
         var errors = new Dictionary<string, string[]>();
 
-        var trimmedName = name?.Trim();
-        if (string.IsNullOrWhiteSpace(trimmedName))
+        if (NameError(name) is { } nameError)
         {
-            errors["name"] = ["Give the universe a name."];
-        }
-        else if (trimmedName.Length > UniverseConfiguration.NameMaxLength)
-        {
-            errors["name"] = [$"Keep the name under {UniverseConfiguration.NameMaxLength} characters."];
+            errors["name"] = [nameError];
         }
 
         // Measured after trimming, because that is what actually gets stored.

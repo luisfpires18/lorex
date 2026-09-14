@@ -5,8 +5,8 @@ Status: accepted (2026-09-09), amended 2026-09-10 (version 3: the file became an
 2026-09-13 (version 4: a universe's eras), 2026-09-13 (relationship type Canon constraints,
 within version 4), 2026-09-13 (version 5: stories), 2026-09-13 (version 6: chapters), 2026-09-13
 (version 7: plot), 2026-09-13 (version 8: scene prose), 2026-09-13 (version 9: entry articles and their
-history), 2026-09-14 (version 10: story content in the Trash, and a manuscript's saved versions), and 2026-09-14 (version 11:
-the ideas that belong to a universe)
+history), 2026-09-14 (version 10: story content in the Trash, and a manuscript's saved versions), 2026-09-14 (version 11:
+the ideas that belong to a universe), and 2026-09-14 (a backup can be restored - ADR 0032; the format is unchanged)
 
 ## Context
 
@@ -169,7 +169,7 @@ neither new member; both read as null, and each revision's `content` is the arti
 A future importer restores an article to the entry of the same id, in the universe being restored and owned by the
 importing account - ownership is never in the file. It validates each document as a save does, re-creates the versions
 with their ids and numbers, writes no entry revision for any of it, and reindexes search. It never applies a revision's
-`content` to the article.
+`content` to the article. (The importer of ADR 0032 does all of this, with each id translated to a new one.)
 
 **Version 10 (2026-09-14) carries story content in the Trash and a manuscript's saved versions** (ADR 0029). Story, chapter,
 scene, arc and beat gain `deletedAt`, null while live; each scene's `manuscript` gains `revisions`, every saved version oldest
@@ -179,7 +179,7 @@ every collection in a story - membership no longer implies live, and a marked ro
 none, so a version 9 reader would restore the Trash into the story with two scenes claiming one place - and the versions are
 authored text a version 9 reader would drop silently. A file at version 9 or earlier has none of these members: everything in
 it is live, and a manuscript has no versions but its text. A future importer restores each marker as it is, places no marked
-row in a live order, and re-creates the versions with their ids and numbers without ever applying one. A browser's recovery copy
+row in a live order, and re-creates the versions with their numbers - under new ids, ADR 0032 - without ever applying one. A browser's recovery copy
 of unsaved writing is never in a backup: it was never saved.
 
 **Version 11 (2026-09-14) carries the ideas that belong to the universe** (ADR 0030). `payload.ideas` holds each idea whose
@@ -195,6 +195,14 @@ re-creates the references whose targets are in the file, keeps `deletedAt`, and 
 **Search indexes are never in a backup** (ADR 0016, ADR 0031). They are derived - Lorex produces them again from the
 authored rows - so the universe search (2026-09-14) changed no member and no version: version 11 stands. An importer's rows are
 indexed as they are written.
+
+**Restoring reads every version, and changes none (2026-09-14, ADR 0032).** A backup is restored as a new universe, never over
+one. The importer reads format versions 1 to 11 - versions 1 and 2 as the single JSON file they were, 3 onwards as the archive -
+through these same records, taking each file as its own version defines it and normalizing it into the current shape the way
+each migration normalized a live database. A version newer than the importer knows is refused as unsupported, not guessed at;
+`BackupFormatSupport.MaxVersion` is held equal to `CurrentVersion` by a test, so a future bump must teach the importer too.
+Adding the importer changed no member and no version: **version 11 stands.** The importer never writes a file back. What
+this ADR said a "future importer" would do, it does, with one deliberate difference recorded below: ids are renumbered.
 
 **Only the authored data.** The test for inclusion is: did a person write this, or would
 Lorex produce it again from what a person wrote?
@@ -278,8 +286,9 @@ attachment named for the world and the day, reduced to lowercase ASCII.
 
 ## Consequences
 
-- This phase exports only. Nothing reads a backup back in, and the UI says so rather than
-  implying a restore exists.
+- ~~This phase exports only. Nothing reads a backup back in, and the UI says so rather than
+  implying a restore exists.~~ Superseded 2026-09-14: a backup is restored as a new universe (ADR 0032), and Settings says
+  where.
 - The format is the durable commitment, not the code that writes it. `UniverseBackup.cs` is
   the contract; a change there owes a version bump.
 - **The archive is deterministic too.** Entries are written in a fixed order - `backup.json`
@@ -290,9 +299,13 @@ attachment named for the world and the day, reduced to lowercase ASCII.
   compressed and storing it makes "the original bytes, exactly" the plainest thing to verify.
 - A backup is large, and history dominates the document - snapshots grow with the number of
   edits (ADR 0013). The container now compresses the document, which is where the growth is.
-- Restoring into a fresh installation will reproduce ids exactly, which is what makes the
+- ~~Restoring into a fresh installation will reproduce ids exactly, which is what makes the
   dismissal fingerprints re-apply. An importer that renumbered ids would have to recompute
-  them, and should not.
+  them, and should not.~~ Superseded 2026-09-14 (ADR 0032). Preserving ids only works when the
+  ids are nowhere else - not when the same backup is restored twice, or beside the universe it
+  came from - so the importer gives every object a new id. The preserved ids still do the job
+  this consequence wanted: each dismissal is re-applied by fingerprinting each restored finding
+  over the ids its records had in the file, which a `CanonFinding` now carries.
 - The serialiser uses the relaxed encoder, so `&`, `<` and non-ASCII text stay literal. That
   is safe precisely because this file is never embedded in HTML - it is written to disk and
   read back by a parser - and it is what keeps a world written in a non-Latin script legible

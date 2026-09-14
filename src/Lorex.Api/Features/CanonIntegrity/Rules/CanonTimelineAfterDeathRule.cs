@@ -67,11 +67,7 @@ public sealed class CanonTimelineAfterDeathRule : ICanonIntegrityRule
         return new CanonFinding(
             RuleCode,
             Severity,
-            CanonFingerprint.From(
-                RuleCode,
-                CanonFingerprint.Id(moment.EntryId),
-                CanonFingerprint.Id(lifespan.EntityId),
-                CanonFingerprint.Id(death.FieldDefinitionId)),
+            [moment.EntryId, lifespan.EntityId, death.FieldDefinitionId],
             CanonRuleText.Title(title),
             CanonRuleText.Explanation(explanation),
             [
