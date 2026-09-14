@@ -162,15 +162,15 @@ export function PlotPanel({
     }
   }
 
-  /** Removes the arc and its beats. No scene, chapter or entry goes with them. */
+  /** Moves the arc and its beats to the Trash. No scene, chapter or entry goes with them. */
   async function removeArc(arc: PlotArc, index: number) {
     const count = arc.beats.length
     const consequence =
-      count === 0 ? 'It holds no beats.' : `Its ${beatCountLabel(count)} will be deleted too.`
+      count === 0 ? 'It holds no beats.' : `Its ${beatCountLabel(count)} will go with it.`
 
     if (
       !window.confirm(
-        `Delete ${arcLabel(index, arc.title)}? The arc will be removed. ${consequence} No scene, chapter or lore is deleted.`,
+        `Delete ${arcLabel(index, arc.title)}? The arc will be removed. ${consequence} No scene, chapter or lore is deleted. You can restore the arc from the Trash.`,
       )
     ) {
       return
@@ -179,7 +179,7 @@ export function PlotPanel({
     setMessage(null)
     try {
       await deletePlotArc(universeId, story.id, arc.id)
-      announce(`Deleted the arc “${arc.title}”.`)
+      announce(`Moved the arc “${arc.title}” to the Trash.`)
       onReload()
     } catch (error: unknown) {
       setMessage(error instanceof ApiError ? error.message : 'That arc could not be deleted.')
@@ -187,12 +187,18 @@ export function PlotPanel({
   }
 
   async function removeBeat(beat: PlotBeat) {
-    if (!window.confirm(`Delete the beat “${beat.title}”? Its linked scenes and lore stay.`)) return
+    if (
+      !window.confirm(
+        `Delete the beat “${beat.title}”? Its linked scenes and lore stay. You can restore the beat from the Trash.`,
+      )
+    ) {
+      return
+    }
 
     setMessage(null)
     try {
       await deletePlotBeat(universeId, story.id, beat.id)
-      announce(`Deleted the beat “${beat.title}”.`)
+      announce(`Moved the beat “${beat.title}” to the Trash.`)
       onReload()
     } catch (error: unknown) {
       setMessage(error instanceof ApiError ? error.message : 'That beat could not be deleted.')

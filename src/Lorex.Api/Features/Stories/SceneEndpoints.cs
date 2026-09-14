@@ -23,6 +23,10 @@ namespace Lorex.Api.Features.Stories;
 ///
 /// <b>No Canon.</b> Like the stories around them, scene writes never pass the promotion gate and
 /// never reconcile findings. A scene references lore; it asserts nothing about it (ADR 0024).
+///
+/// <b>The Trash.</b> Deleting a scene moves it there with its prose, saved versions and links, and
+/// closes the gap it leaves. A scene in the Trash answers every route here as a missing one does;
+/// restoring it is the Trash's work (ADR 0029).
 /// </summary>
 public static class SceneEndpoints
 {
@@ -62,7 +66,7 @@ public static class SceneEndpoints
         return Results.Ok(await LoadScenesAsync(
             db,
             universeId,
-            db.Scenes.Where(scene => scene.StoryId == storyId),
+            db.Scenes.Where(scene => scene.StoryId == storyId && scene.DeletedAt == null),
             cancellationToken));
     }
 
@@ -196,7 +200,7 @@ public static class SceneEndpoints
         var scene = await db.Scenes
             .Include(candidate => candidate.EntityLinks)
             .FirstOrDefaultAsync(
-                candidate => candidate.Id == sceneId && candidate.StoryId == storyId,
+                candidate => candidate.Id == sceneId && candidate.StoryId == storyId && candidate.DeletedAt == null,
                 cancellationToken);
 
         if (scene is null)
@@ -306,7 +310,7 @@ public static class SceneEndpoints
         }
 
         var scene = await db.Scenes.FirstOrDefaultAsync(
-            candidate => candidate.Id == sceneId && candidate.StoryId == storyId,
+            candidate => candidate.Id == sceneId && candidate.StoryId == storyId && candidate.DeletedAt == null,
             cancellationToken);
 
         if (scene is null)
@@ -364,9 +368,10 @@ public static class SceneEndpoints
     }
 
     /// <summary>
-    /// Permanent, and the scenes told after it in its container each move up one place, so the order
-    /// stays contiguous and the next scene appended there still lands last. The scene's links go with it;
-    /// the lore they pointed at does not.
+    /// Moves the scene to the Trash, and the scenes told after it in its container each move up one place,
+    /// so the order stays contiguous and the next scene appended there still lands last. Its prose, saved
+    /// versions, lore links and the beats pointing at it are all kept, unreachable, and come back with it; the
+    /// lore they point at is untouched.
     /// </summary>
     private static async Task<IResult> DeleteAsync(
         Guid universeId,
@@ -390,7 +395,7 @@ public static class SceneEndpoints
         }
 
         var scene = await db.Scenes.FirstOrDefaultAsync(
-            candidate => candidate.Id == sceneId && candidate.StoryId == storyId,
+            candidate => candidate.Id == sceneId && candidate.StoryId == storyId && candidate.DeletedAt == null,
             cancellationToken);
 
         if (scene is null)
@@ -402,7 +407,7 @@ public static class SceneEndpoints
         {
             var chapterId = scene.ChapterId;
 
-            db.Scenes.Remove(scene);
+            scene.DeletedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
 
             var remaining = await StoryOrder.LoadContainerAsync(db, storyId, chapterId, cancellationToken);
@@ -612,7 +617,7 @@ public static class SceneEndpoints
         (await LoadScenesAsync(
             db,
             universeId,
-            db.Scenes.Where(scene => scene.Id == sceneId && scene.StoryId == storyId),
+            db.Scenes.Where(scene => scene.Id == sceneId && scene.StoryId == storyId && scene.DeletedAt == null),
             cancellationToken))
         .FirstOrDefault();
 

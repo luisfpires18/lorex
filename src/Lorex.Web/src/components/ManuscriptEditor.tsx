@@ -1,11 +1,15 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { LocateFixed, Pencil } from 'lucide-react'
+import { History, LocateFixed, Pencil } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ActionIcon } from './ActionIcon'
+import { ManuscriptHistory } from './ManuscriptHistory'
+import { RecoveredDraft } from './RecoveredDraft'
 import { SceneBeats, SceneLore, SceneStamp } from './SceneContext'
+import { useAuth } from '../auth/useAuth'
 import type { Chronology } from '../chronology/types'
 import { ApiError } from '../lib/api'
 import { useLeaveGuard } from '../lib/leaveGuard'
+import { useLocalDraft } from '../lib/useLocalDraft'
 import { getSceneManuscript, MANUSCRIPT_CHANGED, saveSceneManuscript } from '../stories/api'
 import { sceneWhen } from '../stories/format'
 import type { SceneBeatReference } from '../stories/structure'
@@ -46,8 +50,8 @@ interface ManuscriptEditorProps {
  * typed. No formatting, no Markdown and no reading of the text - a name written here links to nothing.
  *
  * Above it, read-only, the scene's planning as the Scenes view draws it - when and through whose eyes, its lore and its
- * beats, each a link to where it is edited - with Edit scene, which opens the scene's own drawer in place, and Show in
- * Scenes, which leads back to the scene's place in the story's structure.
+ * beats, each a link to where it is edited - with Edit scene, which opens the scene's own drawer in place, Show in
+ * Scenes, which leads back to the scene's place in the story's structure, and the manuscript's own history.
  *
  * Mounted once per scene - the panel keys it by the scene's id - so opening another scene starts from nothing and never
  * shows the last scene's prose under the new title while the new one loads.
@@ -57,6 +61,9 @@ interface ManuscriptEditorProps {
  * from another tab or device since this one opened is refused by the API, and the author decides what happens next -
  * keep this text, or load that one. While anything is unsaved, following a link, signing out or leaving the page asks
  * first.
+ *
+ * Unsaved writing is also kept on this device as a recovery copy, never sent anywhere. If a scene opens with a copy that
+ * differs from what is saved, the saved prose stays in the box, held, until the author recovers the copy or discards it.
  */
 export function ManuscriptEditor({
   universeId,
@@ -72,6 +79,13 @@ export function ManuscriptEditor({
   const editorId = useId()
   const statusId = useId()
   const tooLongId = useId()
+  const recoveryId = useId()
+  const historyId = useId()
+
+  const { user } = useAuth()
+  const { found, keep, forget, discard, settle, failed } = useLocalDraft(
+    user ? { accountId: user.id, universeId, kind: 'manuscript', contentId: sceneId } : null,
+  )
 
   const [load, setLoad] = useState<LoadState>({ kind: 'loading' })
   const [reads, setReads] = useState(0)
@@ -80,6 +94,9 @@ export function ManuscriptEditor({
   const [isSaving, setIsSaving] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
   const [conflict, setConflict] = useState<{ updatedAt: string | null } | null>(null)
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+  const [historyKey, setHistoryKey] = useState(0)
+  const [announcement, setAnnouncement] = useState('')
   const inFlight = useRef(false)
   const editor = useRef<HTMLTextAreaElement>(null)
   const shortcut = useRef<() => void>(() => {})
@@ -111,7 +128,30 @@ export function ManuscriptEditor({
   const isDirty = isReady && draft !== stored.content
   const isTooLong = draft.length > MANUSCRIPT_MAX_LENGTH
 
-  useLeaveGuard(isDirty ? `“${scene.title}” has unsaved changes. Leave without saving them?` : null)
+  // A recovery copy that differs from what is saved is offered, and holds the writing until the author chooses. While the
+  // copy is still being looked for the box waits too, so nothing typed can overwrite a copy nobody has seen yet.
+  const offer = isReady && found && found.content !== stored.content ? found : null
+  const isHeld = isReady && (offer !== null || found === undefined)
+
+  // A copy identical to what is saved is nothing to recover: it goes without a word.
+  useEffect(() => {
+    if (isReady && found && found.content === stored.content) discard()
+  }, [isReady, found, stored.content, discard])
+
+  // The recovery copy follows the writing: kept while it differs from what is saved, let go once it does not.
+  useEffect(() => {
+    if (!isReady || isHeld) return
+    if (isDirty) {
+      keep(draft, stored.updatedAt)
+    } else {
+      forget()
+    }
+  }, [isReady, isHeld, isDirty, draft, stored.updatedAt, keep, forget])
+
+  useLeaveGuard(
+    isDirty ? `“${scene.title}” has unsaved changes. Leave without saving them?` : null,
+    discard,
+  )
 
   /** Saves the text as it stands, naming the stored manuscript it was written over. */
   async function save(expectedUpdatedAt: string | null) {
@@ -130,12 +170,13 @@ export function ManuscriptEditor({
       })
       // Measured against what was sent, so anything typed while the save was in flight is still unsaved.
       setStored({ content: saved.content, updatedAt: saved.updatedAt })
+      setHistoryKey((key) => key + 1)
     } catch (error: unknown) {
       if (error instanceof ApiError && error.status === 409 && error.code === MANUSCRIPT_CHANGED) {
         setConflict({ updatedAt: storedMomentOf(error.problem) })
       } else if (error instanceof ApiError && error.status === 404) {
         setFailure(
-          'This scene is no longer in the story, so its manuscript could not be saved. Your text is still here — copy it before you leave.',
+          'This scene is no longer in the story — it may have been moved to the Trash in another window — so its manuscript could not be saved. Your text is still here: copy it before you leave.',
         )
       } else if (error instanceof ApiError && error.status === 400) {
         setFailure(error.message)
@@ -191,7 +232,23 @@ export function ManuscriptEditor({
     ) {
       return
     }
+    discard()
     reread()
+  }
+
+  /** Puts the recovery copy in the box as unsaved writing. Saving it is still the author's to do. */
+  function recoverDraft() {
+    if (!offer) return
+    settle()
+    setDraft(offer.content)
+    setAnnouncement('The recovered draft is in the editor. It is not saved yet.')
+    requestAnimationFrame(() => editor.current?.focus())
+  }
+
+  function discardDraft() {
+    discard()
+    setAnnouncement('The recovered draft was discarded. The saved manuscript is unchanged.')
+    requestAnimationFrame(() => editor.current?.focus())
   }
 
   const hasContext =
@@ -207,6 +264,10 @@ export function ManuscriptEditor({
       : stored.updatedAt === null
         ? { state: 'empty', text: 'Nothing saved yet' }
         : { state: 'saved', text: 'Saved' }
+
+  const describedBy = [statusId, isTooLong ? tooLongId : null, offer ? recoveryId : null]
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <section
@@ -262,8 +323,48 @@ export function ManuscriptEditor({
             <ActionIcon icon={LocateFixed} />
             Show in Scenes
           </Link>
+          {stored.updatedAt !== null || isHistoryOpen ? (
+            <button
+              className="button button--quiet button--icon"
+              type="button"
+              aria-expanded={isHistoryOpen}
+              aria-controls={historyId}
+              aria-describedby={titleId}
+              onClick={() => setIsHistoryOpen((open) => !open)}
+              data-testid="manuscript-history-toggle"
+            >
+              <ActionIcon icon={History} />
+              Manuscript history
+            </button>
+          ) : null}
         </div>
       </header>
+
+      {isHistoryOpen ? (
+        <ManuscriptHistory
+          id={historyId}
+          universeId={universeId}
+          storyId={storyId}
+          sceneId={sceneId}
+          reloadKey={historyKey}
+          current={stored}
+          blocked={
+            !isReady
+              ? 'Opening the manuscript…'
+              : offer
+                ? 'Recover or discard the recovered draft first.'
+                : isDirty
+                  ? 'Save your changes first: putting back a saved version would replace text that is not saved.'
+                  : null
+          }
+          onRestored={(restored) => {
+            setStored({ content: restored.content, updatedAt: restored.updatedAt })
+            setDraft(restored.content)
+            setHistoryKey((key) => key + 1)
+          }}
+          onStale={reread}
+        />
+      ) : null}
 
       {load.kind === 'loading' ? (
         <p className="notice" role="status" data-testid="manuscript-loading">
@@ -274,7 +375,7 @@ export function ManuscriptEditor({
       {load.kind === 'missing' ? (
         <div className="empty" data-testid="manuscript-missing">
           <p className="empty__line">This scene is not here.</p>
-          <p className="empty__hint">It may have been deleted.</p>
+          <p className="empty__hint">It may have been moved to the Trash.</p>
         </div>
       ) : null}
 
@@ -294,6 +395,33 @@ export function ManuscriptEditor({
 
       {isReady ? (
         <>
+          {offer ? (
+            <div id={recoveryId} className="manuscript__recovery">
+              <RecoveredDraft
+                what="this scene's manuscript"
+                draft={offer}
+                savedUpdatedAt={stored.updatedAt}
+                preview={
+                  offer.content === '' ? (
+                    <p className="entry__blank">No text in this draft.</p>
+                  ) : (
+                    <div
+                      className="recovery__prose"
+                      role="region"
+                      aria-label="Text of the recovered draft"
+                      tabIndex={0}
+                    >
+                      {offer.content}
+                    </div>
+                  )
+                }
+                onRecover={recoverDraft}
+                onDiscard={discardDraft}
+                testId="manuscript-recovery"
+              />
+            </div>
+          ) : null}
+
           {conflict ? (
             <div className="manuscript__conflict" role="alert" data-testid="manuscript-conflict">
               <p className="manuscript__conflicttext">
@@ -342,12 +470,14 @@ export function ManuscriptEditor({
             className="manuscript__text"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
+            readOnly={isHeld}
             placeholder="Write the scene."
             spellCheck
-            aria-describedby={isTooLong ? `${statusId} ${tooLongId}` : statusId}
+            aria-describedby={describedBy}
             aria-invalid={isTooLong ? true : undefined}
             aria-keyshortcuts="Control+S Meta+S"
             data-testid="manuscript-editor"
+            data-held={isHeld ? 'true' : 'false'}
           />
 
           <div className="manuscript__bar">
@@ -370,6 +500,15 @@ export function ManuscriptEditor({
                 {count.format(MANUSCRIPT_MAX_LENGTH)} characters. Split it into more scenes.
               </p>
             ) : null}
+            {failed && isDirty ? (
+              <p
+                className="recovery__warning"
+                role="status"
+                data-testid="manuscript-recovery-warning"
+              >
+                This device could not keep a recovery copy of these changes. Save to keep them.
+              </p>
+            ) : null}
             <button
               className="button"
               type="button"
@@ -384,6 +523,10 @@ export function ManuscriptEditor({
           </div>
         </>
       ) : null}
+
+      <p className="visually-hidden" role="status" data-testid="manuscript-announcer">
+        {announcement}
+      </p>
     </section>
   )
 }

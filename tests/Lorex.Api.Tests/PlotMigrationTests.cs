@@ -133,9 +133,10 @@ public sealed class PlotMigrationTests : IDisposable
                 (await ForeignKeys(db, "Scenes")).Order(StringComparer.Ordinal));
             Assert.Equal(["Stories.StoryId:CASCADE"], await ForeignKeys(db, "Chapters"));
 
-            // name:unique:partial - one unique order per story and per arc, and a lookup for each reference.
-            Assert.Contains("IX_PlotArcs_StoryId_SortOrder:1:0", await Indexes(db, "PlotArcs"));
-            Assert.Contains("IX_PlotBeats_PlotArcId_SortOrder:1:0", await Indexes(db, "PlotBeats"));
+            // name:unique:partial - one unique order per story and per arc among live rows (partial since content recovery,
+            // ADR 0029: a row in the Trash holds no place), and a lookup for each reference.
+            Assert.Contains("IX_PlotArcs_StoryId_SortOrder:1:1", await Indexes(db, "PlotArcs"));
+            Assert.Contains("IX_PlotBeats_PlotArcId_SortOrder:1:1", await Indexes(db, "PlotBeats"));
             Assert.Contains("IX_PlotBeatScenes_SceneId:0:0", await Indexes(db, "PlotBeatScenes"));
             Assert.Contains("IX_PlotBeatEntities_EntityId:0:0", await Indexes(db, "PlotBeatEntities"));
             Assert.Equal(["PlotBeatId", "SceneId"], await PrimaryKey(db, "PlotBeatScenes"));
@@ -163,13 +164,13 @@ public sealed class PlotMigrationTests : IDisposable
             await CreateBeat(client, universeId, storyId, mira.Id, "Reveals the gate", [gate], [arlen]);
             await CreateBeat(client, universeId, storyId, mira.Id, "Flees");
 
-            // A scene deleted takes only its link.
+            // A scene moved to the Trash takes only its link out of the beat.
             (await client.DeleteAsync($"{Story(universeId, storyId)}/scenes/{loose}")).EnsureSuccessStatusCode();
             var kept = await ReadBeat(client, universeId, storyId, learns.Id);
             Assert.Equal([gate], kept.SceneIds);
             Assert.Equal(0, kept.SortOrder);
 
-            // An arc deleted takes its beats, and no scene, chapter or entry.
+            // An arc moved to the Trash takes its beats with it, and no scene, chapter or entry.
             (await client.DeleteAsync(Arc(universeId, storyId, fall.Id))).EnsureSuccessStatusCode();
             var remaining = Assert.Single(await Plot(client, universeId, storyId));
             Assert.Equal((mira.Id, 0), (remaining.Id, remaining.SortOrder));
@@ -207,19 +208,24 @@ public sealed class PlotMigrationTests : IDisposable
 
             await db.Entities.Where(entity => entity.Id == arlen).ExecuteDeleteAsync();
 
-            Assert.Equal(2, await db.PlotBeats.CountAsync());
+            // Nothing in the Trash is erased (ADR 0029): the arc's two beats, the loose scene and every scene link are still
+            // stored. The entry row, deleted for good, took only its own links.
+            Assert.Equal(4, await db.PlotBeats.CountAsync());
             Assert.Equal(0, await db.PlotBeatEntities.CountAsync());
-            Assert.Equal(1, await db.PlotBeatScenes.CountAsync());
-            Assert.Equal(2, await db.Scenes.CountAsync());
+            Assert.Equal(4, await db.PlotBeatScenes.CountAsync());
+            Assert.Equal(3, await db.Scenes.CountAsync());
             Assert.Empty(await ForeignKeyViolations(db));
         }
 
         SqliteConnection.ClearAllPools();
 
-        // Down again with a plot in the file - the plot goes, every scene stays - and up once more to an empty plot.
+        // Down again with a plot in the file - the plot goes, every live scene stays - and up once more to an empty plot. The
+        // schema before content recovery had no Trash, so rolling past it discards the scene that was in it.
         await using (var db = Context())
         {
-            var before = await SceneRows(db);
+            var before = (await SceneRows(db))
+                .Where(row => !row.Contains(loose.ToString(), StringComparison.OrdinalIgnoreCase))
+                .ToList();
 
             await db.GetService<IMigrator>().MigrateAsync(BeforePlot);
 

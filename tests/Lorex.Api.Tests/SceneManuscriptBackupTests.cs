@@ -25,7 +25,7 @@ public sealed class SceneManuscriptBackupTests(LorexApiFactory factory) : IClass
         var world = await BuildManuscripts(client, universe.Id);
 
         var backup = await Backup(client, universe.Id);
-        Assert.Equal(9, backup.FormatVersion);
+        Assert.Equal(10, backup.FormatVersion);
         Assert.Equal(UniverseBackup.CurrentVersion, backup.FormatVersion);
 
         var scenes = Assert.Single(backup.Payload.Stories!).Scenes.ToDictionary(scene => scene.Id);
@@ -61,8 +61,16 @@ public sealed class SceneManuscriptBackupTests(LorexApiFactory factory) : IClass
 
         Assert.Contains("manuscript", Names(scene));
         var manuscript = scene.GetProperty("manuscript");
-        Assert.Equal(["content", "updatedAt"], Names(manuscript));
+        Assert.Equal(["content", "revisions", "updatedAt"], Names(manuscript));
         Assert.Equal(Prose, manuscript.GetProperty("content").GetString(), StringComparer.Ordinal);
+
+        // Its saved versions travel beside it since version 10, oldest first, each the whole text and nothing derived from it:
+        // the first draft, then the prose as it stands.
+        var versions = manuscript.GetProperty("revisions").EnumerateArray().ToList();
+        Assert.Equal(2, versions.Count);
+        Assert.All(versions, version => Assert.Equal(["content", "createdAt", "id", "kind", "number", "restoredFromRevisionId"], Names(version)));
+        Assert.Equal(("Created", "A first draft."), (versions[0].GetProperty("kind").GetString(), versions[0].GetProperty("content").GetString()));
+        Assert.Equal(("Edited", Prose), (versions[1].GetProperty("kind").GetString(), versions[1].GetProperty("content").GetString()));
 
         // A scene never written for says so with a null, not an absent member.
         var gate = document.RootElement.GetProperty("payload").GetProperty("stories")[0].GetProperty("scenes")
@@ -70,8 +78,9 @@ public sealed class SceneManuscriptBackupTests(LorexApiFactory factory) : IClass
             .Single(candidate => candidate.GetProperty("id").GetGuid() == world.Gate);
         Assert.Equal(JsonValueKind.Null, gate.GetProperty("manuscript").ValueKind);
 
-        // Once in the whole file: not repeated on a plot beat, a chapter or anywhere else.
-        Assert.Equal(1, Occurrences(text, "The hall had emptied long before Arlen understood"));
+        // Twice in the whole file - the prose as it stands, and its one saved version - and not repeated on a plot beat, a
+        // chapter or anywhere else.
+        Assert.Equal(2, Occurrences(text, "The hall had emptied long before Arlen understood"));
     }
 
     [Fact]

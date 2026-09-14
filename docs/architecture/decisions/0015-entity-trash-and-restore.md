@@ -1,6 +1,6 @@
 # ADR 0015 - An entry is trashed by a marker, and nothing that points at it is destroyed
 
-Status: accepted (2026-09-09)
+Status: accepted (2026-09-09), amended 2026-09-14 (the Trash also holds story content - ADR 0029)
 
 ## Context
 
@@ -114,3 +114,13 @@ there.
 - A trashed entry's page, its history and its relationships all answer 404. It is not editable,
   and trashing one twice is refused rather than re-stamped, so the moment it was thrown away
   cannot be moved by a repeated click.
+
+## Amendment - story content (2026-09-14)
+
+"Only lore entries are trashable" no longer holds. ADR 0029 gives stories, chapters, scenes, plot arcs and beats the same
+marker, because deleting any of them used to destroy prose and planning at once. The rest of this decision stands and is
+reused: a marker, not a table; no global query filter; nothing dependent deleted; neither trashing nor restoring writes a
+version; no permanent delete; the backup carries the Trash. What story content adds is its own - orders that hold live rows
+only, restores that append, content that waits for its story or arc, and one deliberate difference from the rule above: a
+beat's link to a scene in the Trash is hidden rather than marked, and kept by the server through saves no client could see it
+in. The Trash listing now holds every kind, and each kind restores on its own typed route.

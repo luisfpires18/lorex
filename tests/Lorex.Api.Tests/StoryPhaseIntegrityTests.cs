@@ -79,22 +79,24 @@ public sealed class StoryPhaseIntegrityTests(LorexApiFactory factory) : IClassFi
         Assert.True(BeatIn(await Plot(client, u, story), letter).Entities.Single().IsTrashed);
         await AssertProse(client, u, story, prose);
 
+        // Since content recovery every delete below is a move to the Trash (ADR 0029): each piece leaves every read, and not
+        // one row the story held is erased - so the database holds exactly what it held before the first one.
+
         // Arrival is deleted: its scenes are told last in Unchaptered, with their prose and every beat pointing at them.
         (await client.DeleteAsync($"{Story(u, story)}/chapters/{arrival}")).EnsureSuccessStatusCode();
 
         read = await ReadStory(client, u, story);
         Assert.Equal([prologue, gate, council], read.Scenes.Where(scene => scene.ChapterId is null).Select(scene => scene.Id));
-        Assert.Equal(whole with { Chapters = 1 }, await HoldingsOf(story, scenes, beats));
+        Assert.Equal([ashes], read.Chapters.Select(chapter => chapter.Id));
+        Assert.Equal(whole, await HoldingsOf(story, scenes, beats));
         Assert.Equal([gate, council], BeatIn(await Plot(client, u, story), refused).SceneIds);
         await AssertProse(client, u, story, prose);
 
-        // The Council is deleted: its prose, its lore links and its place in two beats go. Both beats stay.
+        // The Council is deleted: its prose, its lore links and its place in two beats leave every read. Both beats stay.
         (await client.DeleteAsync($"{Story(u, story)}/scenes/{council}")).EnsureSuccessStatusCode();
         prose.Remove(council);
 
-        Assert.Equal(
-            new Holdings(Chapters: 1, Scenes: 3, SceneLinks: 2, Manuscripts: 3, Arcs: 2, Beats: 3, BeatScenes: 3, BeatEntities: 2),
-            await HoldingsOf(story, scenes, beats));
+        Assert.Equal(whole, await HoldingsOf(story, scenes, beats));
         var plot = await Plot(client, u, story);
         Assert.Equal([gate], BeatIn(plot, refused).SceneIds);
         Assert.Equal([prologue, breach], BeatIn(plot, letter).SceneIds);
@@ -102,22 +104,41 @@ public sealed class StoryPhaseIntegrityTests(LorexApiFactory factory) : IClassFi
         await AssertProse(client, u, story, prose);
         await AssertLore(live: arlen, trashed: mira);
 
-        // The Fall of the King is deleted: its beat and that beat's links go. No scene, prose or entry does.
+        // The Fall of the King is deleted: it and its beat leave the plot. No scene, prose or entry moves.
         (await client.DeleteAsync(Arc(u, story, fall))).EnsureSuccessStatusCode();
 
-        Assert.Equal(
-            new Holdings(Chapters: 1, Scenes: 3, SceneLinks: 2, Manuscripts: 3, Arcs: 1, Beats: 2, BeatScenes: 2, BeatEntities: 1),
-            await HoldingsOf(story, scenes, beats));
+        Assert.Equal(whole, await HoldingsOf(story, scenes, beats));
+        Assert.Equal([betrayal], (await Plot(client, u, story)).Select(arc => arc.Id));
         await AssertProse(client, u, story, prose);
         await AssertLore(live: arlen, trashed: mira);
 
-        // The story is deleted: everything it held goes. The other telling and the lore stay exactly as they were.
+        // The story is deleted: every read of it answers as missing. The other telling and the lore stay exactly as they were.
         (await client.DeleteAsync(Story(u, story))).EnsureSuccessStatusCode();
 
-        Assert.Equal(new Holdings(0, 0, 0, 0, 0, 0, 0, 0), await HoldingsOf(story, scenes, beats));
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(Story(u, story))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(Manuscript(u, story, gate))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(Arcs(u, story))).StatusCode);
+        Assert.Equal(whole, await HoldingsOf(story, scenes, beats));
         Assert.Equal(otherHoldings, await HoldingsOf(other, [elsewhere], [otherBeat]));
         Assert.Equal("Prose from another telling.", (await ReadManuscript(client, u, other, elsewhere)).Content);
         await AssertLore(live: arlen, trashed: mira);
+
+        // Restored, the story comes back holding what it held when it went. What went before it - Arrival, The Council and
+        // the Fall of the King - is still in the Trash on its own account.
+        (await client.PostAsync($"/api/universes/{u}/trash/stories/{story}/restore", content: null)).EnsureSuccessStatusCode();
+
+        read = await ReadStory(client, u, story);
+        Assert.Equal([prologue, gate, breach], read.Scenes.Select(scene => scene.Id));
+        Assert.Equal([ashes], read.Chapters.Select(chapter => chapter.Id));
+        Assert.Equal([betrayal], (await Plot(client, u, story)).Select(arc => arc.Id));
+        await AssertProse(client, u, story, prose);
+
+        // Only deleting the universe removes any of it for good, and then it removes all of it.
+        (await client.PostAsync($"/api/universes/{u}/archive", content: null)).EnsureSuccessStatusCode();
+        (await client.DeleteAsync($"/api/universes/{u}")).EnsureSuccessStatusCode();
+
+        Assert.Equal(new Holdings(0, 0, 0, 0, 0, 0, 0, 0), await HoldingsOf(story, scenes, beats));
+        Assert.Equal(new Holdings(0, 0, 0, 0, 0, 0, 0, 0), await HoldingsOf(other, [elsewhere], [otherBeat]));
     }
 
     [Fact]

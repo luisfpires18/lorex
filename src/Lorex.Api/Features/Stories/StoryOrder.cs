@@ -19,13 +19,16 @@ namespace Lorex.Api.Features.Stories;
 /// </summary>
 internal static class StoryOrder
 {
-    /// <summary>The scenes of one container: a chapter, or the story's Unchaptered scenes when <paramref name="chapterId"/> is null.</summary>
+    /// <summary>
+    /// The live scenes of one container: a chapter, or the story's Unchaptered scenes when <paramref name="chapterId"/> is
+    /// null. A scene in the Trash holds no place in any container's order (ADR 0029).
+    /// </summary>
     public static IQueryable<Scene> InContainer(this IQueryable<Scene> scenes, Guid storyId, Guid? chapterId) =>
         chapterId is { } id
-            ? scenes.Where(scene => scene.StoryId == storyId && scene.ChapterId == id)
-            : scenes.Where(scene => scene.StoryId == storyId && scene.ChapterId == null);
+            ? scenes.Where(scene => scene.StoryId == storyId && scene.ChapterId == id && scene.DeletedAt == null)
+            : scenes.Where(scene => scene.StoryId == storyId && scene.ChapterId == null && scene.DeletedAt == null);
 
-    /// <summary>One container's scenes, tracked, in the order they are told.</summary>
+    /// <summary>One container's live scenes, tracked, in the order they are told.</summary>
     public static Task<List<Scene>> LoadContainerAsync(
         LorexDbContext db,
         Guid storyId,

@@ -132,7 +132,8 @@ public sealed class ChapterMigrationTests : IDisposable
             Assert.Contains("IX_Scenes_StoryId:0:0", sceneIndexes);
             Assert.Contains("IX_Scenes_EraId:0:0", sceneIndexes);
             Assert.Contains("IX_Scenes_PovEntityId:0:0", sceneIndexes);
-            Assert.Contains("IX_Chapters_StoryId_SortOrder:1:0", await Indexes(db, "Chapters"));
+            // Partial since content recovery (ADR 0029): the order guards live chapters, and a chapter in the Trash holds no place.
+            Assert.Contains("IX_Chapters_StoryId_SortOrder:1:1", await Indexes(db, "Chapters"));
 
             // Unchaptered is guarded - which is exactly what a unique index over (StoryId, ChapterId,
             // SortOrder) would not have done, since it treats every null ChapterId as distinct.

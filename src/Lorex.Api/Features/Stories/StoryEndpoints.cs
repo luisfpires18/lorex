@@ -16,6 +16,9 @@ namespace Lorex.Api.Features.Stories;
 /// point rather than an omission: a story contributes no facts. Its scenes reference lore and never
 /// restate it, so no write to a story can make the world contradict itself or stop doing so
 /// (ADR 0024).
+///
+/// A story in the Trash answers every route here, and every route beneath it, as a missing one does.
+/// Restoring it is the Trash's work (ADR 0029).
 /// </summary>
 public static class StoryEndpoints
 {
@@ -50,7 +53,7 @@ public static class StoryEndpoints
         }
 
         var stories = await db.Stories.AsNoTracking()
-            .Where(story => story.UniverseId == universeId)
+            .Where(story => story.UniverseId == universeId && story.DeletedAt == null)
             .OrderBy(story => story.Title)
             .ThenBy(story => story.Id)
             .Select(story => new StorySummary(
@@ -58,7 +61,7 @@ public static class StoryEndpoints
                 story.Title,
                 story.Premise,
                 story.Status,
-                story.Scenes.Count,
+                story.Scenes.Count(scene => scene.DeletedAt == null),
                 story.CreatedAt,
                 story.UpdatedAt))
             .ToListAsync(cancellationToken);
@@ -153,10 +156,11 @@ public static class StoryEndpoints
     }
 
     /// <summary>
-    /// Permanent. The story's chapters, scenes and their links go with it, by the database's own
-    /// cascade; the lore they referenced is untouched. There is no Trash for stories - ADR 0015 keeps the Trash
-    /// for lore entries, whose removal used to destroy work other records depended on, and nothing
-    /// depends on a story.
+    /// Moves the story to the Trash. Only the story is marked: its chapters, scenes, prose, saved versions
+    /// and plot stay exactly as they are - out of reach while it is there, and back with it on restore - and
+    /// the lore they reference is untouched. A story already in the Trash answers as missing, so the moment
+    /// it was thrown away cannot be moved by a second click. Its <c>UpdatedAt</c> is left alone: nothing in it
+    /// was written (ADR 0029).
     /// </summary>
     private static async Task<IResult> DeleteAsync(
         Guid universeId,
@@ -176,15 +180,15 @@ public static class StoryEndpoints
             return Results.NotFound();
         }
 
-        db.Stories.Remove(story);
+        story.DeletedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
 
         return Results.NoContent();
     }
 
     /// <summary>
-    /// The story, tracked, only if it belongs to this universe. The caller has already proved the
-    /// universe is the caller's; the story id alone is never trusted.
+    /// The story, tracked, only if it belongs to this universe and is not in the Trash. The caller has
+    /// already proved the universe is the caller's; the story id alone is never trusted.
     /// </summary>
     internal static Task<Story?> FindAsync(
         LorexDbContext db,
@@ -192,11 +196,11 @@ public static class StoryEndpoints
         Guid storyId,
         CancellationToken cancellationToken) =>
         db.Stories.FirstOrDefaultAsync(
-            story => story.Id == storyId && story.UniverseId == universeId,
+            story => story.Id == storyId && story.UniverseId == universeId && story.DeletedAt == null,
             cancellationToken);
 
     /// <summary>
-    /// Whether the caller owns the universe and the story is in it. For reads; a write finds the story
+    /// Whether the caller owns the universe and the story is live in it. For reads; a write finds the story
     /// tracked instead, with <see cref="FindAsync"/>.
     /// </summary>
     internal static async Task<bool> OwnsStoryAsync(
@@ -207,13 +211,14 @@ public static class StoryEndpoints
         CancellationToken cancellationToken) =>
         await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken)
         && await db.Stories.AnyAsync(
-            story => story.Id == storyId && story.UniverseId == universeId,
+            story => story.Id == storyId && story.UniverseId == universeId && story.DeletedAt == null,
             cancellationToken);
 
     /// <summary>
-    /// The story, its chapters and every scene in it. A fixed number of queries whatever the story holds:
-    /// the story, its chapters, its scenes with their link ids, and one read of every entry any scene
-    /// references - four for a story of ten chapters and a hundred scenes, as for an empty one.
+    /// The story, its live chapters and every live scene in it. A fixed number of queries whatever the story
+    /// holds: the story, its chapters, its scenes with their link ids, and one read of every entry any scene
+    /// references - four for a story of ten chapters and a hundred scenes, as for an empty one. Nothing in the
+    /// Trash is read.
     /// </summary>
     internal static async Task<StoryDetail?> LoadDetailAsync(
         LorexDbContext db,
@@ -222,7 +227,7 @@ public static class StoryEndpoints
         CancellationToken cancellationToken)
     {
         var story = await db.Stories.AsNoTracking()
-            .Where(candidate => candidate.Id == storyId && candidate.UniverseId == universeId)
+            .Where(candidate => candidate.Id == storyId && candidate.UniverseId == universeId && candidate.DeletedAt == null)
             .Select(candidate => new
             {
                 candidate.Id,
@@ -244,7 +249,7 @@ public static class StoryEndpoints
         var scenes = await SceneEndpoints.LoadScenesAsync(
             db,
             universeId,
-            db.Scenes.Where(scene => scene.StoryId == storyId),
+            db.Scenes.Where(scene => scene.StoryId == storyId && scene.DeletedAt == null),
             cancellationToken);
 
         return new StoryDetail(

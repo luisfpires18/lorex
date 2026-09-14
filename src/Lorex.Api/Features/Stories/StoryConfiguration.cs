@@ -45,8 +45,14 @@ public sealed class ChapterConfiguration : IEntityTypeConfiguration<Chapter>
             .HasForeignKey(chapter => chapter.StoryId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Chapter order is contiguous and unique per story, like scene order inside a container.
-        builder.HasIndex(chapter => new { chapter.StoryId, chapter.SortOrder }).IsUnique();
+        // Chapter order is contiguous and unique among a story's live chapters, like scene order inside a
+        // container. A chapter in the Trash keeps the number it had and holds no place, so it is outside the
+        // index; the plain index serves the story's foreign key, which a partial index cannot.
+        builder.HasIndex(chapter => new { chapter.StoryId, chapter.SortOrder })
+            .IsUnique()
+            .HasFilter("\"DeletedAt\" IS NULL");
+
+        builder.HasIndex(chapter => chapter.StoryId);
     }
 }
 
@@ -118,18 +124,20 @@ public sealed class SceneConfiguration : IEntityTypeConfiguration<Scene>
         // Narrative order is contiguous and unique per container: one chapter, or the story's
         // Unchaptered scenes. Two filtered indexes rather than one over (StoryId, ChapterId, SortOrder),
         // because a unique index treats every null as distinct - it would guard each chapter and leave
-        // Unchaptered, the one container every existing scene is in, unguarded.
+        // Unchaptered, the one container every existing scene is in, unguarded. Both guard live scenes
+        // only: a scene in the Trash keeps the place it had and holds none (ADR 0029).
         builder.HasIndex(scene => new { scene.StoryId, scene.SortOrder })
             .IsUnique()
-            .HasFilter("\"ChapterId\" IS NULL");
+            .HasFilter("\"ChapterId\" IS NULL AND \"DeletedAt\" IS NULL");
 
         builder.HasIndex(scene => new { scene.ChapterId, scene.SortOrder })
             .IsUnique()
-            .HasFilter("\"ChapterId\" IS NOT NULL");
+            .HasFilter("\"ChapterId\" IS NOT NULL AND \"DeletedAt\" IS NULL");
 
         // The story read and the story list take every scene in a story whatever its container, which
-        // neither filtered index can answer.
+        // neither filtered index can answer; and the chapter's foreign key needs an index no filter narrows.
         builder.HasIndex(scene => scene.StoryId);
+        builder.HasIndex(scene => scene.ChapterId);
     }
 }
 

@@ -20,8 +20,13 @@ public sealed class PlotArcConfiguration : IEntityTypeConfiguration<PlotArc>
             .HasForeignKey(arc => arc.StoryId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Arc order is contiguous and unique per story, like chapter order.
-        builder.HasIndex(arc => new { arc.StoryId, arc.SortOrder }).IsUnique();
+        // Arc order is contiguous and unique among a story's live arcs, like chapter order. An arc in the Trash
+        // holds no place; the plain index serves the story's foreign key, which a partial index cannot.
+        builder.HasIndex(arc => new { arc.StoryId, arc.SortOrder })
+            .IsUnique()
+            .HasFilter("\"DeletedAt\" IS NULL");
+
+        builder.HasIndex(arc => arc.StoryId);
     }
 }
 
@@ -42,8 +47,13 @@ public sealed class PlotBeatConfiguration : IEntityTypeConfiguration<PlotBeat>
             .HasForeignKey(beat => beat.PlotArcId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Beat order is contiguous and unique per arc. It also answers every read of one arc's beats.
-        builder.HasIndex(beat => new { beat.PlotArcId, beat.SortOrder }).IsUnique();
+        // Beat order is contiguous and unique among an arc's live beats, and answers every read of them. A beat in
+        // the Trash holds no place; the plain index serves the arc's foreign key, which a partial index cannot.
+        builder.HasIndex(beat => new { beat.PlotArcId, beat.SortOrder })
+            .IsUnique()
+            .HasFilter("\"DeletedAt\" IS NULL");
+
+        builder.HasIndex(beat => beat.PlotArcId);
     }
 }
 

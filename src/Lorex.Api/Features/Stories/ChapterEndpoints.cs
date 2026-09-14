@@ -18,7 +18,8 @@ namespace Lorex.Api.Features.Stories;
 /// reader sees is its position - and no scene's chronology decides where a chapter sits.
 ///
 /// Deleting a chapter never deletes a scene. Its scenes move, in their order, to the end of Unchaptered,
-/// and only then does the chapter go, all in one transaction.
+/// and only then does the chapter go to the Trash - holding no scene - all in one transaction. A chapter in
+/// the Trash answers every route here as a missing one does; restoring it is the Trash's work (ADR 0029).
 ///
 /// <b>No Canon.</b> Like everything else in a story, nothing here passes the promotion gate or
 /// reconciles findings (ADR 0024, ADR 0025).
@@ -74,7 +75,7 @@ public static class ChapterEndpoints
         }
 
         var chapter = await db.Chapters.AsNoTracking()
-            .Where(candidate => candidate.Id == chapterId && candidate.StoryId == storyId)
+            .Where(candidate => candidate.Id == chapterId && candidate.StoryId == storyId && candidate.DeletedAt == null)
             .Select(ToResponse)
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -107,7 +108,7 @@ public static class ChapterEndpoints
         }
 
         var last = await db.Chapters
-            .Where(chapter => chapter.StoryId == storyId)
+            .Where(chapter => chapter.StoryId == storyId && chapter.DeletedAt == null)
             .MaxAsync(chapter => (int?)chapter.SortOrder, cancellationToken);
 
         var now = DateTime.UtcNow;
@@ -164,7 +165,7 @@ public static class ChapterEndpoints
         }
 
         var chapter = await db.Chapters.FirstOrDefaultAsync(
-            candidate => candidate.Id == chapterId && candidate.StoryId == storyId,
+            candidate => candidate.Id == chapterId && candidate.StoryId == storyId && candidate.DeletedAt == null,
             cancellationToken);
 
         if (chapter is null)
@@ -190,10 +191,12 @@ public static class ChapterEndpoints
     }
 
     /// <summary>
-    /// Removes the chapter and keeps every scene in it. The scenes move to the end of Unchaptered, after
-    /// the scenes already there and in the order the chapter told them; Unchaptered is renumbered, the
-    /// chapter goes, and the chapters after it each move up one place. One transaction: either all of
-    /// that happens or none of it does. A scene keeps its id and everything it holds.
+    /// Moves the chapter to the Trash and keeps every scene in it where the story can read it. The scenes
+    /// move to the end of Unchaptered, after the scenes already there and in the order the chapter told
+    /// them; Unchaptered is renumbered, the chapter goes, and the chapters after it each move up one place.
+    /// One transaction: either all of that happens or none of it does. A scene keeps its id and everything
+    /// it holds. A scene already in the Trash leaves the chapter too, so a chapter in the Trash holds no
+    /// scene and restoring it moves none (ADR 0029).
     /// </summary>
     private static async Task<IResult> DeleteAsync(
         Guid universeId,
@@ -217,7 +220,7 @@ public static class ChapterEndpoints
         }
 
         var chapter = await db.Chapters.FirstOrDefaultAsync(
-            candidate => candidate.Id == chapterId && candidate.StoryId == storyId,
+            candidate => candidate.Id == chapterId && candidate.StoryId == storyId && candidate.DeletedAt == null,
             cancellationToken);
 
         if (chapter is null)
@@ -233,11 +236,18 @@ public static class ChapterEndpoints
             await StoryOrder.PlaceScenesAsync(
                 db, [new SceneContainer(null, [.. unchaptered, .. released])], cancellationToken);
 
-            db.Chapters.Remove(chapter);
+            // A scene in the Trash holds no place, so it joins Unchaptered without one.
+            await db.Scenes
+                .Where(scene => scene.ChapterId == chapterId && scene.DeletedAt != null)
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(scene => scene.ChapterId, (Guid?)null),
+                    cancellationToken);
+
+            chapter.DeletedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
 
             var remaining = await db.Chapters
-                .Where(candidate => candidate.StoryId == storyId)
+                .Where(candidate => candidate.StoryId == storyId && candidate.DeletedAt == null)
                 .OrderBy(candidate => candidate.SortOrder)
                 .ThenBy(candidate => candidate.Id)
                 .ToListAsync(cancellationToken);
@@ -294,7 +304,7 @@ public static class ChapterEndpoints
         }
 
         var chapters = await db.Chapters
-            .Where(chapter => chapter.StoryId == storyId)
+            .Where(chapter => chapter.StoryId == storyId && chapter.DeletedAt == null)
             .ToListAsync(cancellationToken);
 
         var byId = chapters.ToDictionary(chapter => chapter.Id);
@@ -327,8 +337,9 @@ public static class ChapterEndpoints
     // ---------- Shared ----------
 
     /// <summary>
-    /// Whether <paramref name="chapterId"/> is a chapter of this story. The caller has already proved the
-    /// story is the caller's; a chapter id a client sends is never trusted on its own.
+    /// Whether <paramref name="chapterId"/> is a live chapter of this story. The caller has already proved the
+    /// story is the caller's; a chapter id a client sends is never trusted on its own, and one in the Trash is
+    /// refused like any other that is not there.
     /// </summary>
     internal static Task<bool> BelongsToStoryAsync(
         LorexDbContext db,
@@ -336,20 +347,20 @@ public static class ChapterEndpoints
         Guid chapterId,
         CancellationToken cancellationToken) =>
         db.Chapters.AnyAsync(
-            chapter => chapter.Id == chapterId && chapter.StoryId == storyId,
+            chapter => chapter.Id == chapterId && chapter.StoryId == storyId && chapter.DeletedAt == null,
             cancellationToken);
 
     /// <summary>The refusal for a chapter id that is not one of this story's, worded the same whoever's it is.</summary>
     internal static Dictionary<string, string[]> ForeignChapter() =>
         new() { ["chapterId"] = ["Choose a chapter from this story."] };
 
-    /// <summary>Every chapter of one story, first first. One query.</summary>
+    /// <summary>Every live chapter of one story, first first. One query.</summary>
     internal static async Task<List<ChapterResponse>> LoadChaptersAsync(
         LorexDbContext db,
         Guid storyId,
         CancellationToken cancellationToken) =>
         await db.Chapters.AsNoTracking()
-            .Where(chapter => chapter.StoryId == storyId)
+            .Where(chapter => chapter.StoryId == storyId && chapter.DeletedAt == null)
             .OrderBy(chapter => chapter.SortOrder)
             .ThenBy(chapter => chapter.Id)
             .Select(ToResponse)

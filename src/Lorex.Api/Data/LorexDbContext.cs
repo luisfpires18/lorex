@@ -79,6 +79,8 @@ public class LorexDbContext(DbContextOptions<LorexDbContext> options)
 
     public DbSet<SceneManuscript> SceneManuscripts => Set<SceneManuscript>();
 
+    public DbSet<SceneManuscriptRevision> SceneManuscriptRevisions => Set<SceneManuscriptRevision>();
+
     public DbSet<PlotArc> PlotArcs => Set<PlotArc>();
 
     public DbSet<PlotBeat> PlotBeats => Set<PlotBeat>();

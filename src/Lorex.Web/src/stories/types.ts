@@ -149,6 +149,36 @@ export interface SceneManuscriptInput {
   expectedUpdatedAt: string | null
 }
 
+/** Mirrors the backend enum. What a saved version of a manuscript was. */
+export const ManuscriptRevisionKind = {
+  Created: 0,
+  Edited: 1,
+  Restored: 2,
+} as const
+
+export type ManuscriptRevisionKindValue =
+  (typeof ManuscriptRevisionKind)[keyof typeof ManuscriptRevisionKind]
+
+/** A row in a manuscript's history. No text; `isEmpty` says the save emptied the prose. */
+export interface ManuscriptRevisionSummary {
+  id: string
+  number: number
+  kind: ManuscriptRevisionKindValue
+  restoredFromRevisionId: string | null
+  createdAt: string
+  isEmpty: boolean
+}
+
+/** One saved version of a manuscript, whole. */
+export interface ManuscriptRevisionDetail {
+  id: string
+  number: number
+  kind: ManuscriptRevisionKindValue
+  restoredFromRevisionId: string | null
+  createdAt: string
+  content: string
+}
+
 /** Everything a client may set on a chapter. No number and no order: both are its position. */
 export interface ChapterInput {
   title: string

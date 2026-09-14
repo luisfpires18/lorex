@@ -1,13 +1,16 @@
 import { useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
+import { useAuth } from '../auth/useAuth'
 import { ChronologySettings } from '../components/ChronologySettings'
 import { UniverseForm } from '../components/UniverseForm'
 import { downloadUniverseBackup } from '../export/api'
+import { discardUniverseDrafts } from '../lib/localDrafts'
 import { deleteUniverse, setUniverseArchived, updateUniverse } from '../universes/api'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
 export default function UniverseSettings() {
   const { universe, refresh, chronology, setChronology } = useOutletContext<WorkspaceContext>()
+  const { user } = useAuth()
   const navigate = useNavigate()
 
   const [saved, setSaved] = useState(false)
@@ -51,6 +54,8 @@ export default function UniverseSettings() {
     setError(null)
     try {
       await deleteUniverse(universe.id)
+      // Nothing is left to recover unsaved writing into, so this device lets the universe's recovery copies go too.
+      if (user) void discardUniverseDrafts(user.id, universe.id).catch(() => undefined)
       await navigate('/app', { replace: true })
     } catch (problem: unknown) {
       setError(problem instanceof Error ? problem.message : 'That could not be deleted.')

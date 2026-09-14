@@ -587,9 +587,12 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
     /// <summary>
     /// Every story by title, each with its chapters in story order, its scenes in reading order -
     /// Unchaptered first, then chapter by chapter, each by its own narrative order - and each scene's
-    /// links sorted by id and its prose beside it. Then its plot: arcs in order, beats in order inside each, and
-    /// each beat's scene and entry links sorted by id. Only ids and authored text: a linked entry's name is in
-    /// the entry, and a linked scene's title is in the scene, not here.
+    /// links sorted by id and its prose and saved versions beside it. Then its plot: arcs in order, beats in order
+    /// inside each, and each beat's scene and entry links sorted by id. Only ids and authored text: a linked entry's
+    /// name is in the entry, and a linked scene's title is in the scene, not here.
+    ///
+    /// The Trash is carried too, marked (ADR 0029). Inside each ordered collection the live rows come first in their
+    /// order and the rows in the Trash after them, so the order a reader sees is still the order the story is told in.
     /// </summary>
     private async Task<IReadOnlyList<BackupStory>> StoriesAsync(
         Guid universeId,
@@ -614,7 +617,8 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                 group => (IReadOnlyList<BackupChapter>)
                 [
                     .. group
-                        .OrderBy(chapter => chapter.SortOrder)
+                        .OrderBy(chapter => chapter.DeletedAt is not null)
+                        .ThenBy(chapter => chapter.SortOrder)
                         .ThenBy(chapter => Key(chapter.Id), StringComparer.Ordinal)
                         .Select(chapter => new BackupChapter(
                             chapter.Id,
@@ -623,7 +627,8 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                             chapter.Summary,
                             chapter.Notes,
                             Utc(chapter.CreatedAt),
-                            Utc(chapter.UpdatedAt))),
+                            Utc(chapter.UpdatedAt),
+                            Utc(chapter.DeletedAt))),
                 ]);
 
         var scenes = await db.Scenes.AsNoTracking()
@@ -648,6 +653,8 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
             .Where(manuscript => manuscript.Scene!.Story!.UniverseId == universeId)
             .ToDictionaryAsync(manuscript => manuscript.SceneId, cancellationToken);
 
+        var manuscriptRevisions = await ManuscriptRevisionsAsync(universeId, cancellationToken);
+
         var scenesByStory = scenes
             .GroupBy(scene => scene.StoryId)
             .ToDictionary(
@@ -656,6 +663,7 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                 [
                     .. group
                         .OrderBy(scene => scene.ChapterId is { } chapterId ? chapterRank[chapterId] : -1)
+                        .ThenBy(scene => scene.DeletedAt is not null)
                         .ThenBy(scene => scene.SortOrder)
                         .ThenBy(scene => Key(scene.Id), StringComparer.Ordinal)
                         .Select(scene => new BackupScene(
@@ -671,10 +679,14 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                                 : null,
                             linkedByScene.GetValueOrDefault(scene.Id, []),
                             manuscripts.TryGetValue(scene.Id, out var manuscript)
-                                ? new BackupSceneManuscript(manuscript.Content, Utc(manuscript.UpdatedAt))
+                                ? new BackupSceneManuscript(
+                                    manuscript.Content,
+                                    Utc(manuscript.UpdatedAt),
+                                    manuscriptRevisions.GetValueOrDefault(scene.Id, []))
                                 : null,
                             Utc(scene.CreatedAt),
-                            Utc(scene.UpdatedAt))),
+                            Utc(scene.UpdatedAt),
+                            Utc(scene.DeletedAt))),
                 ]);
 
         var arcsByStory = await PlotArcsAsync(universeId, cancellationToken);
@@ -691,10 +703,41 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                     story.Status,
                     Utc(story.CreatedAt),
                     Utc(story.UpdatedAt),
+                    Utc(story.DeletedAt),
                     chaptersByStory.GetValueOrDefault(story.Id, []),
                     scenesByStory.GetValueOrDefault(story.Id, []),
                     arcsByStory.GetValueOrDefault(story.Id, []))),
         ];
+    }
+
+    /// <summary>
+    /// Every manuscript's saved versions, keyed by scene and ordered oldest first, each version whole - a scene in the Trash
+    /// included. Never a browser's unsaved recovery copy: those live on a device and were never saved.
+    /// </summary>
+    private async Task<Dictionary<Guid, IReadOnlyList<BackupManuscriptRevision>>> ManuscriptRevisionsAsync(
+        Guid universeId,
+        CancellationToken cancellationToken)
+    {
+        var revisions = await db.SceneManuscriptRevisions.AsNoTracking()
+            .Where(revision => revision.Scene!.Story!.UniverseId == universeId)
+            .ToListAsync(cancellationToken);
+
+        return revisions
+            .GroupBy(revision => revision.SceneId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<BackupManuscriptRevision>)
+                [
+                    .. group
+                        .OrderBy(revision => revision.Number)
+                        .Select(revision => new BackupManuscriptRevision(
+                            revision.Id,
+                            revision.Number,
+                            revision.Kind,
+                            revision.RestoredFromRevisionId,
+                            Utc(revision.CreatedAt),
+                            revision.Content)),
+                ]);
     }
 
     /// <summary>
@@ -740,7 +783,8 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                 group => (IReadOnlyList<BackupPlotBeat>)
                 [
                     .. group
-                        .OrderBy(beat => beat.SortOrder)
+                        .OrderBy(beat => beat.DeletedAt is not null)
+                        .ThenBy(beat => beat.SortOrder)
                         .ThenBy(beat => Key(beat.Id), StringComparer.Ordinal)
                         .Select(beat => new BackupPlotBeat(
                             beat.Id,
@@ -751,7 +795,8 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                             scenesByBeat.GetValueOrDefault(beat.Id, []),
                             entitiesByBeat.GetValueOrDefault(beat.Id, []),
                             Utc(beat.CreatedAt),
-                            Utc(beat.UpdatedAt))),
+                            Utc(beat.UpdatedAt),
+                            Utc(beat.DeletedAt))),
                 ]);
 
         return arcs
@@ -761,7 +806,8 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                 group => (IReadOnlyList<BackupPlotArc>)
                 [
                     .. group
-                        .OrderBy(arc => arc.SortOrder)
+                        .OrderBy(arc => arc.DeletedAt is not null)
+                        .ThenBy(arc => arc.SortOrder)
                         .ThenBy(arc => Key(arc.Id), StringComparer.Ordinal)
                         .Select(arc => new BackupPlotArc(
                             arc.Id,
@@ -771,6 +817,7 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                             arc.Notes,
                             Utc(arc.CreatedAt),
                             Utc(arc.UpdatedAt),
+                            Utc(arc.DeletedAt),
                             beatsByArc.GetValueOrDefault(arc.Id, []))),
                 ]);
     }

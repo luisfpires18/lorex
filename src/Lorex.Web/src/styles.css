@@ -2322,6 +2322,76 @@ a {
   margin-top: 0.75rem;
 }
 
+/* ---------- Recovered drafts ----------
+
+   A recovery copy is offered, never applied: a rule beside it in the accent, like a note in a margin, rather than a
+   warning. What it says is in words - whether the saved text has moved on since is a sentence, not a colour. */
+
+.recovery {
+  max-width: 62ch;
+  margin: 0 0 1.25rem;
+  padding: 0.8rem 0 0.9rem 0.9rem;
+  border-left: 2px solid var(--accent);
+}
+
+.recovery__title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--ink);
+}
+
+.recovery__text {
+  margin: 0.35rem 0 0;
+  font-size: 0.925rem;
+  overflow-wrap: anywhere;
+}
+
+.recovery__hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.recovery__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+/* The copy, read before choosing: bounded, so a long one never pushes the choice off the screen. */
+.recovery__preview {
+  margin-top: 0.9rem;
+  max-height: 22rem;
+  overflow: auto;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+}
+
+.recovery__preview .article__body {
+  max-width: none;
+}
+
+.recovery__prose {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--display);
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.recovery__warning {
+  flex: 1 1 100%;
+  order: -1;
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
 .snapshot__article {
   margin: 1rem 0;
   padding-top: 0.75rem;
@@ -4924,6 +4994,59 @@ a.lorechip--pov:focus-visible .lorechip__name {
   margin-top: 0.7rem;
 }
 
+.manuscript__recovery .recovery {
+  margin: 1rem 0 0;
+}
+
+/* Held while a recovered draft waits for a choice: still readable, plainly not the thing to type into. */
+.manuscript__text[data-held='true'] {
+  background: var(--paper);
+  color: var(--muted);
+}
+
+/* A manuscript's saved versions, opened under its tools: the same rows as an article's history. */
+.mshistory {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--rule);
+}
+
+.mshistory__title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.mshistory__lede,
+.mshistory__blocked,
+.mshistory__done {
+  margin: 0.35rem 0 0;
+  max-width: 62ch;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.mshistory__blocked,
+.mshistory__done {
+  color: var(--ink);
+}
+
+.mshistory .history__list {
+  margin-top: 0.75rem;
+}
+
+.mshistory__text {
+  max-height: 24rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--display);
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
 @media (max-width: 1100px) {
   .manuscript__layout {
     grid-template-columns: minmax(0, 1fr);
@@ -5461,12 +5584,64 @@ a.lorechip--pov:focus-visible .lorechip__name {
   margin: 0;
   font-size: 0.95rem;
   color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+/* What a row is, in a word before its name: never a colour alone. */
+.trash__kind {
+  display: inline-block;
+  margin-right: 0.55rem;
+  padding: 0 0.35rem;
+  border: 1px solid var(--rule);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  vertical-align: 0.12em;
+  color: var(--muted);
 }
 
 .trash__meta {
   margin: 0.2rem 0 0;
   font-size: 0.78rem;
   color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.trash__waiting {
+  margin: 0.3rem 0 0;
+  font-size: 0.8rem;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.trash__row > .button {
+  flex: none;
+}
+
+.trash__outcome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+}
+
+.trash__outcome p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .trash__row {
+    flex-wrap: wrap;
+  }
+
+  .trash__what {
+    flex-basis: calc(100% - 1.5rem);
+  }
+
+  .trash__row > .button {
+    margin-left: 1.35rem;
+  }
 }
 
 /* ---------- Touch ----------

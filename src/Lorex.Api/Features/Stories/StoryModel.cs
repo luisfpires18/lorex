@@ -24,9 +24,10 @@ public enum StoryStatus
 /// becomes a fact: no Canon finding, no timeline moment, no relationship and no change to any entry
 /// is ever produced from it. Its scenes reference lore by id and never keep a copy of it.
 ///
-/// Owned by the universe and deleted with it. Deleting a story is permanent and takes its scenes
-/// with it; there is no Trash for stories. See
-/// <c>docs/architecture/decisions/0024-story-scene-foundation.md</c>.
+/// Owned by the universe and deleted with it. Deleting a story moves it to the Trash with everything it
+/// holds; only deleting the universe removes it for good. See
+/// <c>docs/architecture/decisions/0024-story-scene-foundation.md</c> and
+/// <c>docs/architecture/decisions/0029-content-recovery.md</c>.
 /// </summary>
 public sealed class Story
 {
@@ -47,6 +48,12 @@ public sealed class Story
 
     /// <summary>When the story, its chapters, any of its scenes or their prose, or its plot was last written to.</summary>
     public DateTime UpdatedAt { get; set; }
+
+    /// <summary>
+    /// When the story was moved to the Trash, or null while it is live. Only the story is marked: its chapters, scenes,
+    /// prose and plot are left exactly as they were, unreachable while it is there and back with it on restore.
+    /// </summary>
+    public DateTime? DeletedAt { get; set; }
 
     public ICollection<Chapter> Chapters { get; } = [];
 
@@ -69,8 +76,9 @@ public sealed class Story
 /// chapter without touching a word the author wrote.
 ///
 /// Owned by the story and deleted with it. Deleting only the chapter never deletes a scene: its scenes
-/// move to the end of Unchaptered, in their order. See
-/// <c>docs/architecture/decisions/0025-story-chapters.md</c>.
+/// move to the end of Unchaptered, in their order, and the chapter goes to the Trash holding none. See
+/// <c>docs/architecture/decisions/0025-story-chapters.md</c> and
+/// <c>docs/architecture/decisions/0029-content-recovery.md</c>.
 /// </summary>
 public sealed class Chapter
 {
@@ -89,14 +97,18 @@ public sealed class Chapter
     public string? Notes { get; set; }
 
     /// <summary>
-    /// The chapter's place in its story, from 0. Contiguous and unique per story: creating appends,
-    /// deleting closes the gap, and only the chapter order route moves one.
+    /// The chapter's place in its story, from 0. Contiguous and unique among the story's live chapters:
+    /// creating appends, deleting closes the gap, and only the chapter order route moves one. A chapter in
+    /// the Trash holds no place - the number is what it had when it went - and a restore appends it.
     /// </summary>
     public int SortOrder { get; set; }
 
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
+
+    /// <summary>When the chapter was moved to the Trash, or null while it is live.</summary>
+    public DateTime? DeletedAt { get; set; }
 
     public ICollection<Scene> Scenes { get; } = [];
 }
@@ -143,8 +155,9 @@ public sealed class Scene
 
     /// <summary>
     /// The scene's place inside its container - its chapter, or Unchaptered - from 0. Contiguous and
-    /// unique per container, never across the whole story: creating appends to the container, deleting
-    /// or moving out closes the gap, and reordering rewrites one container in one transaction.
+    /// unique among the container's live scenes, never across the whole story: creating appends to the
+    /// container, deleting or moving out closes the gap, and reordering rewrites one container in one
+    /// transaction. A scene in the Trash holds no place, and a restore appends it.
     /// </summary>
     public int SortOrder { get; set; }
 
@@ -174,6 +187,12 @@ public sealed class Scene
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
+
+    /// <summary>
+    /// When the scene was moved to the Trash, or null while it is live. Its prose, saved versions, lore
+    /// links and the beats pointing at it are all kept, unreachable, and come back with it.
+    /// </summary>
+    public DateTime? DeletedAt { get; set; }
 
     public ICollection<SceneEntityLink> EntityLinks { get; } = [];
 }

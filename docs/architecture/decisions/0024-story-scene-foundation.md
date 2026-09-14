@@ -1,7 +1,7 @@
 # ADR 0024 - A story is authored narrative that references lore, told in its own order
 
 Status: accepted (2026-09-13), amended 2026-09-13 (chapters, ADR 0025: scene order is now per chapter or
-Unchaptered)
+Unchaptered), amended 2026-09-14 (deleting moves to the Trash - ADR 0029)
 
 ## Context
 
@@ -111,3 +111,11 @@ reader that ignored them would restore a world with every story silently missing
 - The migration only creates tables, so an existing database gains empty ones and nothing else.
   `StoryMigrationTests` walks it down and back up over real lore on a file and reads the delete
   actions back from SQLite.
+
+## Amendment - the Trash (2026-09-14)
+
+"Deleting is permanent and scoped" is superseded, and the deferred "A Trash, or an undo, for stories and scenes" is done in
+part. ADR 0029: deleting a story or a scene marks it (`DeletedAt`) and moves it to the universe's Trash - a story with its
+chapters, scenes, prose and plot untouched beneath it, a scene with its prose, saved versions and links - and one restore
+brings either back whole. Scene order is unique among live scenes; a restored scene is appended to its container. Only deleting
+the universe removes a story for good. Lore is untouched either way, as before.

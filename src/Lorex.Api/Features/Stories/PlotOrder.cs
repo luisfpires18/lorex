@@ -16,13 +16,13 @@ namespace Lorex.Api.Features.Stories;
 /// </summary>
 internal static class PlotOrder
 {
-    /// <summary>One arc's beats, tracked, in order.</summary>
+    /// <summary>One arc's live beats, tracked, in order. A beat in the Trash holds no place in its arc (ADR 0029).</summary>
     public static Task<List<PlotBeat>> LoadBeatsAsync(
         LorexDbContext db,
         Guid plotArcId,
         CancellationToken cancellationToken) =>
         db.PlotBeats
-            .Where(beat => beat.PlotArcId == plotArcId)
+            .Where(beat => beat.PlotArcId == plotArcId && beat.DeletedAt == null)
             .OrderBy(beat => beat.SortOrder)
             .ThenBy(beat => beat.Id)
             .ToListAsync(cancellationToken);

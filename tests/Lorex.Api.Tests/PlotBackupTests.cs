@@ -23,9 +23,9 @@ public sealed class PlotBackupTests(LorexApiFactory factory) : IClassFixture<Lor
         var (client, universe) = await SignedInWithUniverse(_factory, "plotbackup");
         var world = await BuildPlot(client, universe.Id);
 
-        // Plot arrived in version 7; prose took the file to 8 without changing how plot travels.
+        // Plot arrived in version 7; prose, articles and the Trash moved the file on without changing how a live plot travels.
         var backup = await Backup(client, universe.Id);
-        Assert.Equal(9, backup.FormatVersion);
+        Assert.Equal(10, backup.FormatVersion);
 
         var stories = backup.Payload.Stories!;
         Assert.Equal(["Plotted", "Unplotted"], stories.Select(story => story.Title));
@@ -78,13 +78,14 @@ public sealed class PlotBackupTests(LorexApiFactory factory) : IClassFixture<Lor
         var arc = arcs[1];
         var beat = arc.GetProperty("beats")[1];
 
-        // No number, no count, and no copy of what a link points at.
+        // No number, no count, and no copy of what a link points at. Only whether it is in the Trash (version 10).
         Assert.Equal(
-            ["beats", "createdAt", "description", "id", "notes", "sortOrder", "title", "updatedAt"],
+            ["beats", "createdAt", "deletedAt", "description", "id", "notes", "sortOrder", "title", "updatedAt"],
             Names(arc));
         Assert.Equal(
-            ["createdAt", "description", "id", "linkedEntityIds", "linkedSceneIds", "notes", "sortOrder", "title", "updatedAt"],
+            ["createdAt", "deletedAt", "description", "id", "linkedEntityIds", "linkedSceneIds", "notes", "sortOrder", "title", "updatedAt"],
             Names(beat));
+        Assert.Equal(JsonValueKind.Null, arc.GetProperty("deletedAt").ValueKind);
 
         var plot = arcs.GetRawText();
         Assert.DoesNotContain("Arlen", plot, StringComparison.Ordinal);
