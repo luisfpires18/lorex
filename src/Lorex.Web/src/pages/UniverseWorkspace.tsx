@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router-dom'
 import { AccountMenu } from '../components/AccountMenu'
+import { UniverseSearch } from '../components/UniverseSearch'
 import { getChronology } from '../chronology/api'
 import type { Chronology } from '../chronology/types'
 import { getUniverse } from '../universes/api'
@@ -21,12 +22,6 @@ const SECTIONS = [
   { segment: 'types', label: 'Types', testId: 'workspace-types' },
   { segment: 'trash', label: 'Trash', testId: 'workspace-trash' },
 ] as const
-
-/**
- * Sections that exist in the plan but not yet in the product. They are shown so the shape
- * of a universe is legible, and disabled so nothing pretends to work.
- */
-const PLANNED = ['Search']
 
 type LoadState =
   | { kind: 'loading' }
@@ -231,28 +226,28 @@ export default function UniverseWorkspace() {
               </NavLink>
             </li>
           ))}
-          {PLANNED.map((label) => (
-            <li key={label}>
-              <span className="sidebar__link sidebar__link--planned" aria-disabled="true">
-                {label}
-              </span>
-            </li>
-          ))}
           <li>
             <NavLink to="settings" className="sidebar__link" data-testid="workspace-settings">
               Settings
             </NavLink>
           </li>
         </ul>
-
-        <p className="sidebar__soon">Greyed sections are not built yet.</p>
       </aside>
 
-      <main className="canvas">
-        <Outlet
-          context={{ universe, refresh, chronology, setChronology } satisfies WorkspaceContext}
-        />
-      </main>
+      <div className="workspace__column">
+        {/* The universe's search, above every screen in it rather than on any one of them. Keyed by the universe, so a
+            search typed in one world is never left standing in the next. Search was the sidebar's last greyed section;
+            it is not a section, it is how any section's content is reached. */}
+        <div className="workspace__top">
+          <UniverseSearch key={universe.id} universeId={universe.id} />
+        </div>
+
+        <main className="canvas">
+          <Outlet
+            context={{ universe, refresh, chronology, setChronology } satisfies WorkspaceContext}
+          />
+        </main>
+      </div>
     </div>
   )
 }

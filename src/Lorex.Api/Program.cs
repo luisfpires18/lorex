@@ -9,6 +9,7 @@ using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Media;
 using Lorex.Api.Features.Profile;
 using Lorex.Api.Features.Relationships;
+using Lorex.Api.Features.Search;
 using Lorex.Api.Features.Stories;
 using Lorex.Api.Features.Timeline;
 using Lorex.Api.Features.Trash;
@@ -84,6 +85,7 @@ app.MapPlotBeatEndpoints();
 app.MapCanonIntegrityEndpoints();
 app.MapTrashEndpoints();
 app.MapIdeaEndpoints();
+app.MapUniverseSearchEndpoints();
 app.MapUniverseExportEndpoints();
 
 // Last: the client-side routing fallback only answers what no route above claimed.

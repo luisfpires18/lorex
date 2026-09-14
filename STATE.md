@@ -162,13 +162,33 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     reckoning, `a + b - 1` from a countdown era into the ascending era after it, unknown otherwise.
   - Edited inside the relation kind form on the Types screen. Backup stays version 4, additively.
 - **Phase 3 - Authoring, Ideas & Recovery** (owner-sequenced, unnumbered branches): 1. Lore articles - merged. 2. Content
-  recovery - merged. 3. Ideas - committed, **not merged, not pushed**. 4. Persistent top search bar - next. 5. Backup Import /
-  Restore - last.
-- **Phase 3 - Ideas** (`feat/ideas` from `dev` `33da348`, committed, **not merged, not pushed**). Possibilities kept apart from
+  recovery - merged. 3. Ideas - merged. 4. Persistent top search bar - committed, **not merged, not pushed**. 5. Backup
+  Import / Restore - next, and last.
+- **Phase 3 - Universe search** (`feat/universe-search` from `dev` `95687ba`, committed, **not merged, not pushed**). "A search
+  bar on top that allows to enter anything", scoped to the current universe. ADR 0031.
+  - Searches lore (name, aliases, summary, article), stories (title, premise), chapters, scenes, arcs, beats (title, summary or
+    description, notes), saved manuscripts, and the account's live ideas of that universe (title, body). Live content only - a
+    child of something in the Trash is out; archived entries out as in Lore. Never unassigned ideas, other universes, the
+    Trash, versions or recovered drafts. Keyword search with the lore search's tokenizing; not AI. Lore search unchanged.
+  - `GET /api/universes/{id}/search?q=`: ownership 404 first; one query per kind, at most 5 each (`hasMore`), ordered by where
+    the words were found (title, then planning text, then prose), merged in that tier then a fixed kind order - no score
+    compared across indexes; 16-word excerpts as text runs. Thirteen queries fixed; 10-40 ms on the 25 MB dev database.
+  - Indexes: lore's `EntitySearchIndex` plus three FTS5 tables (`StorySearchIndex`, `SceneManuscriptSearchIndex`,
+    `IdeaSearchIndex`) kept in step by 21 SQLite triggers (plain text, every write path and cascade) and filled by the
+    migration. Derived: text only, live-ness by join. U+E000/U+E001 written as spaces in every index copy - ADR 0028's marker
+    limitation closed. No backup change: version 11 stands.
+  - Web: `UniverseSearch` above every universe screen (a 36px row on a phone, 44px under touch), APG combobox with listbox,
+    debounce and abort, results only for the current text, empty/failure/retry, leave guard before a result opens another page.
+    Deep links: entry (`#article` for an article match), Scenes `#chapter-`/`#scene-`, Plot `#arc-`/`#beat-`, manuscript,
+    universe idea. Story page now one per story (keyed). Sidebar's greyed "Search" removed. The manuscript's narrow-screen
+    outline disclosure names the scene on one line, so its text box keeps the Phase 2 first-screen promise under the bar.
+  - Owner manual pass: `docs/testing/phase3-universe-search-manual-test.md`.
+- **Phase 3 - Ideas** (`feat/ideas` from `dev` `33da348`, merged into `dev` at `95687ba`). Possibilities kept apart from
   lore, owned by the account. ADR 0030.
   - `Ideas`: owner (cascade), optional `UniverseId` (`SET NULL`), title 200, plain body 20,000, `DeletedAt`; no status, tag,
     folder or order - newest update first. Five reference join tables (entry, story, scene, arc, beat), cascading both sides.
-    Never lore: no entry, relationship, moment, story, Canon, finding, revision or search write, pinned by a test.
+    Never lore: no entry, relationship, moment, story, Canon, finding or revision write, pinned by a test (its words reach only
+    the universe search's own derived index, ADR 0031).
   - `/api/ideas`: account-scoped list (`universeId` | `unassigned`, `deleted`, `search`, paged, 240-char excerpt), create,
     read, whole save with stale 409 `idea_changed` (no token is stale too), delete to Recently deleted, restore, and
     `reference-targets` for the picker. Another account's idea, universe or content is a 404 or refused in not-found words.
@@ -318,12 +338,14 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 
 ## Baseline
 
-- **778 API integration tests, 124 Playwright tests**, green. The Ideas full Playwright runs lost two each to the known
-  contention below - canon + timeline, then canon + pwa (a universe `PUT` answered 400 "name taken" from a locked commit) -
-  and each file passed on a rerun alone; the API log showed `database is locked` in `CanonIntegrityEndpoints.TransitionAsync`.
-  Canon alone also flakes on a large dev database: against the same 25 MB copy, `dev` failed 3 of 8 parallel runs and
-  `feat/ideas` 5 of 8; on a fresh database `dev` passed 4 of 4. `ideas.spec.ts` and `content-recovery.spec.ts` were 7/7 in
-  every run. No frontend unit runner exists; the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E
+- **798 API integration tests, 131 Playwright tests**, green. Universe search full Playwright runs (dev database grown to
+  31 MB): 129/131 - the story first-screen test was a real regression from the new phone row, fixed before the next run - then
+  126/131 and 128/131. Every other failure was the known contention below, `database is locked` on a commit in
+  `CanonIntegrityEndpoints.TransitionAsync`, `UniverseEndpoints.SetArchivedAsync`, `StoryEndpoints.UpdateAsync`/`DeleteAsync`,
+  `StoryContentRestore.RestoreStoryAsync` or `ProfileImageEndpoints.RemoveAsync` - no write the search triggers touch - and
+  each passed alone (ideas: three parallel file runs 7/7). Measured trigger cost: 1-2 ms on a title or body write, ~5 ms on a
+  53,000-character manuscript save. Canon alone also flakes on a large dev database (Ideas phase: `dev` failed 3 of 8 parallel
+  runs on a 25 MB copy, 4 of 4 green on a fresh one). No frontend unit runner exists; the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E
   project has no format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
 - The test host no longer migrates itself, so every API test boots through the same startup path a
@@ -334,8 +356,10 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   is contention on the one SQLite writer, not the specs, and the content recovery run's API log shows how: a write's commit
   throws `SQLite Error 5: 'database is locked'` at once, not after the provider's retry, and is answered as a 500 - or as a
   false 409 where an endpoint maps every `DbUpdateException` to a conflict (entity type update: "name taken").
-- 27 migrations, latest `AddIdeas` - additive: `Ideas` and five reference tables; `IdeaMigrationTests` walks it down and up
-  and deletes a universe row under it. Before it, `AddContentRecovery` - `DeletedAt` on five story tables, their order indexes
+- 28 migrations, latest `AddUniverseSearchIndex` - raw SQL: three FTS5 tables filled from existing rows, 21 triggers, and the
+  lore index rows holding a marker character removed for the backfill; the snapshot gains two keyless match types.
+  `UniverseSearchMigrationTests` walks it down and up on a file and reads every trigger back. Before it, `AddIdeas` - additive:
+  `Ideas` and five reference tables; `IdeaMigrationTests` walks it down and up and deletes a universe row under it. Before that, `AddContentRecovery` - `DeletedAt` on five story tables, their order indexes
   recreated partial on live rows, and `SceneManuscriptRevisions` with each manuscript as its version 1. Its rollback drops the columns with
   SQLite's native `DROP COLUMN`, as `AddEntityArticles` did for `Entities.Content` (EF Core's table rebuild loses what it
   cannot see, such as the FTS delete trigger), and discards the Trash, what is in it and every manuscript's history.
@@ -387,7 +411,7 @@ tool has changed the picture.
   ADR 0022.
 - **`Age`** is declarable but read by nothing until a structured reference year exists. ADR 0011.
 - **Story work deferred past Phase 2** - later work, not Phase 2 gaps: acts and volumes, rich text, saved versions of
-  anything in a story but its manuscript, Story search, drag-and-drop, collaboration, manuscript export, AI, and restoring
+  anything in a story but its manuscript, drag-and-drop, collaboration, manuscript export, AI, and restoring
   a backup. Also: collapsing chapters, bulk scene moves, Story-vs-Lore checks, pre-era scene years in Settings; a plot
   status, beat chronology, editing beats from a scene, board or graph views; autosave, word counts, a "has prose" marker on
   scene cards (it needs a flag the story read can give without reading prose). ADR 0024-0027, 0029.
@@ -395,7 +419,10 @@ tool has changed the picture.
   pruning, restoring article text held in pre-ADR-0028 entry versions from the screen, autosave, word counts. ADR 0028.
 - **Ideas deferred** - not gaps: promoting an idea (AI proposals are Phase 5), statuses, tags, collections, rich text, wiki
   links, saved versions, cross-universe references, permanent delete, an account export for unassigned ideas, importing ideas
-  (Backup Import / Restore), and the search bar including ideas (next). ADR 0030.
+  (Backup Import / Restore). ADR 0030.
+- **Universe search deferred** - not gaps: **account-wide search is an unsettled owner decision**; unassigned ideas in any bar;
+  AI, semantic or fuzzy search, substring matching; a command palette, results page, filters, saved searches, history; timeline,
+  Canon, types and Trash search; highlighting the match inside an opened article or manuscript; a pinned bar. ADR 0031.
 - **Content recovery deferred** - not gaps: recovered drafts for forms, drafts synced across browsers or devices, merging a
   draft into a newer save, a restored chapter taking back the scenes it held. ADR 0029.
 - **Relationship life-state constraints** (an end alive at the link's date) wait for dated
@@ -415,9 +442,10 @@ tool has changed the picture.
 
 None. Follow-ups, not blocking:
 
-- Search matches whole words and prefixes, so the substring hits `LIKE` used to give are gone -
-  ADR 0016 argues the trade. Search is SQLite-only and will be redesigned when PostgreSQL
-  arrives.
+- Search - lore and universe alike - matches whole words and prefixes, so the substring hits `LIKE` used to give are gone -
+  ADR 0016 argues the trade. Search is SQLite-only (FTS5 tables and triggers) and will be redesigned when PostgreSQL
+  arrives (ADR 0031). A migration that rebuilds a story, manuscript or idea table must recreate its search triggers;
+  `UniverseSearchMigrationTests` fails if one is missing.
 - Orphaned media objects are swept best-effort and never retried. A delete that fails after the
   database has committed logs a warning naming the key and leaves the object; the entry is
   correct either way. ADR 0019 argues the trade.

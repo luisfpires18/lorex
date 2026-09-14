@@ -2,7 +2,7 @@
 
 Status: accepted (2026-09-13), amended 2026-09-13 (Phase 2 closeout: the shared header, Write and Show in Scenes,
 Sign out asks, Back and Forward decided), amended 2026-09-14 (Back and Forward caught - ADR 0028), amended 2026-09-14 (saved
-versions, recovered drafts and the Trash - ADR 0029)
+versions, recovered drafts and the Trash - ADR 0029), amended 2026-09-14 (universe search - ADR 0031)
 
 ## Context
 
@@ -157,3 +157,14 @@ ADR 0029 changes four things here, and leaves the storage, route, bound and stal
   scene opens; nothing is saved without Save. The deferred "Autosave and offline drafts" is done only as far as that.
 - **Deleting a scene** moves it to the Trash with its prose and versions instead of deleting them; a story deleted keeps every
   manuscript beneath it. Only deleting the universe deletes prose for good.
+
+## Amendment - universe search (2026-09-14)
+
+"No search index entry comes from a manuscript" and the deferred "Story and manuscript search" are superseded by ADR 0031:
+a scene's saved prose is indexed - by a trigger on `SceneManuscripts`, in its own table - and found by the universe's search
+bar as a Manuscript result that opens this view. Only saved prose: never a recovered draft or an old version. Still no
+Canon, timeline, lore or plot meaning is read from it, and the Lore search still finds none of it. The prose still travels
+only on its own route; a search result carries at most a sixteen-word excerpt.
+
+At 1100px and below the outline's disclosure names the open scene on one line, cut with an ellipsis: the scene's whole title
+is the heading just beneath it, and the line it gave back keeps the text box on a phone's first screen under the search bar.

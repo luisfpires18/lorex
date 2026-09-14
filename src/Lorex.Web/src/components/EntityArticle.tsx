@@ -350,13 +350,16 @@ export function EntityArticleSection({
   return (
     <section
       ref={section}
+      // The entry page's `#article` - where a search result found in the article lands (ADR 0031).
+      id="article"
       className="entry__article article"
       aria-labelledby={headingId}
       data-testid="article"
       data-state={isEditing ? 'editing' : 'reading'}
     >
       <div className="article__head">
-        <h3 className="article__title" id={headingId}>
+        {/* Focusable by script only, so arriving at the article puts a keyboard and a screen reader on its heading. */}
+        <h3 className="article__title" id={headingId} tabIndex={-1} data-arrival-focus>
           Article
         </h3>
         {isReady && !isEditing && hasArticle ? (

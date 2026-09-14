@@ -192,6 +192,10 @@ universe backup**: it is the account's, and this file is one world, not an accou
 universe's file would be false. A future importer gives each idea to the importing account and the universe being restored,
 re-creates the references whose targets are in the file, keeps `deletedAt`, and never turns an idea into lore.
 
+**Search indexes are never in a backup** (ADR 0016, ADR 0031). They are derived - Lorex produces them again from the
+authored rows - so the universe search (2026-09-14) changed no member and no version: version 11 stands. An importer's rows are
+indexed as they are written.
+
 **Only the authored data.** The test for inclusion is: did a person write this, or would
 Lorex produce it again from what a person wrote?
 

@@ -1124,29 +1124,211 @@ a {
   color: var(--ink);
 }
 
-.sidebar__link--planned {
-  color: var(--muted);
-  cursor: default;
-  opacity: 0.65;
-}
-
-.sidebar__link--planned:hover {
-  color: var(--muted);
-}
-
-.sidebar__soon {
-  margin: 1.5rem 0 0;
-  font-size: 0.75rem;
-  line-height: 1.5;
-  color: var(--muted);
+/* The column the rail and the sidebar leave: the universe's search bar above, and the screen below. */
+.workspace__column {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* One box for every screen in the workspace, filling the column the rail and the sidebar leave,
    inside its own padding. Nothing is capped here: a page that wants a reading measure sets one on
    the thing that needs it - an article, a summary, a settings section - which keeps prose readable
-   without leaving half of a wide display empty. */
+   without leaving half of a wide display empty. The search bar above already opens the column, so
+   the screen starts closer under it than it would under nothing. */
 .canvas {
   padding: clamp(2rem, 4vw, 3.25rem);
+  padding-top: clamp(1.5rem, 2.5vw, 2rem);
+}
+
+/* ---------- The universe's search bar ----------
+
+   A band at the head of the column, in the canvas's own side padding, so the box lines up with the
+   screen beneath it. The box is wide enough to type a real phrase into and stops well short of a
+   wide display's edge; the list it opens is as wide as the box, and floats over the screen rather
+   than pushing it down. */
+
+.workspace__top {
+  padding: clamp(1rem, 2vw, 1.4rem) clamp(2rem, 4vw, 3.25rem) 0;
+}
+
+.unisearch {
+  position: relative;
+  max-width: 46rem;
+}
+
+.unisearch__icon {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0.8rem;
+  display: flex;
+  align-items: center;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.unisearch__input {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.9rem 0.5rem 2.5rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.975rem;
+  transition: border-color 120ms ease;
+}
+
+.unisearch__input::placeholder {
+  color: var(--muted);
+}
+
+.unisearch__input:hover {
+  border-color: var(--ink);
+}
+
+.unisearch__input:focus {
+  border-color: var(--accent);
+}
+
+.unisearch__panel {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  z-index: 25;
+  max-height: min(70vh, 36rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--rule-strong);
+  background: var(--surface);
+  box-shadow: 0 0.9rem 2.25rem color-mix(in srgb, #000 18%, transparent);
+}
+
+.unisearch__panel[hidden],
+.unisearch__list[hidden] {
+  display: none;
+}
+
+.unisearch__note {
+  margin: 0;
+  padding: 0.8rem 1rem;
+  font-size: 0.875rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.unisearch__failure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  color: var(--danger);
+}
+
+.unisearch__failure p {
+  margin: 0;
+}
+
+.unisearch__list {
+  list-style: none;
+  margin: 0;
+  padding: 0.3rem 0;
+}
+
+/* One result: its kind in a word on the left, then its title, where it sits, and why it matched.
+   The highlighted one - the keyboard's - is marked by a bar and a wash together, never a colour alone. */
+.unisearch__option {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  gap: 0 0.85rem;
+  padding: 0.6rem 1rem 0.65rem 0.8rem;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+
+.unisearch__option:hover {
+  background: color-mix(in srgb, var(--ink) 5%, var(--surface));
+}
+
+.unisearch__option[aria-selected='true'] {
+  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 13%, var(--surface));
+}
+
+.unisearch__kind {
+  padding-top: 0.22rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.unisearch__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.unisearch__title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-family: var(--display);
+  font-size: 1.03rem;
+  line-height: 1.3;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.unisearch__context {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.unisearch__excerpt {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  margin-top: 0.1rem;
+  font-size: 0.83rem;
+  line-height: 1.45;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.unisearch__where {
+  margin-right: 0.45rem;
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.unisearch__excerpt mark {
+  padding: 0 0.1em;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--ink);
+}
+
+.unisearch__more {
+  margin: 0;
+  padding: 0.6rem 1rem 0.7rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.8rem;
+  color: var(--muted);
 }
 
 /* ---------- Overview ---------- */
@@ -2224,6 +2406,38 @@ a {
   font-weight: 600;
   letter-spacing: 0.05em;
   color: var(--muted);
+}
+
+/* Arriving at the article from a search result: the mark says where, as a scene's does, so the heading
+   the focus moved to needs no ring of its own. Clear of the narrow screen's sticky bar when scrolled to. */
+.article {
+  scroll-margin-top: 1rem;
+  transition:
+    background-color 700ms ease,
+    box-shadow 700ms ease;
+}
+
+.article[data-arrived] {
+  background: var(--surface);
+  box-shadow:
+    inset 2px 0 0 var(--accent),
+    0 0 0 0.6rem var(--surface);
+}
+
+.article__title:focus {
+  outline: none;
+}
+
+@media (max-width: 860px) {
+  .article {
+    scroll-margin-top: 4.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .article {
+    transition: none;
+  }
 }
 
 .article__empty {
@@ -3423,12 +3637,45 @@ a {
     color: var(--ink);
   }
 
-  .sidebar__soon {
-    margin-top: 0.9rem;
+  .canvas {
+    padding: 0.75rem 1.25rem 3rem;
   }
 
-  .canvas {
-    padding: 2rem 1.25rem 3rem;
+  /* The search keeps a row of its own under the bar: a real box, never folded into an icon. A compact
+     one, and the screen starts close beneath it, so the row costs a phone's first screen almost
+     nothing - the manuscript's text box is still on it. A touch screen gets the taller box below. Its
+     list takes the whole width, and stacks the kind above the title. */
+  .workspace__top {
+    padding: 0.5rem 1.25rem 0;
+  }
+
+  .unisearch {
+    max-width: none;
+  }
+
+  .unisearch__input {
+    min-height: 2.25rem;
+    padding-top: 0.3rem;
+    padding-bottom: 0.3rem;
+  }
+
+  .unisearch__panel {
+    max-height: min(60vh, 30rem);
+  }
+
+  .unisearch__option {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 0.65rem 0.9rem 0.7rem 0.75rem;
+  }
+
+  .unisearch__kind {
+    padding-top: 0;
+  }
+}
+
+@media (max-width: 860px) and (pointer: coarse) {
+  .unisearch__input {
+    min-height: 2.75rem;
   }
 }
 
@@ -5085,10 +5332,13 @@ a.lorechip--pov:focus-visible .lorechip__name {
     color: var(--muted);
   }
 
+  /* One line: the disclosure only names the open scene, whose whole title is the heading just beneath it. */
   .msoutline__current {
     min-width: 0;
+    overflow: hidden;
     font-size: 0.95rem;
-    overflow-wrap: anywhere;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
   .msoutline__body[data-open='false'] {

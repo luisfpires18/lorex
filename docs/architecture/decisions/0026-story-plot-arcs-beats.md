@@ -1,6 +1,7 @@
 # ADR 0026 - Plot is planning: arcs of beats that point at scenes and lore and own neither
 
-Status: accepted (2026-09-13), amended 2026-09-14 (arcs and beats go to the Trash - ADR 0029)
+Status: accepted (2026-09-13), amended 2026-09-14 (arcs and beats go to the Trash - ADR 0029), amended 2026-09-14 (universe
+search - ADR 0031)
 
 ## Context
 
@@ -124,3 +125,9 @@ untouched beneath it; a beat goes with its links. Each comes back last in its or
 in the Trash. Arc and beat order are unique among live rows. A beat's link to a scene in the Trash is kept and hidden - the plot
 read leaves it out, a beat save keeps it whatever it sends, and it returns with the scene - and a scene in the Trash cannot be
 newly linked. Still no plot delete reaches a scene, a chapter or an entry.
+
+## Amendment - universe search (2026-09-14)
+
+The deferred "Plot search" is done (ADR 0031): an arc's and a beat's title, description and notes are searched by the
+universe's search bar, and a result opens the Plot view at the arc or beat. A beat inside an arc in the Trash is not found.
+Nothing about plot's meaning, links or order changes.
