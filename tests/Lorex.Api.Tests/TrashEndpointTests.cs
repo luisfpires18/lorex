@@ -81,7 +81,7 @@ public sealed class TrashEndpointTests(LorexApiFactory factory) : IClassFixture<
         // And it is not editable while it is in the Trash.
         var edit = await client.PutAsJsonAsync(
             Entity(universe.Id, entry.Id),
-            new EntityRequest(type, "Renamed", null, null, CanonStatus.Idea, null, null, null));
+            new EntityRequest(type, "Renamed", null, CanonStatus.Idea, null, null, null));
 
         Assert.Equal(HttpStatusCode.NotFound, edit.StatusCode);
     }
@@ -162,19 +162,27 @@ public sealed class TrashEndpointTests(LorexApiFactory factory) : IClassFixture<
             type,
             "Gatewarden",
             summary: "Keeper of the northern gate.",
-            content: Article,
             aliases: ["The Keyholder", "Warden"],
             tags: ["gates", "north"],
             fields: [new FieldValueInput(title.Id, "Warden of the Gate", null, null, null, null, null)]);
+        var saved = await ArticleTestClient.WriteArticle(client, universe.Id, entry.Id, Article);
 
         await Trashed(client, universe.Id, entry.Id);
+
+        // Kept, and out of reach with its entry: the article route answers as for any entry that is not here.
+        Assert.Equal(
+            HttpStatusCode.NotFound,
+            (await client.GetAsync(ArticleTestClient.ArticlePath(universe.Id, entry.Id))).StatusCode);
+
         await Restored(client, universe.Id, entry.Id);
 
         var back = await Detail(client, universe.Id, entry.Id);
+        var article = await ArticleTestClient.ReadArticle(client, universe.Id, entry.Id);
 
         Assert.Equal("Gatewarden", back.Name);
         Assert.Equal("Keeper of the northern gate.", back.Summary);
-        Assert.Equal(Article, back.Content);
+        Assert.Equal(Article, article.Content);
+        ManuscriptTestClient.SameMoment(saved.UpdatedAt, article.UpdatedAt);
         Assert.Equal(["The Keyholder", "Warden"], back.Aliases);
         Assert.Equal(["gates", "north"], back.Tags);
         Assert.Equal(
@@ -681,14 +689,13 @@ public sealed class TrashEndpointTests(LorexApiFactory factory) : IClassFixture<
         string name,
         CanonStatus canonStatus = CanonStatus.Idea,
         string? summary = null,
-        string? content = null,
         IReadOnlyList<string>? aliases = null,
         IReadOnlyList<string>? tags = null,
         IReadOnlyList<FieldValueInput>? fields = null)
     {
         var response = await client.PostAsJsonAsync(
             $"/api/universes/{universeId}/entities",
-            new EntityRequest(typeId, name, summary, content, canonStatus, aliases, tags, fields));
+            new EntityRequest(typeId, name, summary, canonStatus, aliases, tags, fields));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
     }
@@ -702,7 +709,6 @@ public sealed class TrashEndpointTests(LorexApiFactory factory) : IClassFixture<
                 entity.EntityTypeId,
                 entity.Name,
                 entity.Summary,
-                entity.Content,
                 entity.CanonStatus,
                 entity.Aliases,
                 entity.Tags,

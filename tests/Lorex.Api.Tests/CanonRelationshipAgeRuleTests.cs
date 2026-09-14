@@ -533,7 +533,7 @@ public sealed class CanonRelationshipAgeRuleTests(LorexApiFactory factory) : ICl
 
         var response = await world.Client.PostAsJsonAsync(
             $"/api/universes/{world.UniverseId}/entities",
-            new EntityRequest(type.Id, name, null, null, status, null, null, Born(world, born, era)));
+            new EntityRequest(type.Id, name, null, status, null, null, Born(world, born, era)));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
     }
@@ -545,7 +545,6 @@ public sealed class CanonRelationshipAgeRuleTests(LorexApiFactory factory) : ICl
                 entity.EntityTypeId,
                 entity.Name,
                 entity.Summary,
-                entity.Content,
                 entity.CanonStatus,
                 entity.Aliases,
                 entity.Tags,

@@ -188,8 +188,12 @@ public sealed class EntityRevisionTests(LorexApiFactory factory) : IClassFixture
 
     // ---------- What a version keeps ----------
 
+    /// <summary>
+    /// A version is the structured entry. The article keeps a history of its own (ADR 0028), so a version recorded now
+    /// holds no copy of it - and saving the article is not an edit to the entry, so it records no version here.
+    /// </summary>
     [Fact]
-    public async Task A_version_keeps_the_article_the_aliases_the_tags_and_the_status()
+    public async Task A_version_keeps_the_aliases_the_tags_and_the_status_and_no_copy_of_the_article()
     {
         var (client, universe) = await SignedInWithUniverse("revkeeps");
         var entity = await CreateEntity(
@@ -197,18 +201,23 @@ public sealed class EntityRevisionTests(LorexApiFactory factory) : IClassFixture
             universe.Id,
             "Voronwe",
             summary: "The one mariner who came back.",
-            content: Article,
             canonStatus: CanonStatus.Canon,
             aliases: ["Bronweg", "The Steadfast"],
             tags: ["mariner", "gondolin"]);
 
+        await ArticleTestClient.WriteArticle(client, universe.Id, entity.Id, Article);
+        Assert.Single(await Revisions(client, universe.Id, entity.Id));
+
         await Put(client, universe.Id, entity with { Name = "Voronwe the Steadfast" });
 
         var first = await Revision(client, universe.Id, entity.Id, 1);
+        var second = await Revision(client, universe.Id, entity.Id, 2);
 
         Assert.Equal("Voronwe", first.Name);
         Assert.Equal("The one mariner who came back.", first.Summary);
-        Assert.Equal(Article, first.Content);
+        Assert.Null(first.Content);
+        Assert.Null(second.Content);
+        Assert.Equal(EntityRevisionChange.Name, second.Changes);
         Assert.Equal(CanonStatus.Canon, first.CanonStatus);
         Assert.Equal(["Bronweg", "The Steadfast"], first.Aliases);
         Assert.Equal(["gondolin", "mariner"], first.Tags);
@@ -595,7 +604,6 @@ public sealed class EntityRevisionTests(LorexApiFactory factory) : IClassFixture
         Guid universeId,
         string name,
         string? summary = null,
-        string? content = null,
         CanonStatus canonStatus = CanonStatus.Idea,
         IReadOnlyList<string>? aliases = null,
         IReadOnlyList<string>? tags = null,
@@ -604,7 +612,7 @@ public sealed class EntityRevisionTests(LorexApiFactory factory) : IClassFixture
         var type = await CharacterType(client, universeId);
         var response = await client.PostAsJsonAsync(
             $"/api/universes/{universeId}/entities",
-            new EntityRequest(type.Id, name, summary, content, canonStatus, aliases, tags, fields));
+            new EntityRequest(type.Id, name, summary, canonStatus, aliases, tags, fields));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
     }
@@ -621,7 +629,6 @@ public sealed class EntityRevisionTests(LorexApiFactory factory) : IClassFixture
                 entity.EntityTypeId,
                 entity.Name,
                 entity.Summary,
-                entity.Content,
                 entity.CanonStatus,
                 entity.Aliases,
                 entity.Tags,

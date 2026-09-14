@@ -562,7 +562,7 @@ public sealed class ChronologyEndpointTests(LorexApiFactory factory) : IClassFix
     {
         var response = await client.PostAsJsonAsync(
             $"/api/universes/{universeId}/entities",
-            new EntityRequest(typeId, name, null, null, status, null, null, fields));
+            new EntityRequest(typeId, name, null, status, null, null, fields));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
     }
@@ -576,7 +576,7 @@ public sealed class ChronologyEndpointTests(LorexApiFactory factory) : IClassFix
         (await client.PutAsJsonAsync(
             $"/api/universes/{universeId}/entities/{entity.Id}",
             new EntityRequest(
-                entity.EntityTypeId, entity.Name, entity.Summary, entity.Content, entity.CanonStatus,
+                entity.EntityTypeId, entity.Name, entity.Summary, entity.CanonStatus,
                 entity.Aliases, entity.Tags, fields)))
             .EnsureSuccessStatusCode();
 

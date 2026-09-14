@@ -37,7 +37,7 @@ public sealed class StoryBackupTests(LorexApiFactory factory) : IClassFixture<Lo
 
         var backup = await Backup(client, universe.Id);
 
-        Assert.Equal(8, backup.FormatVersion);
+        Assert.Equal(9, backup.FormatVersion);
         var stories = backup.Payload.Stories!;
 
         // By title, ordinally: "Aftermath" before "The Long Winter".
@@ -81,7 +81,7 @@ public sealed class StoryBackupTests(LorexApiFactory factory) : IClassFixture<Lo
 
         var backup = await Backup(client, universe.Id);
 
-        Assert.Equal(8, backup.FormatVersion);
+        Assert.Equal(9, backup.FormatVersion);
         var story = Assert.Single(backup.Payload.Stories!);
         var chapters = story.Chapters!;
 
@@ -332,10 +332,10 @@ public sealed class StoryBackupTests(LorexApiFactory factory) : IClassFixture<Lo
 
         var arlen = await PutJson<EntityDetail>(
             client, HttpMethod.Post, $"/api/universes/{universeId}/entities",
-            new EntityRequest(character, "Arlen", null, null, CanonStatus.Canon, null, null, null));
+            new EntityRequest(character, "Arlen", null, CanonStatus.Canon, null, null, null));
         var tower = await PutJson<EntityDetail>(
             client, HttpMethod.Post, $"/api/universes/{universeId}/entities",
-            new EntityRequest(character, "White Tower", null, null, CanonStatus.Canon, null, null, null));
+            new EntityRequest(character, "White Tower", null, CanonStatus.Canon, null, null, null));
 
         var stories = $"/api/universes/{universeId}/stories";
         var winter = await PutJson<StoryDetail>(
@@ -370,7 +370,7 @@ public sealed class StoryBackupTests(LorexApiFactory factory) : IClassFixture<Lo
     {
         var arlen = await PutJson<EntityDetail>(
             client, HttpMethod.Post, $"/api/universes/{universeId}/entities",
-            new EntityRequest(await CharacterType(client, universeId), "Arlen of the chapters", null, null, CanonStatus.Canon, null, null, null));
+            new EntityRequest(await CharacterType(client, universeId), "Arlen of the chapters", null, CanonStatus.Canon, null, null, null));
 
         var story = await PutJson<StoryDetail>(
             client, HttpMethod.Post, $"/api/universes/{universeId}/stories",

@@ -79,7 +79,6 @@ async function seedEntities(page: Page, universeId: string, names: string[]) {
         entityTypeId: character.id,
         name,
         summary: null,
-        content: null,
         canonStatus: 0,
         aliases: [],
         tags: [],

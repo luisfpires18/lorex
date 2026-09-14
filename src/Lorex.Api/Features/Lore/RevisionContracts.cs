@@ -35,6 +35,10 @@ public sealed record EntityRevisionFieldResponse(
 /// <summary>
 /// One whole version, shaped like <see cref="EntityDetail"/> so the dossier can render an
 /// older version with the components it already has.
+///
+/// <paramref name="Content"/> is the article as it read then, only for a version recorded
+/// before articles kept their own history, and null otherwise. It is shown for reference and
+/// restoring the version never applies it (ADR 0028).
 /// </summary>
 public sealed record EntityRevisionDetail(
     Guid Id,

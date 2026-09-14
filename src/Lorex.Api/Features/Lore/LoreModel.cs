@@ -157,12 +157,9 @@ public sealed class LoreEntity
 
     public string? Summary { get; set; }
 
-    /// <summary>
-    /// The lore article, stored as a Tiptap document. JSON is the editor's own format and
-    /// is validated structurally on the way in; it is never the model for custom fields,
-    /// and the raw text is never shown to the author.
-    /// </summary>
-    public string? Content { get; set; }
+    // The entry's article is not a column here. It lives in a row of its own, EntityArticle,
+    // read and written on its own route, so no structured read or write ever carries it -
+    // see docs/architecture/decisions/0028-entity-article.md.
 
     public CanonStatus CanonStatus { get; set; }
 

@@ -783,7 +783,7 @@ public sealed class TimelineEndpointTests(LorexApiFactory factory) : IClassFixtu
 
         var response = await client.PostAsJsonAsync(
             $"/api/universes/{universeId}/entities",
-            new EntityRequest(type.Id, name, null, null, CanonStatus.Idea, null, null, null));
+            new EntityRequest(type.Id, name, null, CanonStatus.Idea, null, null, null));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
     }

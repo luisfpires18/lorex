@@ -117,6 +117,11 @@ export interface EntityRevisionDetail {
   entityTypeName: string
   name: string
   summary: string | null
+
+  /**
+   * The article as it read at this version - only for a version recorded before articles kept their own history, and
+   * null for every version since. Shown for reference; restoring the version never applies it.
+   */
   content: string | null
   canonStatus: CanonStatusValue
   aliases: string[]

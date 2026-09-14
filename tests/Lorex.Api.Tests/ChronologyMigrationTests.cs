@@ -241,7 +241,7 @@ public sealed class ChronologyMigrationTests : IDisposable
     {
         var response = await client.PostAsJsonAsync(
             $"/api/universes/{universeId}/entities",
-            new EntityRequest(typeId, name, null, null, CanonStatus.Idea, null, null, fields));
+            new EntityRequest(typeId, name, null, CanonStatus.Idea, null, null, fields));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
     }

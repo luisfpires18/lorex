@@ -70,6 +70,7 @@ app.MapEntityTypeEndpoints();
 app.MapEntityEndpoints();
 app.MapEntityImageEndpoints();
 app.MapEntityRevisionEndpoints();
+app.MapEntityArticleEndpoints();
 app.MapRelationshipTypeEndpoints();
 app.MapRelationshipEndpoints();
 app.MapTimelineEndpoints();

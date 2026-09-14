@@ -119,7 +119,7 @@ export function EntityHistory({
 
     if (
       !window.confirm(
-        `Put version ${revision.number} back? It becomes the newest version.${warning}`,
+        `Put version ${revision.number} back? It becomes the newest version. The article stays as it is: it keeps its own history.${warning}`,
       )
     ) {
       return
@@ -157,6 +157,11 @@ export function EntityHistory({
           History
         </h3>
       </div>
+
+      <p className="history__quiet" data-testid="history-article-note">
+        Versions of this entry&rsquo;s details. The article keeps its own history, under the
+        article.
+      </p>
 
       {carriesImages ? (
         <p className="history__quiet" data-testid="history-image-note">
@@ -273,11 +278,16 @@ function Snapshot({
 
       {revision.summary ? <p className="entry__summary">{revision.summary}</p> : null}
 
-      {isEmptyDocument(revision.content) ? (
-        <p className="entry__blank">No article in this version.</p>
-      ) : (
-        <LoreArticle content={revision.content} />
-      )}
+      {/* Only a version recorded before the article kept its own history holds a copy of it, and a restore never
+          applies that copy - so it is shown as what it is, and a version without one says nothing about the article. */}
+      {!isEmptyDocument(revision.content) ? (
+        <div className="snapshot__article" data-testid="version-article">
+          <p className="snapshot__articlenote">
+            The article as it read then. Restoring this version leaves the article as it is.
+          </p>
+          <LoreArticle content={revision.content} />
+        </div>
+      ) : null}
 
       {revision.fields.length > 0 ? (
         <dl className="facts">

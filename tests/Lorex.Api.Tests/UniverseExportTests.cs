@@ -240,6 +240,8 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
         var warden = payload.Entities.Single(entity => entity.Id == built.Warden.Id);
         Assert.Equal(CanonStatus.Canon, warden.CanonStatus);
         Assert.Equal(Article, warden.Content);
+        Assert.NotNull(warden.ArticleUpdatedAt);
+        Assert.Equal(Article, Assert.Single(warden.ArticleRevisions!).Content);
         Assert.Equal(["The Warden", "Vance"], warden.Aliases);
         Assert.Equal(2, warden.TagIds.Count);
 
@@ -261,6 +263,8 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
         Assert.Empty(coast.Aliases);
         Assert.Empty(coast.TagIds);
         Assert.Null(coast.Content);
+        Assert.Null(coast.ArticleUpdatedAt);
+        Assert.Empty(coast.ArticleRevisions!);
     }
 
     /// <summary>
@@ -396,7 +400,7 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
         // Authored configuration, added within version 4: no fact changes meaning without it. The file
         // is at version 8 because of stories, their chapters, their plot and their prose (ADR 0024-0027), not because
         // of these.
-        Assert.Equal(8, backup.FormatVersion);
+        Assert.Equal(9, backup.FormatVersion);
 
         var parent = backup.Payload.RelationshipTypes.Single(type => type.Name == "parent of");
         Assert.Equal(RelationshipAgeOrder.SourceOlder, parent.AgeOrder);
@@ -493,7 +497,7 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
 
         // Eras arrived in version 4; stories took the file to 5, chapters to 6, plot to 7 and prose to 8 without
         // changing how eras travel.
-        Assert.Equal(8, backup.FormatVersion);
+        Assert.Equal(9, backup.FormatVersion);
         Assert.Equal(
             [
                 new BackupChronologyEra(
@@ -690,7 +694,9 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
         // A snapshot carries both halves of every reference (ADR 0013): the id, and the text
         // that reference displayed at the time.
         var first = revisions[0];
-        Assert.Equal(Article, first.Content);
+
+        // No copy of the article: it travels once, with its own history (ADR 0028).
+        Assert.Null(first.Content);
         Assert.Equal(["The Warden", "Vance"], first.Aliases);
         Assert.Equal(["coast", "wardens"], first.Tags);
 
@@ -1399,7 +1405,7 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
             character.Id,
             "Alenna Vance",
             CanonStatus.Canon,
-            content: Article,
+            article: Article,
             aliases: ["The Warden", "Vance"],
             tags: ["coast", "wardens"],
             fields:
@@ -1474,16 +1480,24 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
         Guid typeId,
         string name,
         CanonStatus canonStatus,
-        string? content = null,
+        string? article = null,
         IReadOnlyList<string>? aliases = null,
         IReadOnlyList<string>? tags = null,
         IReadOnlyList<FieldValueInput>? fields = null)
     {
         var response = await client.PostAsJsonAsync(
             $"/api/universes/{universeId}/entities",
-            new EntityRequest(typeId, name, null, content, canonStatus, aliases, tags, fields));
+            new EntityRequest(typeId, name, null, canonStatus, aliases, tags, fields));
         response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
+        var created = (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
+
+        // The article is saved on its own route, as the editor saves it.
+        if (article is not null)
+        {
+            await ArticleTestClient.WriteArticle(client, universeId, created.Id, article);
+        }
+
+        return created;
     }
 
     /// <summary>Re-saves an entry from its own detail, which is what the client does.</summary>
@@ -1495,7 +1509,6 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
                 entity.EntityTypeId,
                 entity.Name,
                 entity.Summary,
-                entity.Content,
                 entity.CanonStatus,
                 entity.Aliases,
                 entity.Tags,

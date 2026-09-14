@@ -11,15 +11,34 @@ export function isSafeHref(href: string) {
   return ALLOWED_LINK_SCHEMES.includes(trimmed.slice(0, separator).toLowerCase())
 }
 
-/** An empty Tiptap document still serialises, so treat one with no content as no article. */
+interface DocumentNode {
+  type?: unknown
+  text?: unknown
+  content?: unknown
+}
+
+/** Nodes that hold nothing an author can see when they are empty. */
+const BLANK_NODE_TYPES = new Set(['doc', 'paragraph', 'hardBreak', 'text'])
+
+/**
+ * An empty Tiptap document still serialises - an editor that was typed in and emptied again holds one empty paragraph -
+ * so treat a document with no text and nothing else in it as no article.
+ */
 export function isEmptyDocument(json: string | null): boolean {
   if (!json) return true
   try {
-    const parsed = JSON.parse(json) as { content?: unknown[] }
-    return !parsed.content || parsed.content.length === 0
+    return isBlankNode(JSON.parse(json) as DocumentNode, 0)
   } catch {
     return true
   }
+}
+
+function isBlankNode(node: DocumentNode, depth: number): boolean {
+  if (depth > 40 || typeof node !== 'object' || node === null) return true
+  if (typeof node.type === 'string' && !BLANK_NODE_TYPES.has(node.type)) return false
+  if (typeof node.text === 'string' && node.text.trim() !== '') return false
+  if (!Array.isArray(node.content)) return true
+  return (node.content as DocumentNode[]).every((child) => isBlankNode(child, depth + 1))
 }
 
 /** The starting value for a field the entity has never had one for. */

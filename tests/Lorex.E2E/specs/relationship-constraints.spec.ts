@@ -98,7 +98,6 @@ async function seedCharacter(
       entityTypeId: ids.typeId,
       name,
       summary: null,
-      content: null,
       canonStatus: Canon.canon,
       aliases: [],
       tags: [],

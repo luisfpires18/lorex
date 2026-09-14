@@ -1614,6 +1614,29 @@ a {
   color: var(--muted);
 }
 
+/* Why a search result is here, when the article is where it matched. Quiet, and bounded by the API. */
+.dossier__excerpt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.dossier__excerptlabel {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dossier__excerpt mark {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--ink);
+  padding: 0 0.1em;
+}
+
 /* ---------- Entry: the lore article ---------- */
 
 .entry {
@@ -2181,6 +2204,135 @@ a {
   float: left;
   height: 0;
   pointer-events: none;
+}
+
+/* ---------- The article: reading, writing, its history ---------- */
+
+.article__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  max-width: calc(62ch + 2.5rem);
+  margin-bottom: 0.75rem;
+}
+
+.article__title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.article__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.article__empty .entry__blank {
+  margin: 0;
+}
+
+.article__note {
+  margin: -0.25rem 0 1rem;
+  max-width: 52ch;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* Save stays in reach however far down a long article the author is: the bar holds to the bottom of the screen, over
+   the writing, at the writing's own measure. The entry's actions step aside while it is shown. */
+.article__bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  max-width: calc(62ch + 2.5rem);
+  padding: 0.75rem 0;
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  background: var(--paper);
+}
+
+.article__status {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.article__status[data-state='dirty'],
+.article__status[data-state='saving'] {
+  color: var(--ink);
+}
+
+.article__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.article__toolong {
+  flex: 1 1 100%;
+  order: -1;
+  margin: 0;
+}
+
+.article__failure {
+  max-width: 62ch;
+  margin: 0 0 1rem;
+}
+
+.article__conflict {
+  max-width: 62ch;
+  margin: 0 0 1rem;
+  padding: 0.8rem 0 0.8rem 0.9rem;
+  border-left: 2px solid var(--danger);
+}
+
+.article__conflicttext {
+  margin: 0;
+  font-size: 0.925rem;
+}
+
+.article__conflictactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.7rem;
+}
+
+/* The writing surface gives a phone most of its height rather than a fixed strip. */
+.article__editing .editor__surface {
+  min-height: clamp(16rem, 55dvh, 32rem);
+}
+
+.article__history {
+  margin-top: 1.5rem;
+}
+
+.article__history .history__list {
+  margin-top: 0.75rem;
+}
+
+.snapshot__article {
+  margin: 1rem 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--rule);
+}
+
+.snapshot__articlenote {
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--muted);
 }
 
 /* ---------- Tokens ---------- */
@@ -2984,7 +3136,9 @@ a {
 
 @media (max-width: 1100px) {
   .entry__layout {
-    grid-template-columns: 1fr;
+    /* minmax(0, 1fr), not 1fr: a bare 1fr column grows to its content's narrowest width, and one long unbroken word
+       in an article - an address, a name run together - would push the whole entry wider than the screen. */
+    grid-template-columns: minmax(0, 1fr);
     gap: 2rem;
   }
 

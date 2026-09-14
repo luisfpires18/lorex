@@ -308,7 +308,7 @@ public sealed class CanonPromotionGateTests(LorexApiFactory factory) : IClassFix
         var response = await client.PostAsJsonAsync(
             $"/api/universes/{universe.Id}/entities",
             new EntityRequest(
-                draft.EntityTypeId, "Someone Else", null, null, CanonStatus.Canon, null, null, null));
+                draft.EntityTypeId, "Someone Else", null, CanonStatus.Canon, null, null, null));
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
         var after = Assert.Single((await List(client, universe.Id)).Items);
@@ -498,7 +498,6 @@ public sealed class CanonPromotionGateTests(LorexApiFactory factory) : IClassFix
             new EntityRequest(
                 (await CharacterType(client, universe.Id)).Id,
                 "An Impossible Life",
-                null,
                 null,
                 CanonStatus.Canon,
                 null,
@@ -780,7 +779,7 @@ public sealed class CanonPromotionGateTests(LorexApiFactory factory) : IClassFix
         var edit = await intruder.PutAsJsonAsync(
             $"/api/universes/{universe.Id}/entities/{character.Id}",
             new EntityRequest(
-                character.EntityTypeId, "Renamed", null, null, CanonStatus.Canon, null, null,
+                character.EntityTypeId, "Renamed", null, CanonStatus.Canon, null, null,
                 Years(fields, 3118, 3000)));
         Assert.Equal(HttpStatusCode.NotFound, edit.StatusCode);
         Assert.Equal(0, edit.Content.Headers.ContentLength ?? 0);
@@ -894,7 +893,6 @@ public sealed class CanonPromotionGateTests(LorexApiFactory factory) : IClassFix
                 entity.EntityTypeId,
                 entity.Name,
                 entity.Summary,
-                entity.Content,
                 entity.CanonStatus,
                 entity.Aliases,
                 entity.Tags,
@@ -1038,7 +1036,7 @@ public sealed class CanonPromotionGateTests(LorexApiFactory factory) : IClassFix
 
         var response = await client.PostAsJsonAsync(
             $"/api/universes/{universeId}/entities",
-            new EntityRequest(type.Id, name, null, null, canonStatus, null, null, fields));
+            new EntityRequest(type.Id, name, null, canonStatus, null, null, fields));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
     }

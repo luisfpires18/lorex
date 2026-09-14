@@ -286,7 +286,7 @@ public sealed class SceneEndpointTests(LorexApiFactory factory) : IClassFixture<
         // Renaming the entry renames it in the scene: nothing was copied.
         var renamed = await client.PutAsJsonAsync(
             $"/api/universes/{universe.Id}/entities/{arlen.Id}",
-            new EntityRequest(arlen.EntityTypeId, "Arlen the Grey", null, null, CanonStatus.Canon, null, null, null));
+            new EntityRequest(arlen.EntityTypeId, "Arlen the Grey", null, CanonStatus.Canon, null, null, null));
         renamed.EnsureSuccessStatusCode();
 
         var read = (await Detail(client, universe.Id, story.Id)).Scenes.Single();
@@ -578,7 +578,7 @@ public sealed class SceneEndpointTests(LorexApiFactory factory) : IClassFixture<
 
         var response = await client.PostAsJsonAsync(
             $"/api/universes/{universeId}/entities",
-            new EntityRequest(typeId.Value, name, null, null, CanonStatus.Canon, null, null, null));
+            new EntityRequest(typeId.Value, name, null, CanonStatus.Canon, null, null, null));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EntityDetail>())!;
     }

@@ -61,10 +61,14 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Chronology/ChronologyContracts.cs` | Request and response records for the chronology. |
 | `Features/Chronology/ChronologyValidation.cs` | Era shape checks: names, labels, enums, the bound. |
 | `Features/Chronology/ChronologyPointValidation.cs` | Checks for one stored point - month and day shape, the era a year needs, years from 1 in an era. Shared by timeline entries and scenes. |
-| `Features/Lore/LoreModel.cs` | Entity, type, field, option, alias, value and tag entities, and `EntityFieldSemantic`. |
+| `Features/Lore/LoreModel.cs` | Entity, type, field, option, alias, value and tag entities, and `EntityFieldSemantic`. No article. |
+| `Features/Lore/EntityArticleModel.cs` | `EntityArticle`: one entry's Tiptap article, keyed by the entry, no navigation back; `EntityArticleRevision`: its own saved versions. |
+| `Features/Lore/EntityArticleConfiguration.cs` | Article schema: the entry's id as key and foreign key, version numbers unique per entry, both deleted with the entry. |
+| `Features/Lore/EntityArticleContracts.cs` | The article save (document and the `updatedAt` it was written over), read, restore and version records. |
+| `Features/Lore/EntityArticleEndpoints.cs` | Read, save and restore an entry's article and read its history; live entries of the owner's universe only; the stale-save 409; the entry's `UpdatedAt` and search kept in step. The only route that carries an article. |
 | `Features/Lore/LoreConfiguration.cs` | Lore schema: keys, indexes and delete behaviour. |
 | `Features/Lore/LoreAccess.cs` | The universe-ownership gate every lore route passes. |
-| `Features/Lore/EntityEndpoints.cs` | Entity CRUD, search, filters, paging, tags. |
+| `Features/Lore/EntityEndpoints.cs` | Entity CRUD, search, filters, paging, tags; an entry write that still carries the article refused whole. |
 | `Features/Lore/EntityTypeEndpoints.cs` | Entity types and their field definitions. |
 | `Features/Lore/EntityTypeDefaults.cs` | Idempotent seeding of the starter types, each with its icon key as data. |
 | `Features/Lore/EntityTypeIcons.cs` | The closed set of icon keys a type may carry; mirrored by the web client. |
@@ -79,14 +83,14 @@ Repository index. Paths and one-line responsibilities only.
 | `Features/Media/R2MediaObjectStore.cs` | Cloudflare R2 over its S3-compatible API: the two upload flags R2 needs, and SDK failures kept inside. |
 | `Features/Media/InMemoryMediaObjectStore.cs` | Objects in a dictionary, for local development and Playwright. |
 | `Features/Media/MediaSetup.cs` | Which store this host runs against, from `Media:Provider`. |
-| `Features/Lore/RevisionModel.cs` | `EntityRevision` and its alias, tag and value snapshot rows. |
+| `Features/Lore/RevisionModel.cs` | `EntityRevision` and its alias, tag and value snapshot rows; the article copy only versions from before ADR 0028 hold. |
 | `Features/Lore/RevisionConfiguration.cs` | Revision schema: the per-entry version index, and where a key deliberately is not. |
-| `Features/Lore/RevisionCapture.cs` | Reads the entry back after a write, compares it to the last version, records the next. |
+| `Features/Lore/RevisionCapture.cs` | Reads the structured entry back after a write, compares it to the last version, records the next. Never the article. |
 | `Features/Lore/RevisionEndpoints.cs` | History list, one version, and the restore that replays it through the entity update. |
 | `Features/Lore/RevisionContracts.cs` | Response records for history and one version. |
 | `Features/Lore/LoreContent.cs` | Structural validation of the Tiptap article. |
 | `Features/Lore/LoreArticleText.cs` | Reduces a Tiptap document to the prose an author wrote. |
-| `Features/Lore/EntitySearchIndex.cs` | The SQLite FTS5 index: reindex, backfill, the scored query, and how typed words become an expression. |
+| `Features/Lore/EntitySearchIndex.cs` | The SQLite FTS5 index: reindex, backfill, the scored query, a result page's article excerpts, and how typed words become an expression. |
 | `Features/Lore/EntitySearchBackfill.cs` | Indexes entries that have no index row, once, at startup. |
 | `Features/Lore/LoreValidation.cs` | Shared lore input checks. |
 | `Features/Relationships/RelationshipModel.cs` | `RelationshipType` with its Canon constraints, `RelationshipAgeOrder`, and `LoreRelationship`. |
@@ -157,17 +161,17 @@ Repository index. Paths and one-line responsibilities only.
 | `public/brand-mark.png` | The same mark, transparent, for use inside the product. |
 | `src/main.tsx` | React entry point. |
 | `src/pwa.ts` | Registers the service worker, in production builds only. |
-| `src/App.tsx` | Routes and providers. |
+| `src/App.tsx` | Routes and providers, held by a data router with one catch-all route so history moves can be guarded. |
 | `src/styles.css` | Design tokens, all component styles, and the narrow-screen and touch layers. |
 | `src/lib/api.ts` | Same-origin fetch wrapper and `ApiError`. |
 | `src/lib/imageCrop.ts` | The crop shape, the accepted formats and the size ceiling, shared by both pictures. |
 | `src/lib/upload.ts` | The one `XMLHttpRequest` in Lorex: a multipart upload that reports byte progress, failing as the same `ApiError`. |
-| `src/lib/leaveGuard.ts` | `useLeaveGuard`: asks before unsaved work is left by a same-origin link or by leaving the page, and `confirmLeaving` for Sign out. Not the Back button. |
+| `src/lib/leaveGuard.ts` | `useLeaveGuard`: asks before unsaved work is left by a same-origin link or by leaving the page; `confirmLeaving` for Sign out; `HistoryLeaveGuard`, the one router blocker, for the browser's Back and Forward. |
 | `src/lib/returnFocus.ts` | `useReturnFocus`: hands the focus back to whatever opened a story drawer once it closes. |
 | `src/auth/` | Session context, `useAuth`, and the route guards. |
 | `src/universes/` | Universe API client and types. |
 | `src/profile/` | Profile photo API client and DTO types, the address of one stored variant, and the provider every avatar reads so they cannot disagree. |
-| `src/lore/` | Lore API client, shared types, document and field helpers, the revision client, the image client that composes an asset's URL, and `typeIcons.ts` (the built-in type icon keys and their glyphs). |
+| `src/lore/` | Lore API client, shared types, document and field helpers, the revision client, the article client and its bound (`article.ts`), the image client that composes an asset's URL, and `typeIcons.ts` (the built-in type icon keys and their glyphs). |
 | `src/export/` | Backup download: the request, the server's filename, and handing the archive to the browser. |
 | `src/trash/` | Trash API client and DTO types. |
 | `src/relationships/` | Relationship API client, DTO types, and both-readings helper. |
@@ -176,7 +180,7 @@ Repository index. Paths and one-line responsibilities only.
 | `src/timeline/` | Timeline API client, DTO types, date stamps and year grouping on top of the chronology formatter. |
 | `src/canon/` | Canon Integrity API client, DTO types, and the reader for the promotion gate's 409. |
 | `src/lib/dates.ts` | Timestamp formatting, date-input round trips, and spans. |
-| `src/components/` | `AuthLayout`, `Wordmark` (the drawn "Lore X", spoken "Lorex"), `Field`, `UniverseCard`, `UniverseForm`, `EntityCard`, `EntityPortrait` (the card's picture, or its monogram), `EntityImageField` (pick, frame, replace, edit thumbnail, remove), `ImageCropDialog` (the cropper, and `CroppedPicture` for unsaved previews), `BrandMark` (the Lorex symbol, decorative, beside the wordmark), `Avatar` (the account's photo or its monogram, wherever one is drawn), `AccountMenu` (the one account dropdown: the rail's and the header's), `ProfileAvatar` (the Profile screen's circle, and upload, reframe, replace and remove), `TypeIcon`, `TypeIconPicker`, `TypeFilterBar` (the Lore browser's type chips), `ActionIcon` (the decorative icon beside an action's label), `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker` (single and multi, one shared search), `EntityHistory`, `RelationshipSection`, `RelationshipTypeManager`, `TimelineEntryForm`, `ChronologyPointFields` (the one era, year, month and day row, shared by the timeline and scene forms), `StoryForm`, `ChapterForm`, `ChapterSection` (a chapter's heading, summary, tools and scenes), `SceneForm` (with its Chapter field), `SceneCard` (a scene, Write, its lore and Plot rows, Move up/down and the Move to… disclosure), `SceneContext` (a scene's date, point of view, lore and beats, drawn the same on its card and on its manuscript page), `LoreReference` (a lore chip or point-of-view portrait, on a scene or a beat), `PlotPanel` (a story's Plot view: arcs, beats, reorder, delete), `PlotArcSection`, `PlotBeatItem` (a beat, its scene and lore chips, Move up/down), `PlotArcForm`, `PlotBeatForm` (with its Arc field), `SceneReferencePicker` (a story's scenes by chapter, filtered, as checkboxes), `ManuscriptPanel` (a story's Manuscript view: the outline, and the open scene), `ManuscriptEditor` (one scene's prose: plain text, Save and Ctrl+S, the stale-save choice, the leave guard, and the scene's planning beside it with Edit scene and Show in Scenes), `ChronologySettings` (name, order and turn a universe's eras, with a preview), `ConflictEntry`, `CanonBlockNotice` (the one refused-write presentation, shared by every gated form). |
+| `src/components/` | `AuthLayout`, `Wordmark` (the drawn "Lore X", spoken "Lorex"), `Field`, `UniverseCard`, `UniverseForm`, `EntityCard` (with a search result's article excerpt), `EntityArticle` (an entry's article: reading, writing with Save and Ctrl+S, the stale-save choice, the leave guard, and its own history), `EntityPortrait` (the card's picture, or its monogram), `EntityImageField` (pick, frame, replace, edit thumbnail, remove), `ImageCropDialog` (the cropper, and `CroppedPicture` for unsaved previews), `BrandMark` (the Lorex symbol, decorative, beside the wordmark), `Avatar` (the account's photo or its monogram, wherever one is drawn), `AccountMenu` (the one account dropdown: the rail's and the header's), `ProfileAvatar` (the Profile screen's circle, and upload, reframe, replace and remove), `TypeIcon`, `TypeIconPicker`, `TypeFilterBar` (the Lore browser's type chips), `ActionIcon` (the decorative icon beside an action's label), `FieldInputs`, `TokenInput`, `LoreEditor`, `EntityPicker` (single and multi, one shared search), `EntityHistory`, `RelationshipSection`, `RelationshipTypeManager`, `TimelineEntryForm`, `ChronologyPointFields` (the one era, year, month and day row, shared by the timeline and scene forms), `StoryForm`, `ChapterForm`, `ChapterSection` (a chapter's heading, summary, tools and scenes), `SceneForm` (with its Chapter field), `SceneCard` (a scene, Write, its lore and Plot rows, Move up/down and the Move to… disclosure), `SceneContext` (a scene's date, point of view, lore and beats, drawn the same on its card and on its manuscript page), `LoreReference` (a lore chip or point-of-view portrait, on a scene or a beat), `PlotPanel` (a story's Plot view: arcs, beats, reorder, delete), `PlotArcSection`, `PlotBeatItem` (a beat, its scene and lore chips, Move up/down), `PlotArcForm`, `PlotBeatForm` (with its Arc field), `SceneReferencePicker` (a story's scenes by chapter, filtered, as checkboxes), `ManuscriptPanel` (a story's Manuscript view: the outline, and the open scene), `ManuscriptEditor` (one scene's prose: plain text, Save and Ctrl+S, the stale-save choice, the leave guard, and the scene's planning beside it with Edit scene and Show in Scenes), `ChronologySettings` (name, order and turn a universe's eras, with a preview), `ConflictEntry`, `CanonBlockNotice` (the one refused-write presentation, shared by every gated form). |
 | `src/pages/` | Login, Register, Universes browser, Profile, and the workspace: Overview, Lore, entry page, Timeline, Stories, a story (its Scenes, Plot and Manuscript views, one header), Canon, Types, Trash and Settings. `UniverseWorkspace` also owns the collapsing narrow-screen navigation, and lets the Lore browser alone fill the workspace column. |
 | `vite.config.ts` | Dev server port 5173, proxy to the API, build config. |
 
@@ -208,7 +212,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.Api.Tests/SceneEndpointTests.cs` | Narrative order against chronology, reorder refusals, scene chronology, lore references, the Trash, delete actions and ownership. |
 | `Lorex.Api.Tests/ChapterEndpointTests.cs` | Chapter CRUD, order and reorder refusals, the number that is only a position, the delete that keeps every scene, what deleting a story, universe or entry takes, and ownership. |
 | `Lorex.Api.Tests/SceneChapterTests.cs` | Scenes per container: create, reorder one container, moves in every direction with nothing lost, the edit that moves, foreign chapters refused. |
-| `Lorex.Api.Tests/StoryBackupTests.cs` | Stories in a version 8 backup: order, chapters and each scene's place in one, references, no copied lore, determinism, and version 5 and 4 files. |
+| `Lorex.Api.Tests/StoryBackupTests.cs` | Stories in the current (version 9) backup: order, chapters and each scene's place in one, references, no copied lore, determinism, and version 5 and 4 files. |
 | `Lorex.Api.Tests/CommandCounter.cs` | Counts the database commands a request runs, for every read that promises a fixed query count. |
 | `Lorex.Api.Tests/PlotTestClient.cs` | The HTTP steps the plot tests share, and reading a backup back. Not a test. |
 | `Lorex.Api.Tests/PlotArcEndpointTests.cs` | Arc CRUD, order and refusals, what deleting an arc, story or universe takes and never takes, no Canon, the plot read's fixed query count, and ownership. |
@@ -217,7 +221,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.Api.Tests/PlotMigrationTests.cs` | The plot migration over a story in chapters on a file: nothing else changed, delete actions, indexes and keys read back, uniqueness in SQLite, and a rollback with a plot. |
 | `Lorex.Api.Tests/ManuscriptTestClient.cs` | The HTTP steps the manuscript tests share, and a sample of real-world prose. Not a test. |
 | `Lorex.Api.Tests/SceneManuscriptEndpointTests.cs` | Prose read and saved exactly, empty and cleared, the bound, stale saves, ownership and foreign ids, what it lives and dies with, no Canon or search, and no prose in any story, scene, chapter or plot read. |
-| `Lorex.Api.Tests/SceneManuscriptBackupTests.cs` | Prose in a version 8 backup: exact, beside its scene, once, deterministic, and a version 7 file. |
+| `Lorex.Api.Tests/SceneManuscriptBackupTests.cs` | Prose in the backup since version 8: exact, beside its scene, once, deterministic, and a version 7 file. |
 | `Lorex.Api.Tests/SceneManuscriptMigrationTests.cs` | The manuscript migration over a story in chapters with a plot on a file: key, columns and cascade read back, prose through structural changes, and a rollback with prose. |
 | `Lorex.Api.Tests/StoryPhaseIntegrityTests.cs` | The Story phase as one product: the whole ownership graph taken apart delete by delete beside a second story, and a full story workflow changing no lore, relationship, timeline, revision, Canon finding or search result. |
 | `Lorex.Api.Tests/StoryMigrationTests.cs` | The story migration down and back up over real lore on a file, with the delete actions read back from SQLite. |
@@ -227,12 +231,17 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.Api.Tests/R2MediaObjectStoreTests.cs` | The R2 adapter alone: the upload flags on the request and on the wire, and SDK failures kept inside. |
 | `Lorex.Api.Tests/EntityImageTests.cs` | What is stored, how a thumbnail is framed and reframed, who may touch it, and what a replace, reframe or remove leaves behind. |
 | `Lorex.Api.Tests/ProfileImageTests.cs` | The account's photo: what is stored, who may touch it, what a replace, reframe or remove leaves behind, and what a backup must never hold. |
-| `Lorex.Api.Tests/EntitySearchTests.cs` | What full text finds, what it must never find, and what keeps the index in step. |
+| `Lorex.Api.Tests/EntitySearchTests.cs` | What full text finds, what it must never find, what keeps the index in step, and the article excerpt a result carries. |
+| `Lorex.Api.Tests/ArticleTestClient.cs` | The HTTP steps the article tests share, and a sample of a real article document. Not a test. |
+| `Lorex.Api.Tests/EntityArticleEndpointTests.cs` | An article read and saved exactly, empty and cleared, the bound, refused documents, stale saves, ownership and foreign ids, independence from structured edits and entry restores, entry writes still carrying the article refused whole, versions from before, its own history and restore, the Trash, universe deletion, and no article in any other payload. |
+| `Lorex.Api.Tests/EntityArticleBackupTests.cs` | Articles in a version 9 backup: exact, with every version, cleared and trashed ones, no copy on entry revisions, determinism, and a version 8 file. |
+| `Lorex.Api.Tests/EntityArticleMigrationTests.cs` | The article migration over lore on a file: articles moved exactly with a first version, the column dropped without a rebuild, foreign keys and the search trigger intact, versions from before still readable, and a rollback with articles. |
 | `Lorex.E2E/playwright.config.ts` | Starts API + web, runs Chromium. |
 | `Lorex.E2E/specs/smoke.spec.ts` | Frontend-loads smoke suite. |
 | `Lorex.E2E/specs/auth.spec.ts` | Register, sign out, guard, sign back in. |
 | `Lorex.E2E/specs/universes.spec.ts` | Create, edit, search, archive, paginate, ownership. |
 | `Lorex.E2E/specs/lore.spec.ts` | Author an entry, edit it, filter, and cross-owner isolation. |
+| `Lorex.E2E/specs/lore-article.spec.ts` | An entry's article written, saved by button and keyboard, kept through reloads and structured edits, found by search with an excerpt, and restored from its history; asking before unsaved text is left, including Sign out and the browser's Back and Forward, once per action; failed, stale and orphaned saves; 390px to 1920px, light and dark. |
 | `Lorex.E2E/specs/relationships.spec.ts` | Both readings, relation kinds, refusals, and the universe and owner boundaries. |
 | `Lorex.E2E/specs/relationship-constraints.spec.ts` | A kind's Canon constraints: configured, broken, reported, corrected, edited and cleared; the editor from 390px to 1920px, light and dark. |
 | `Lorex.E2E/specs/timeline.spec.ts` | Date kinds through the drawer, order, filters, paging, refusals, and the owner boundary. |
@@ -271,6 +280,7 @@ Repository index. Paths and one-line responsibilities only.
 | --- | --- |
 | `architecture/branching.md` | Branch naming and merge rules. |
 | `testing/phase2-story-manual-test.md` | The owner's manual Phase 2 Story pass: one writing session from an empty story to a backup, in eighteen steps. |
+| `testing/phase3-lore-article-manual-test.md` | The owner's manual pass over entry articles: writing, two tabs, unsaved text, history, search, Trash, phone, dark and backup, in fourteen steps. |
 | `deployment/azure-dev.md` | The DEV runbook: topology, setup, deploy, limitations, troubleshooting. |
 | `deployment/cloudflare-r2.md` | The R2 runbook: bucket, token, config keys, the SDK upload flags R2 needs, and what a backup does not hold. |
 | `architecture/decisions/README.md` | One-line index of every ADR. |

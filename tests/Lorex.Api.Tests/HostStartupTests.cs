@@ -320,7 +320,7 @@ public sealed class HostStartupTests : IDisposable
     {
         var response = await client.PostAsJsonAsync(
             $"/api/universes/{universeId}/entities",
-            new EntityRequest(typeId, name, null, null, CanonStatus.Idea, null, null, null),
+            new EntityRequest(typeId, name, null, CanonStatus.Idea, null, null, null),
             CancellationToken.None);
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EntityDetail>(

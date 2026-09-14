@@ -30,6 +30,11 @@ public enum EntityRevisionChange
     None = 0,
     Name = 1 << 0,
     Summary = 1 << 1,
+
+    /// <summary>
+    /// The article changed. Set only on versions recorded before articles kept their own history
+    /// (ADR 0028); an article save now records an <see cref="EntityArticleRevision"/> instead.
+    /// </summary>
     Article = 1 << 2,
     CanonStatus = 1 << 3,
     EntityType = 1 << 4,
@@ -104,8 +109,11 @@ public sealed class EntityRevision
     public string? Summary { get; set; }
 
     /// <summary>
-    /// The Tiptap document as it was. The same format the live column holds, validated on
-    /// the way in by the write this revision recorded, and never re-parsed here.
+    /// The article as it read at this version, for a version recorded before articles kept a
+    /// history of their own; null for every version recorded since, which holds no copy of the
+    /// article at all (<see cref="EntityArticleRevision"/> does). Never written again, never
+    /// compared, and never applied by a restore - so an old version cannot put back, or wipe,
+    /// an article saved after it. Kept because it is what the author wrote. See ADR 0028.
     /// </summary>
     public string? Content { get; set; }
 

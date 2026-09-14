@@ -4,7 +4,8 @@ Status: accepted (2026-09-09), amended 2026-09-10 (version 3: the file became an
 2026-09-11 (type icon keys, and a short-lived image framing member, both within version 3),
 2026-09-13 (version 4: a universe's eras), 2026-09-13 (relationship type Canon constraints,
 within version 4), 2026-09-13 (version 5: stories), 2026-09-13 (version 6: chapters), 2026-09-13
-(version 7: plot), and 2026-09-13 (version 8: scene prose)
+(version 7: plot), 2026-09-13 (version 8: scene prose), and 2026-09-13 (version 9: entry articles and their
+history)
 
 ## Context
 
@@ -153,6 +154,22 @@ would parse the file and restore every scene with its prose silently gone. So it
 is carried: no word count, no rendering, no copy of the scene's planning. A file at version 7 or earlier has no
 `manuscript`; it reads as null and means a scene with nothing written.
 
+**Version 9 (2026-09-13) carries entry articles and their history** (ADR 0028). The article moved into a row of its own
+with a history of its own. Each entry keeps `content` - the article as it stands, exactly as stored, null for no article or
+a cleared one - and gains `articleUpdatedAt`, when it was last saved (null if never), and `articleRevisions`, every saved
+version oldest first: `id`, `number`, `kind`, `restoredFromRevisionId` and the whole document (`""` for a clear). The
+question was whether that could stay within version 8, and it fails the test twice. The versions are authored text a
+version 8 reader would drop silently - the loss an entry's history would be. And each entry revision's `content` is
+re-meant: in version 8 a null there said the entry had no article at that version, and restoring the version applied it;
+from version 9 a revision recorded after the move holds no copy of the article at all, so a version 8 reader restoring it
+would wipe an article that exists. That is the re-meaning clause, so it is a bump. A file at version 8 or earlier has
+neither new member; both read as null, and each revision's `content` is the article as it read then.
+
+A future importer restores an article to the entry of the same id, in the universe being restored and owned by the
+importing account - ownership is never in the file. It validates each document as a save does, re-creates the versions
+with their ids and numbers, writes no entry revision for any of it, and reindexes search. It never applies a revision's
+`content` to the article.
+
 **Only the authored data.** The test for inclusion is: did a person write this, or would
 Lorex produce it again from what a person wrote?
 
@@ -160,7 +177,8 @@ Lorex produce it again from what a person wrote?
 | --- | --- |
 | Universe name, description, accent, archived flag, timestamps | `OwnerId` |
 | Entity types with their icon key, field definitions with their declared `Semantic`, options | - |
-| Entries: name, summary, Tiptap article, canon status, archived flag, `deletedAt` | - |
+| Entries: name, summary, canon status, archived flag, `deletedAt` | - |
+| Each entry's Tiptap article as it stands, when it was last saved, and every saved version of it | Any extracted text or search excerpt |
 | Aliases, tags, stored values including entity references | Alias and value row ids |
 | Relationship types with their Canon constraints, and relationships | - |
 | The universe's eras: name, short label, order, direction, label position | Formatted dates and sort keys |
@@ -168,7 +186,7 @@ Lorex produce it again from what a person wrote?
 | Stories; their chapters in order with title, summary and notes; their scenes with chapter, place in it, point of view, chronology and linked entry ids | Any name, type or formatted date of what a scene references, and any chapter number |
 | Each story's plot arcs in order with title, description and notes; their beats in order with text and linked scene and entry ids | Any arc or beat number, and any scene title, chapter or entry name a beat points at |
 | Each scene's manuscript: its plain text exactly as stored, and when it was last saved | Any word count, rendering or copy of the scene's planning |
-| Every entry's revision history (ADR 0013) | - |
+| Every entry's revision history (ADR 0013); versions recorded since version 9 hold no copy of the article | - |
 | Each entry's primary image: the original bytes, its asset id, filename, content type, dimensions, chosen crop and archive path | The generated thumbnail and its id, and every R2 object key, bucket name, endpoint and URL |
 | Canon conflicts the author **dismissed** | Pending and resolved conflicts, and all conflict wording |
 | | Tag `Slug` |

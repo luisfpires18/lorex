@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace Lorex.Api.Features.Lore;
 
 /// <summary>
-/// Reduces the Tiptap document stored in <see cref="LoreEntity.Content"/> to the plain text an
+/// Reduces the Tiptap document stored in <see cref="EntityArticle.Content"/> to the plain text an
 /// author actually wrote, so the article can be indexed as prose rather than as editor JSON.
 ///
 /// The document is a ProseMirror tree. Every character the author typed lives in the

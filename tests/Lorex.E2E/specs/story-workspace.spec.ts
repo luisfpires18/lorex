@@ -47,7 +47,6 @@ async function seedEntity(page: Page, universeId: string, name: string) {
       entityTypeId: types.find((type) => type.name === 'Character')!.id,
       name,
       summary: null,
-      content: null,
       canonStatus: 0,
       aliases: [],
       tags: [],

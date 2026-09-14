@@ -253,6 +253,13 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
 
         var revisionsByEntity = await RevisionsAsync(universeId, cancellationToken);
 
+        // The article is its own row, read here beside the entry it belongs to - trashed entries' included.
+        var articles = await db.EntityArticles.AsNoTracking()
+            .Where(article => article.Entity!.UniverseId == universeId)
+            .ToDictionaryAsync(article => article.EntityId, cancellationToken);
+
+        var articleRevisionsByEntity = await ArticleRevisionsAsync(universeId, cancellationToken);
+
         var aliasesByEntity = aliases
             .GroupBy(alias => alias.EntityId)
             .ToDictionary(
@@ -303,7 +310,8 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                     entity.EntityTypeId,
                     entity.Name,
                     entity.Summary,
-                    entity.Content,
+                    ArticleContent(articles, entity.Id),
+                    Utc(articles.GetValueOrDefault(entity.Id)?.UpdatedAt),
                     entity.CanonStatus,
                     entity.IsArchived,
                     Utc(entity.DeletedAt),
@@ -313,8 +321,43 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                     tagIdsByEntity.GetValueOrDefault(entity.Id, []),
                     valuesByEntity.GetValueOrDefault(entity.Id, []),
                     Image(images, entity.Id),
-                    revisionsByEntity.GetValueOrDefault(entity.Id, []))),
+                    revisionsByEntity.GetValueOrDefault(entity.Id, []),
+                    articleRevisionsByEntity.GetValueOrDefault(entity.Id, []))),
         ];
+    }
+
+    /// <summary>
+    /// The article as it stands, exactly as stored - or null for an entry with none, and for one written and then cleared,
+    /// which is what <c>content</c> has always meant for an entry with no article.
+    /// </summary>
+    private static string? ArticleContent(Dictionary<Guid, EntityArticle> articles, Guid entityId) =>
+        articles.TryGetValue(entityId, out var article) && article.Content.Length > 0 ? article.Content : null;
+
+    /// <summary>Every entry's article history, keyed by entry and ordered oldest first, each version whole.</summary>
+    private async Task<Dictionary<Guid, IReadOnlyList<BackupArticleRevision>>> ArticleRevisionsAsync(
+        Guid universeId,
+        CancellationToken cancellationToken)
+    {
+        var revisions = await db.EntityArticleRevisions.AsNoTracking()
+            .Where(revision => revision.Entity!.UniverseId == universeId)
+            .ToListAsync(cancellationToken);
+
+        return revisions
+            .GroupBy(revision => revision.EntityId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<BackupArticleRevision>)
+                [
+                    .. group
+                        .OrderBy(revision => revision.Number)
+                        .Select(revision => new BackupArticleRevision(
+                            revision.Id,
+                            revision.Number,
+                            revision.Kind,
+                            revision.RestoredFromRevisionId,
+                            Utc(revision.CreatedAt),
+                            revision.Content)),
+                ]);
     }
 
     /// <summary>

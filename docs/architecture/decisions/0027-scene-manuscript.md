@@ -1,7 +1,7 @@
 # ADR 0027 - A scene's manuscript is plain prose in a row of its own, read and written on its own route
 
 Status: accepted (2026-09-13), amended 2026-09-13 (Phase 2 closeout: the shared header, Write and Show in Scenes,
-Sign out asks, Back and Forward decided)
+Sign out asks, Back and Forward decided), amended 2026-09-14 (Back and Forward caught - ADR 0028)
 
 ## Context
 
@@ -125,7 +125,6 @@ changed. What changed is how the three views meet.
 - Word counts, writing goals and statistics.
 - Export to documents, publishing, and reading a backup back in.
 - Advisory Story-versus-Lore checks against prose, and any AI assistance.
-- Catching the browser's Back and Forward buttons with unsaved prose, which needs a data router.
 
 ## Consequences
 
@@ -136,3 +135,10 @@ changed. What changed is how the three views meet.
   would need to revisit it.
 - Backups grow by the prose. `backup.json` is deflated in the archive and prose compresses well, but the archive is still
   assembled in memory (ADR 0014).
+
+## Amendment - Back and Forward caught (2026-09-14)
+
+The closeout decision to leave the browser's Back and Forward uncaught is superseded. ADR 0028's merge-readiness amendment
+moved the app onto a data router - one catch-all route around the existing routes - and mounted `HistoryLeaveGuard`, so a
+history move with unsaved prose asks the same question a link does, once, and staying keeps the scene and its text. The
+deferred item it named is done.

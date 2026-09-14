@@ -108,11 +108,6 @@ public static partial class LoreValidation
             errors["canonStatus"] = ["That is not a canon status Lorex knows."];
         }
 
-        if (!LoreContent.TryValidate(request.Content, out var contentError))
-        {
-            errors["content"] = [contentError!];
-        }
-
         // A JSON array can carry nulls, so entries are length-checked defensively.
         if (request.Aliases is not null
             && request.Aliases.Any(alias => (alias?.Trim().Length ?? 0) > LoreLimits.NameMaxLength))
@@ -127,6 +122,25 @@ public static partial class LoreValidation
         }
 
         return errors.Count == 0 ? null : errors;
+    }
+
+    /// <summary>
+    /// One article save. Null is refused, so a malformed body can never clear an article; blank clears it; anything else
+    /// must be a document <see cref="LoreContent"/> accepts, within the bound.
+    /// </summary>
+    public static Dictionary<string, string[]>? ValidateArticle(string? content)
+    {
+        if (content is null)
+        {
+            return new Dictionary<string, string[]>
+            {
+                ["content"] = ["Send the article. An empty one clears it."],
+            };
+        }
+
+        return LoreContent.TryValidate(content, out var error)
+            ? null
+            : new Dictionary<string, string[]> { ["content"] = [error!] };
     }
 
     public static string? Normalize(string? value) =>

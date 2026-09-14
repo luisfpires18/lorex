@@ -64,7 +64,6 @@ async function createEntry(
       entityTypeId,
       name,
       summary,
-      content: null,
       canonStatus: 0,
       aliases: [],
       tags: [],

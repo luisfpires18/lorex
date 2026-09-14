@@ -47,6 +47,22 @@ export function EntityCard({ universeId, entity }: { universeId: string; entity:
 
       {entity.summary ? <span className="dossier__summary">{entity.summary}</span> : null}
 
+      {/* Why a search found it, when the article is where: plain runs of text, the matched words marked. */}
+      {entity.articleExcerpt ? (
+        <span className="dossier__excerpt" data-testid="entity-excerpt">
+          <span className="dossier__excerptlabel">In the article</span>
+          <span className="dossier__excerpttext">
+            {entity.articleExcerpt.map((part, index) =>
+              part.isMatch ? (
+                <mark key={index}>{part.text}</mark>
+              ) : (
+                <span key={index}>{part.text}</span>
+              ),
+            )}
+          </span>
+        </span>
+      ) : null}
+
       {entity.tags.length > 0 ? (
         <span className="dossier__tags">
           {entity.tags.map((tag) => (

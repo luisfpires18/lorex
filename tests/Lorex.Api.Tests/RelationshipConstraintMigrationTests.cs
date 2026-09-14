@@ -189,7 +189,7 @@ public sealed class RelationshipConstraintMigrationTests : IDisposable
         var response = await client.PostAsJsonAsync(
             $"/api/universes/{universeId}/entities",
             new EntityRequest(
-                typeId, name, null, null, CanonStatus.Canon, null, null,
+                typeId, name, null, CanonStatus.Canon, null, null,
                 [new FieldValueInput(bornFieldId, null, born, null, null, null, null)]));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EntityDetail>())!;

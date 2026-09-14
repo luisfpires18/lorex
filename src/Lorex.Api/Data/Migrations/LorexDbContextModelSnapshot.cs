@@ -215,6 +215,58 @@ namespace Lorex.Api.Data.Migrations
                     b.ToTable("EntityAliases", (string)null);
                 });
 
+            modelBuilder.Entity("Lorex.Api.Features.Lore.EntityArticle", b =>
+                {
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(200000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("EntityId");
+
+                    b.ToTable("EntityArticles", (string)null);
+                });
+
+            modelBuilder.Entity("Lorex.Api.Features.Lore.EntityArticleRevision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(200000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("RestoredFromRevisionId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EntityId", "Number")
+                        .IsUnique();
+
+                    b.ToTable("EntityArticleRevisions", (string)null);
+                });
+
             modelBuilder.Entity("Lorex.Api.Features.Lore.EntityFieldDefinition", b =>
                 {
                     b.Property<Guid>("Id")
@@ -633,10 +685,6 @@ namespace Lorex.Api.Data.Migrations
 
                     b.Property<int>("CanonStatus")
                         .HasColumnType("INTEGER");
-
-                    b.Property<string>("Content")
-                        .HasMaxLength(200000)
-                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
@@ -1443,6 +1491,28 @@ namespace Lorex.Api.Data.Migrations
                 {
                     b.HasOne("Lorex.Api.Features.Lore.LoreEntity", "Entity")
                         .WithMany("Aliases")
+                        .HasForeignKey("EntityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Entity");
+                });
+
+            modelBuilder.Entity("Lorex.Api.Features.Lore.EntityArticle", b =>
+                {
+                    b.HasOne("Lorex.Api.Features.Lore.LoreEntity", "Entity")
+                        .WithOne()
+                        .HasForeignKey("Lorex.Api.Features.Lore.EntityArticle", "EntityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Entity");
+                });
+
+            modelBuilder.Entity("Lorex.Api.Features.Lore.EntityArticleRevision", b =>
+                {
+                    b.HasOne("Lorex.Api.Features.Lore.LoreEntity", "Entity")
+                        .WithMany()
                         .HasForeignKey("EntityId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();

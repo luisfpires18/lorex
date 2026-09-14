@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Lorex.Api.Features.Media;
 
 namespace Lorex.Api.Features.Lore;
@@ -72,15 +74,35 @@ public sealed record FieldValueInput(
     Guid? ReferencedEntityId,
     Guid? EraId = null);
 
+/// <summary>
+/// The structured half of an entry. The article is not part of it: the article is saved on its own route
+/// (<see cref="EntityArticleRequest"/>), so a structured edit cannot overwrite it - and a request that still sends one
+/// here is refused whole (<see cref="CarriesLegacyArticle"/>).
+/// </summary>
 public sealed record EntityRequest(
     Guid EntityTypeId,
     string? Name,
     string? Summary,
-    string? Content,
     CanonStatus CanonStatus,
     IReadOnlyList<string>? Aliases,
     IReadOnlyList<string>? Tags,
-    IReadOnlyList<FieldValueInput>? Fields);
+    IReadOnlyList<FieldValueInput>? Fields)
+{
+    /// <summary>
+    /// The <c>content</c> member an entry request carried before the article moved to its own route (ADR 0028), declared
+    /// only so that its presence can be seen. The serializer skips any member a record does not declare, so without this a
+    /// client still writing the article with the entry would be answered as saved and lose the article. It is matched as
+    /// every member is - case-insensitively - and whatever it holds, null included, marks that client: from an old editor,
+    /// null meant "clear the article". Never read as an article.
+    /// </summary>
+    [JsonPropertyName("content")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public JsonElement LegacyContent { get; init; }
+
+    /// <summary>Whether the request sent the article member at all. An absent member is the only accepted shape.</summary>
+    [JsonIgnore]
+    public bool CarriesLegacyArticle => LegacyContent.ValueKind != JsonValueKind.Undefined;
+}
 
 /// <summary>
 /// <paramref name="ReferencedEntityIsTrashed"/> says the reference still points at real lore
@@ -186,7 +208,13 @@ public sealed record EntityImageCrop(double X, double Y, double Width, double He
 /// </summary>
 public sealed record EntityThumbnailRequest(Guid AssetId, EntityImageCrop? Crop);
 
-/// <summary>Card row. Carries enough to render a type-aware card, and no universe or owner id.</summary>
+/// <summary>
+/// Card row. Carries enough to render a type-aware card, and no universe or owner id - and never an article.
+///
+/// <paramref name="ArticleExcerpt"/> is set only on a search result whose article matched: a few words around the match,
+/// cut by the index, as runs of text with the matched words marked. Null when browsing, and when only the name, an alias
+/// or the summary matched.
+/// </summary>
 public sealed record EntitySummary(
     Guid Id,
     string Name,
@@ -200,13 +228,17 @@ public sealed record EntitySummary(
     IReadOnlyList<string> Aliases,
     IReadOnlyList<string> Tags,
     EntityImageRef? Image,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    IReadOnlyList<SearchExcerptPart>? ArticleExcerpt);
 
+/// <summary>One run of an article excerpt: plain text as the author wrote it, and whether it is part of the match.</summary>
+public sealed record SearchExcerptPart(string Text, bool IsMatch);
+
+/// <summary>An entry's structured lore. Its article is read on its own route (<see cref="EntityArticleResponse"/>).</summary>
 public sealed record EntityDetail(
     Guid Id,
     string Name,
     string? Summary,
-    string? Content,
     CanonStatus CanonStatus,
     bool IsArchived,
     Guid EntityTypeId,

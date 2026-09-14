@@ -46,7 +46,6 @@ async function seedEntity(page: Page, universeId: string, name: string) {
       entityTypeId: types.find((type) => type.name === 'Character')!.id,
       name,
       summary: null,
-      content: null,
       canonStatus: 0,
       aliases: [],
       tags: [],
@@ -439,6 +438,18 @@ test.describe('manuscript', () => {
 
     // Choosing to leave does leave, and what was unsaved is gone - from the screen and from the API alike.
     await editor.fill('A draft that is never saved.')
+
+    // The browser's Back button asks too, once; staying keeps the scene, its address and the draft.
+    let backQuestions = 0
+    page.once('dialog', (dialog) => {
+      backQuestions += 1
+      void dialog.dismiss()
+    })
+    await page.goBack()
+    await expect.poll(() => backQuestions).toBe(1)
+    await expect(page).toHaveURL(new RegExp(`/manuscript/${second}$`))
+    await expect(editor).toHaveValue('A draft that is never saved.')
+
     page.once('dialog', (dialog) => void dialog.accept())
     await outlineScene(page, 'First').click()
     await page.waitForURL(firstUrl)

@@ -87,11 +87,15 @@ test.describe('lore', () => {
     await page.getByLabel('Registry').fill('KR-118')
     await page.getByLabel('Class').selectOption({ label: 'Courier' })
 
-    await page.getByTestId('lore-editor').click()
-    await page.keyboard.type('She was built for running, and never once for fighting.')
-
     await page.getByTestId('save-entity').click()
     await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
+
+    // The article is written on the entry once it exists, and saved on its own.
+    await page.getByTestId('article-write').click()
+    await page.keyboard.type('She was built for running, and never once for fighting.')
+    await page.getByTestId('article-save').click()
+    await expect(page.getByTestId('article-status')).toHaveText('Saved')
+    await page.getByTestId('article-done').click()
 
     // Everything comes back on the article page.
     await expect(page.getByTestId('entry-name')).toHaveText(name)
@@ -147,10 +151,13 @@ test.describe('lore', () => {
     // Edit in place.
     await page.getByTestId('edit-entity').click()
     await page.getByLabel('Summary').fill('Warden of the drowned coast, and its last cartographer.')
-    await page.getByTestId('lore-editor').click()
-    await page.keyboard.type('She kept the tide ledger by hand.')
     await page.getByTestId('save-entity').click()
     await expect(page.getByTestId('entry-summary')).toContainText('last cartographer')
+
+    await page.getByTestId('article-write').click()
+    await page.keyboard.type('She kept the tide ledger by hand.')
+    await page.getByTestId('article-save').click()
+    await expect(page.getByTestId('article-status')).toHaveText('Saved')
 
     // Everything persists across a full reload.
     await page.reload()
