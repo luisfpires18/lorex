@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.RegularExpressions;
 using Lorex.Api.Data;
+using Lorex.Api.Features.Ideas;
 using Lorex.Api.Features.Lore;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -259,6 +260,8 @@ public static partial class UniverseEndpoints
     {
         var ownerId = principal.RequireUserId();
 
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
         var universe = await FindOwnedAsync(db, id, ownerId, cancellationToken);
         if (universe is null)
         {
@@ -275,8 +278,14 @@ public static partial class UniverseEndpoints
                 statusCode: StatusCodes.Status409Conflict);
         }
 
+        // Ideas belong to the account, not to the universe (ADR 0030): every idea about this
+        // universe stays, unassigned, and only its references - to content deleted below - go.
+        // Same transaction, so no idea can be left pointing into a universe that is gone.
+        await IdeaReferences.ReleaseUniverseAsync(db, universe.Id, cancellationToken);
+
         db.Universes.Remove(universe);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return Results.NoContent();
     }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { AccountMenu } from '../components/AccountMenu'
 import { BrandMark } from '../components/BrandMark'
 import { UniverseCard } from '../components/UniverseCard'
@@ -62,7 +62,13 @@ export default function UniversesPage() {
           <BrandMark />
           <Wordmark />
         </span>
-        <AccountMenu variant="bar" />
+        <div className="home__session">
+          {/* Ideas belong to the account, not to a world, so they are reached from here without opening one. */}
+          <Link className="home__back" to="/app/ideas" data-testid="home-ideas">
+            Ideas
+          </Link>
+          <AccountMenu variant="bar" />
+        </div>
       </header>
 
       <main className="home__body">

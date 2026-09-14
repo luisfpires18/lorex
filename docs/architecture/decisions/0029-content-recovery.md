@@ -1,6 +1,6 @@
 # ADR 0029 - Content recovery: saved versions, a Trash for story content, and recovery copies of unsaved writing
 
-Status: accepted (2026-09-14)
+Status: accepted (2026-09-14), amended 2026-09-14 (ideas keep recovery copies too, scoped to the account - ADR 0030)
 
 ## Context
 
@@ -41,6 +41,7 @@ None of them promotes anything into Canon, reads writing for meaning, or reinter
 | Scene manuscript | **Yes** | With its scene | **Yes** |
 | Plot arc | No | **Yes**, with its beats | No |
 | Plot beat | No | **Yes**, with its links | No |
+| Idea (ADR 0030) | No | Recently deleted, in Ideas | **Yes** |
 
 Short text and structure are deliberately not versioned: a story's title and status, a chapter's or arc's notes, a scene's
 summary and every reorder, move and link change would grow a history no author asked for. They are protected against the
@@ -142,6 +143,11 @@ device's, not Lorex's.
 - Leaving the page itself - reload, close, a typed address - keeps the copy. The browser's own prompt cannot say what was
   answered, and a closed tab is exactly what a copy is for.
 - Deleting a universe from Settings drops that account's copies in it.
+
+**Amendment (ADR 0030): ideas.** The idea editor is a third writer of recovery copies (`kind: 'idea'`), with the lifecycle
+above. An idea belongs to an account, not a universe, so `universeId` in a copy's key is now nullable: an existing idea's
+copy has none, and a universe deletion never lets it go. A new idea's copy is kept per place it was started - globally, or
+under the universe it was started in, which does go with that universe.
 
 **The offer.** When an article or manuscript opens with a copy:
 

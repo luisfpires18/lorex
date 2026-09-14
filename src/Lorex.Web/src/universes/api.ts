@@ -5,10 +5,10 @@ const BASE = '/api/universes'
 
 export const PAGE_SIZE = 12
 
-export function listUniverses(query: UniverseQuery, signal?: AbortSignal) {
+export function listUniverses(query: UniverseQuery, signal?: AbortSignal, pageSize = PAGE_SIZE) {
   const params = new URLSearchParams({
     page: String(query.page),
-    pageSize: String(PAGE_SIZE),
+    pageSize: String(pageSize),
     includeArchived: String(query.includeArchived),
   })
   if (query.search.trim()) {

@@ -162,8 +162,27 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     reckoning, `a + b - 1` from a countdown era into the ascending era after it, unknown otherwise.
   - Edited inside the relation kind form on the Types screen. Backup stays version 4, additively.
 - **Phase 3 - Authoring, Ideas & Recovery** (owner-sequenced, unnumbered branches): 1. Lore articles - merged. 2. Content
-  recovery - committed, **not merged, not pushed**. 3. Ideas. 4. Persistent top search bar. 5. Backup Import / Restore - last.
-- **Phase 3 - Content recovery** (`feat/content-recovery` from `dev` `0784fac`, committed, **not merged, not pushed**). Three
+  recovery - merged. 3. Ideas - committed, **not merged, not pushed**. 4. Persistent top search bar - next. 5. Backup Import /
+  Restore - last.
+- **Phase 3 - Ideas** (`feat/ideas` from `dev` `33da348`, committed, **not merged, not pushed**). Possibilities kept apart from
+  lore, owned by the account. ADR 0030.
+  - `Ideas`: owner (cascade), optional `UniverseId` (`SET NULL`), title 200, plain body 20,000, `DeletedAt`; no status, tag,
+    folder or order - newest update first. Five reference join tables (entry, story, scene, arc, beat), cascading both sides.
+    Never lore: no entry, relationship, moment, story, Canon, finding, revision or search write, pinned by a test.
+  - `/api/ideas`: account-scoped list (`universeId` | `unassigned`, `deleted`, `search`, paged, 240-char excerpt), create,
+    read, whole save with stale 409 `idea_changed` (no token is stale too), delete to Recently deleted, restore, and
+    `reference-targets` for the picker. Another account's idea, universe or content is a 404 or refused in not-found words.
+  - References: explicit kind, own universe only, none without a universe; changing universe and references is one save; a
+    target in the Trash stays, marked, never newly chosen. No saved versions.
+  - Universe delete: one transaction deletes its ideas' references, unassigns them and moves `UpdatedAt`, then deletes the
+    universe. Words kept, nothing reattached.
+  - Web: `/app/ideas` (from the universes bar, account frame) and the universe sidebar's Ideas section - one `IdeasBrowser` and
+    one `IdeaEditor`. Picker drawer, leave guard, recovered drafts (`kind: 'idea'`; existing ideas account-scoped with no
+    universe, new ideas per start place). Trash and Settings point to Recently deleted / say ideas survive.
+  - Backup format version 11: `payload.ideas` for the universe's ideas, deleted marked, references by kind and id. **Unassigned
+    ideas are in no universe backup** - no account export exists. ADR 0014.
+  - Owner manual pass: `docs/testing/phase3-ideas-manual-test.md`.
+- **Phase 3 - Content recovery** (`feat/content-recovery` from `dev` `0784fac`, merged into `dev` at `33da348`). Three
   recoveries kept apart - saved versions, a Trash for story content, recovered drafts of unsaved writing. ADR 0029.
   - Manuscript versions: `SceneManuscriptRevisions`, the whole text per changing save (`Created|Edited|Restored`); a save that
     changes nothing writes nothing (ADR 0027 amended). `.../manuscript/revisions`, `/{id}`, `/{id}/restore` naming
@@ -299,11 +318,13 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 
 ## Baseline
 
-- **756 API integration tests, 117 Playwright tests**, green. The content recovery full Playwright run lost four tests to
-  the known contention below - account-menu, canon, relationships, type-filter - and each file was green alone (5/5, 6/6,
-  6/6, 4/4); `content-recovery.spec.ts` was 28/28 over four parallel repeats. No frontend unit runner exists;
-  the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E project has no
-  format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
+- **778 API integration tests, 124 Playwright tests**, green. The Ideas full Playwright runs lost two each to the known
+  contention below - canon + timeline, then canon + pwa (a universe `PUT` answered 400 "name taken" from a locked commit) -
+  and each file passed on a rerun alone; the API log showed `database is locked` in `CanonIntegrityEndpoints.TransitionAsync`.
+  Canon alone also flakes on a large dev database: against the same 25 MB copy, `dev` failed 3 of 8 parallel runs and
+  `feat/ideas` 5 of 8; on a fresh database `dev` passed 4 of 4. `ideas.spec.ts` and `content-recovery.spec.ts` were 7/7 in
+  every run. No frontend unit runner exists; the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E
+  project has no format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
 - The test host no longer migrates itself, so every API test boots through the same startup path a
   deployment uses.
@@ -313,8 +334,9 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   is contention on the one SQLite writer, not the specs, and the content recovery run's API log shows how: a write's commit
   throws `SQLite Error 5: 'database is locked'` at once, not after the provider's retry, and is answered as a 500 - or as a
   false 409 where an endpoint maps every `DbUpdateException` to a conflict (entity type update: "name taken").
-- 26 migrations, latest `AddContentRecovery` - `DeletedAt` on five story tables, their order indexes recreated partial on
-  live rows, and `SceneManuscriptRevisions` with each manuscript as its version 1. Its rollback drops the columns with
+- 27 migrations, latest `AddIdeas` - additive: `Ideas` and five reference tables; `IdeaMigrationTests` walks it down and up
+  and deletes a universe row under it. Before it, `AddContentRecovery` - `DeletedAt` on five story tables, their order indexes
+  recreated partial on live rows, and `SceneManuscriptRevisions` with each manuscript as its version 1. Its rollback drops the columns with
   SQLite's native `DROP COLUMN`, as `AddEntityArticles` did for `Entities.Content` (EF Core's table rebuild loses what it
   cannot see, such as the FTS delete trigger), and discards the Trash, what is in it and every manuscript's history.
   `ContentRecoveryMigrationTests` walks it down and up over stories on a file; `EntityArticleMigrationTests` still walks
@@ -371,6 +393,9 @@ tool has changed the picture.
   scene cards (it needs a flag the story read can give without reading prose). ADR 0024-0027, 0029.
 - **Lore article work deferred** - later, not gaps: plain text or Markdown, wiki links and backlinks, version diffs and
   pruning, restoring article text held in pre-ADR-0028 entry versions from the screen, autosave, word counts. ADR 0028.
+- **Ideas deferred** - not gaps: promoting an idea (AI proposals are Phase 5), statuses, tags, collections, rich text, wiki
+  links, saved versions, cross-universe references, permanent delete, an account export for unassigned ideas, importing ideas
+  (Backup Import / Restore), and the search bar including ideas (next). ADR 0030.
 - **Content recovery deferred** - not gaps: recovered drafts for forms, drafts synced across browsers or devices, merging a
   draft into a newer save, a restored chapter taking back the scenes it held. ADR 0029.
 - **Relationship life-state constraints** (an end alive at the link's date) wait for dated
@@ -396,6 +421,8 @@ None. Follow-ups, not blocking:
 - Orphaned media objects are swept best-effort and never retried. A delete that fails after the
   database has committed logs a warning naming the key and leaves the object; the entry is
   correct either way. ADR 0019 argues the trade.
+- Ideas with no universe have no file-level backup: a universe backup cannot truthfully hold them and no account export
+  exists. The database is their only copy. ADR 0030.
 - A backup archive is assembled whole in memory before it is sent, so that a missing image can be
   refused rather than truncated. Bounded by 8 MB per picture; worth revisiting only if a world
   ever holds enough media to matter. ADR 0014.

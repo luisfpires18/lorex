@@ -102,8 +102,10 @@ export default function UniverseSettings() {
         <p className="settings__note">
           Download this universe as a single archive: its entries and their articles, types and
           fields, tags, relationships, the timeline, every entry&rsquo;s history, and the full-size
-          image of every entry that has one. Nothing about your account is in it. Lorex cannot read
-          a backup back in yet, so keep the file somewhere you trust.
+          image of every entry that has one, and the ideas that belong to this universe. Nothing
+          about your account is in it - so ideas that belong to no universe are in no
+          universe&rsquo;s backup. Lorex cannot read a backup back in yet, so keep the file
+          somewhere you trust.
         </p>
         <button
           className="button button--quiet"
@@ -149,6 +151,10 @@ export default function UniverseSettings() {
           <h3 className="settings__heading">Delete</h3>
           <p className="settings__note">
             Deleting removes this universe and everything in it. There is no undo.
+          </p>
+          <p className="settings__note" data-testid="delete-ideas-note">
+            Your ideas about it are kept: they belong to your account, so they stay in Ideas with no
+            universe, and only their references to this universe&rsquo;s content go.
           </p>
           {confirmingDelete ? (
             <div className="settings__confirm">
