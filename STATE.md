@@ -161,10 +161,37 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - The gap is `UniverseChronology.YearsBetween`: the signed difference inside one era or the plain
     reckoning, `a + b - 1` from a countdown era into the ascending era after it, unknown otherwise.
   - Edited inside the relation kind form on the Types screen. Backup stays version 4, additively.
-- **Phase 4 - World Rules & Family Trees** (owner-sequenced, unnumbered branches): 1. World Rules - merged. 2. Timeline-based
-  Canon validation - committed, **not merged, not pushed**. 3. Family Trees - next, and Phase 4's last feature.
-- **Phase 4 - Timeline rule validation** (`feat/timeline-rule-validation` from `dev` `3508baf`, committed, **not merged, not
-  pushed**). The first checkable World Rule pattern: at most N Canon moments of one event kind by one method per participant. ADR
+- **Phase 4 - World Rules & Family Trees - COMPLETE** (owner-sequenced, unnumbered branches): 1. World Rules - merged.
+  2. Timeline-based Canon validation - merged. 3. Family Trees - committed, **not merged, not pushed**.
+- **Phase 4 - Family Trees** (`feat/family-trees` from `dev` `02118ca`, committed, **not merged, not pushed**). Phase 4's last
+  feature: family connections an author records explicitly, and the relatives that follow from them. ADR 0035 (ADR 0008, 0014,
+  0023, 0032 amended).
+  - `RelationshipTypes.FamilySemantic`: `None` | `BiologicalParent` | `AdoptiveParent`, on the stored direction - source parent,
+    target child. Never inferred from a kind's name, in any language; refused on a symmetric kind, and on turning one symmetric
+    beneath a meaning. Independent of the Canon constraints beside it; `familySemantic` left out of a save keeps what is stored.
+  - `GET .../family-tree/{entityId}`: parents, grandparents, siblings, children, grandchildren, `generationsEachWay` 2 and no
+    depth parameter. At most five queries whatever the family's size (pinned at 40 relatives). Derived per read, never stored:
+    a sibling is two parent links sharing a parent. Ids only - no name, alias, tag, entry type, date, story or prose is read.
+  - Each relative carries the link paths that make it one, so a card can say *Shares Mara — biological for both*. **No full or
+    half sibling**: one recorded parent claims nothing about a parent nobody wrote down. Any number of parents; no Character type
+    and no personhood test anywhere.
+  - Circles: traversal is bounded by construction, circles among the links a tree read come back in `loops` (Tarjan, explicit
+    stack), and `CANON-FAMILY-001` Medium reports one per circle of Canon links between Canon live entries, fingerprinted over
+    those links as a set. Nothing is refused, rewritten or deleted.
+  - Trash and Canon follow what relationships already do: a link is read only while both ends are live, a trashed entry has no
+    tree (404) and restoring brings the connection back whole; each link and entry shows its own Canon status, and a Draft link
+    is drawn faintly and named in words.
+  - Backup format **14**: `relationshipTypes[].familySemantic` by name. A v13 reader would drop the meaning of every link and
+    must not guess it back from a name - the line ADR 0023's constraints sat on the other side of. Importer 1-14; before 14 none
+    even if carried. Migration `AddRelationshipFamilySemantics`: one additive column, native `DROP COLUMN` on the way down.
+  - Web: `Family Tree` after Lore, at `/family-tree/{entityId}` - the entry in focus is in the address. Generation rows in plain
+    React and CSS with the lines measured from the cards in one `aria-hidden` SVG (solid biological, dashed adoptive, faded
+    non-Canon); every position is also written on the card, so the keyboard and a screen reader read the same tree. Contained
+    sideways scrolling on a phone, never the page. Family meaning is set on the Types screen; "Add family connection" writes an
+    ordinary relationship; every entry page offers "Family tree".
+  - Owner manual pass: `docs/testing/phase4-family-trees-manual-test.md`.
+- **Phase 4 - Timeline rule validation** (`feat/timeline-rule-validation` from `dev` `3508baf`, merged into `dev` at `02118ca`).
+  The first checkable World Rule pattern: at most N Canon moments of one event kind by one method per participant. ADR
   0034 (ADR 0010, 0012, 0014, 0032, 0033 amended).
   - Explicit only: a rule's stored check and moments' stored details. No title, description, linked entry, story, manuscript or
     idea is read; tests use invented names.
@@ -406,14 +433,13 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 
 ## Baseline
 
-- **942 API integration tests, 148 Playwright tests**, green. Timeline rule validation full Playwright runs on the dev database:
-  143/148 (two restore expectations still at format version 12 - fixed - and canon, account-menu, story-workspace), then 145/148
-  (canon, content-recovery - a Trash restore answered "Something went wrong" - and type-filter); every failing spec passed alone,
-  serially, and none exercises a world rule check. World Rules full Playwright run on the dev database: 139/143 -
-  canon, chronology, type-filter and universe-search (a story delete answered 500), each beside `SQLite Error 5: 'database is
-  locked'` in the API log; all four passed alone, serially. The focused run's world-rules Trash restore failed the same way in
-  parallel and passed alone. The known contention below, not the feature. Backup restore's runs saw 134/137 at 36 MB and
-  universe search's the same pattern at 31 MB; a fresh database ran 137/137 with no lock in the log. No frontend unit runner exists; the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E
+- **979 API integration tests, 155 Playwright tests**, green. Family Trees full Playwright run on the dev database: 151/155 -
+  canon, content-recovery, pwa and type-filter, none of which touches a family tree; all four passed on a serial rerun, which
+  itself lost one canon test at sign-up, and canon passed 6/6 alone. Two genuine failures were found and fixed first: the restore
+  screen's preview still expected "Version 13", and the "newer Lorex" file it refuses was written at version 14, which the format
+  bump made real. Every earlier phase's run has the same shape - a rotating one to four specs lost in parallel, each green alone,
+  the known contention below rather than the feature. No frontend unit runner exists; the web checks are `typecheck`, `lint`,
+  `format:check` and `build`. The E2E
   project has no format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
 - The test host no longer migrates itself, so every API test boots through the same startup path a
@@ -424,7 +450,11 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   is contention on the one SQLite writer, not the specs, and the content recovery run's API log shows how: a write's commit
   throws `SQLite Error 5: 'database is locked'` at once, not after the provider's retry, and is answered as a 500 - or as a
   false 409 where an endpoint maps every `DbUpdateException` to a conflict (entity type update: "name taken").
-- 30 migrations, latest `AddRuleValidation` - additive: `ValidationTerms`, `WorldRuleValidations`, `TimelineEntryValidations`;
+- 31 migrations, latest `AddRelationshipFamilySemantics` - one additive column on `RelationshipTypes`, defaulting to no family
+  meaning; the rollback uses SQLite's native `DROP COLUMN` so nothing that points at the table is rebuilt under it.
+  `FamilySemanticMigrationTests` walks it down and up on a file over kinds called parent, mother and father, and reads every
+  trigger and index back. Before it, `AddRuleValidation` - additive: `ValidationTerms`, `WorldRuleValidations`,
+  `TimelineEntryValidations`;
   nothing rebuilt. `RuleValidationMigrationTests` walks it down and up on a file and reads every trigger back. Before it,
   `AddWorldRules` - additive: `WorldRules`, its FTS5 index and three triggers; no existing table rebuilt.
   `WorldRuleMigrationTests` walks it down and up on a file and reads every search trigger back. Before it, `AddUniverseSearchIndex` - raw SQL: three FTS5 tables filled from existing rows, 21 triggers, and the
@@ -441,9 +471,9 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 - No automated test reaches Cloudflare and none can: the API host registers an in-process object
   store, Playwright runs against `Media:Provider=InMemory`, and the R2 adapter tests answer the SDK
   from an in-process HTTP handler. That covers profile photos too - they use the same store.
-- Nine rules in `src/Lorex.Api/Features/CanonIntegrity/Rules/`: three structural (Medium), three
-  chronological (High), which compare across named eras, two relationship constraints (Medium) and one world rule check
-  (Medium). Behaviour: ADR 0010, 0011, 0012, 0022, 0023, 0034.
+- Ten rules in `src/Lorex.Api/Features/CanonIntegrity/Rules/`: three structural (Medium), three
+  chronological (High), which compare across named eras, two relationship constraints (Medium), one world rule check
+  (Medium) and one family circle (Medium). Behaviour: ADR 0010, 0011, 0012, 0022, 0023, 0034, 0035.
 
 ## Remote
 

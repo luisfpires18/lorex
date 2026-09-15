@@ -9,6 +9,9 @@ namespace Lorex.Api.Features.Relationships;
 /// update, null leaves the stored constraints exactly as they are, the way a null
 /// <paramref name="DisplayOrder"/> leaves the order - so a client that predates constraints cannot
 /// wipe them by saving a rename. To clear them, send the group with no rule in it.
+///
+/// <paramref name="FamilySemantic"/> follows the same rule for the same reason: null on a create is no family meaning, null on
+/// an update keeps the stored one, and <c>None</c> clears it (ADR 0035).
 /// </summary>
 public sealed record RelationshipTypeRequest(
     string? Name,
@@ -16,7 +19,8 @@ public sealed record RelationshipTypeRequest(
     bool IsSymmetric,
     string? Description,
     int? DisplayOrder,
-    RelationshipTypeCanonConstraints? CanonConstraints = null);
+    RelationshipTypeCanonConstraints? CanonConstraints = null,
+    RelationshipFamilySemantic? FamilySemantic = null);
 
 public sealed record RelationshipTypeResponse(
     Guid Id,
@@ -26,7 +30,8 @@ public sealed record RelationshipTypeResponse(
     string? Description,
     int DisplayOrder,
     int RelationshipCount,
-    RelationshipTypeCanonConstraints CanonConstraints);
+    RelationshipTypeCanonConstraints CanonConstraints,
+    RelationshipFamilySemantic FamilySemantic);
 
 /// <summary>
 /// The rules Canon Integrity checks every Canon relationship of a type against, all on the stored

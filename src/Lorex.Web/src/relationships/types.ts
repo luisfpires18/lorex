@@ -20,6 +20,33 @@ export const AgeOrder = {
 export type AgeOrderValue = (typeof AgeOrder)[keyof typeof AgeOrder]
 
 /**
+ * Mirrors `RelationshipFamilySemantic`. What every link of a kind means to a family tree, on the stored
+ * direction: the source is the parent, the target is the child. Configured by the author, never inferred
+ * from the kind's name.
+ */
+export const FamilySemantic = {
+  None: 0,
+  BiologicalParent: 1,
+  AdoptiveParent: 2,
+} as const
+
+export type FamilySemanticValue = (typeof FamilySemantic)[keyof typeof FamilySemantic]
+
+/** What each meaning is called on screen. No enum name is ever shown. */
+export const FAMILY_SEMANTIC_LABELS: Record<FamilySemanticValue, string> = {
+  [FamilySemantic.None]: 'Not a family connection',
+  [FamilySemantic.BiologicalParent]: 'Source is the biological parent',
+  [FamilySemantic.AdoptiveParent]: 'Source is the adoptive parent',
+}
+
+/** The one word a family tree uses for a link of each meaning. */
+export const FAMILY_SEMANTIC_WORDS: Record<FamilySemanticValue, string> = {
+  [FamilySemantic.None]: '',
+  [FamilySemantic.BiologicalParent]: 'biological',
+  [FamilySemantic.AdoptiveParent]: 'adoptive',
+}
+
+/**
  * Rules Canon Integrity checks every Canon link of a type against, on the stored direction:
  * source, then target. Configured by the author and never inferred from the type's name.
  */
@@ -38,6 +65,7 @@ export interface RelationshipType {
   displayOrder: number
   relationshipCount: number
   canonConstraints: RelationshipCanonConstraints
+  familySemantic: FamilySemanticValue
 }
 
 export interface RelationshipTypeInput {
@@ -48,6 +76,8 @@ export interface RelationshipTypeInput {
   displayOrder: number | null
   /** Null on an update leaves the stored constraints as they are. */
   canonConstraints: RelationshipCanonConstraints | null
+  /** Null on an update leaves the stored family meaning as it is; `None` clears it. */
+  familySemantic: FamilySemanticValue | null
 }
 
 /** The stored link as it is, used when creating, editing and reading one row. */

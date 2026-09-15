@@ -4,6 +4,7 @@ import { RequireAuth, RequireGuest } from './auth/routes'
 import { HistoryLeaveGuard } from './lib/leaveGuard'
 import CanonPage from './pages/CanonPage'
 import EntityPage from './pages/EntityPage'
+import FamilyTreePage from './pages/FamilyTreePage'
 import IdeaPage from './pages/IdeaPage'
 import IdeasPage from './pages/IdeasPage'
 import LoginPage from './pages/LoginPage'
@@ -48,6 +49,8 @@ function Root() {
               <Route path="lore" element={<LorePage />} />
               <Route path="lore/new" element={<EntityPage />} />
               <Route path="lore/:entityId" element={<EntityPage />} />
+              <Route path="family-tree" element={<FamilyTreePage />} />
+              <Route path="family-tree/:entityId" element={<FamilyTreePage />} />
               <Route path="timeline" element={<TimelinePage />} />
               <Route path="world-rules" element={<WorldRulesPage />} />
               <Route path="world-rules/new" element={<WorldRulePage isNew />} />

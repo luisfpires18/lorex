@@ -44,3 +44,13 @@ not precede `StartDate`. No fantasy calendars.
   supplying a new one.
 - Relationships carry no custom fields. If they ever need them, the entity field model is
   the shape to copy, not JSON.
+
+## Amendment - a kind may say its links are parent links (2026-09-16)
+
+A relation kind may carry a family meaning - biological or adoptive parent - which is the only thing a family
+tree reads (ADR 0035). Nothing in this decision changes. There is still one row per link, the reverse reading
+is still derived from `InverseName` at read time, and the stored direction is still the one direction anything
+is judged on: the meaning says the source is the parent and the target the child, so no second "child of" kind
+is needed to write a link from the child's side - the kind's own inverse name is what reads it back that way.
+A symmetric kind may not carry a family meaning, for the reason it may not carry an age order (ADR 0023): it
+says neither end is special. The family tree reads these rows and writes none of its own.

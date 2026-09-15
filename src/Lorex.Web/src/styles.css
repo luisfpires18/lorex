@@ -6898,3 +6898,240 @@ a.idearef__name {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ---------- Family tree ----------
+
+   A family, drawn as generations rather than as a graph: grandparents and parents above, the entry
+   in focus and its siblings in the middle, children and grandchildren below. The lines are measured
+   from the cards and drawn behind them, and they are decoration: every connection is also written
+   out in words on the card it belongs to, so the tree reads the same without them.
+
+   The diagram scrolls sideways inside its own box on a narrow screen. The page never does. */
+
+.family__picker {
+  max-width: 26rem;
+  margin: 1.5rem 0 0.5rem;
+}
+
+.family__loop {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+}
+
+.family__note {
+  margin: 1rem 0 1.25rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  max-width: 62ch;
+}
+
+.familytree {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.familytree__scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.5rem;
+}
+
+.familytree__canvas {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+  min-width: max-content;
+  padding: 0.5rem 0.25rem 1rem;
+}
+
+.familytree__lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.familytree__line {
+  fill: none;
+  stroke: var(--rule-strong);
+  stroke-width: 1.5;
+}
+
+/* Adoptive connections are dashed, and anything that is not Canon yet is faded - the same distinction
+   the cards make in words. */
+.familytree__line[data-semantic='2'] {
+  stroke-dasharray: 5 4;
+}
+
+.familytree__line[data-canon='0'],
+.familytree__line[data-canon='1'] {
+  opacity: 0.4;
+}
+
+.familytree__row {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.familytree__rowlabel {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.familytree__members {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.familynode {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 12rem;
+  padding: 0.75rem;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+}
+
+.familynode--focal {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.familynode__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  text-align: left;
+}
+
+.familynode__button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.familynode__button:hover .familynode__name {
+  text-decoration: underline;
+}
+
+.familynode .portrait {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+}
+
+.familynode__name {
+  font-family: var(--display);
+  font-size: 1rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.familynode__action {
+  flex-basis: 100%;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.familynode__kind {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.familynode__focusmark {
+  flex-basis: 100%;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.familynode__roles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.78rem;
+}
+
+.familynode__roles li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  overflow-wrap: anywhere;
+}
+
+.familynode__position {
+  font-weight: 600;
+}
+
+.familynode__draft {
+  color: var(--danger);
+}
+
+.familynode__open {
+  font-size: 0.78rem;
+}
+
+.familytree__legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.familytree__key {
+  display: inline-block;
+  width: 1.6rem;
+  border-top: 2px solid var(--rule-strong);
+}
+
+.familytree__key[data-semantic='2'] {
+  border-top-style: dashed;
+}
+
+.familytree__legendnote {
+  flex-basis: 100%;
+}
+
+.familylink {
+  margin: 1.25rem 0;
+}
+
+@media (max-width: 640px) {
+  .familynode {
+    width: 10.5rem;
+  }
+}

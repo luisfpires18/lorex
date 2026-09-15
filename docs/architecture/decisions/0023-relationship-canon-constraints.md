@@ -113,3 +113,15 @@ file written before them, means no constraint.
   reconciled and ungated. Were a constraint ever made High, relationship create and update would move
   to `RunAsync`, and the type update would first need an answer to whether changing a rule counts as
   introducing a contradiction.
+
+## Amendment - a family meaning sits beside these constraints (2026-09-16)
+
+`RelationshipTypes` now carries a second piece of explicit configuration, `FamilySemantic` (ADR 0035), and the
+two are independent. A kind may have an age rule, a family meaning, both or neither; configuring one never
+changes the other, and a link of a family kind is checked by `CANON-REL-002` and `CANON-REL-003` exactly as any
+other link of a kind that carries those rules. What the two share is this decision's central rule, which now
+covers both: **a name has no semantic authority**. "Parent of" orders nothing and is no family link until
+someone says so, and a kind called anything at all with either configuration is read exactly as configured.
+
+`CANON-FAMILY-001` joins the two rules above as a third Medium relationship rule, so the conclusion above still
+holds: no High rule reads a relationship or a relationship type, and both writes stay reconciled and ungated.

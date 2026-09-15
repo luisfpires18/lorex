@@ -46,6 +46,14 @@ public sealed class RelationshipType
     /// <summary>The largest gap allowed between the two ends' birth years, in whole years. Null for none.</summary>
     public int? MaxAgeDifferenceYears { get; set; }
 
+    /// <summary>
+    /// What every relationship of this type means to a family tree, as the author configured it, on the stored direction:
+    /// the source is the parent and the target the child. Never read out of <see cref="Name"/> - "mother of" means nothing
+    /// to a family tree until someone says it does. Independent of the Canon constraints above. See
+    /// <c>docs/architecture/decisions/0035-family-trees.md</c>.
+    /// </summary>
+    public RelationshipFamilySemantic FamilySemantic { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
@@ -65,6 +73,22 @@ public enum RelationshipAgeOrder
 
     /// <summary>The source was born after the target.</summary>
     SourceYounger = 2,
+}
+
+/// <summary>
+/// What a <see cref="RelationshipType"/> means to a family tree. A closed set, configured by the author and never inferred;
+/// only a family tree reads it (ADR 0035). Both parent meanings point the same way: source parent, target child.
+/// </summary>
+public enum RelationshipFamilySemantic
+{
+    /// <summary>No family meaning. Every type written before family trees existed, and the default.</summary>
+    None = 0,
+
+    /// <summary>The source is a biological parent of the target.</summary>
+    BiologicalParent = 1,
+
+    /// <summary>The source is an adoptive parent of the target.</summary>
+    AdoptiveParent = 2,
 }
 
 /// <summary>

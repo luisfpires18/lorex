@@ -56,8 +56,9 @@ public static class RelationshipTypeEndpoints
         }
 
         var constraints = request.CanonConstraints ?? RelationshipTypeCanonConstraints.None;
+        var familySemantic = request.FamilySemantic ?? RelationshipFamilySemantic.None;
 
-        if (RelationshipValidation.ValidateType(request, constraints) is { } errors)
+        if (RelationshipValidation.ValidateType(request, constraints, familySemantic) is { } errors)
         {
             return Results.ValidationProblem(errors);
         }
@@ -89,6 +90,7 @@ public static class RelationshipTypeEndpoints
             AgeOrder = constraints.AgeOrder,
             MinAgeDifferenceYears = constraints.MinAgeDifferenceYears,
             MaxAgeDifferenceYears = constraints.MaxAgeDifferenceYears,
+            FamilySemantic = familySemantic,
             CreatedAt = now,
             UpdatedAt = now,
         };
@@ -117,8 +119,9 @@ public static class RelationshipTypeEndpoints
     /// fingerprint is the relationship and the offending endpoint - so a rename rewords an
     /// existing conflict in place and cannot open, close or duplicate one. <c>CANON-REL-002</c> and
     /// <c>CANON-REL-003</c> read this type's Canon constraints, so changing one can open or resolve
-    /// conflicts on every relationship of this type at once. Either way the conflict table has to
-    /// say so when the write lands, not whenever somebody next asks for an evaluation.
+    /// conflicts on every relationship of this type at once. <c>CANON-FAMILY-001</c> reads this type's family meaning, so giving
+    /// one or taking it away can open or close an ancestry circle across every link of the type (ADR 0035). Either way the
+    /// conflict table has to say so when the write lands, not whenever somebody next asks for an evaluation.
     ///
     /// Nothing is refused, on purpose. A constraint changes the rule being checked, never a fact:
     /// the years and the links are exactly what they were, and reporting what they now contradict is
@@ -159,8 +162,9 @@ public static class RelationshipTypeEndpoints
         CancellationToken cancellationToken)
     {
         var constraints = request.CanonConstraints ?? RelationshipTypeCanonConstraints.Of(relationshipType);
+        var familySemantic = request.FamilySemantic ?? relationshipType.FamilySemantic;
 
-        if (RelationshipValidation.ValidateType(request, constraints) is { } errors)
+        if (RelationshipValidation.ValidateType(request, constraints, familySemantic) is { } errors)
         {
             return Results.ValidationProblem(errors);
         }
@@ -184,6 +188,7 @@ public static class RelationshipTypeEndpoints
         relationshipType.AgeOrder = constraints.AgeOrder;
         relationshipType.MinAgeDifferenceYears = constraints.MinAgeDifferenceYears;
         relationshipType.MaxAgeDifferenceYears = constraints.MaxAgeDifferenceYears;
+        relationshipType.FamilySemantic = familySemantic;
         relationshipType.UpdatedAt = DateTime.UtcNow;
 
         try
@@ -272,7 +277,8 @@ public static class RelationshipTypeEndpoints
                 new RelationshipTypeCanonConstraints(
                     type.AgeOrder,
                     type.MinAgeDifferenceYears,
-                    type.MaxAgeDifferenceYears)))
+                    type.MaxAgeDifferenceYears),
+                type.FamilySemantic))
             .ToListAsync(cancellationToken);
 
     private static IResult NameTaken() =>
