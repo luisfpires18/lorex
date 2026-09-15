@@ -1,0 +1,936 @@
+using System.Collections.Concurrent;
+using Lorex.Api.Data;
+using Lorex.Api.Features.CanonIntegrity;
+using Lorex.Api.Features.Chronology;
+using Lorex.Api.Features.Export;
+using Lorex.Api.Features.Ideas;
+using Lorex.Api.Features.Lore;
+using Lorex.Api.Features.Media;
+using Lorex.Api.Features.Relationships;
+using Lorex.Api.Features.Stories;
+using Lorex.Api.Features.Timeline;
+using Lorex.Api.Features.Universes;
+using Microsoft.EntityFrameworkCore;
+
+namespace Lorex.Api.Features.Restore;
+
+/// <summary>
+/// Every id in a backup, and the new id it becomes in the restored universe. See ADR 0032.
+///
+/// A restore never reuses a source id. The same backup restored twice, restored into the account that
+/// exported it while the original still exists, or restored from another installation, must never
+/// meet a row that is already there - and a new universe must not share an identity with the one it
+/// was copied from. So every object the file holds is given a fresh id before anything is written,
+/// and every reference is rewritten through this one map.
+///
+/// <see cref="Map"/> is for references validation proved resolve inside the file; a miss is a bug.
+/// <see cref="Translate"/> is for ids a stored version merely recorded (ADR 0013) - a field since
+/// deleted, say. Each such id is still given a fresh id of its own, the same one every time it
+/// appears, so history stays internally consistent and can never name an object outside the restored
+/// universe.
+/// </summary>
+internal sealed class RestoreIdentity
+{
+    private readonly Dictionary<Guid, Guid> _restored = [];
+    private readonly Dictionary<Guid, Guid> _source = [];
+
+    public RestoreIdentity(UniverseBackupPayload payload)
+    {
+        foreach (var id in KnownIds(payload))
+        {
+            Allocate(id);
+        }
+    }
+
+    public Guid Map(Guid source) => _restored[source];
+
+    public Guid? Map(Guid? source) => source is { } id ? Map(id) : null;
+
+    public Guid Translate(Guid source) => _restored.TryGetValue(source, out var restored) ? restored : Allocate(source);
+
+    public Guid? Translate(Guid? source) => source is { } id ? Translate(id) : null;
+
+    /// <summary>The id a restored object had in the backup - for re-deriving what the backup identified by it.</summary>
+    public Guid Source(Guid restored) => _source.TryGetValue(restored, out var source) ? source : restored;
+
+    private Guid Allocate(Guid source)
+    {
+        var restored = Guid.NewGuid();
+        _restored[source] = restored;
+        _source[restored] = source;
+        return restored;
+    }
+
+    private static IEnumerable<Guid> KnownIds(UniverseBackupPayload payload)
+    {
+        foreach (var era in payload.ChronologyEras!)
+        {
+            yield return era.Id;
+        }
+
+        foreach (var type in payload.EntityTypes)
+        {
+            yield return type.Id;
+
+            foreach (var field in type.Fields)
+            {
+                yield return field.Id;
+
+                foreach (var option in field.Options)
+                {
+                    yield return option.Id;
+                }
+            }
+        }
+
+        foreach (var tag in payload.Tags)
+        {
+            yield return tag.Id;
+        }
+
+        foreach (var entity in payload.Entities)
+        {
+            yield return entity.Id;
+
+            foreach (var revision in entity.Revisions)
+            {
+                yield return revision.Id;
+            }
+
+            foreach (var revision in entity.ArticleRevisions!)
+            {
+                yield return revision.Id;
+            }
+        }
+
+        foreach (var type in payload.RelationshipTypes)
+        {
+            yield return type.Id;
+        }
+
+        foreach (var relationship in payload.Relationships)
+        {
+            yield return relationship.Id;
+        }
+
+        foreach (var entry in payload.TimelineEntries)
+        {
+            yield return entry.Id;
+        }
+
+        foreach (var story in payload.Stories!)
+        {
+            yield return story.Id;
+
+            foreach (var chapter in story.Chapters!)
+            {
+                yield return chapter.Id;
+            }
+
+            foreach (var scene in story.Scenes)
+            {
+                yield return scene.Id;
+
+                foreach (var revision in scene.Manuscript?.Revisions ?? [])
+                {
+                    yield return revision.Id;
+                }
+            }
+
+            foreach (var arc in story.PlotArcs!)
+            {
+                yield return arc.Id;
+
+                foreach (var beat in arc.Beats)
+                {
+                    yield return beat.Id;
+                }
+            }
+        }
+
+        foreach (var idea in payload.Ideas!)
+        {
+            yield return idea.Id;
+        }
+    }
+}
+
+/// <summary>The account already has a universe by the name chosen for the restore. Nothing was kept.</summary>
+internal sealed class RestoreNameTakenException() : Exception("The account already has a universe with that name.");
+
+/// <summary>
+/// Writes a validated backup as a new universe owned by the restoring account. See ADR 0032.
+///
+/// <para><b>Not a replay.</b> Nothing goes through the endpoints a person uses. Those would record a
+/// version for every entry written, run the Canon gate on every write, close and reopen order gaps and
+/// reindex search row by row - a fabricated history of an importer typing the world back in. This
+/// writes the rows the backup describes, with the history the backup holds, once.</para>
+///
+/// <para><b>Media first, then the database, then nothing.</b> R2 and SQLite share no transaction, so the
+/// order is the one ADR 0019 uses for an upload. Every picture is written under keys built from the new
+/// universe's id, which nothing else can be using. Only when all of them are stored does one database
+/// transaction write every row, index the lore, reconcile Canon and commit. A failure anywhere before
+/// the commit rolls the database back and sweeps every key this restore tried to write - never another
+/// key, so no existing picture can be touched. What cannot happen is a committed universe naming a
+/// picture that is not there. A process that dies between the pictures and the commit leaves unreferenced
+/// objects under a universe id that never existed; that is the same trade ADR 0019 already accepts.</para>
+///
+/// <para><b>Derived data is derived again.</b> Thumbnails are cut from the originals. The lore search
+/// index is written from the restored entries; the story, manuscript and idea indexes are filled by their
+/// triggers as the rows land (ADR 0031). Canon conflicts are evaluated afresh, and each dismissal the
+/// backup recorded is re-applied to the finding it identified.</para>
+/// </summary>
+internal sealed partial class UniverseRestore(
+    LorexDbContext db,
+    IMediaObjectStore store,
+    CanonIntegrityEvaluator evaluator,
+    ILogger logger)
+{
+    public async Task<Universe> RestoreAsync(
+        RestorableBackup backup,
+        OpenedBackup opened,
+        string ownerId,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        var ids = new RestoreIdentity(backup.Payload);
+        var universeId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var attempted = new ConcurrentQueue<string>();
+
+        try
+        {
+            var images = await StoreImagesAsync(backup, opened, ids, universeId, now, attempted, cancellationToken);
+            return await WriteAsync(backup.Payload, ids, universeId, ownerId, name, now, images, cancellationToken);
+        }
+        catch
+        {
+            // Nothing references these: the transaction never committed. A key that was never written deletes as nothing.
+            if (!attempted.IsEmpty)
+            {
+                await MediaObjectWrites.SweepAsync(store, logger, LogOrphanedObject, [.. attempted]);
+            }
+
+            throw;
+        }
+    }
+
+    // ---------- Pictures ----------
+
+    private async Task<Dictionary<Guid, EntityImage>> StoreImagesAsync(
+        RestorableBackup backup,
+        OpenedBackup opened,
+        RestoreIdentity ids,
+        Guid universeId,
+        DateTime now,
+        ConcurrentQueue<string> attempted,
+        CancellationToken cancellationToken)
+    {
+        var rows = new ConcurrentDictionary<Guid, EntityImage>();
+        var withImages = backup.Payload.Entities.Where(entity => entity.Image is not null).ToList();
+
+        if (withImages.Count == 0)
+        {
+            return [];
+        }
+
+        using var failed = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var gate = new SemaphoreSlim(BackupRestoreLimits.ImageConcurrency);
+
+        var writes = withImages.Select(async entity =>
+        {
+            await gate.WaitAsync(failed.Token);
+            try
+            {
+                var image = entity.Image!;
+                var validated = backup.Images[entity.Id];
+                var original = await opened.ReadMediaAsync(validated.MediaPath, failed.Token);
+
+                var entityId = ids.Map(entity.Id);
+                var assetId = Guid.NewGuid();
+                var thumbnailId = Guid.NewGuid();
+                var originalKey = EntityImageKeys.Original(universeId, entityId, assetId, validated.Extension);
+                var thumbnailKey = EntityImageKeys.Thumbnail(universeId, entityId, assetId, thumbnailId);
+
+                attempted.Enqueue(originalKey);
+                attempted.Enqueue(thumbnailKey);
+
+                using var originalBytes = new MemoryStream(original, writable: false);
+                using var thumbnailBytes = new MemoryStream(validated.Thumbnail, writable: false);
+
+                await MediaObjectWrites.PutAllAsync(
+                    store,
+                    failed.Token,
+                    new PendingMediaObject(originalKey, originalBytes, validated.ContentType),
+                    new PendingMediaObject(thumbnailKey, thumbnailBytes, "image/webp"));
+
+                rows[entity.Id] = new EntityImage
+                {
+                    EntityId = entityId,
+                    AssetId = assetId,
+                    OriginalKey = originalKey,
+                    ThumbnailId = thumbnailId,
+                    ThumbnailKey = thumbnailKey,
+
+                    // The framing the author chose, exactly as the backup recorded it; null stays null and still means
+                    // the centred square the thumbnail was just cut as.
+                    CropX = image.Crop?.X,
+                    CropY = image.Crop?.Y,
+                    CropWidth = image.Crop?.Width,
+                    CropHeight = image.Crop?.Height,
+                    ContentType = validated.ContentType,
+                    FileName = FileNameLabel(image.FileName),
+                    Width = validated.Width,
+                    Height = validated.Height,
+                    ByteSize = validated.ByteSize,
+
+                    // Not in the format: this is when the picture arrived in this installation.
+                    UploadedAt = now,
+                };
+            }
+            catch
+            {
+                await failed.CancelAsync();
+                throw;
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }).ToArray();
+
+        try
+        {
+            await Task.WhenAll(writes);
+        }
+        catch
+        {
+            // Report what actually went wrong, not the cancellation it caused in the writes still queued behind it.
+            var cause = writes
+                .Where(write => write.IsFaulted)
+                .Select(write => write.Exception!.InnerExceptions[0])
+                .FirstOrDefault(exception => exception is not OperationCanceledException);
+
+            if (cause is not null)
+            {
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(cause);
+            }
+
+            throw;
+        }
+
+        return new Dictionary<Guid, EntityImage>(rows);
+    }
+
+    private static string? FileNameLabel(string? fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return null;
+        }
+
+        var label = Path.GetFileName(fileName.Trim());
+        return label.Length == 0 ? null : label[..Math.Min(label.Length, StoredImageLimits.FileNameMaxLength)];
+    }
+
+    // ---------- The database ----------
+
+    private async Task<Universe> WriteAsync(
+        UniverseBackupPayload payload,
+        RestoreIdentity ids,
+        Guid universeId,
+        string ownerId,
+        string name,
+        DateTime now,
+        Dictionary<Guid, EntityImage> images,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        if (await db.Universes.AnyAsync(universe => universe.OwnerId == ownerId && universe.Name == name, cancellationToken))
+        {
+            throw new RestoreNameTakenException();
+        }
+
+        var source = payload.Universe;
+        var universe = new Universe
+        {
+            Id = universeId,
+            OwnerId = ownerId,
+            Name = name,
+            Description = source.Description,
+            AccentColor = source.AccentColor?.ToLowerInvariant(),
+            IsArchived = source.IsArchived,
+
+            // The universe is new in this account; everything inside it keeps the moments the backup recorded.
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+
+        var detectChanges = db.ChangeTracker.AutoDetectChangesEnabled;
+        db.ChangeTracker.AutoDetectChangesEnabled = false;
+
+        try
+        {
+            db.Universes.Add(universe);
+            AddLore(payload, ids, universeId, images);
+            AddStories(payload, ids, universeId);
+            AddIdeas(payload, ids, universeId, ownerId);
+
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            // The unique index settles a universe of the same name created a moment ago; anything else is a real failure.
+            db.ChangeTracker.Clear();
+            await transaction.RollbackAsync(cancellationToken);
+
+            if (await db.Universes.AnyAsync(candidate => candidate.OwnerId == ownerId && candidate.Name == name, cancellationToken))
+            {
+                throw new RestoreNameTakenException();
+            }
+
+            throw;
+        }
+        finally
+        {
+            // Thousands of rows need not stay tracked for what follows, which reads through queries of its own.
+            db.ChangeTracker.Clear();
+            db.ChangeTracker.AutoDetectChangesEnabled = detectChanges;
+        }
+
+        foreach (var entity in payload.Entities)
+        {
+            await EntitySearchIndex.ReindexAsync(db, ids.Map(entity.Id), cancellationToken);
+        }
+
+        await ReconcileCanonAsync(payload, ids, universeId, cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+
+        return universe;
+    }
+
+    private void AddLore(UniverseBackupPayload payload, RestoreIdentity ids, Guid universeId, Dictionary<Guid, EntityImage> images)
+    {
+        foreach (var era in payload.ChronologyEras!)
+        {
+            db.ChronologyEras.Add(new ChronologyEra
+            {
+                Id = ids.Map(era.Id),
+                UniverseId = universeId,
+                Name = era.Name,
+                Abbreviation = era.Abbreviation,
+                SortOrder = era.SortOrder,
+                Direction = era.Direction,
+                LabelPosition = era.LabelPosition,
+            });
+        }
+
+        foreach (var type in payload.EntityTypes)
+        {
+            db.EntityTypes.Add(new EntityType
+            {
+                Id = ids.Map(type.Id),
+                UniverseId = universeId,
+                Name = type.Name,
+                Description = type.Description,
+                Icon = type.Icon,
+                AccentColor = type.AccentColor?.ToLowerInvariant(),
+                DisplayOrder = type.DisplayOrder,
+                CreatedAt = type.CreatedAt,
+                UpdatedAt = type.UpdatedAt,
+            });
+
+            foreach (var field in type.Fields)
+            {
+                db.EntityFieldDefinitions.Add(new EntityFieldDefinition
+                {
+                    Id = ids.Map(field.Id),
+                    EntityTypeId = ids.Map(type.Id),
+                    Name = field.Name,
+                    Kind = field.Kind,
+                    Semantic = field.Semantic,
+                    IsRequired = field.IsRequired,
+                    DisplayOrder = field.DisplayOrder,
+                    DefaultValue = field.DefaultValue,
+                });
+
+                foreach (var option in field.Options)
+                {
+                    db.EntityFieldOptions.Add(new EntityFieldOption
+                    {
+                        Id = ids.Map(option.Id),
+                        FieldDefinitionId = ids.Map(field.Id),
+                        Value = option.Value,
+                        DisplayOrder = option.DisplayOrder,
+                    });
+                }
+            }
+        }
+
+        foreach (var tag in payload.Tags)
+        {
+            db.Tags.Add(new Tag
+            {
+                Id = ids.Map(tag.Id),
+                UniverseId = universeId,
+                Name = tag.Name,
+                Slug = tag.Name.ToLowerInvariant(),
+            });
+        }
+
+        foreach (var entity in payload.Entities)
+        {
+            AddEntity(entity, ids, universeId, images);
+        }
+
+        foreach (var type in payload.RelationshipTypes)
+        {
+            db.RelationshipTypes.Add(new RelationshipType
+            {
+                Id = ids.Map(type.Id),
+                UniverseId = universeId,
+                Name = type.Name,
+                InverseName = type.InverseName,
+                IsSymmetric = type.IsSymmetric,
+                Description = type.Description,
+                DisplayOrder = type.DisplayOrder,
+                AgeOrder = type.AgeOrder,
+                MinAgeDifferenceYears = type.MinAgeDifferenceYears,
+                MaxAgeDifferenceYears = type.MaxAgeDifferenceYears,
+                CreatedAt = type.CreatedAt,
+                UpdatedAt = type.UpdatedAt,
+            });
+        }
+
+        foreach (var relationship in payload.Relationships)
+        {
+            db.Relationships.Add(new LoreRelationship
+            {
+                Id = ids.Map(relationship.Id),
+                UniverseId = universeId,
+                RelationshipTypeId = ids.Map(relationship.RelationshipTypeId),
+                SourceEntityId = ids.Map(relationship.SourceEntityId),
+                TargetEntityId = ids.Map(relationship.TargetEntityId),
+                CanonStatus = relationship.CanonStatus,
+                StartDate = relationship.StartDate,
+                EndDate = relationship.EndDate,
+                Notes = relationship.Notes,
+                CreatedAt = relationship.CreatedAt,
+                UpdatedAt = relationship.UpdatedAt,
+            });
+        }
+
+        foreach (var entry in payload.TimelineEntries)
+        {
+            var entryId = ids.Map(entry.Id);
+
+            db.TimelineEntries.Add(new TimelineEntry
+            {
+                Id = entryId,
+                UniverseId = universeId,
+                Title = entry.Title,
+                Description = entry.Description,
+                CanonStatus = entry.CanonStatus,
+                DateKind = entry.DateKind,
+                StartYear = entry.StartYear,
+                StartMonth = entry.StartMonth,
+                StartDay = entry.StartDay,
+                EndYear = entry.EndYear,
+                EndMonth = entry.EndMonth,
+                EndDay = entry.EndDay,
+                StartEraId = ids.Map(entry.StartEraId),
+                EndEraId = ids.Map(entry.EndEraId),
+                EraLabel = entry.EraLabel,
+                CreatedAt = entry.CreatedAt,
+                UpdatedAt = entry.UpdatedAt,
+            });
+
+            foreach (var participant in entry.ParticipantEntityIds)
+            {
+                db.TimelineEntryLinks.Add(new TimelineEntryLink { TimelineEntryId = entryId, EntityId = ids.Map(participant) });
+            }
+        }
+    }
+
+    private void AddEntity(BackupEntity entity, RestoreIdentity ids, Guid universeId, Dictionary<Guid, EntityImage> images)
+    {
+        var entityId = ids.Map(entity.Id);
+
+        db.Entities.Add(new LoreEntity
+        {
+            Id = entityId,
+            UniverseId = universeId,
+            EntityTypeId = ids.Map(entity.EntityTypeId),
+            Name = entity.Name,
+            Summary = entity.Summary,
+            CanonStatus = entity.CanonStatus,
+            IsArchived = entity.IsArchived,
+            DeletedAt = entity.DeletedAt,
+            CreatedAt = entity.CreatedAt,
+            UpdatedAt = entity.UpdatedAt,
+        });
+
+        foreach (var alias in entity.Aliases)
+        {
+            db.EntityAliases.Add(new EntityAlias { Id = Guid.NewGuid(), EntityId = entityId, Value = alias });
+        }
+
+        foreach (var tagId in entity.TagIds)
+        {
+            db.EntityTags.Add(new EntityTag { EntityId = entityId, TagId = ids.Map(tagId) });
+        }
+
+        foreach (var value in entity.FieldValues)
+        {
+            db.EntityFieldValues.Add(new EntityFieldValue
+            {
+                Id = Guid.NewGuid(),
+                EntityId = entityId,
+                FieldDefinitionId = ids.Map(value.FieldDefinitionId),
+                TextValue = value.TextValue,
+                NumberValue = value.NumberValue,
+                EraId = ids.Map(value.EraId),
+                BooleanValue = value.BooleanValue,
+                DateValue = value.DateValue,
+                OptionId = ids.Map(value.OptionId),
+                ReferencedEntityId = ids.Map(value.ReferencedEntityId),
+            });
+        }
+
+        // An article row exists exactly when it was ever saved; a cleared one is a row holding nothing (ADR 0028).
+        if (entity.ArticleUpdatedAt is { } articleUpdatedAt)
+        {
+            db.EntityArticles.Add(new EntityArticle
+            {
+                EntityId = entityId,
+                Content = entity.Content ?? string.Empty,
+                UpdatedAt = articleUpdatedAt,
+            });
+        }
+
+        foreach (var revision in entity.ArticleRevisions!)
+        {
+            db.EntityArticleRevisions.Add(new EntityArticleRevision
+            {
+                Id = ids.Map(revision.Id),
+                EntityId = entityId,
+                Number = revision.Number,
+                Kind = revision.Kind,
+                RestoredFromRevisionId = ids.Translate(revision.RestoredFromRevisionId),
+                CreatedAt = revision.CreatedAt,
+                Content = revision.Content,
+            });
+        }
+
+        if (images.TryGetValue(entity.Id, out var image))
+        {
+            db.EntityImages.Add(image);
+        }
+
+        foreach (var revision in entity.Revisions)
+        {
+            var revisionRow = new EntityRevision
+            {
+                Id = ids.Map(revision.Id),
+                EntityId = entityId,
+                Number = revision.Number,
+                Kind = revision.Kind,
+                Changes = revision.Changes,
+                RestoredFromRevisionId = ids.Translate(revision.RestoredFromRevisionId),
+                CreatedAt = revision.CreatedAt,
+                EntityTypeId = ids.Translate(revision.EntityTypeId),
+                EntityTypeName = revision.EntityTypeName,
+                Name = revision.Name,
+                Summary = revision.Summary,
+                Content = revision.Content,
+                CanonStatus = revision.CanonStatus,
+            };
+
+            db.EntityRevisions.Add(revisionRow);
+
+            foreach (var alias in revision.Aliases)
+            {
+                db.EntityRevisionAliases.Add(new EntityRevisionAlias { Id = Guid.NewGuid(), RevisionId = revisionRow.Id, Value = alias });
+            }
+
+            foreach (var tag in revision.Tags)
+            {
+                db.EntityRevisionTags.Add(new EntityRevisionTag { Id = Guid.NewGuid(), RevisionId = revisionRow.Id, Name = tag });
+            }
+
+            foreach (var value in revision.FieldValues)
+            {
+                db.EntityRevisionFieldValues.Add(new EntityRevisionFieldValue
+                {
+                    Id = Guid.NewGuid(),
+                    RevisionId = revisionRow.Id,
+                    FieldDefinitionId = ids.Translate(value.FieldDefinitionId),
+                    FieldName = value.FieldName,
+                    Kind = value.Kind,
+                    DisplayOrder = value.DisplayOrder,
+                    TextValue = value.TextValue,
+                    NumberValue = value.NumberValue,
+                    EraId = ids.Translate(value.EraId),
+                    EraLabel = value.EraLabel,
+                    BooleanValue = value.BooleanValue,
+                    DateValue = value.DateValue,
+                    OptionId = ids.Translate(value.OptionId),
+                    OptionValue = value.OptionValue,
+                    ReferencedEntityId = ids.Translate(value.ReferencedEntityId),
+                    ReferencedEntityName = value.ReferencedEntityName,
+                });
+            }
+        }
+    }
+
+    private void AddStories(UniverseBackupPayload payload, RestoreIdentity ids, Guid universeId)
+    {
+        foreach (var story in payload.Stories!)
+        {
+            var storyId = ids.Map(story.Id);
+
+            db.Stories.Add(new Story
+            {
+                Id = storyId,
+                UniverseId = universeId,
+                Title = story.Title,
+                Premise = story.Premise,
+                Status = story.Status,
+                CreatedAt = story.CreatedAt,
+                UpdatedAt = story.UpdatedAt,
+                DeletedAt = story.DeletedAt,
+            });
+
+            foreach (var chapter in story.Chapters!)
+            {
+                db.Chapters.Add(new Chapter
+                {
+                    Id = ids.Map(chapter.Id),
+                    StoryId = storyId,
+                    Title = chapter.Title,
+                    Summary = chapter.Summary,
+                    Notes = chapter.Notes,
+                    SortOrder = chapter.SortOrder,
+                    CreatedAt = chapter.CreatedAt,
+                    UpdatedAt = chapter.UpdatedAt,
+                    DeletedAt = chapter.DeletedAt,
+                });
+            }
+
+            foreach (var scene in story.Scenes)
+            {
+                var sceneId = ids.Map(scene.Id);
+
+                db.Scenes.Add(new Scene
+                {
+                    Id = sceneId,
+                    StoryId = storyId,
+                    Title = scene.Title,
+                    Summary = scene.Summary,
+                    Notes = scene.Notes,
+                    ChapterId = ids.Map(scene.ChapterId),
+                    SortOrder = scene.SortOrder,
+                    PovEntityId = ids.Map(scene.PovEntityId),
+                    EraId = ids.Map(scene.Chronology?.EraId),
+                    Year = scene.Chronology?.Year,
+                    Month = scene.Chronology?.Month,
+                    Day = scene.Chronology?.Day,
+                    CreatedAt = scene.CreatedAt,
+                    UpdatedAt = scene.UpdatedAt,
+                    DeletedAt = scene.DeletedAt,
+                });
+
+                foreach (var entityId in scene.LinkedEntityIds)
+                {
+                    db.SceneEntityLinks.Add(new SceneEntityLink { SceneId = sceneId, EntityId = ids.Map(entityId) });
+                }
+
+                if (scene.Manuscript is { } manuscript)
+                {
+                    db.SceneManuscripts.Add(new SceneManuscript
+                    {
+                        SceneId = sceneId,
+                        Content = manuscript.Content,
+                        UpdatedAt = manuscript.UpdatedAt,
+                    });
+
+                    foreach (var revision in manuscript.Revisions!)
+                    {
+                        db.SceneManuscriptRevisions.Add(new SceneManuscriptRevision
+                        {
+                            Id = ids.Map(revision.Id),
+                            SceneId = sceneId,
+                            Number = revision.Number,
+                            Kind = revision.Kind,
+                            RestoredFromRevisionId = ids.Translate(revision.RestoredFromRevisionId),
+                            CreatedAt = revision.CreatedAt,
+                            Content = revision.Content,
+                        });
+                    }
+                }
+            }
+
+            foreach (var arc in story.PlotArcs!)
+            {
+                var arcId = ids.Map(arc.Id);
+
+                db.PlotArcs.Add(new PlotArc
+                {
+                    Id = arcId,
+                    StoryId = storyId,
+                    Title = arc.Title,
+                    Description = arc.Description,
+                    Notes = arc.Notes,
+                    SortOrder = arc.SortOrder,
+                    CreatedAt = arc.CreatedAt,
+                    UpdatedAt = arc.UpdatedAt,
+                    DeletedAt = arc.DeletedAt,
+                });
+
+                foreach (var beat in arc.Beats)
+                {
+                    var beatId = ids.Map(beat.Id);
+
+                    db.PlotBeats.Add(new PlotBeat
+                    {
+                        Id = beatId,
+                        PlotArcId = arcId,
+                        Title = beat.Title,
+                        Description = beat.Description,
+                        Notes = beat.Notes,
+                        SortOrder = beat.SortOrder,
+                        CreatedAt = beat.CreatedAt,
+                        UpdatedAt = beat.UpdatedAt,
+                        DeletedAt = beat.DeletedAt,
+                    });
+
+                    foreach (var sceneId in beat.LinkedSceneIds)
+                    {
+                        db.PlotBeatScenes.Add(new PlotBeatScene { PlotBeatId = beatId, SceneId = ids.Map(sceneId) });
+                    }
+
+                    foreach (var entityId in beat.LinkedEntityIds)
+                    {
+                        db.PlotBeatEntities.Add(new PlotBeatEntity { PlotBeatId = beatId, EntityId = ids.Map(entityId) });
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// The ideas of the backed-up universe become the restoring account's ideas about the restored one (ADR 0030).
+    /// The file's association with its universe is what says they belong here; no owner id is read from it.
+    /// </summary>
+    private void AddIdeas(UniverseBackupPayload payload, RestoreIdentity ids, Guid universeId, string ownerId)
+    {
+        foreach (var idea in payload.Ideas!)
+        {
+            var ideaId = ids.Map(idea.Id);
+
+            db.Ideas.Add(new Idea
+            {
+                Id = ideaId,
+                OwnerId = ownerId,
+                UniverseId = universeId,
+                Title = idea.Title,
+                Body = idea.Body,
+                CreatedAt = idea.CreatedAt,
+                UpdatedAt = idea.UpdatedAt,
+                DeletedAt = idea.DeletedAt,
+            });
+
+            foreach (var reference in idea.References)
+            {
+                var targetId = ids.Map(reference.Id);
+
+                switch (reference.Kind)
+                {
+                    case IdeaReferenceKind.Entity:
+                        db.IdeaEntityReferences.Add(new IdeaEntityReference { IdeaId = ideaId, EntityId = targetId });
+                        break;
+                    case IdeaReferenceKind.Story:
+                        db.IdeaStoryReferences.Add(new IdeaStoryReference { IdeaId = ideaId, StoryId = targetId });
+                        break;
+                    case IdeaReferenceKind.Scene:
+                        db.IdeaSceneReferences.Add(new IdeaSceneReference { IdeaId = ideaId, SceneId = targetId });
+                        break;
+                    case IdeaReferenceKind.PlotArc:
+                        db.IdeaPlotArcReferences.Add(new IdeaPlotArcReference { IdeaId = ideaId, PlotArcId = targetId });
+                        break;
+                    case IdeaReferenceKind.PlotBeat:
+                        db.IdeaPlotBeatReferences.Add(new IdeaPlotBeatReference { IdeaId = ideaId, PlotBeatId = targetId });
+                        break;
+                }
+            }
+        }
+    }
+
+    // ---------- Canon ----------
+
+    /// <summary>
+    /// Conflicts are derived (ADR 0010), so they are found again over the restored lore rather than copied. A dismissal
+    /// is not derived, and the backup identifies each one by a fingerprint of the ids it was about - ids this universe
+    /// no longer uses. So each finding's fingerprint is also computed over the ids its records had in the backup, and a
+    /// finding whose old fingerprint was dismissed is dismissed again, as of when it was. A dismissal whose finding no
+    /// longer arises is not kept: evaluation would have resolved it in the source universe the next time it ran.
+    /// </summary>
+    private async Task ReconcileCanonAsync(
+        UniverseBackupPayload payload,
+        RestoreIdentity ids,
+        Guid universeId,
+        CancellationToken cancellationToken)
+    {
+        var findings = await evaluator.DetectAsync(universeId, cancellationToken);
+        await evaluator.ReconcileAsync(universeId, findings, cancellationToken);
+
+        if (payload.DismissedConflicts.Count == 0 || findings.Count == 0)
+        {
+            return;
+        }
+
+        var dismissedAt = payload.DismissedConflicts.ToDictionary(
+            conflict => conflict.Fingerprint,
+            conflict => conflict.DismissedAt,
+            StringComparer.Ordinal);
+
+        var dismiss = new Dictionary<string, DateTime>(StringComparer.Ordinal);
+
+        foreach (var finding in findings.Values)
+        {
+            var original = CanonFingerprint.Of(finding.RuleCode, finding.FingerprintIds.Select(ids.Source));
+
+            if (dismissedAt.TryGetValue(original, out var moment))
+            {
+                dismiss[finding.Fingerprint] = moment;
+            }
+        }
+
+        if (dismiss.Count == 0)
+        {
+            return;
+        }
+
+        var conflicts = await db.CanonConflicts
+            .Where(conflict => conflict.UniverseId == universeId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var conflict in conflicts)
+        {
+            if (dismiss.TryGetValue(conflict.Fingerprint, out var moment))
+            {
+                conflict.Status = CanonConflictStatus.Dismissed;
+                conflict.UpdatedAt = moment;
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Orphaned media object left behind at '{ObjectKey}' after a restore that did not complete. Nothing references it and it is safe to delete.")]
+    private static partial void LogOrphanedObject(ILogger logger, string objectKey, Exception exception);
+}

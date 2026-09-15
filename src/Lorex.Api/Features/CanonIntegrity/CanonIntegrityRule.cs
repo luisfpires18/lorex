@@ -18,14 +18,23 @@ public sealed record CanonFindingSubject(CanonSubjectKind Kind, Guid SubjectId, 
 /// One problem a rule detected on one evaluation. Findings are values, not rows: the
 /// evaluator decides what to store. Two runs over unchanged lore must produce findings
 /// with identical fingerprints, or evaluation stops being idempotent.
+///
+/// <paramref name="FingerprintIds"/> are the ids the rule identifies the problem by, in the
+/// rule's own order, and <see cref="Fingerprint"/> is always their hash. The ids are kept on
+/// the finding rather than only hashed away because a restore gives every record a new id
+/// (ADR 0032): to re-apply a dismissal a backup recorded under the old ids, the importer hashes
+/// the same ids translated back, which only works if it can see which ids went in.
 /// </summary>
 public sealed record CanonFinding(
     string RuleCode,
     CanonConflictSeverity Severity,
-    string Fingerprint,
+    IReadOnlyList<Guid> FingerprintIds,
     string Title,
     string Explanation,
-    IReadOnlyList<CanonFindingSubject> Subjects);
+    IReadOnlyList<CanonFindingSubject> Subjects)
+{
+    public string Fingerprint { get; } = CanonFingerprint.Of(RuleCode, FingerprintIds);
+}
 
 /// <summary>
 /// A deterministic check over one universe's lore.
@@ -81,4 +90,12 @@ public static class CanonFingerprint
 
     /// <summary>Guids in one invariant form, so the hash never depends on formatting.</summary>
     public static string Id(Guid id) => id.ToString("N", CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// The fingerprint of a finding identified by <paramref name="ids"/>: exactly
+    /// <see cref="From"/> over each id in its invariant form, so every conflict already stored
+    /// keeps the fingerprint it was recorded with.
+    /// </summary>
+    public static string Of(string ruleCode, IEnumerable<Guid> ids) =>
+        From(ruleCode, [.. ids.Select(Id)]);
 }

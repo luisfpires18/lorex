@@ -75,11 +75,7 @@ public sealed class CanonTimelineBeforeBirthRule : ICanonIntegrityRule
             // The moment, the participant, and the field the birth year came from. Editing
             // either year refreshes this conflict; moving the meaning to a different field
             // is a different fact and opens a new one.
-            CanonFingerprint.From(
-                RuleCode,
-                CanonFingerprint.Id(moment.EntryId),
-                CanonFingerprint.Id(lifespan.EntityId),
-                CanonFingerprint.Id(birth.FieldDefinitionId)),
+            [moment.EntryId, lifespan.EntityId, birth.FieldDefinitionId],
             CanonRuleText.Title(title),
             CanonRuleText.Explanation(explanation),
             [

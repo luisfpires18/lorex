@@ -155,7 +155,9 @@ Accepted deliberately. Each one is a reason this topology is not a production to
   short outage.
 - **Data Protection keys are unencrypted at rest**, with no rotation policy and no Key Vault.
   Anyone who can read `/home/data/keys` can forge a session cookie.
-- **No automated backup, and no restore path** beyond the per-universe export archive.
+- **No automated backup.** The per-universe export archive is the only backup, taken by hand; it restores as a new
+  universe from the universes page (ADR 0032). A validated upload waits up to 30 minutes in the site's local temp folder -
+  not on `/home` - so a restart or redeploy in between asks the author to choose the file again.
 - **`AllowedHosts` is `*` by default.** Narrow it to the site hostname
   (`az webapp config appsettings set --settings AllowedHosts=<app-name>.azurewebsites.net`)
   once DEV is reachable; adding a custom domain later means updating it again.

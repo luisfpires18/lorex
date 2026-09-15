@@ -84,12 +84,7 @@ public sealed class CanonRelationshipAgeGapRule : ICanonIntegrityRule
 
             // The link, its type and its two ends. The years and the bound are not in it, so a
             // corrected year or a retuned bound rewords this conflict or resolves it.
-            CanonFingerprint.From(
-                RuleCode,
-                CanonFingerprint.Id(relationship.RelationshipId),
-                CanonFingerprint.Id(relationship.TypeId),
-                CanonFingerprint.Id(relationship.Source.EntityId),
-                CanonFingerprint.Id(relationship.Target.EntityId)),
+            [relationship.RelationshipId, relationship.TypeId, relationship.Source.EntityId, relationship.Target.EntityId],
             CanonRuleText.Title(title),
             CanonRuleText.Explanation(explanation),
             [

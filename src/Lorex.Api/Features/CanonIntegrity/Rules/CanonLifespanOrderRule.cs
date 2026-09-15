@@ -60,11 +60,7 @@ public sealed class CanonLifespanOrderRule : ICanonIntegrityRule
             // The entity and the two fields that disagree - never the years themselves.
             // Correcting 3441 to 2441 leaves the same conflict to reword or resolve, while
             // moving the meaning to a different field is a different fact and a new one.
-            CanonFingerprint.From(
-                RuleCode,
-                CanonFingerprint.Id(lifespan.EntityId),
-                CanonFingerprint.Id(birth.FieldDefinitionId),
-                CanonFingerprint.Id(death.FieldDefinitionId)),
+            [lifespan.EntityId, birth.FieldDefinitionId, death.FieldDefinitionId],
             CanonRuleText.Title(title),
             CanonRuleText.Explanation(explanation),
             [

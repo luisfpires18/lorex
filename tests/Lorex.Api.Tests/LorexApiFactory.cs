@@ -1,9 +1,11 @@
+using System.Data.Common;
 using Lorex.Api.Data;
 using Lorex.Api.Features.Media;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -28,6 +30,12 @@ public sealed class LorexApiFactory : WebApplicationFactory<Program>
     /// </summary>
     public TestMediaObjectStore Media { get; } = new();
 
+    /// <summary>A way to make one database command fail, for proving what a failure leaves behind.</summary>
+    public TestCommandFaults Commands { get; } = new();
+
+    /// <summary>The clock the host reads where it asks for one, which a test may move forward.</summary>
+    public TestClock Clock { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -38,10 +46,13 @@ public sealed class LorexApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<LorexDbContext>();
 
             _connection.Open();
-            services.AddDbContext<LorexDbContext>(options => options.UseSqlite(_connection));
+            services.AddDbContext<LorexDbContext>(options => options.UseSqlite(_connection).AddInterceptors(Commands));
 
             services.RemoveAll<IMediaObjectStore>();
             services.AddSingleton<IMediaObjectStore>(Media);
+
+            services.RemoveAll<TimeProvider>();
+            services.AddSingleton<TimeProvider>(Clock);
         });
     }
 
@@ -53,4 +64,71 @@ public sealed class LorexApiFactory : WebApplicationFactory<Program>
             _connection.Dispose();
         }
     }
+}
+
+/// <summary>
+/// Fails any command <see cref="FailWhen"/> picks, just before it runs. Unset, it does nothing. Registered on every
+/// context the host creates, so a failure can be placed deep inside a request that no HTTP input could break.
+/// </summary>
+public sealed class TestCommandFaults : DbCommandInterceptor
+{
+    public Func<DbCommand, bool>? FailWhen { get; set; }
+
+    public override InterceptionResult<DbDataReader> ReaderExecuting(
+        DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result)
+    {
+        Check(command);
+        return result;
+    }
+
+    public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+        DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
+    {
+        Check(command);
+        return ValueTask.FromResult(result);
+    }
+
+    public override InterceptionResult<int> NonQueryExecuting(
+        DbCommand command, CommandEventData eventData, InterceptionResult<int> result)
+    {
+        Check(command);
+        return result;
+    }
+
+    public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+        DbCommand command, CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+    {
+        Check(command);
+        return ValueTask.FromResult(result);
+    }
+
+    public override InterceptionResult<object> ScalarExecuting(
+        DbCommand command, CommandEventData eventData, InterceptionResult<object> result)
+    {
+        Check(command);
+        return result;
+    }
+
+    public override ValueTask<InterceptionResult<object>> ScalarExecutingAsync(
+        DbCommand command, CommandEventData eventData, InterceptionResult<object> result, CancellationToken cancellationToken = default)
+    {
+        Check(command);
+        return ValueTask.FromResult(result);
+    }
+
+    private void Check(DbCommand command)
+    {
+        if (FailWhen?.Invoke(command) == true)
+        {
+            throw new InvalidOperationException("A test failed this command on purpose.");
+        }
+    }
+}
+
+/// <summary>The system clock, plus however far a test has moved it.</summary>
+public sealed class TestClock : TimeProvider
+{
+    public TimeSpan Offset { get; set; }
+
+    public override DateTimeOffset GetUtcNow() => System.GetUtcNow() + Offset;
 }

@@ -72,12 +72,7 @@ public sealed class CanonRelationshipAgeOrderRule : ICanonIntegrityRule
             // Who must be the elder, who the younger, under which type and on which link - never the
             // years. Correcting a year rewords this conflict or resolves it; reversing the link or
             // flipping the rule makes a different entry the one at fault, and a different conflict.
-            CanonFingerprint.From(
-                RuleCode,
-                CanonFingerprint.Id(relationship.RelationshipId),
-                CanonFingerprint.Id(relationship.TypeId),
-                CanonFingerprint.Id(elder.EntityId),
-                CanonFingerprint.Id(younger.EntityId)),
+            [relationship.RelationshipId, relationship.TypeId, elder.EntityId, younger.EntityId],
             CanonRuleText.Title(title),
             CanonRuleText.Explanation(explanation),
             [

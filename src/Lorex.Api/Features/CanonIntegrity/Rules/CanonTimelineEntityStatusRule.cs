@@ -71,10 +71,7 @@ public sealed class CanonTimelineEntityStatusRule : ICanonIntegrityRule
 
             // The moment and the one participant at fault. Swapping in a different
             // participant is a different problem and gets its own conflict.
-            CanonFingerprint.From(
-                RuleCode,
-                CanonFingerprint.Id(row.EntryId),
-                CanonFingerprint.Id(offender.Id)),
+            [row.EntryId, offender.Id],
             CanonRuleText.Title(title),
             CanonRuleText.Explanation(explanation),
             [

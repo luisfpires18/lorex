@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AccountMenu } from '../components/AccountMenu'
 import { BrandMark } from '../components/BrandMark'
+import { RestoreBackup } from '../components/RestoreBackup'
 import { UniverseCard } from '../components/UniverseCard'
 import { UniverseForm } from '../components/UniverseForm'
 import { Wordmark } from '../components/Wordmark'
@@ -13,6 +14,7 @@ type LoadState =
 
 export default function UniversesPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [search, setSearch] = useState('')
   const [includeArchived, setIncludeArchived] = useState(false)
@@ -20,6 +22,15 @@ export default function UniversesPage() {
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
   const [isCreating, setIsCreating] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+
+  // A universe's Settings links here with `?restore`, because restoring makes a universe rather than changing one.
+  const isRestoring = searchParams.has('restore')
+
+  function setRestoring(open: boolean) {
+    if (open === isRestoring) return
+    setSearchParams(open ? { restore: '' } : {}, { replace: true })
+    if (open) setIsCreating(false)
+  }
 
   useEffect(() => {
     const controller = new AbortController()
@@ -74,15 +85,36 @@ export default function UniversesPage() {
       <main className="home__body">
         <div className="home__heading">
           <h1 className="home__title">Universes</h1>
-          <button
-            className="button"
-            type="button"
-            onClick={() => setIsCreating(true)}
-            data-testid="new-universe"
-          >
-            New universe
-          </button>
+          <div className="home__actions">
+            <button
+              className="button"
+              type="button"
+              onClick={() => {
+                setRestoring(false)
+                setIsCreating(true)
+              }}
+              data-testid="new-universe"
+            >
+              New universe
+            </button>
+            <button
+              className="button button--quiet"
+              type="button"
+              aria-expanded={isRestoring}
+              onClick={() => setRestoring(true)}
+              data-testid="restore-backup"
+            >
+              Restore backup
+            </button>
+          </div>
         </div>
+
+        {isRestoring ? (
+          <RestoreBackup
+            onCancel={() => setRestoring(false)}
+            onRestored={(universe) => void navigate(`/app/universes/${universe.id}`)}
+          />
+        ) : null}
 
         {isCreating ? (
           <section className="composer" aria-label="Create a universe">

@@ -66,11 +66,7 @@ public sealed class CanonEntityReferenceStatusRule : ICanonIntegrityRule
 
             // The field definition rather than the stored value row: saving an entity
             // rewrites its value rows, so their ids churn while the definition's does not.
-            CanonFingerprint.From(
-                RuleCode,
-                CanonFingerprint.Id(row.OwnerId),
-                CanonFingerprint.Id(row.FieldDefinitionId),
-                CanonFingerprint.Id(row.ReferenceId)),
+            [row.OwnerId, row.FieldDefinitionId, row.ReferenceId],
             CanonRuleText.Title(title),
             CanonRuleText.Explanation(explanation),
             [

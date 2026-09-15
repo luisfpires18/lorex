@@ -88,10 +88,7 @@ public sealed class CanonRelationshipEntityStatusRule : ICanonIntegrityRule
 
             // The relationship and the one endpoint at fault. Retargeting the relationship
             // at a different entry is a different problem and gets its own conflict.
-            CanonFingerprint.From(
-                RuleCode,
-                CanonFingerprint.Id(row.RelationshipId),
-                CanonFingerprint.Id(entityId)),
+            [row.RelationshipId, entityId],
             CanonRuleText.Title(title),
             CanonRuleText.Explanation(explanation),
             [
