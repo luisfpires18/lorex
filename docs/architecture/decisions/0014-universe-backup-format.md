@@ -6,7 +6,8 @@ Status: accepted (2026-09-09), amended 2026-09-10 (version 3: the file became an
 within version 4), 2026-09-13 (version 5: stories), 2026-09-13 (version 6: chapters), 2026-09-13
 (version 7: plot), 2026-09-13 (version 8: scene prose), 2026-09-13 (version 9: entry articles and their
 history), 2026-09-14 (version 10: story content in the Trash, and a manuscript's saved versions), 2026-09-14 (version 11:
-the ideas that belong to a universe), and 2026-09-14 (a backup can be restored - ADR 0032; the format is unchanged)
+the ideas that belong to a universe), 2026-09-14 (a backup can be restored - ADR 0032; the format is unchanged), and 2026-09-15
+(version 12: a universe's world rules - ADR 0033)
 
 ## Context
 
@@ -192,6 +193,14 @@ universe backup**: it is the account's, and this file is one world, not an accou
 universe's file would be false. A future importer gives each idea to the importing account and the universe being restored,
 re-creates the references whose targets are in the file, keeps `deletedAt`, and never turns an idea into lore.
 
+**Version 12 (2026-09-15) carries the universe's world rules** (ADR 0033). `payload.worldRules` holds each rule - `id`, `title`,
+`description` exactly as stored, `createdAt`, `updatedAt`, `deletedAt` - live rules first, then those in the Trash, each group by
+title then id. It fails the test the way stories and ideas did: a rule's words are authored, so a version 11 reader would parse
+the file and restore the universe with every rule silently gone. Nothing derived is carried - no search index row, and no
+validation state, since none exists. A file at version 11 or earlier has no `worldRules`; it reads as null and means none. The
+importer reads versions 1 to 12 and writes each rule into the new universe under a new id, its marker and moments kept (ADR 0032
+amendment).
+
 **Search indexes are never in a backup** (ADR 0016, ADR 0031). They are derived - Lorex produces them again from the
 authored rows - so the universe search (2026-09-14) changed no member and no version: version 11 stands. An importer's rows are
 indexed as they are written.
@@ -222,6 +231,7 @@ Lorex produce it again from what a person wrote?
 | Each scene's manuscript: its plain text exactly as stored, when it was last saved, and every saved version of it | Any word count, rendering or copy of the scene's planning, and any unsaved recovery copy a browser kept |
 | Every entry's revision history (ADR 0013); versions recorded since version 9 hold no copy of the article | - |
 | The ideas that belong to this universe: title, body, deleted marker, and references by kind and id | Ideas that belong to no universe or to another universe, any owner id, and any unsaved recovery copy |
+| The universe's world rules: title, description, deleted marker and moments | The search index's copy of their words, and any validation state |
 | Each entry's primary image: the original bytes, its asset id, filename, content type, dimensions, chosen crop and archive path | The generated thumbnail and its id, and every R2 object key, bucket name, endpoint and URL |
 | Canon conflicts the author **dismissed** | Pending and resolved conflicts, and all conflict wording |
 | | Tag `Slug` |

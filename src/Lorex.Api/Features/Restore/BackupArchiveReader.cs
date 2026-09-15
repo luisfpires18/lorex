@@ -8,7 +8,7 @@ namespace Lorex.Api.Features.Restore;
 /// <summary>
 /// Which backup format versions this build restores. See ADR 0032.
 ///
-/// Every version Lorex has ever written, 1 to 11: each one's shape is a subset of the next, each
+/// Every version Lorex has ever written, 1 to 12: each one's shape is a subset of the next, each
 /// member that was added reads as null in a file from before it, and ADR 0014 records what every
 /// change re-meant, so each older file normalizes into the current shape without a guess.
 ///
@@ -20,7 +20,7 @@ public static class BackupFormatSupport
 {
     public const int MinVersion = 1;
 
-    public const int MaxVersion = 11;
+    public const int MaxVersion = 12;
 
     /// <summary>Versions 1 and 2 were a single JSON file; from 3 a backup is a ZIP holding it (ADR 0014).</summary>
     public const int FirstArchiveVersion = 3;

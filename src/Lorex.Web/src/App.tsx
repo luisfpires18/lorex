@@ -20,6 +20,8 @@ import UniverseTrash from './pages/UniverseTrash'
 import UniverseTypes from './pages/UniverseTypes'
 import UniverseWorkspace from './pages/UniverseWorkspace'
 import UniversesPage from './pages/UniversesPage'
+import WorldRulePage from './pages/WorldRulePage'
+import WorldRulesPage from './pages/WorldRulesPage'
 
 /** The app's providers and routes, exactly as they are declared - the router below only holds them. */
 function Root() {
@@ -47,6 +49,9 @@ function Root() {
               <Route path="lore/new" element={<EntityPage />} />
               <Route path="lore/:entityId" element={<EntityPage />} />
               <Route path="timeline" element={<TimelinePage />} />
+              <Route path="world-rules" element={<WorldRulesPage />} />
+              <Route path="world-rules/new" element={<WorldRulePage isNew />} />
+              <Route path="world-rules/:ruleId" element={<WorldRulePage />} />
               <Route path="stories" element={<StoriesPage />} />
               <Route path="stories/:storyId" element={<StoryPage view="scenes" />} />
               <Route path="stories/:storyId/plot" element={<StoryPage view="plot" />} />

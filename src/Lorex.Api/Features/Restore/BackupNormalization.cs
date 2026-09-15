@@ -32,6 +32,7 @@ namespace Lorex.Api.Features.Restore;
 /// <item>Versions 1-9: nothing is in the Trash, and each manuscript becomes its own version 1
 /// (<c>AddContentRecovery</c>, ADR 0029).</item>
 /// <item>Versions 1-10: no ideas.</item>
+/// <item>Versions 1-11: no world rules (<c>AddWorldRules</c>, ADR 0033).</item>
 /// </list>
 ///
 /// One thing is normalized for every version: the live rows of each ordered collection are numbered
@@ -60,6 +61,7 @@ internal static class BackupNormalization
             ? [.. payload.Stories.Select(story => story is null ? null! : ProjectStory(story, version))]
             : null,
         Ideas = version >= 11 ? payload.Ideas : null,
+        WorldRules = version >= 12 ? payload.WorldRules : null,
     };
 
     private static BackupEntity ProjectEntity(BackupEntity entity, int version) => entity with
@@ -123,6 +125,7 @@ internal static class BackupNormalization
         Entities = [.. payload.Entities.Select(entity => NormalizeEntity(entity, version))],
         Stories = [.. (payload.Stories ?? []).Select(story => NormalizeStory(story, version))],
         Ideas = payload.Ideas ?? [],
+        WorldRules = payload.WorldRules ?? [],
         DismissedConflicts = [.. payload.DismissedConflicts.DistinctBy(conflict => conflict.Fingerprint, StringComparer.Ordinal)],
     };
 

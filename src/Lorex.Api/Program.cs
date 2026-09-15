@@ -15,6 +15,7 @@ using Lorex.Api.Features.Stories;
 using Lorex.Api.Features.Timeline;
 using Lorex.Api.Features.Trash;
 using Lorex.Api.Features.Universes;
+using Lorex.Api.Features.WorldRules;
 using Lorex.Api.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -78,6 +79,7 @@ app.MapEntityArticleEndpoints();
 app.MapRelationshipTypeEndpoints();
 app.MapRelationshipEndpoints();
 app.MapTimelineEndpoints();
+app.MapWorldRuleEndpoints();
 app.MapStoryEndpoints();
 app.MapChapterEndpoints();
 app.MapSceneEndpoints();

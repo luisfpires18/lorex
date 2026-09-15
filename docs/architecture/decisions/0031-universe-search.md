@@ -1,6 +1,6 @@
 # ADR 0031 - A universe is searched across its recorded content from one persistent bar, over derived FTS5 indexes
 
-Status: accepted (2026-09-14)
+Status: accepted (2026-09-14), amended 2026-09-15 (world rules - ADR 0033)
 
 ## Context
 
@@ -35,6 +35,7 @@ filter and ordering. The bar is a second, separate way in.
 | Beat | title | description, notes | - |
 | Manuscript | - | - | the saved prose |
 | Idea | title | body | - |
+| World rule (amendment) | title | description | - |
 
 Chapters are included: their titles are authored, and the Scenes view already lands on a chapter by its anchor (the Trash's
 restored link uses it). Nothing else is: not tags or field values (filters, as ADR 0016 argued), statuses, ids, dates or
@@ -192,3 +193,22 @@ question. The endpoint's per-kind queries, the tiers, the merge and the contract
 - The Lore browser now has two search boxes, "Search" for the grid and "Search this universe" above it.
 - A phone's first screen gives the bar about 20px more than before; the manuscript view paid it back with its one-line
   disclosure, and every screen starts a little closer under the bar.
+
+## Amendment - world rules (2026-09-15)
+
+A universe's world rules (ADR 0033) are searched too. Nothing else about the bar, its scope, its ranking or its contract changes.
+
+- **What.** A live rule's title (the title tier) and its description (the planning tier, `matchedIn: Description`, "In the
+  description"). A rule in the Trash is never a result; a rule sits inside nothing else that could be.
+- **The index.** `WorldRuleSearchIndex` (`WorldRuleId` unindexed; `Title`, `Description`), same tokenizer, created by
+  `AddWorldRules` with three triggers: `WorldRuleSearchIndex_WorldRuleInserted`, `WorldRuleSearchIndex_WorldRuleUpdated` (only
+  when the words change, so the Trash marker and a timestamp rewrite nothing) and `WorldRuleSearchIndex_WorldRuleDeleted` (every
+  cascade from a deleted universe included). The excerpt markers become spaces. BM25 weights title 10, description 1, as an
+  idea's. Derived: nothing is read back from it, and it is in no backup. `WorldRuleMigrationTests` reads its triggers back by
+  name, beside every trigger this ADR created. The table is new, so no existing table was rebuilt and no trigger was at risk.
+- **Order.** `WorldRule` is kind 8, appended after Idea in the fixed order of kinds; tiers unchanged; no score crosses an index.
+- **The contract.** `kind: WorldRule` ("World rule" on screen), the rule's id and title, no context members.
+- **Opening.** `world-rules/{id}` in the universe: the rule's own editor, at an address that reloads.
+- **Cost.** One kind query and one excerpt query more: at most fifteen queries, and at most 45 results (nine kinds of five).
+
+The backup changed at version 12 because rules are authored (ADR 0033), not because they became searchable.

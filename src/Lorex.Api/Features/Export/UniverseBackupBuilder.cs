@@ -72,7 +72,8 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
             await TimelineAsync(universeId, cancellationToken),
             await StoriesAsync(universeId, cancellationToken),
             await DismissedConflictsAsync(universeId, cancellationToken),
-            await IdeasAsync(universe.Id, universe.OwnerId, cancellationToken));
+            await IdeasAsync(universe.Id, universe.OwnerId, cancellationToken),
+            await WorldRulesAsync(universeId, cancellationToken));
 
         // Read-only, so there is nothing to commit; this just closes the snapshot.
         await transaction.CommitAsync(cancellationToken);
@@ -902,6 +903,36 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                     Utc(idea.UpdatedAt),
                     Utc(idea.DeletedAt),
                     referencesByIdea.GetValueOrDefault(idea.Id, []))),
+        ];
+    }
+
+    // ---------- World rules ----------
+
+    /// <summary>
+    /// Every world rule of the universe, live ones first and those in the Trash after, each group by title and then id (ADR
+    /// 0033). Title, description and moments exactly as stored; the search index's copy of the text is derived and never here.
+    /// </summary>
+    private async Task<IReadOnlyList<BackupWorldRule>> WorldRulesAsync(
+        Guid universeId,
+        CancellationToken cancellationToken)
+    {
+        var rules = await db.WorldRules.AsNoTracking()
+            .Where(rule => rule.UniverseId == universeId)
+            .ToListAsync(cancellationToken);
+
+        return
+        [
+            .. rules
+                .OrderBy(rule => rule.DeletedAt is not null)
+                .ThenBy(rule => rule.Title, StringComparer.Ordinal)
+                .ThenBy(rule => Key(rule.Id), StringComparer.Ordinal)
+                .Select(rule => new BackupWorldRule(
+                    rule.Id,
+                    rule.Title,
+                    rule.Description,
+                    Utc(rule.CreatedAt),
+                    Utc(rule.UpdatedAt),
+                    Utc(rule.DeletedAt))),
         ];
     }
 

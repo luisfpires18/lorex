@@ -1,6 +1,6 @@
 # ADR 0032 - A backup is restored as a new universe: validated first, every id new, the account's own
 
-Status: accepted (2026-09-14)
+Status: accepted (2026-09-14), amended 2026-09-15 (format version 12: world rules - ADR 0033)
 
 ## Context
 
@@ -201,3 +201,18 @@ job system. App Service's 230-second front-end limit is far above both.
 - Pictures in a backup restored while no object store is configured refuse the restore with a 503 after validating; a world
   without pictures restores anywhere.
 - Validation decodes every picture, and a restore validates again, so each picture is decoded once per request.
+
+## Amendment - format version 12: world rules (2026-09-15)
+
+Format version 12 adds a universe's world rules (ADR 0033, ADR 0014), and the importer learned it in the same change:
+`BackupFormatSupport.MaxVersion` is 12, still held to `UniverseBackup.CurrentVersion` by its test.
+
+- **Versions.** Every version 1 to 12 restores. Projection: before 12 a file has no rules, even one carrying a `worldRules`
+  member. Normalization: none means an empty list. A version 12 file without the member is refused as incomplete.
+- **Validation.** Each rule's id is registered with every other id in the file (present, unique); its title is present and within
+  200 characters, its description present and within 10,000. What a rule says is never judged.
+- **Identity and writing.** Each rule gets a new id from `RestoreIdentity`, belongs to the new universe and so to the restoring
+  account, and keeps `createdAt`, `updatedAt` and `deletedAt`: a rule in the Trash is in the restored Trash, restorable. The rows
+  are written directly in the one transaction; the search triggers index them as they land. Twice is two independent sets.
+- **The preview** counts `worldRules` and `worldRulesInTrash`; the restore screen shows a World Rules line and counts rules in
+  "In the Trash".

@@ -3,6 +3,7 @@ using Lorex.Api.Data;
 using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Universes;
+using Lorex.Api.Features.WorldRules;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,7 +15,8 @@ namespace Lorex.Api.Features.Trash;
 /// Two kinds of authored work are trashable, each where its removal used to destroy a large amount of writing at once. A
 /// lore entry, whose deletion took its article, values, aliases, history and every relationship and timeline appearance
 /// that rested on it (ADR 0015). And a story's content - a story, a chapter, a scene, an arc or a beat - whose deletion took
-/// prose, planning and every link inside it (ADR 0029). Everything else the API deletes is one small row a deliberate
+/// prose, planning and every link inside it (ADR 0029). A world rule is the third: authored text about how the world works,
+/// whose deletion would otherwise lose it outright (ADR 0033). Everything else the API deletes is one small row a deliberate
 /// action removed (a relationship, a moment), a derived record nothing authors (a Canon conflict), or a configuration
 /// object whose deletion is already refused while anything depends on it.
 ///
@@ -45,6 +47,8 @@ public static class TrashEndpoints
             .WithName("RestoreTrashedPlotArc");
         group.MapPost("/plot-beats/{plotBeatId:guid}/restore", StoryContentRestore.RestorePlotBeatAsync)
             .WithName("RestoreTrashedPlotBeat");
+        group.MapPost("/world-rules/{worldRuleId:guid}/restore", WorldRuleEndpoints.RestoreAsync)
+            .WithName("RestoreTrashedWorldRule");
 
         return endpoints;
     }
@@ -57,9 +61,9 @@ public static class TrashEndpoints
     /// Only what was itself thrown away is listed. What sits inside a story in the Trash is not a row of its own, because
     /// it comes back with the story; a scene thrown away before its story was is, and says it must wait for the story.
     ///
-    /// Six compact reads - one per kind, names and places only, never an article, prose or notes - merged and paged here. A
-    /// Trash is thrown away by hand, so it stays small next to what a page of it costs; a union across six tables in SQL
-    /// is the first change if one ever does not.
+    /// Seven compact reads - one per kind, names and places only, never an article, prose, notes or a rule's description -
+    /// merged and paged here. A Trash is thrown away by hand, so it stays small next to what a page of it costs; a union
+    /// across seven tables in SQL is the first change if one ever does not.
     /// </summary>
     private static async Task<IResult> ListAsync(
         Guid universeId,
@@ -195,6 +199,26 @@ public static class TrashEndpoints
                     : beat.PlotArc.DeletedAt != null
                         ? TrashRestoreBlock.ArcInTrash
                         : TrashRestoreBlock.None))
+            .ToListAsync(cancellationToken));
+
+        // A world rule belongs to its universe directly, so it has no story, arc or anything else to wait for.
+        rows.AddRange(await db.WorldRules.AsNoTracking()
+            .Where(rule => rule.UniverseId == universeId && rule.DeletedAt != null)
+            .Select(rule => new TrashItem(
+                TrashItemKind.WorldRule,
+                rule.Id,
+                rule.Title,
+                rule.DeletedAt!.Value,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                TrashRestoreBlock.None))
             .ToListAsync(cancellationToken));
 
         var totalCount = rows.Count;

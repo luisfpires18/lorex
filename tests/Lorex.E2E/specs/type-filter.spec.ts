@@ -396,6 +396,7 @@ test.describe('the type bar', () => {
     for (const section of [
       'workspace-lore',
       'workspace-timeline',
+      'workspace-world-rules',
       'workspace-canon',
       'workspace-types',
       'workspace-trash',

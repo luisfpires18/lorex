@@ -16,6 +16,7 @@ public enum UniverseSearchKind
     PlotBeat = 5,
     Manuscript = 6,
     Idea = 7,
+    WorldRule = 8,
 }
 
 /// <summary>

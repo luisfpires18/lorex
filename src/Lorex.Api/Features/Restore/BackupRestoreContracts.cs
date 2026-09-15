@@ -28,7 +28,9 @@ public sealed record BackupPreviewCounts(
     int StoryItemsInTrash,
     int Ideas,
     int IdeasDeleted,
-    int DismissedConflicts)
+    int DismissedConflicts,
+    int WorldRules,
+    int WorldRulesInTrash)
 {
     internal static BackupPreviewCounts Of(UniverseBackupPayload payload, int images)
     {
@@ -64,7 +66,9 @@ public sealed record BackupPreviewCounts(
                 + beats.Count(beat => beat.DeletedAt is not null),
             payload.Ideas!.Count(idea => idea.DeletedAt is null),
             payload.Ideas!.Count(idea => idea.DeletedAt is not null),
-            payload.DismissedConflicts.Count);
+            payload.DismissedConflicts.Count,
+            payload.WorldRules!.Count(rule => rule.DeletedAt is null),
+            payload.WorldRules!.Count(rule => rule.DeletedAt is not null));
     }
 }
 

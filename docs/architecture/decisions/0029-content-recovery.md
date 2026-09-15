@@ -1,6 +1,7 @@
 # ADR 0029 - Content recovery: saved versions, a Trash for story content, and recovery copies of unsaved writing
 
-Status: accepted (2026-09-14), amended 2026-09-14 (ideas keep recovery copies too, scoped to the account - ADR 0030)
+Status: accepted (2026-09-14), amended 2026-09-14 (ideas keep recovery copies too, scoped to the account - ADR 0030), 2026-09-15
+(world rules use the Trash - ADR 0033)
 
 ## Context
 
@@ -42,6 +43,7 @@ None of them promotes anything into Canon, reads writing for meaning, or reinter
 | Plot arc | No | **Yes**, with its beats | No |
 | Plot beat | No | **Yes**, with its links | No |
 | Idea (ADR 0030) | No | Recently deleted, in Ideas | **Yes** |
+| World rule (ADR 0033) | No | **Yes**, the universe's Trash | No |
 
 Short text and structure are deliberately not versioned: a story's title and status, a chapter's or arc's notes, a scene's
 summary and every reorder, move and link change would grow a history no author asked for. They are protected against the
@@ -205,3 +207,10 @@ and numbers and never applies one. Recovered drafts are not in a backup: they we
 - Rolling the migration back discards the Trash and every manuscript's history: the schema before had room for neither.
 - An editor may wait up to two seconds on storage that never answers before it can be written in.
 - The Trash list reads every marked row's name to page them; a union query is the first change if that ever shows.
+
+## Amendment - world rules (2026-09-15)
+
+World rules (ADR 0033) join the matrix as short text in a form: no saved versions, no recovered draft, and the universe's Trash
+for deletion - a seventh kind of row, `WorldRule`, restored on its own typed route (`.../trash/world-rules/{id}/restore`). A rule
+sits in nothing but its universe, so it never waits for anything, and its restore passes no Canon gate because a rule contributes
+no facts. Still no permanent delete: only deleting the universe removes a rule for good.

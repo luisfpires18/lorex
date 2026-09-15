@@ -8,6 +8,7 @@ using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.Stories;
 using Lorex.Api.Features.Timeline;
 using Lorex.Api.Features.Universes;
+using Lorex.Api.Features.WorldRules;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -101,6 +102,8 @@ public class LorexDbContext(DbContextOptions<LorexDbContext> options)
     public DbSet<IdeaPlotArcReference> IdeaPlotArcReferences => Set<IdeaPlotArcReference>();
 
     public DbSet<IdeaPlotBeatReference> IdeaPlotBeatReferences => Set<IdeaPlotBeatReference>();
+
+    public DbSet<WorldRule> WorldRules => Set<WorldRule>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

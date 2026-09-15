@@ -16,6 +16,7 @@ const SECTIONS = [
   { segment: '', label: 'Overview', testId: 'workspace-overview' },
   { segment: 'lore', label: 'Lore', testId: 'workspace-lore' },
   { segment: 'timeline', label: 'Timeline', testId: 'workspace-timeline' },
+  { segment: 'world-rules', label: 'World Rules', testId: 'workspace-world-rules' },
   { segment: 'stories', label: 'Stories', testId: 'workspace-stories' },
   { segment: 'ideas', label: 'Ideas', testId: 'workspace-ideas' },
   { segment: 'canon', label: 'Canon', testId: 'workspace-canon' },

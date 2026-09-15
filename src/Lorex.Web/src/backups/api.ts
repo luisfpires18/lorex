@@ -37,6 +37,8 @@ export interface BackupPreviewCounts {
   ideas: number
   ideasDeleted: number
   dismissedConflicts: number
+  worldRules: number
+  worldRulesInTrash: number
 }
 
 export interface BackupPreview {

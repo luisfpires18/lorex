@@ -67,8 +67,9 @@ public sealed class BackupValidationTests(LorexApiFactory factory) : IClassFixtu
     {
         var (client, archive) = await Setup("versions");
 
-        var newer = await AssertRefused(client, Rewrite(archive, root => root["formatVersion"] = 12), BackupIssueCodes.UnsupportedVersion);
-        Assert.Contains("12", newer.Detail, StringComparison.Ordinal);
+        var next = BackupFormatSupport.MaxVersion + 1;
+        var newer = await AssertRefused(client, Rewrite(archive, root => root["formatVersion"] = next), BackupIssueCodes.UnsupportedVersion);
+        Assert.Contains(next.ToString(System.Globalization.CultureInfo.InvariantCulture), newer.Detail, StringComparison.Ordinal);
         Assert.Contains(BackupFormatSupport.MaxVersion.ToString(System.Globalization.CultureInfo.InvariantCulture), newer.Detail, StringComparison.Ordinal);
 
         // A newer file is told it is newer even when its payload would not parse as anything this build knows.
@@ -208,6 +209,7 @@ public sealed class BackupValidationTests(LorexApiFactory factory) : IClassFixtu
             "same place");
 
         await AssertIssue(client, Rewrite(archive, root => Payload(root).Remove("ideas")), BackupIssueCodes.MissingMember, "ideas");
+        await AssertIssue(client, Rewrite(archive, root => Payload(root).Remove("worldRules")), BackupIssueCodes.MissingMember, "world rules");
     }
 
     [Fact]
