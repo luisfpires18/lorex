@@ -38,6 +38,8 @@ function whereItWas(item: TrashItem) {
       return 'A whole story, with everything in it'
     case TrashKind.PlotBeat:
       return `In the arc “${item.plotArcTitle ?? ''}” of “${item.storyTitle ?? ''}”`
+    case TrashKind.WorldRule:
+      return 'In World Rules'
     default:
       return `In “${item.storyTitle ?? ''}”`
   }
@@ -68,6 +70,8 @@ function backText(item: TrashItem) {
       return `The arc “${item.name}” is back in “${item.storyTitle ?? ''}”.`
     case TrashKind.PlotBeat:
       return `The beat “${item.name}” is back in “${item.plotArcTitle ?? ''}”.`
+    case TrashKind.WorldRule:
+      return `The world rule “${item.name}” is back in World Rules.`
   }
 }
 
@@ -165,10 +169,10 @@ export default function UniverseTrash() {
       <header className="trash__head">
         <h2 className="trash__title">Trash</h2>
         <p className="trash__lede">
-          What you removed from your lore and your stories. Nothing here has been erased — restoring
-          puts each thing back with everything it held: an entry&rsquo;s article, fields, history
-          and connections; a scene&rsquo;s manuscript and its saved versions; a story&rsquo;s
-          chapters, scenes and plot.
+          What you removed from your lore, your stories and your world rules. Nothing here has been
+          erased — restoring puts each thing back with everything it held: an entry&rsquo;s article,
+          fields, history and connections; a scene&rsquo;s manuscript and its saved versions; a
+          story&rsquo;s chapters, scenes and plot; a rule&rsquo;s words.
         </p>
         <p className="trash__lede" data-testid="trash-ideas-pointer">
           Deleted ideas are not here: they belong to your account, and wait in{' '}
@@ -271,7 +275,7 @@ export default function UniverseTrash() {
         <div className="empty" data-testid="trash-empty">
           <p className="empty__line">The Trash is empty.</p>
           <p className="empty__hint">
-            Anything you remove from your lore or your stories waits here.
+            Anything you remove from your lore, your stories or your world rules waits here.
           </p>
         </div>
       ) : null}

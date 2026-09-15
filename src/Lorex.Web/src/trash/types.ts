@@ -8,6 +8,7 @@ export const TrashKind = {
   Scene: 3,
   PlotArc: 4,
   PlotBeat: 5,
+  WorldRule: 6,
 } as const
 
 export type TrashKindValue = (typeof TrashKind)[keyof typeof TrashKind]
@@ -20,6 +21,7 @@ export const TRASH_KIND_LABELS: Record<TrashKindValue, string> = {
   [TrashKind.Scene]: 'Scene',
   [TrashKind.PlotArc]: 'Arc',
   [TrashKind.PlotBeat]: 'Beat',
+  [TrashKind.WorldRule]: 'World rule',
 }
 
 /** Mirrors the backend enum. Why a row cannot be restored yet, if it cannot. */

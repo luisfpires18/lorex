@@ -264,7 +264,7 @@ public sealed class BackupRestoreTests(LorexApiFactory factory) : IClassFixture<
 
         var trash = (await client.GetFromJsonAsync<TrashPage>($"/api/universes/{r}/trash?pageSize=100"))!;
         Assert.Equal(
-            ["Abandoned Draft", "Cut Scene", "Departure", "Hides", "Lost Heir"],
+            ["A binned rule", "Abandoned Draft", "Cut Scene", "Departure", "Hides", "Lost Heir"],
             [.. trash.Items.Select(item => item.Name).Order(StringComparer.Ordinal)]);
 
         var stories = (await client.GetFromJsonAsync<List<StorySummary>>($"/api/universes/{r}/stories"))!;

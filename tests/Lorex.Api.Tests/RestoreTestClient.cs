@@ -214,14 +214,14 @@ internal static partial class RestoreTestClient
         byte[] WardenPicture);
 
     /// <summary>
-    /// Everything a version 11 backup can carry, written through the API as an author would: two eras and years in them;
+    /// Everything a version 12 backup can carry, written through the API as an author would: two eras and years in them;
     /// a custom type and fields of several kinds with declared meanings; entries with aliases, tags, values, an edited
     /// history, an article with a restored version and a framed picture; an entry in the Trash; a relation kind with
     /// constraints and a Canon link that is flagged and dismissed beside a finding left pending; a moment across eras; a
     /// story with chapters, Unchaptered, reordered scenes, a point of view, a date, lore links, prose with saved versions;
     /// a chapter, a scene, a beat and a whole story in the Trash; an arc with beats linked to scenes and lore; an idea
-    /// referring to every kind and a deleted one. Plus an unassigned idea and another universe's idea, which no backup of
-    /// this universe may hold.
+    /// referring to every kind and a deleted one; a world rule saved twice and one in the Trash. Plus an unassigned idea and
+    /// another universe's idea and rule, which no backup of this universe may hold.
     /// </summary>
     public static async Task<RichWorld> BuildRichWorld(HttpClient client, string name)
     {
@@ -392,6 +392,12 @@ internal static partial class RestoreTestClient
         var elsewhere = await PostJson<UniverseDetail>(client, "/api/universes", new CreateUniverseRequest($"{name} elsewhere", null, null));
         await IdeaTestClient.CreateIdea(client, "Another world's idea", "Belongs elsewhere.", elsewhere.Id);
 
+        var veil = await WorldRuleTestClient.CreateRule(client, u, "Teleportation cannot cross the Veil", "  Not even the wardens.\n北の門 & <b>not html</b>  ");
+        await WorldRuleTestClient.SaveRule(client, u, veil, description: "  Not even the wardens.\n\tNor the tide. 北の門 & <b>not html</b>  ");
+        var binnedRule = await WorldRuleTestClient.CreateRule(client, u, "A binned rule", "Still recoverable.");
+        await WorldRuleTestClient.DeleteRule(client, u, binnedRule.Id);
+        await WorldRuleTestClient.CreateRule(client, elsewhere.Id, "Another world's rule", "Belongs elsewhere.");
+
         return new RichWorld(
             universe, warden.Id, mentor.Id, coast.Id, lostHeir.Id, story, abandoned, arrival, departure, coldOpen, council, vote,
             cutScene, arc.Id, learns.Id, hides.Id, floating.Id, binned.Id, afterTheFall, picture);
@@ -436,6 +442,11 @@ internal static partial class RestoreTestClient
             {
                 node?.AsObject().Remove(member);
             }
+        }
+
+        if (version < 12)
+        {
+            Drop(payload, "worldRules");
         }
 
         if (version < 11)
@@ -575,7 +586,7 @@ internal static partial class RestoreTestClient
 
     /// <summary>
     /// A world every format version could have held: eras and years in them, a typed entry with an article and a picture,
-    /// a constrained relation kind, a moment, and a story of Unchaptered scenes with prose, an arc and an idea - no
+    /// a constrained relation kind, a moment, and a story of Unchaptered scenes with prose, an arc, an idea and a world rule - no
     /// chapters and nothing in the Trash, so reading it as an older version loses only what that version did not carry.
     /// </summary>
     public static async Task<PlainWorld> BuildPlainWorld(HttpClient client, string name)
@@ -629,6 +640,8 @@ internal static partial class RestoreTestClient
         var arc = await CreateArc(client, u, story, "Fall of the King");
         await CreateBeat(client, u, story, arc.Id, "Learns", [first], [warden.Id]);
         await IdeaTestClient.CreateIdea(client, "Maybe the city floats", "Nobody below.", u, [IdeaTestClient.Ref(IdeaReferenceKind.Scene, first)]);
+
+        await WorldRuleTestClient.CreateRule(client, u, "The Veil holds", "Plain.");
 
         return new PlainWorld(universe, warden.Id, story, picture);
     }
@@ -799,6 +812,11 @@ internal static partial class RestoreTestClient
             });
 
             lines.Add($"idea {idea.Title} body={idea.Body} deleted={T(idea.DeletedAt)} {T(idea.CreatedAt)} {T(idea.UpdatedAt)} refs={L(references)}");
+        }
+
+        foreach (var rule in (payload.WorldRules ?? []).OrderBy(rule => rule.Title, StringComparer.Ordinal))
+        {
+            lines.Add($"world rule {rule.Title} description={rule.Description} deleted={T(rule.DeletedAt)} {T(rule.CreatedAt)} {T(rule.UpdatedAt)}");
         }
 
         foreach (var conflict in payload.DismissedConflicts.Select(conflict => $"dismissed {conflict.RuleCode} {conflict.Severity} {T(conflict.DismissedAt)}").Order(StringComparer.Ordinal))

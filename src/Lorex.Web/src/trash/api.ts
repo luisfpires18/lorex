@@ -23,6 +23,7 @@ const ROUTES: Record<Exclude<TrashItem['kind'], typeof TrashKind.Entry>, string>
   [TrashKind.Scene]: 'scenes',
   [TrashKind.PlotArc]: 'plot-arcs',
   [TrashKind.PlotBeat]: 'plot-beats',
+  [TrashKind.WorldRule]: 'world-rules',
 }
 
 /**
@@ -30,7 +31,7 @@ const ROUTES: Record<Exclude<TrashItem['kind'], typeof TrashKind.Entry>, string>
  *
  * An entry's restore is gated on the API like any other lore write, so it can fail with the Canon promotion gate's 409 -
  * read it with `blockingFindingsOf` - and a refused restore is atomic. Story content passes no gate; it can be refused
- * with `TRASH_PARENT_IN_TRASH` while its story, or a beat's arc, is in the Trash too.
+ * with `TRASH_PARENT_IN_TRASH` while its story, or a beat's arc, is in the Trash too. A world rule waits for nothing.
  */
 export function restoreFromTrash(universeId: string, item: TrashItem) {
   const path =
@@ -58,5 +59,7 @@ export function restoredPath(universeId: string, item: TrashItem) {
       return `${story}/plot#arc-${item.id}`
     case TrashKind.PlotBeat:
       return `${story}/plot#beat-${item.id}`
+    case TrashKind.WorldRule:
+      return `${universe}/world-rules/${item.id}`
   }
 }

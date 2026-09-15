@@ -32,6 +32,7 @@ public sealed class BackupVersionTests(LorexApiFactory factory) : IClassFixture<
     [InlineData(9)]
     [InlineData(10)]
     [InlineData(11)]
+    [InlineData(12)]
     public async Task A_backup_of_every_version_restores_with_what_that_version_carried(int version)
     {
         var client = await SignedIn(_factory, $"version-{version}");
@@ -117,6 +118,9 @@ public sealed class BackupVersionTests(LorexApiFactory factory) : IClassFixture<
 
         // Ideas from 11.
         Assert.Equal(version >= 11 ? 1 : 0, copy.Ideas!.Count);
+
+        // World rules from 12.
+        Assert.Equal(version >= 12 ? ["The Veil holds"] : [], copy.WorldRules!.Select(rule => rule.Title));
     }
 
     [Fact]

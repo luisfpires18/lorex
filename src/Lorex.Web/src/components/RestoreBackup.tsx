@@ -463,12 +463,16 @@ function summaryRows(counts: BackupPreviewCounts): [string, string][] {
     ])
   }
 
+  if (counts.worldRules > 0) {
+    rows.push(['World Rules', plural(counts.worldRules, 'world rule', 'world rules')])
+  }
+
   const history = counts.entryVersions + counts.articleVersions + counts.manuscriptVersions
   if (history > 0) {
     rows.push(['Saved versions', plural(history, 'saved version', 'saved versions')])
   }
 
-  const trash = counts.entriesInTrash + counts.storyItemsInTrash
+  const trash = counts.entriesInTrash + counts.storyItemsInTrash + counts.worldRulesInTrash
   if (trash > 0) {
     rows.push(['In the Trash', plural(trash, 'item', 'items')])
   }

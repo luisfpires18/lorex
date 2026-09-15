@@ -54,7 +54,7 @@ interface Seeded {
 
 /**
  * One of each thing the restore screen should bring back into view: an entry with an article and a picture, a story with a
- * chapter, a scene with prose and a scene in the Trash, an arc and a beat, and an idea about the universe.
+ * chapter, a scene with prose and a scene in the Trash, an arc and a beat, an idea about the universe, and a world rule.
  */
 async function seedWorld(page: Page, name: string): Promise<Seeded> {
   const universe = await api<{ id: string }>(page, 'POST', '/api/universes', {
@@ -142,6 +142,11 @@ async function seedWorld(page: Page, name: string): Promise<Seeded> {
     references: [{ kind: 0, id: entity.id }],
     expectedUpdatedAt: null,
   })
+  await api(page, 'POST', `${u}/world-rules`, {
+    title: 'The Orlamund light never goes out',
+    description: 'Not in the Carrowgate storms, and not for any keeper.',
+    expectedUpdatedAt: null,
+  })
 
   return { universeId: universe.id, name }
 }
@@ -195,7 +200,8 @@ test.describe('restore a backup', () => {
     await expect(preview).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Ready to restore' })).toBeFocused()
     await expect(page.getByTestId('restore-universe-name')).toHaveText(source.name)
-    await expect(preview).toContainText('Version 11')
+    await expect(preview).toContainText('Version 12')
+    await expect(preview).toContainText('1 world rule')
     await expect(preview).toContainText('1 entry')
     await expect(preview).toContainText('1 picture')
     await expect(preview).toContainText('1 story, 1 chapter, 1 scene')
@@ -254,6 +260,12 @@ test.describe('restore a backup', () => {
     await page.goto(`/app/universes/${restoredId}/ideas`)
     await expect(page.getByText('What if the lamp is alive?')).toBeVisible()
 
+    // The world rule, in the restored universe's World Rules.
+    await page.goto(`/app/universes/${restoredId}/world-rules`)
+    await expect(
+      page.getByTestId('world-rule-row').filter({ hasText: 'The Orlamund light never goes out' }),
+    ).toBeVisible()
+
     // The scene that was in the Trash is in the Trash.
     await page.goto(`/app/universes/${restoredId}/trash`)
     await expect(page.getByTestId('trash-row-A Scene Cut Short')).toBeVisible()
@@ -263,6 +275,16 @@ test.describe('restore a backup', () => {
     await page.getByRole('combobox', { name: 'Search this universe' }).fill('Vellmarch')
     await answered
     await expect(page.getByRole('listbox', { name: 'Results' }).getByRole('option')).toHaveCount(1)
+
+    // And so are a rule's.
+    const ruleAnswered = page.waitForResponse(
+      (response) => response.url().includes('/search?') && response.url().includes('Carrowgate'),
+    )
+    await page.getByRole('combobox', { name: 'Search this universe' }).fill('Carrowgate')
+    await ruleAnswered
+    const ruleResult = page.getByRole('listbox', { name: 'Results' }).getByRole('option')
+    await expect(ruleResult).toHaveCount(1)
+    await expect(ruleResult).toContainText('World rule')
 
     // The same file again is another universe, and the original has not changed.
     await chooseAndCheck(page, {
@@ -306,7 +328,7 @@ test.describe('restore a backup', () => {
         {
           name: 'future.json',
           mimeType: 'application/json',
-          buffer: Buffer.from(JSON.stringify({ ...document, formatVersion: 12 })),
+          buffer: Buffer.from(JSON.stringify({ ...document, formatVersion: 13 })),
         },
         /newer Lorex/,
       ],

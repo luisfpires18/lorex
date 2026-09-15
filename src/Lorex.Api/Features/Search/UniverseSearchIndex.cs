@@ -29,7 +29,7 @@ public sealed record UniverseSearchExcerpts(
 
 /// <summary>
 /// The SQLite FTS5 indexes behind the universe search (ADR 0031) for everything that is not lore: story planning text,
-/// scene manuscripts and ideas. The only file that knows those indexes exist. Lore keeps its own index and file
+/// scene manuscripts, ideas and world rules. The only file that knows those indexes exist. Lore keeps its own index and file
 /// (<see cref="EntitySearchIndex"/>, ADR 0016), whose tokenizing, excerpt and column filter rules this one reuses so the
 /// two can never disagree about what a word or an excerpt is.
 ///
@@ -40,6 +40,8 @@ public sealed record UniverseSearchExcerpts(
 ///   in <c>Summary</c>), chapters, scenes, plot arcs and beats (their description in <c>Summary</c>).
 /// - <c>SceneManuscriptSearchIndex</c> (<c>SceneId</c>, <c>Content</c>): each scene's saved prose.
 /// - <c>IdeaSearchIndex</c> (<c>IdeaId</c>, <c>Title</c>, <c>Body</c>): every idea, whichever universe it names or none.
+/// - <c>WorldRuleSearchIndex</c> (<c>WorldRuleId</c>, <c>Title</c>, <c>Description</c>): every world rule, created by the
+///   <c>AddWorldRules</c> migration (ADR 0033).
 ///
 /// Prose gets a table of its own so that looking up a scene's title never walks the posting lists of a million words of
 /// manuscript; ideas get one because they are the account's, not a story's.
@@ -139,6 +141,27 @@ public static class UniverseSearchIndex
     }
 
     /// <summary>
+    /// World rules holding every word: in the title (field 0), or reaching into the description (field 1). Title 10,
+    /// description 1 - the same weights an idea's title and body have. Nothing but the text is indexed.
+    /// </summary>
+    public static IQueryable<UniverseSearchMatch> WorldRules(LorexDbContext db, string expression)
+    {
+        var title = EntitySearchIndex.ColumnFilter("Title", expression);
+
+        return db.Set<UniverseSearchMatch>().FromSql(
+            $"""
+            SELECT WorldRuleId AS ItemId,
+                   bm25(WorldRuleSearchIndex, 0.0, 10.0, 1.0) AS Rank,
+                   CASE
+                       WHEN rowid IN (SELECT rowid FROM WorldRuleSearchIndex WHERE WorldRuleSearchIndex MATCH {title}) THEN 0
+                       ELSE 1
+                   END AS Field
+            FROM WorldRuleSearchIndex
+            WHERE WorldRuleSearchIndex MATCH {expression}
+            """);
+    }
+
+    /// <summary>
     /// For story content already chosen as results, the words around the match in the summary column (first) and the notes
     /// (second). Columns 3 and 4, in the migration's order.
     /// </summary>
@@ -164,6 +187,14 @@ public static class UniverseSearchIndex
         IReadOnlyList<Guid> ideaIds,
         CancellationToken cancellationToken) =>
         ExcerptsAsync(db, "IdeaSearchIndex", "IdeaId", 2, null, expression, ideaIds, cancellationToken);
+
+    /// <summary>For world rules already chosen as results, the words around the match in their description (first). Column 2.</summary>
+    public static Task<Dictionary<Guid, UniverseSearchExcerpts>> WorldRuleExcerptsAsync(
+        LorexDbContext db,
+        string expression,
+        IReadOnlyList<Guid> worldRuleIds,
+        CancellationToken cancellationToken) =>
+        ExcerptsAsync(db, "WorldRuleSearchIndex", "WorldRuleId", 2, null, expression, worldRuleIds, cancellationToken);
 
     /// <summary>
     /// FTS5's <c>snippet</c> for a handful of rows, by their key. The table, key and column numbers are written in this file,

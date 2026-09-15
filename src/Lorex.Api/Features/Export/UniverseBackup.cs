@@ -114,8 +114,14 @@ public sealed record UniverseBackup(
     /// 10 reader would parse the file and restore the universe with every idea about it silently gone. An idea that belongs
     /// to no universe is an account's, not a world's, and is in no universe backup. A file at version 10 or earlier has no
     /// <c>ideas</c>; it reads as null, which means none.
+    ///
+    /// 12 - A universe may state its world rules (ADR 0033). <see cref="UniverseBackupPayload.WorldRules"/> carries every rule -
+    /// its title and description exactly as stored, and its Trash marker. Nullable, but not ignorable: a rule's words are
+    /// authored, so a version 11 reader would parse the file and restore the universe with every rule silently gone - the loss
+    /// versions 5 and 11 were bumped for. A file at version 11 or earlier has no <c>worldRules</c>; it reads as null, which means
+    /// none.
     /// </summary>
-    public const int CurrentVersion = 11;
+    public const int CurrentVersion = 12;
 
     public static UniverseBackup Of(UniverseBackupPayload payload, DateTime generatedAt) =>
         new(FormatName, CurrentVersion, generatedAt, payload);
@@ -135,6 +141,9 @@ public sealed record UniverseBackup(
 ///
 /// <paramref name="Ideas"/> is every idea that belongs to the universe, live ones first (since version 11). Empty means
 /// none; absent - null, in any earlier file - means the same thing. Ideas that belong to no universe are never here.
+///
+/// <paramref name="WorldRules"/> is every world rule of the universe, live ones first (since version 12). Empty means none;
+/// absent - null, in any earlier file - means the same thing.
 /// </summary>
 public sealed record UniverseBackupPayload(
     BackupUniverse Universe,
@@ -147,7 +156,8 @@ public sealed record UniverseBackupPayload(
     IReadOnlyList<BackupTimelineEntry> TimelineEntries,
     IReadOnlyList<BackupStory>? Stories,
     IReadOnlyList<BackupDismissedConflict> DismissedConflicts,
-    IReadOnlyList<BackupIdea>? Ideas);
+    IReadOnlyList<BackupIdea>? Ideas,
+    IReadOnlyList<BackupWorldRule>? WorldRules);
 
 /// <summary>
 /// The universe itself. <c>OwnerId</c> is deliberately absent: it names an Identity row that
@@ -630,6 +640,24 @@ public sealed record BackupIdea(
 
 /// <summary>One reference of an idea: what the target is, stated explicitly, and its id.</summary>
 public sealed record BackupIdeaReference(IdeaReferenceKind Kind, Guid Id);
+
+/// <summary>
+/// One world rule of this universe (since version 12): an explicit statement, in the author's words, about how the world works.
+/// Text and nothing else - no meaning, status, finding or validation result is carried, because none exists: nothing reads a
+/// rule's words.
+///
+/// <paramref name="Description"/> is plain text exactly as stored, <c>""</c> when there is none. <paramref name="DeletedAt"/> is
+/// when the rule was moved to the Trash, or null while it is live; a rule in the Trash travels whole, because it can still be
+/// restored. The importer (ADR 0032) gives the rule a new id in the universe being restored, keeps its marker and moments, and
+/// its search index is derived again from the row.
+/// </summary>
+public sealed record BackupWorldRule(
+    Guid Id,
+    string Title,
+    string Description,
+    DateTime CreatedAt,
+    DateTime UpdatedAt,
+    DateTime? DeletedAt);
 
 /// <summary>
 /// A position on the universe's line: the era the year is counted in - null on the plain reckoning -

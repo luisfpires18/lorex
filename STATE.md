@@ -45,7 +45,7 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - Same filenames, new bytes, and root static files are cached by path - hence the version
     bumps. ADR 0017 amendment.
 - **Numbered implementation pauses after 022.** Work continues on unnumbered
-  `<type>/<description>` branches: Phase 2 Story, and now Phase 3.
+  `<type>/<description>` branches: Phase 2 Story, Phase 3, and now Phase 4.
   **Phase 023 - Production Hardening / PostgreSQL - remains deferred** and is not started; the
   next numbered phase resumes only when the owner says so.
 - **Entry images** (`feat/entity-images-r2`, merged into `dev`). An entry may carry one picture:
@@ -161,10 +161,28 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - The gap is `UniverseChronology.YearsBetween`: the signed difference inside one era or the plain
     reckoning, `a + b - 1` from a countdown era into the ascending era after it, unknown otherwise.
   - Edited inside the relation kind form on the Types screen. Backup stays version 4, additively.
-- **Phase 3 - Authoring, Ideas & Recovery** (owner-sequenced, unnumbered branches): 1. Lore articles - merged. 2. Content
-  recovery - merged. 3. Ideas - merged. 4. Persistent top search bar - merged. 5. Backup Import / Restore - committed,
-  **not merged, not pushed**. That is the last Phase 3 feature: Phase 3 is complete once it merges.
-- **Phase 3 - Backup restore** (`feat/backup-restore` from `dev` `2f3d1c5`, committed, **not merged, not pushed**). Backup ->
+- **Phase 4 - World Rules & Family Trees** (owner-sequenced, unnumbered branches): 1. World Rules - committed, **not merged,
+  not pushed**. 2. Timeline-based Canon validation - next. 3. Family Trees.
+- **Phase 4 - World Rules** (`feat/world-rules` from `dev` `db13011`, committed, **not merged, not pushed**). Explicit
+  statements about how one universe works, as their own domain - not lore. ADR 0033 (ADR 0014, 0029, 0031, 0032 amended).
+  - `WorldRules` (universe cascade): title 200 trimmed, plain description 10,000 exact, Trash marker. No priority, order,
+    category, tag or enabled flag; listed by title. Words never read for meaning: no Canon, lore, timeline, story or idea write,
+    pinned by a test whose rules say "Canon: Arlen is dead".
+  - `/api/universes/{u}/world-rules`: paged list (240-char excerpt), create, read, whole save with stale 409 `world_rule_changed`
+    (no token is stale), unchanged save writes nothing, delete into the Trash. Restore: `.../trash/world-rules/{id}/restore`.
+    Ownership 404 first; a rule only through its own universe.
+  - Trash: seventh kind `WorldRule`, waits for nothing, no Canon gate. No saved versions, no recovered draft (a short form).
+  - Search: `WorldRuleSearchIndex` (FTS5, 3 triggers); kind 8 "World rule", title / planning tiers, opens `world-rules/{id}`.
+    At most 15 queries and 45 results.
+  - Backup format **12**: `payload.worldRules`, live first, Trash marked; v11 reader would drop rules silently. Importer 1-12,
+    before 12 none even if carried; validated, new ids, markers and moments kept, preview counts.
+  - Web: sidebar World Rules after Timeline; list, editor (Save and Ctrl/Cmd+S, stale choice, leave guard, Delete), Trash row,
+    search result, restore preview line. Nothing on screen claims validation.
+  - Canon unchanged: no subject kind or finding for rules. The rule id is step 2's attachment point.
+  - Owner manual pass: `docs/testing/phase4-world-rules-manual-test.md`.
+- **Phase 3 - Authoring, Ideas & Recovery - COMPLETE** (owner-sequenced, unnumbered branches): lore articles, content recovery,
+  ideas, persistent top search bar, Backup Import / Restore - all merged.
+- **Phase 3 - Backup restore** (`feat/backup-restore` from `dev` `2f3d1c5`, merged into `dev` at `db13011`). Backup ->
   validate -> restore as a **new** universe; no overwrite, no merge. ADR 0032 (ADR 0014, 0010 amended).
   - `PUT /api/backups/validate` streams the raw file to a staging folder, validates, answers a preview (server-counted) and a
     256-bit token; `POST /api/backups/restore` takes token + name, validates the kept file again, restores; `DELETE` discards.
@@ -178,7 +196,7 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     Lorex's own path decoded by the upload gate, no unnamed files. 20 issues listed, rest counted. No semantic inference.
   - Versions 1-11 restore (1-2 bare JSON, 3+ zip): project by version, then normalize as the migrations did (article -> row + v1,
     manuscript v1, icons, Unchaptered, live orders renumbered). `BackupFormatSupport.MaxVersion` test-held to `CurrentVersion`.
-    **Format stays version 11.** No export gap found; `EntityImage.UploadedAt` is not authored and becomes restore time.
+    **Format stayed version 11** (12 since World Rules). No export gap found; `EntityImage.UploadedAt` is not authored and becomes restore time.
   - Every id new (`RestoreIdentity`); history's recorded ids translated consistently. Universe and ideas owned by the restoring
     account; no account data. Rows written directly, not replayed: no fabricated versions; Trash markers, history, ideas (deleted
     kept, references rewritten) exactly as backed up; unassigned ideas and drafts never.
@@ -363,12 +381,11 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 
 ## Baseline
 
-- **869 API integration tests, 137 Playwright tests**, green. Backup restore full Playwright runs on the 36 MB dev database:
-  134/137 twice - canon (Dismiss/Reopen answered "Something went wrong", the `TransitionAsync` commit), profile, ideas, and
-  universes (a rename answered a false "name taken": `UpdateAsync` maps a locked commit's `DbUpdateException` to it). Each
-  passed alone; canon + universes failed a parallel repeat on that database, then passed it 22/22 serially and 22/22 in parallel
-  on a fresh one. The whole suite against a fresh database: 137/137, no `database is locked` in the API log. So the known
-  contention below, growing with the dev database, not the restore. Universe search's runs saw the same pattern at 31 MB. No frontend unit runner exists; the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E
+- **888 API integration tests, 143 Playwright tests**, green. World Rules full Playwright run on the dev database: 139/143 -
+  canon, chronology, type-filter and universe-search (a story delete answered 500), each beside `SQLite Error 5: 'database is
+  locked'` in the API log; all four passed alone, serially. The focused run's world-rules Trash restore failed the same way in
+  parallel and passed alone. The known contention below, not the feature. Backup restore's runs saw 134/137 at 36 MB and
+  universe search's the same pattern at 31 MB; a fresh database ran 137/137 with no lock in the log. No frontend unit runner exists; the web checks are `typecheck`, `lint`, `format:check` and `build`. The E2E
   project has no format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.
 - The test host no longer migrates itself, so every API test boots through the same startup path a
@@ -379,7 +396,8 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   is contention on the one SQLite writer, not the specs, and the content recovery run's API log shows how: a write's commit
   throws `SQLite Error 5: 'database is locked'` at once, not after the provider's retry, and is answered as a 500 - or as a
   false 409 where an endpoint maps every `DbUpdateException` to a conflict (entity type update: "name taken").
-- 28 migrations, latest `AddUniverseSearchIndex` - raw SQL: three FTS5 tables filled from existing rows, 21 triggers, and the
+- 29 migrations, latest `AddWorldRules` - additive: `WorldRules`, its FTS5 index and three triggers; no existing table rebuilt.
+  `WorldRuleMigrationTests` walks it down and up on a file and reads every search trigger back. Before it, `AddUniverseSearchIndex` - raw SQL: three FTS5 tables filled from existing rows, 21 triggers, and the
   lore index rows holding a marker character removed for the backfill; the snapshot gains two keyless match types.
   `UniverseSearchMigrationTests` walks it down and up on a file and reads every trigger back. Before it, `AddIdeas` - additive:
   `Ideas` and five reference tables; `IdeaMigrationTests` walks it down and up and deletes a universe row under it. Before that, `AddContentRecovery` - `DeletedAt` on five story tables, their order indexes
@@ -447,6 +465,9 @@ tool has changed the picture.
 - **Backup restore deferred** - not gaps: restoring over or merging into a universe, partial/selective restore, account-wide
   backup, scheduled/cloud backups, encryption, import from other tools, repair by hand or AI, a background job or resumable
   upload. ADR 0032.
+- **World Rules deferred** - Phase 4 step 2 owns Timeline-based Canon validation and its first structured pattern; later: the
+  node/tree rule builder, rule findings and a Canon subject kind, an enabled state if validation needs one. Not planned: reading
+  rule prose for meaning, a DSL, AI over rules, priorities/categories/tags, saved versions, permanent delete. ADR 0033.
 - **Content recovery deferred** - not gaps: recovered drafts for forms, drafts synced across browsers or devices, merging a
   draft into a newer save, a restored chapter taking back the scenes it held. ADR 0029.
 - **Relationship life-state constraints** (an end alive at the link's date) wait for dated
@@ -468,8 +489,8 @@ None. Follow-ups, not blocking:
 
 - Search - lore and universe alike - matches whole words and prefixes, so the substring hits `LIKE` used to give are gone -
   ADR 0016 argues the trade. Search is SQLite-only (FTS5 tables and triggers) and will be redesigned when PostgreSQL
-  arrives (ADR 0031). A migration that rebuilds a story, manuscript or idea table must recreate its search triggers;
-  `UniverseSearchMigrationTests` fails if one is missing.
+  arrives (ADR 0031). A migration that rebuilds a story, manuscript, idea or world rule table must recreate its search
+  triggers; `UniverseSearchMigrationTests` and `WorldRuleMigrationTests` fail if one is missing.
 - Orphaned media objects are swept best-effort and never retried. A delete that fails after the
   database has committed logs a warning naming the key and leaves the object; the entry is
   correct either way. ADR 0019 argues the trade.

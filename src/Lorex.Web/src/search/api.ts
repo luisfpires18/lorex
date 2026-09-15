@@ -23,7 +23,7 @@ export function searchUniverse(universeId: string, query: string, signal?: Abort
 /**
  * Where a result opens: the existing place for that thing, never a page of its own. A scene or chapter lands on the
  * story's Scenes view and an arc or beat on its Plot view, scrolled to, focused and marked; a manuscript opens the scene's
- * writing; an entry whose words were only in its article opens at the article.
+ * writing; an entry whose words were only in its article opens at the article; a world rule opens that rule.
  */
 export function resultPath(universeId: string, result: SearchResult) {
   const universe = `/app/universes/${universeId}`
@@ -36,6 +36,8 @@ export function resultPath(universeId: string, result: SearchResult) {
         : `${universe}/lore/${result.id}`
     case SearchKind.Idea:
       return `${universe}/ideas/${result.id}`
+    case SearchKind.WorldRule:
+      return `${universe}/world-rules/${result.id}`
     case SearchKind.Story:
       return story
     case SearchKind.Chapter:

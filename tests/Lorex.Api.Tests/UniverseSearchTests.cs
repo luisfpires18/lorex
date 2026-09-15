@@ -505,12 +505,12 @@ public sealed class UniverseSearchTests(LorexApiFactory factory) : IClassFixture
         var (smallQueries, smallBody) = await CommandCounter.CountAsync([small.Id, .. smallIds], () => Search(client, small.Id, "Gravemark"));
         var (largeQueries, largeBody) = await CommandCounter.CountAsync([large.Id, .. largeIds], () => Search(client, large.Id, "Gravemark"));
 
-        Assert.Equal(8, smallBody.Results.Select(result => result.Kind).Distinct().Count());
-        Assert.Equal(8 * UniverseSearchEndpoints.ResultsPerKind, largeBody.Results.Count);
+        Assert.Equal(9, smallBody.Results.Select(result => result.Kind).Distinct().Count());
+        Assert.Equal(9 * UniverseSearchEndpoints.ResultsPerKind, largeBody.Results.Count);
 
         // Ownership, one query per kind, and one excerpt query per index - nothing per result.
         Assert.Equal(smallQueries, largeQueries);
-        Assert.InRange(largeQueries, 1, 13);
+        Assert.InRange(largeQueries, 1, 15);
 
         async Task<List<Guid>> Seed(Guid universeId, int count)
         {
@@ -527,7 +527,8 @@ public sealed class UniverseSearchTests(LorexApiFactory factory) : IClassFixture
                 var arc = await CreateArc(client, universeId, story, $"Arc {index}", description: "Gravemark description");
                 var beat = await CreateBeat(client, universeId, story, arc.Id, $"Beat {index}", description: "Gravemark description");
                 var idea = await CreateIdea(client, $"Idea {index}", "Gravemark body", universeId);
-                ids.AddRange([entity, story, chapter, scene, arc.Id, beat.Id, idea.Id]);
+                var rule = await WorldRuleTestClient.CreateRule(client, universeId, $"Rule {index}", "Gravemark description");
+                ids.AddRange([entity, story, chapter, scene, arc.Id, beat.Id, idea.Id, rule.Id]);
             }
 
             return ids;
@@ -643,7 +644,7 @@ public sealed class UniverseSearchTests(LorexApiFactory factory) : IClassFixture
     // ---------- The backup ----------
 
     [Fact]
-    public async Task A_backup_stays_version_11_and_carries_no_search_index()
+    public async Task A_backup_carries_no_search_index()
     {
         var (client, universe) = await SignedInWithUniverse(_factory, "usbackup");
         var story = await CreateStory(client, universe.Id, "Backed up");
@@ -656,7 +657,7 @@ public sealed class UniverseSearchTests(LorexApiFactory factory) : IClassFixture
         var raw = DocumentText(await RawArchive(client, universe.Id));
         var backup = System.Text.Json.JsonSerializer.Deserialize<UniverseBackup>(raw, UniverseBackupJson.Options)!;
 
-        Assert.Equal(11, backup.FormatVersion);
+        Assert.Equal(UniverseBackup.CurrentVersion, backup.FormatVersion);
         Assert.DoesNotContain("SearchIndex", raw, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("excerpt", raw, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("matchedIn", raw, StringComparison.OrdinalIgnoreCase);

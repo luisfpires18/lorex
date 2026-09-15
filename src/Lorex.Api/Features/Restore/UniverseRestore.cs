@@ -4,6 +4,7 @@ using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Chronology;
 using Lorex.Api.Features.Export;
 using Lorex.Api.Features.Ideas;
+using Lorex.Api.Features.WorldRules;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Media;
 using Lorex.Api.Features.Relationships;
@@ -152,6 +153,11 @@ internal sealed class RestoreIdentity
         {
             yield return idea.Id;
         }
+
+        foreach (var rule in payload.WorldRules!)
+        {
+            yield return rule.Id;
+        }
     }
 }
 
@@ -176,7 +182,7 @@ internal sealed class RestoreNameTakenException() : Exception("The account alrea
 /// objects under a universe id that never existed; that is the same trade ADR 0019 already accepts.</para>
 ///
 /// <para><b>Derived data is derived again.</b> Thumbnails are cut from the originals. The lore search
-/// index is written from the restored entries; the story, manuscript and idea indexes are filled by their
+/// index is written from the restored entries; the story, manuscript, idea and world rule indexes are filled by their
 /// triggers as the rows land (ADR 0031). Canon conflicts are evaluated afresh, and each dismissal the
 /// backup recorded is re-applied to the finding it identified.</para>
 /// </summary>
@@ -376,6 +382,7 @@ internal sealed partial class UniverseRestore(
             AddLore(payload, ids, universeId, images);
             AddStories(payload, ids, universeId);
             AddIdeas(payload, ids, universeId, ownerId);
+            AddWorldRules(payload, ids, universeId);
 
             await db.SaveChangesAsync(cancellationToken);
         }
@@ -865,6 +872,28 @@ internal sealed partial class UniverseRestore(
                         break;
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// The backed-up universe's world rules become the restored universe's (ADR 0033): a new id each, the marker and moments as
+    /// the backup recorded them, the words exactly. Nothing is read into them and nothing else is written for them; their search
+    /// index rows are written by its triggers as the rows land.
+    /// </summary>
+    private void AddWorldRules(UniverseBackupPayload payload, RestoreIdentity ids, Guid universeId)
+    {
+        foreach (var rule in payload.WorldRules!)
+        {
+            db.WorldRules.Add(new WorldRule
+            {
+                Id = ids.Map(rule.Id),
+                UniverseId = universeId,
+                Title = rule.Title,
+                Description = rule.Description,
+                CreatedAt = rule.CreatedAt,
+                UpdatedAt = rule.UpdatedAt,
+                DeletedAt = rule.DeletedAt,
+            });
         }
     }
 

@@ -9,6 +9,7 @@ using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.Stories;
 using Lorex.Api.Features.Timeline;
 using Lorex.Api.Features.Universes;
+using Lorex.Api.Features.WorldRules;
 
 namespace Lorex.Api.Features.Restore;
 
@@ -203,6 +204,7 @@ internal static partial class BackupValidation
         }
 
         count += payload.Ideas!.Sum(idea => 1L + idea.References.Count);
+        count += payload.WorldRules!.Count;
 
         return (int)Math.Min(count, int.MaxValue);
     }
@@ -255,6 +257,7 @@ internal static partial class BackupValidation
             var stories = Required(payload.Stories, "the list of stories", since: 5);
             var dismissed = Required(payload.DismissedConflicts, "the dismissed Canon conflicts");
             var ideas = Required(payload.Ideas, "the list of ideas", since: 11);
+            var worldRules = Required(payload.WorldRules, "the list of world rules", since: 12);
 
             // Everything that can be referenced is listed first, so a reference checked below can
             // point anywhere in the file regardless of order.
@@ -294,6 +297,11 @@ internal static partial class BackupValidation
             foreach (var idea in ideas)
             {
                 CheckIdea(idea);
+            }
+
+            foreach (var rule in worldRules)
+            {
+                CheckWorldRule(rule);
             }
 
             foreach (var conflict in dismissed)
@@ -1107,6 +1115,31 @@ internal static partial class BackupValidation
                 {
                     Add(BackupIssueCodes.Duplicate, $"{what} lists the same reference twice.");
                 }
+            }
+        }
+
+        // ---------- World rules ----------
+
+        /// <summary>A rule's shape only: an id, a title, a description that is there and fits. What it says is never judged.</summary>
+        private void CheckWorldRule(BackupWorldRule rule)
+        {
+            if (rule is null)
+            {
+                Missing("a world rule");
+                return;
+            }
+
+            var what = $"The world rule {Quote(rule.Title)}";
+            Register(rule.Id, what);
+            Text(rule.Title, WorldRuleLimits.TitleMaxLength, $"{what}'s title", required: true);
+
+            if (rule.Description is null)
+            {
+                Missing($"the description of {what.ToLowerInvariant()}");
+            }
+            else
+            {
+                Text(rule.Description, WorldRuleLimits.DescriptionMaxLength, $"{what}'s description");
             }
         }
 

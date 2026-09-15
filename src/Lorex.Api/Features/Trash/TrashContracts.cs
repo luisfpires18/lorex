@@ -2,7 +2,7 @@ using Lorex.Api.Features.Lore;
 
 namespace Lorex.Api.Features.Trash;
 
-/// <summary>What a row in the Trash is. Stored nowhere: each kind is its own table's marker (ADR 0015, ADR 0029).</summary>
+/// <summary>What a row in the Trash is. Stored nowhere: each kind is its own table's marker (ADR 0015, ADR 0029, ADR 0033).</summary>
 public enum TrashItemKind
 {
     Entry = 0,
@@ -11,6 +11,7 @@ public enum TrashItemKind
     Scene = 3,
     PlotArc = 4,
     PlotBeat = 5,
+    WorldRule = 6,
 }
 
 /// <summary>Why a row in the Trash cannot be put back yet, if it cannot. Never inferred from a name.</summary>
@@ -33,7 +34,8 @@ public enum TrashRestoreBlock
 /// it, and when". Nothing a row held - an article, fields, prose, notes, links - is reported here, and every word of it is
 /// readable again the moment it is restored.
 ///
-/// <paramref name="Kind"/> says what it is. The entry members - type and Canon status - are set for an entry only.
+/// <paramref name="Kind"/> says what it is. The entry members - type and Canon status - are set for an entry only; a world
+/// rule carries none of the context members, because it sits in nothing but its universe.
 /// <paramref name="StoryId"/> is set for everything from a story: the story itself, and the chapter, scene, arc or beat's
 /// own story, whose <paramref name="StoryTitle"/> says where it was. <paramref name="PlotArcId"/> and
 /// <paramref name="PlotArcTitle"/> are a beat's arc. <paramref name="BlockedBy"/> says the row cannot come back until what

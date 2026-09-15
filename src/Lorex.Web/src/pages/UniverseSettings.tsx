@@ -101,10 +101,10 @@ export default function UniverseSettings() {
         <h3 className="settings__heading">Backup</h3>
         <p className="settings__note">
           Download this universe as a single archive: its entries and their articles, types and
-          fields, tags, relationships, the timeline, every entry&rsquo;s history, and the full-size
-          image of every entry that has one, and the ideas that belong to this universe. Nothing
-          about your account is in it - so ideas that belong to no universe are in no
-          universe&rsquo;s backup. Keep the file somewhere you trust.
+          fields, tags, relationships, the timeline, its world rules, every entry&rsquo;s history,
+          and the full-size image of every entry that has one, and the ideas that belong to this
+          universe. Nothing about your account is in it - so ideas that belong to no universe are in
+          no universe&rsquo;s backup. Keep the file somewhere you trust.
         </p>
         <p className="settings__note">
           A backup is restored as a new universe beside this one - never over it.{' '}

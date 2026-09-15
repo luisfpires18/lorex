@@ -9,8 +9,8 @@ namespace Lorex.Api.Features.Search;
 
 /// <summary>
 /// The universe search behind the persistent search bar (ADR 0031): what an author typed, looked for across the recorded
-/// content of one universe - lore and articles, stories, chapters, scenes, plot arcs and beats, saved manuscripts, and the
-/// ideas that belong to the universe.
+/// content of one universe - lore and articles, stories, chapters, scenes, plot arcs and beats, saved manuscripts, the ideas
+/// that belong to the universe, and its world rules.
 ///
 /// <b>Recorded words, nothing more.</b> Keyword search over saved text, with the lore search's own rules: words ANDed, the
 /// last one a prefix, accents folded, nothing typed ever run as query syntax. No meaning is read, no question answered.
@@ -81,6 +81,7 @@ public static class UniverseSearchEndpoints
         await AddStoryContentAsync(db, universeId, expression, found, cancellationToken);
         await AddManuscriptsAsync(db, universeId, expression, found, cancellationToken);
         await AddIdeasAsync(db, ownerId, universeId, expression, found, cancellationToken);
+        await AddWorldRulesAsync(db, universeId, expression, found, cancellationToken);
 
         // Each kind read one row past its limit: that row is not shown, it only says the kind holds more.
         var hasMore = found.Exists(one => one.Position >= ResultsPerKind);
@@ -493,6 +494,55 @@ public static class UniverseSearchEndpoints
                     row.Id,
                     row.Title,
                     inTitle ? UniverseSearchField.Title : UniverseSearchField.Body,
+                    inTitle ? null : excerpts.GetValueOrDefault(row.Id)?.First)));
+        }
+    }
+
+    // ---------- World rules ----------
+
+    /// <summary>
+    /// The universe's live world rules, by title or description. A rule in the Trash is never a result. Its words are matched
+    /// as words and nothing more: a rule is found by what it says, never by anything read into it.
+    /// </summary>
+    private static async Task AddWorldRulesAsync(
+        LorexDbContext db,
+        Guid universeId,
+        string expression,
+        List<Found> found,
+        CancellationToken cancellationToken)
+    {
+        var rows = await db.WorldRules.AsNoTracking()
+            .Where(rule => rule.UniverseId == universeId && rule.DeletedAt == null)
+            .Join(
+                UniverseSearchIndex.WorldRules(db, expression),
+                rule => rule.Id,
+                match => match.ItemId,
+                (rule, match) => new { rule.Id, rule.Title, match.Field, match.Rank })
+            .OrderBy(row => row.Field)
+            .ThenBy(row => row.Rank)
+            .ThenBy(row => row.Id)
+            .Take(ResultsPerKind + 1)
+            .ToListAsync(cancellationToken);
+
+        var excerpts = await UniverseSearchIndex.WorldRuleExcerptsAsync(
+            db,
+            expression,
+            [.. rows.Take(ResultsPerKind).Where(row => row.Field != UniverseSearchIndex.TitleField).Select(row => row.Id)],
+            cancellationToken);
+
+        for (var position = 0; position < rows.Count; position++)
+        {
+            var row = rows[position];
+            var inTitle = row.Field == UniverseSearchIndex.TitleField;
+
+            found.Add(new Found(
+                inTitle ? TitleTier : PlanningTier,
+                position,
+                Result(
+                    UniverseSearchKind.WorldRule,
+                    row.Id,
+                    row.Title,
+                    inTitle ? UniverseSearchField.Title : UniverseSearchField.Description,
                     inTitle ? null : excerpts.GetValueOrDefault(row.Id)?.First)));
         }
     }

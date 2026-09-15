@@ -10,6 +10,7 @@ export const SearchKind = {
   PlotBeat: 5,
   Manuscript: 6,
   Idea: 7,
+  WorldRule: 8,
 } as const
 
 export type SearchKindValue = (typeof SearchKind)[keyof typeof SearchKind]
@@ -24,6 +25,7 @@ export const SEARCH_KIND_LABELS: Record<SearchKindValue, string> = {
   [SearchKind.PlotBeat]: 'Beat',
   [SearchKind.Manuscript]: 'Manuscript',
   [SearchKind.Idea]: 'Idea',
+  [SearchKind.WorldRule]: 'World rule',
 }
 
 /** Mirrors the backend enum. Where the searched words were found - the narrowest place that holds all of them. */
