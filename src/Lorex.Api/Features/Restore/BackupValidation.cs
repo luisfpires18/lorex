@@ -753,6 +753,11 @@ internal static partial class BackupValidation
                     Add(BackupIssueCodes.InvalidValue, $"{what} reads the same from both sides, so it cannot name an older side.");
                 }
 
+                if (Defined(type.FamilySemantic, $"{what}'s family meaning") && type.IsSymmetric && type.FamilySemantic != RelationshipFamilySemantic.None)
+                {
+                    Add(BackupIssueCodes.InvalidValue, $"{what} reads the same from both sides, so it cannot name a parent side.");
+                }
+
                 if (type.MinAgeDifferenceYears is < 0 || type.MaxAgeDifferenceYears is < 0)
                 {
                     Add(BackupIssueCodes.InvalidValue, $"{what} has a negative age gap.");

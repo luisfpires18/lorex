@@ -325,6 +325,15 @@ internal static partial class RestoreTestClient
             client, $"/api/universes/{u}/relationship-types",
             new RelationshipTypeRequest("sworn to", null, true, null, null));
 
+        // A kind with a family meaning, and a Draft link of it: a family tree reads it, and nothing else does (ADR 0035).
+        var raised = await PostJson<RelationshipTypeResponse>(
+            client, $"/api/universes/{u}/relationship-types",
+            new RelationshipTypeRequest("raised", "raised by", false, null, null, null, RelationshipFamilySemantic.AdoptiveParent));
+        (await client.PostAsJsonAsync(
+            $"/api/universes/{u}/relationships",
+            new RelationshipRequest(raised.Id, mentor.Id, warden.Id, CanonStatus.Draft, null, null, "Took her in after the flood.")))
+            .EnsureSuccessStatusCode();
+
         // A Canon link onto an Idea: one finding, dismissed. The Canon entry's reference to a Draft mentor: another, left pending.
         (await client.PostAsJsonAsync(
             $"/api/universes/{u}/relationships",
@@ -459,6 +468,14 @@ internal static partial class RestoreTestClient
             foreach (var member in members)
             {
                 node?.AsObject().Remove(member);
+            }
+        }
+
+        if (version < 14)
+        {
+            foreach (var type in payload["relationshipTypes"]!.AsArray())
+            {
+                Drop(type, "familySemantic");
             }
         }
 
@@ -657,6 +674,11 @@ internal static partial class RestoreTestClient
         var rules = await PostJson<RelationshipTypeResponse>(
             client, $"/api/universes/{u}/relationship-types",
             new RelationshipTypeRequest("rules", "ruled by", false, null, null, new RelationshipTypeCanonConstraints(RelationshipAgeOrder.SourceOlder, 1, null)));
+
+        // A kind with a family meaning and no link of its own: every version could hold the kind, and only version 14 its meaning.
+        await PostJson<RelationshipTypeResponse>(
+            client, $"/api/universes/{u}/relationship-types",
+            new RelationshipTypeRequest("bore", "born to", false, null, null, null, RelationshipFamilySemantic.BiologicalParent));
         (await client.PostAsJsonAsync(
             $"/api/universes/{u}/relationships",
             new RelationshipRequest(rules.Id, warden.Id, coast, CanonStatus.Canon, null, null, null))).EnsureSuccessStatusCode();
@@ -786,7 +808,7 @@ internal static partial class RestoreTestClient
 
         foreach (var type in payload.RelationshipTypes.OrderBy(type => type.Name, StringComparer.Ordinal))
         {
-            lines.Add($"relation kind {type.Name} inverse={type.InverseName} symmetric={type.IsSymmetric} description={type.Description} order={type.DisplayOrder} {type.AgeOrder} {type.MinAgeDifferenceYears}-{type.MaxAgeDifferenceYears} {T(type.CreatedAt)} {T(type.UpdatedAt)}");
+            lines.Add($"relation kind {type.Name} inverse={type.InverseName} symmetric={type.IsSymmetric} description={type.Description} order={type.DisplayOrder} {type.AgeOrder} {type.MinAgeDifferenceYears}-{type.MaxAgeDifferenceYears} family={type.FamilySemantic} {T(type.CreatedAt)} {T(type.UpdatedAt)}");
         }
 
         foreach (var line in payload.Relationships.Select(relationship =>

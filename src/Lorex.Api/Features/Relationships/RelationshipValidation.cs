@@ -7,10 +7,12 @@ public static class RelationshipValidation
     /// <paramref name="constraints"/> is the group as it will be stored: the request's own, or on an
     /// update that sent none, the type's current one. Checking the effective group rather than only
     /// what arrived is what stops a type being turned symmetric underneath an age order it already has.
+    /// <paramref name="familySemantic"/> is the family meaning as it will be stored, for the same reason.
     /// </summary>
     public static Dictionary<string, string[]>? ValidateType(
         RelationshipTypeRequest request,
-        RelationshipTypeCanonConstraints constraints)
+        RelationshipTypeCanonConstraints constraints,
+        RelationshipFamilySemantic familySemantic)
     {
         var errors = new Dictionary<string, string[]>();
 
@@ -48,8 +50,30 @@ public static class RelationshipValidation
         }
 
         ValidateConstraints(constraints, request.IsSymmetric, errors);
+        ValidateFamilySemantic(familySemantic, request.IsSymmetric, errors);
 
         return errors.Count == 0 ? null : errors;
+    }
+
+    /// <summary>
+    /// A family meaning names the source as the parent, so a symmetric type - which says neither end is special - cannot carry
+    /// one, for the reason it cannot carry an age order. A request that sets one, or turns a type symmetric beneath one, is
+    /// refused rather than having the meaning silently dropped (ADR 0035).
+    /// </summary>
+    private static void ValidateFamilySemantic(
+        RelationshipFamilySemantic familySemantic,
+        bool isSymmetric,
+        Dictionary<string, string[]> errors)
+    {
+        if (!Enum.IsDefined(familySemantic))
+        {
+            errors["familySemantic"] = ["That is not a family meaning Lorex knows."];
+        }
+        else if (isSymmetric && familySemantic != RelationshipFamilySemantic.None)
+        {
+            errors["familySemantic"] =
+                ["A kind that reads the same from both sides has no parent side. Remove the family meaning, or make the kind one-way."];
+        }
     }
 
     /// <summary>

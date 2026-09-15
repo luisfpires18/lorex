@@ -130,8 +130,15 @@ public sealed record UniverseBackup(
     /// facts about the world - what kind of event it was, by what means, and whose - that nothing derives again: a version 12
     /// reader would parse the file and restore the universe with all of them silently gone. A file at version 12 or earlier has
     /// none of these members; each reads as null, which means no terms, no rule checked and no moment described.
+    ///
+    /// 14 - A relation kind may carry a family meaning (ADR 0035). <see cref="BackupRelationshipType.FamilySemantic"/> says every
+    /// link of the kind is a biological or an adoptive parent link, source parent and target child. Not ignorable, and not the
+    /// relationship constraint case either: a constraint is a check run against links whose meaning a reader keeps, and this is
+    /// that meaning. It is authored, nothing derives it again - and nothing may derive it from the kind's name - so a version 13
+    /// reader would restore every link with the family it records silently gone and every family tree in the universe empty. A
+    /// file at version 13 or earlier has no <c>familySemantic</c>; it reads as <c>None</c>, whatever a kind is called.
     /// </summary>
-    public const int CurrentVersion = 13;
+    public const int CurrentVersion = 14;
 
     public static UniverseBackup Of(UniverseBackupPayload payload, DateTime generatedAt) =>
         new(FormatName, CurrentVersion, generatedAt, payload);
@@ -426,6 +433,9 @@ public sealed record BackupRevisionFieldValue(
 /// reader that ignores them loses the checks and misreads no year, link or entry. A type is written
 /// with <c>None</c> and two nulls when it has no constraint, and a file written before they existed -
 /// where all three are absent - means exactly that.
+///
+/// <paramref name="FamilySemantic"/> was added in version 14, as a bump (see <see cref="UniverseBackup.CurrentVersion"/>). Written by
+/// name, <c>None</c> for a kind with no family meaning; absent, in any earlier file, it means <c>None</c>.
 /// </summary>
 public sealed record BackupRelationshipType(
     Guid Id,
@@ -437,6 +447,7 @@ public sealed record BackupRelationshipType(
     RelationshipAgeOrder AgeOrder,
     int? MinAgeDifferenceYears,
     int? MaxAgeDifferenceYears,
+    RelationshipFamilySemantic FamilySemantic,
     DateTime CreatedAt,
     DateTime UpdatedAt);
 

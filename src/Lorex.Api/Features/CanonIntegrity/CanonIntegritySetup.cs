@@ -20,6 +20,10 @@ public static class CanonIntegritySetup
         services.AddScoped<ICanonIntegrityRule, CanonRelationshipAgeOrderRule>();
         services.AddScoped<ICanonIntegrityRule, CanonRelationshipAgeGapRule>();
 
+        // Family meaning. Only a type its author gave a family meaning is read, as parent links; a type without one is invisible
+        // to it, whatever it is called (ADR 0035).
+        services.AddScoped<ICanonIntegrityRule, CanonFamilyLoopRule>();
+
         // Chronology. These read what a field means rather than how records link, so they
         // only see entities whose author declared a birth or death year.
         services.AddScoped<ICanonIntegrityRule, CanonLifespanOrderRule>();

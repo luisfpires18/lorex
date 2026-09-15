@@ -503,6 +503,7 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                     type.AgeOrder,
                     type.MinAgeDifferenceYears,
                     type.MaxAgeDifferenceYears,
+                    type.FamilySemantic,
                     Utc(type.CreatedAt),
                     Utc(type.UpdatedAt))),
         ];

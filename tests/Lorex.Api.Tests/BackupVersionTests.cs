@@ -34,6 +34,7 @@ public sealed class BackupVersionTests(LorexApiFactory factory) : IClassFixture<
     [InlineData(11)]
     [InlineData(12)]
     [InlineData(13)]
+    [InlineData(14)]
     public async Task A_backup_of_every_version_restores_with_what_that_version_carried(int version)
     {
         var client = await SignedIn(_factory, $"version-{version}");
@@ -128,6 +129,12 @@ public sealed class BackupVersionTests(LorexApiFactory factory) : IClassFixture<
         Assert.Equal(version >= 13 ? ["Return", "Rite"] : [], copy.ValidationTerms!.Select(term => term.Name));
         Assert.Equal(version >= 13, copy.WorldRules!.Any(rule => rule.Validation is not null));
         Assert.Equal(version >= 13 ? warden.Id : (Guid?)null, moment.Validation?.ParticipantEntityId);
+
+        // A relation kind's family meaning from 14. Before it none, and nothing is read from the kind called "bore".
+        Assert.Equal(
+            version >= 14 ? RelationshipFamilySemantic.BiologicalParent : RelationshipFamilySemantic.None,
+            copy.RelationshipTypes.Single(type => type.Name == "bore").FamilySemantic);
+        Assert.Equal(RelationshipFamilySemantic.None, copy.RelationshipTypes.Single(type => type.Name == "rules").FamilySemantic);
     }
 
     [Fact]

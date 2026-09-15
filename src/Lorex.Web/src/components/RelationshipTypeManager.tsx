@@ -9,7 +9,11 @@ import {
 } from '../relationships/api'
 import {
   AgeOrder,
+  FAMILY_SEMANTIC_LABELS,
+  FAMILY_SEMANTIC_WORDS,
+  FamilySemantic,
   type AgeOrderValue,
+  type FamilySemanticValue,
   type RelationshipCanonConstraints,
   type RelationshipType,
 } from '../relationships/types'
@@ -23,6 +27,7 @@ interface TypeDraft {
   /** As typed, so a half-written number is never silently read as "no gap". */
   minGap: string
   maxGap: string
+  familySemantic: FamilySemanticValue
 }
 
 const BLANK: TypeDraft = {
@@ -33,12 +38,14 @@ const BLANK: TypeDraft = {
   ageOrder: AgeOrder.None,
   minGap: '',
   maxGap: '',
+  familySemantic: FamilySemantic.None,
 }
 
 /** The server's field keys, lowercased the way `ApiError` hands them over. */
 const ORDER_KEY = 'canonconstraints.ageorder'
 const MIN_KEY = 'canonconstraints.minagedifferenceyears'
 const MAX_KEY = 'canonconstraints.maxagedifferenceyears'
+const FAMILY_KEY = 'familysemantic'
 
 const GAP_MESSAGE = 'An age gap is a whole number of years, 0 or more.'
 
@@ -52,7 +59,15 @@ function draftFrom(type: RelationshipType): TypeDraft {
     ageOrder: constraints.ageOrder,
     minGap: constraints.minAgeDifferenceYears?.toString() ?? '',
     maxGap: constraints.maxAgeDifferenceYears?.toString() ?? '',
+    familySemantic: type.familySemantic,
   }
+}
+
+/** What a kind means to the Family Tree, in words, or null when it means nothing to it. */
+function familySummary(familySemantic: FamilySemanticValue) {
+  return familySemantic === FamilySemantic.None
+    ? null
+    : `Family: ${FAMILY_SEMANTIC_WORDS[familySemantic]} parent → child`
 }
 
 /** How a type reads from each side, in the author's own words. */
@@ -164,6 +179,8 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
         minAgeDifferenceYears: min,
         maxAgeDifferenceYears: max,
       },
+      // A symmetric kind has no parent side either, for the same reason.
+      familySemantic: draft.isSymmetric ? FamilySemantic.None : draft.familySemantic,
     }
 
     try {
@@ -322,6 +339,65 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
         </div>
       </fieldset>
 
+      <fieldset className="reltype__canon" data-testid="reltype-family">
+        <legend className="reltype__legend">Family meaning</legend>
+        <p className="field__hint">
+          Optional. Only a kind given a family meaning here appears in the Family Tree, and LoreX
+          never infers one from the relationship name.
+        </p>
+
+        {draft.isSymmetric ? (
+          <p className="field__hint" data-testid="reltype-no-family">
+            Reads the same from both sides, so neither end is the parent. Make the kind one-way to
+            give it a family meaning.
+          </p>
+        ) : (
+          <>
+            <div className="field">
+              <label className="field__label" htmlFor="reltype-family-meaning">
+                Family meaning
+              </label>
+              <select
+                id="reltype-family-meaning"
+                className="field__input field__input--select"
+                value={draft.familySemantic}
+                onChange={(event) =>
+                  edit({ familySemantic: Number(event.target.value) as FamilySemanticValue })
+                }
+                aria-invalid={fieldErrors[FAMILY_KEY] ? true : undefined}
+                aria-describedby={fieldErrors[FAMILY_KEY] ? 'reltype-family-error' : undefined}
+                data-testid="reltype-family-meaning"
+              >
+                {[
+                  FamilySemantic.None,
+                  FamilySemantic.BiologicalParent,
+                  FamilySemantic.AdoptiveParent,
+                ].map((option) => (
+                  <option key={option} value={option}>
+                    {FAMILY_SEMANTIC_LABELS[option]}
+                  </option>
+                ))}
+              </select>
+              {fieldErrors[FAMILY_KEY] ? (
+                <p className="field__error" id="reltype-family-error">
+                  {fieldErrors[FAMILY_KEY]}
+                </p>
+              ) : null}
+            </div>
+
+            {draft.familySemantic === FamilySemantic.None ? null : (
+              <p className="reltype__direction" data-testid="reltype-family-direction">
+                <span className="reltype__end">Source</span>
+                <span>is the {FAMILY_SEMANTIC_WORDS[draft.familySemantic]} parent</span>
+                <span aria-hidden="true">·</span>
+                <span className="reltype__end">Target</span>
+                <span>is the child</span>
+              </p>
+            )}
+          </>
+        )}
+      </fieldset>
+
       <div className="relform__actions">
         <button
           className="button"
@@ -400,6 +476,7 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
             }
 
             const summary = constraintSummary(type.canonConstraints)
+            const family = familySummary(type.familySemantic)
 
             return (
               <li className="types__row" key={type.id} data-reltype-name={type.name}>
@@ -443,6 +520,14 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
                     data-testid={`reltype-constraints-${type.name}`}
                   >
                     {summary}
+                  </p>
+                ) : null}
+                {family ? (
+                  <p
+                    className="types__description reltype__rule"
+                    data-testid={`reltype-family-${type.name}`}
+                  >
+                    {family}
                   </p>
                 ) : null}
                 {type.description ? <p className="types__description">{type.description}</p> : null}

@@ -336,3 +336,20 @@ attachment named for the world and the day, reduced to lowercase ASCII.
   entry images and version 3; that gap is closed, and it is why the format moved.
 - Two things a backup deliberately does not claim to be: an account export, and a disaster
   recovery mechanism. It is one world, taken by hand, by the person who owns it.
+
+## Amendment - format version 14: family meanings (2026-09-16)
+
+`relationshipTypes[].familySemantic` carries what a relation kind means to a family tree - `None`,
+`BiologicalParent` or `AdoptiveParent` - written by name, always present (ADR 0035).
+
+This is a bump, and the line it sits on the far side of is the one ADR 0023 drew. Canon constraints were added
+*within* version 4 because a reader that ignored them lost a check and misread no fact. A family meaning is not
+a check: it is the meaning of the links themselves, the difference between a stored row and "Mara is Lia's
+biological mother". A version 13 reader would restore every link with the family it records silently gone, and
+the one thing that must never happen is that a reader guesses it back from what the kind is called. So the
+version number refuses the file instead.
+
+A file at version 13 or earlier has no `familySemantic`, and every kind in it reads as `None` whatever its name,
+even when the file carries the member - which Lorex never wrote. No derived relative is in a backup: siblings,
+grandparents and grandchildren are recomputed from the links, and a backup holds only the authored kinds and
+the authored links.

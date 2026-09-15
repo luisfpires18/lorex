@@ -233,3 +233,18 @@ the importer learned it in the same change: `BackupFormatSupport.MaxVersion` is 
   moment's, terms' and participant's new ids, so none can point outside the new universe. No check state is read or written.
 - **Canon.** Evaluated after the rows as ever. A world rule finding is fingerprinted over a set of moments whose ids all changed;
   `CanonFinding.UnorderedFrom` makes the translated set hash to the backup's key, so its dismissal is re-applied like any other.
+
+## Amendment - format version 14: family meanings (2026-09-16)
+
+Format version 14 adds the family meaning a relation kind carries (ADR 0035, ADR 0014), and the importer learned it in the same
+change: `BackupFormatSupport.MaxVersion` is 14.
+
+- **Versions.** Every version 1 to 14 restores. Projection: before 14 no kind has a family meaning, even in a file carrying one -
+  and none is ever taken from what a kind is called. Normalization: none is needed; the column's absence is `None`.
+- **Validation.** The meaning must be one Lorex knows, and a kind that reads the same from both sides may not carry one, exactly as
+  it may not name an older side. Nothing a kind is called is judged.
+- **Identity and writing.** The meaning travels with its kind, which already gets a new id from `RestoreIdentity`; no relationship
+  row changes, because the meaning was never on one. A restored universe therefore derives the same family trees as the original,
+  under ids it shares with nothing - pinned by a test that describes every relative of every entry by name on both sides.
+- **Canon.** `CANON-FAMILY-001` is fingerprinted over the links that close a circle, as a set, so `CanonFinding.UnorderedFrom`
+  re-applies a dismissal over the restored ids the way a world rule finding's is.

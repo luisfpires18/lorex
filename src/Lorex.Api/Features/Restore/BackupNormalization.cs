@@ -36,6 +36,8 @@ namespace Lorex.Api.Features.Restore;
 /// <item>Versions 1-11: no world rules (<c>AddWorldRules</c>, ADR 0033).</item>
 /// <item>Versions 1-12: no event kinds or methods, no rule checked, no moment described (<c>AddRuleValidation</c>, ADR 0034). In
 /// every version, a check of kind <c>None</c> is no check and a moment's details with no part are no details.</item>
+/// <item>Versions 1-13: no relation kind has a family meaning, even when the file carries one, and none is ever read from a kind's
+/// name (<c>AddRelationshipFamilySemantics</c>, ADR 0035).</item>
 /// </list>
 ///
 /// One thing is normalized for every version: the live rows of each ordered collection are numbered
@@ -52,11 +54,9 @@ internal static class BackupNormalization
     {
         ChronologyEras = version >= 4 ? payload.ChronologyEras : null,
         Entities = payload.Entities is null ? null! : [.. payload.Entities.Select(entity => entity is null ? null! : ProjectEntity(entity, version))],
-        RelationshipTypes = version >= 4 || payload.RelationshipTypes is null
+        RelationshipTypes = version >= 14 || payload.RelationshipTypes is null
             ? payload.RelationshipTypes!
-            : [.. payload.RelationshipTypes.Select(type => type is null
-                ? null!
-                : type with { AgeOrder = RelationshipAgeOrder.None, MinAgeDifferenceYears = null, MaxAgeDifferenceYears = null })],
+            : [.. payload.RelationshipTypes.Select(type => type is null ? null! : ProjectRelationshipType(type, version))],
         TimelineEntries = version >= 13 || payload.TimelineEntries is null
             ? payload.TimelineEntries!
             : [.. payload.TimelineEntries.Select(entry => entry is null
@@ -77,6 +77,15 @@ internal static class BackupNormalization
                 ? payload.WorldRules
                 : [.. payload.WorldRules.Select(rule => rule is null ? null! : rule with { Validation = null })],
         ValidationTerms = version >= 13 ? payload.ValidationTerms : null,
+    };
+
+    /// <summary>Constraints from version 4, a family meaning from version 14 - never taken from what a kind is called.</summary>
+    private static BackupRelationshipType ProjectRelationshipType(BackupRelationshipType type, int version) => type with
+    {
+        AgeOrder = version >= 4 ? type.AgeOrder : RelationshipAgeOrder.None,
+        MinAgeDifferenceYears = version >= 4 ? type.MinAgeDifferenceYears : null,
+        MaxAgeDifferenceYears = version >= 4 ? type.MaxAgeDifferenceYears : null,
+        FamilySemantic = RelationshipFamilySemantic.None,
     };
 
     private static BackupEntity ProjectEntity(BackupEntity entity, int version) => entity with

@@ -513,6 +513,7 @@ internal sealed partial class UniverseRestore(
                 AgeOrder = type.AgeOrder,
                 MinAgeDifferenceYears = type.MinAgeDifferenceYears,
                 MaxAgeDifferenceYears = type.MaxAgeDifferenceYears,
+                FamilySemantic = type.FamilySemantic,
                 CreatedAt = type.CreatedAt,
                 UpdatedAt = type.UpdatedAt,
             });

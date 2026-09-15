@@ -398,9 +398,8 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
         var backup = await Backup(client, universe.Id);
 
         // Authored configuration, added within version 4: no fact changes meaning without it. The file
-        // is at version 8 because of stories, their chapters, their plot and their prose (ADR 0024-0027), not because
-        // of these.
-        Assert.Equal(13, backup.FormatVersion);
+        // is at its current version because of everything since (ADR 0024-0035), not because of these.
+        Assert.Equal(14, backup.FormatVersion);
 
         var parent = backup.Payload.RelationshipTypes.Single(type => type.Name == "parent of");
         Assert.Equal(RelationshipAgeOrder.SourceOlder, parent.AgeOrder);
@@ -424,6 +423,10 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
         Assert.Equal("None", written.GetProperty("ageOrder").GetString());
         Assert.Equal(JsonValueKind.Null, written.GetProperty("minAgeDifferenceYears").ValueKind);
         Assert.Equal(JsonValueKind.Null, written.GetProperty("maxAgeDifferenceYears").ValueKind);
+
+        // A kind called "parent of" whose author gave it no family meaning is written as having none (ADR 0035).
+        Assert.Equal("None", written.GetProperty("familySemantic").GetString());
+        Assert.All(backup.Payload.RelationshipTypes, type => Assert.Equal(RelationshipFamilySemantic.None, type.FamilySemantic));
     }
 
     [Fact]
@@ -443,6 +446,9 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
         Assert.Equal(RelationshipAgeOrder.None, type.AgeOrder);
         Assert.Null(type.MinAgeDifferenceYears);
         Assert.Null(type.MaxAgeDifferenceYears);
+
+        // Nor does a file written before family meanings existed acquire one from the words "parent of" (ADR 0035).
+        Assert.Equal(RelationshipFamilySemantic.None, type.FamilySemantic);
     }
 
     [Fact]
@@ -497,7 +503,7 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
 
         // Eras arrived in version 4; stories took the file to 5, chapters to 6, plot to 7 and prose to 8 without
         // changing how eras travel.
-        Assert.Equal(13, backup.FormatVersion);
+        Assert.Equal(14, backup.FormatVersion);
         Assert.Equal(
             [
                 new BackupChronologyEra(

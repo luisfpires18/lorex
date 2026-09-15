@@ -38,8 +38,9 @@ One ADR per durable decision. Rationale lives in the ADR, never here.
 | 0032 | A backup is restored as a new universe: validated first, every id new, the account's own | [0032-backup-restore.md](0032-backup-restore.md) |
 | 0033 | A world rule is a universe's own statement of how its world works, and means nothing to Lorex by itself | [0033-world-rules.md](0033-world-rules.md) |
 | 0034 | A world rule may carry one explicit check, counted against the explicit details of Canon moments | [0034-timeline-rule-validation.md](0034-timeline-rule-validation.md) |
+| 0035 | A relation kind may carry an explicit family meaning, and a family tree derives the rest | [0035-family-trees.md](0035-family-trees.md) |
 
-All accepted. Next number: `0035`.
+All accepted. Next number: `0036`.
 
 Known limitations are recorded in the ADR that owns them - cross-era ordering on the plain
 reckoning in 0009 and 0011, and years written before a universe named its eras, the listing's

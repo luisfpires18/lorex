@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom'
-import { Check, Pencil, Trash, X } from 'lucide-react'
+import { Check, Network, Pencil, Trash, X } from 'lucide-react'
 import { ActionIcon } from '../components/ActionIcon'
 import { EntityArticleSection } from '../components/EntityArticle'
 import { EntityHistory } from '../components/EntityHistory'
@@ -668,6 +668,16 @@ export default function EntityPage() {
                 <ActionIcon icon={Pencil} />
                 Edit
               </button>
+              {/* Offered on every entry: family is recorded by the author, never inferred from what an
+                  entry is. An entry with no family connections opens an empty tree that says so. */}
+              <Link
+                className="button button--quiet button--icon"
+                to={`/app/universes/${universe.id}/family-tree/${entityId}`}
+                data-testid="entity-family-tree"
+              >
+                <ActionIcon icon={Network} />
+                Family tree
+              </Link>
               <button
                 className="button button--quiet button--icon"
                 type="button"
