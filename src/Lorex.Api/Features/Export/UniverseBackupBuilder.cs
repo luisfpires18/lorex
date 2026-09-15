@@ -73,7 +73,8 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
             await StoriesAsync(universeId, cancellationToken),
             await DismissedConflictsAsync(universeId, cancellationToken),
             await IdeasAsync(universe.Id, universe.OwnerId, cancellationToken),
-            await WorldRulesAsync(universeId, cancellationToken));
+            await WorldRulesAsync(universeId, cancellationToken),
+            await ValidationTermsAsync(universeId, cancellationToken));
 
         // Read-only, so there is nothing to commit; this just closes the snapshot.
         await transaction.CommitAsync(cancellationToken);
@@ -550,6 +551,10 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
             .Where(link => link.TimelineEntry!.UniverseId == universeId)
             .ToListAsync(cancellationToken);
 
+        var details = await db.TimelineEntryValidations.AsNoTracking()
+            .Where(validation => validation.TimelineEntry!.UniverseId == universeId)
+            .ToDictionaryAsync(validation => validation.TimelineEntryId, cancellationToken);
+
         var participantsByEntry = links
             .GroupBy(link => link.TimelineEntryId)
             .ToDictionary(
@@ -581,7 +586,10 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                     entry.EraLabel,
                     Utc(entry.CreatedAt),
                     Utc(entry.UpdatedAt),
-                    participantsByEntry.GetValueOrDefault(entry.Id, []))),
+                    participantsByEntry.GetValueOrDefault(entry.Id, []),
+                    details.TryGetValue(entry.Id, out var described)
+                        ? new BackupTimelineValidation(described.EventKindTermId, described.MethodTermId, described.ParticipantEntityId)
+                        : null)),
         ];
     }
 
@@ -920,6 +928,10 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
             .Where(rule => rule.UniverseId == universeId)
             .ToListAsync(cancellationToken);
 
+        var checks = await db.WorldRuleValidations.AsNoTracking()
+            .Where(validation => validation.WorldRule!.UniverseId == universeId)
+            .ToDictionaryAsync(validation => validation.WorldRuleId, cancellationToken);
+
         return
         [
             .. rules
@@ -932,7 +944,34 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                     rule.Description,
                     Utc(rule.CreatedAt),
                     Utc(rule.UpdatedAt),
-                    Utc(rule.DeletedAt))),
+                    Utc(rule.DeletedAt),
+                    checks.TryGetValue(rule.Id, out var check)
+                        ? new BackupWorldRuleValidation(check.Kind, check.EventKindTermId, check.MethodTermId, check.MaxOccurrences)
+                        : null)),
+        ];
+    }
+
+    // ---------- Rule validation ----------
+
+    /// <summary>
+    /// Every event kind and method of the universe, event kinds first, each group by name and then id (ADR 0034). The normalized
+    /// name uniqueness is enforced on is derived from the name, so it is never here; neither is anything a check found.
+    /// </summary>
+    private async Task<IReadOnlyList<BackupValidationTerm>> ValidationTermsAsync(
+        Guid universeId,
+        CancellationToken cancellationToken)
+    {
+        var terms = await db.ValidationTerms.AsNoTracking()
+            .Where(term => term.UniverseId == universeId)
+            .ToListAsync(cancellationToken);
+
+        return
+        [
+            .. terms
+                .OrderBy(term => term.Kind)
+                .ThenBy(term => term.Name, StringComparer.Ordinal)
+                .ThenBy(term => Key(term.Id), StringComparer.Ordinal)
+                .Select(term => new BackupValidationTerm(term.Id, term.Kind, term.Name, Utc(term.CreatedAt), Utc(term.UpdatedAt))),
         ];
     }
 

@@ -44,7 +44,7 @@ public sealed class WorldRuleBackupTests(LorexApiFactory factory) : IClassFixtur
         var raw = DocumentText(await RawArchive(client, u));
         var backup = JsonSerializer.Deserialize<UniverseBackup>(raw, UniverseBackupJson.Options)!;
 
-        Assert.Equal(12, backup.FormatVersion);
+        Assert.Equal(13, backup.FormatVersion);
         Assert.Equal(UniverseBackup.CurrentVersion, backup.FormatVersion);
 
         // Live ones by title as written, then the one in the Trash.
@@ -61,7 +61,7 @@ public sealed class WorldRuleBackupTests(LorexApiFactory factory) : IClassFixtur
         using (var document = JsonDocument.Parse(raw))
         {
             var written = document.RootElement.GetProperty("payload").GetProperty("worldRules")[0];
-            Assert.Equal(["id", "title", "description", "createdAt", "updatedAt", "deletedAt"], written.EnumerateObject().Select(property => property.Name));
+            Assert.Equal(["id", "title", "description", "createdAt", "updatedAt", "deletedAt", "validation"], written.EnumerateObject().Select(property => property.Name));
         }
 
         Assert.DoesNotContain("Another world's rule", raw, StringComparison.Ordinal);
@@ -87,7 +87,7 @@ public sealed class WorldRuleBackupTests(LorexApiFactory factory) : IClassFixtur
         var source = BackupOf(archive).Payload.WorldRules!;
 
         var validated = await Validated(client, archive);
-        Assert.Equal((12, 1, 1), (validated.Preview.FormatVersion, validated.Preview.Counts.WorldRules, validated.Preview.Counts.WorldRulesInTrash));
+        Assert.Equal((13, 1, 1), (validated.Preview.FormatVersion, validated.Preview.Counts.WorldRules, validated.Preview.Counts.WorldRulesInTrash));
 
         var first = await Restored(client, validated.Token, "Restored wrrestore one");
         var second = await RestoreArchive(client, archive, "Restored wrrestore two");

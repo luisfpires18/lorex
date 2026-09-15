@@ -161,9 +161,34 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - The gap is `UniverseChronology.YearsBetween`: the signed difference inside one era or the plain
     reckoning, `a + b - 1` from a countdown era into the ascending era after it, unknown otherwise.
   - Edited inside the relation kind form on the Types screen. Backup stays version 4, additively.
-- **Phase 4 - World Rules & Family Trees** (owner-sequenced, unnumbered branches): 1. World Rules - committed, **not merged,
-  not pushed**. 2. Timeline-based Canon validation - next. 3. Family Trees.
-- **Phase 4 - World Rules** (`feat/world-rules` from `dev` `db13011`, committed, **not merged, not pushed**). Explicit
+- **Phase 4 - World Rules & Family Trees** (owner-sequenced, unnumbered branches): 1. World Rules - merged. 2. Timeline-based
+  Canon validation - committed, **not merged, not pushed**. 3. Family Trees - next, and Phase 4's last feature.
+- **Phase 4 - Timeline rule validation** (`feat/timeline-rule-validation` from `dev` `3508baf`, committed, **not merged, not
+  pushed**). The first checkable World Rule pattern: at most N Canon moments of one event kind by one method per participant. ADR
+  0034 (ADR 0010, 0012, 0014, 0032, 0033 amended).
+  - Explicit only: a rule's stored check and moments' stored details. No title, description, linked entry, story, manuscript or
+    idea is read; tests use invented names.
+  - `ValidationTerms` (event kind | method, universe-owned, name unique per kind case-insensitively; identity is the id) at
+    `/validation-terms`: list with usage, create, rename (reconciled for wording), delete refused 409 `validation_term_in_use` while a
+    rule (Trash included) or moment names it. Created in place from the rule editor and moment drawer; renamed/deleted on Types.
+  - `WorldRuleValidations` (one per rule: kind, event kind, method, limit 1-10,000) saved with the rule under its stale-save 409;
+    `validation` left out keeps, `None` removes. `TimelineEntryValidations` (event kind, method, participant - each optional; SET NULL
+    participant; a trashed participant kept, never newly chosen); left out keeps, all-null removes. Moments stay last-write-wins.
+  - Count (`WorldRuleOccurrences`, two queries per universe): explicit different term = other event; non-Canon not counted; Canon
+    missing a part or with participant in Trash = uncounted; group by participant id. Rule detail's derived `check`: Checked /
+    Incomplete (names uncounted moments, never "holds") / CannotCheck (a stored row that cannot run; never passes).
+  - `CANON-WORLD-001` Medium, one per rule + participant over the limit; subjects rule (`CanonSubjectKind.WorldRule`), participant,
+    each moment. Fingerprint: rule, event kind, method, participant + moments as a set (`CanonFinding.UnorderedFrom`, so the set
+    survives restore). A third moment is a new finding. Canon links rule, entry and `timeline?moment={id}` (opens the drawer).
+  - Reconciled: timeline writes (already), rule create/update/delete/restore only with a check, term rename. Rule in Trash checks
+    nothing; participant in Trash leaks nothing.
+  - Backup format **13**: `validationTerms`, `worldRules[].validation`, `timelineEntries[].validation`; v12 reader would drop authored
+    names and recorded facts silently. Importer 1-13; before 13 none even if carried; ids remapped; dismissals re-applied.
+  - Migration `AddRuleValidation`: three new tables, nothing rebuilt, triggers untouched.
+  - Fixed on the way: Canon finding explanation and subjects did not wrap a long unbroken word on a phone; EntityPicker's Change left
+    the focus on nothing (now the search box).
+  - Owner manual pass: `docs/testing/phase4-timeline-rule-validation-manual-test.md`.
+- **Phase 4 - World Rules** (`feat/world-rules` from `dev` `db13011`, merged into `dev` at `3508baf`). Explicit
   statements about how one universe works, as their own domain - not lore. ADR 0033 (ADR 0014, 0029, 0031, 0032 amended).
   - `WorldRules` (universe cascade): title 200 trimmed, plain description 10,000 exact, Trash marker. No priority, order,
     category, tag or enabled flag; listed by title. Words never read for meaning: no Canon, lore, timeline, story or idea write,
@@ -178,7 +203,7 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     before 12 none even if carried; validated, new ids, markers and moments kept, preview counts.
   - Web: sidebar World Rules after Timeline; list, editor (Save and Ctrl/Cmd+S, stale choice, leave guard, Delete), Trash row,
     search result, restore preview line. Nothing on screen claims validation.
-  - Canon unchanged: no subject kind or finding for rules. The rule id is step 2's attachment point.
+  - Canon unchanged here; step 2 attached checks by the rule id (above).
   - Owner manual pass: `docs/testing/phase4-world-rules-manual-test.md`.
 - **Phase 3 - Authoring, Ideas & Recovery - COMPLETE** (owner-sequenced, unnumbered branches): lore articles, content recovery,
   ideas, persistent top search bar, Backup Import / Restore - all merged.
@@ -381,7 +406,10 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 
 ## Baseline
 
-- **888 API integration tests, 143 Playwright tests**, green. World Rules full Playwright run on the dev database: 139/143 -
+- **942 API integration tests, 148 Playwright tests**, green. Timeline rule validation full Playwright runs on the dev database:
+  143/148 (two restore expectations still at format version 12 - fixed - and canon, account-menu, story-workspace), then 145/148
+  (canon, content-recovery - a Trash restore answered "Something went wrong" - and type-filter); every failing spec passed alone,
+  serially, and none exercises a world rule check. World Rules full Playwright run on the dev database: 139/143 -
   canon, chronology, type-filter and universe-search (a story delete answered 500), each beside `SQLite Error 5: 'database is
   locked'` in the API log; all four passed alone, serially. The focused run's world-rules Trash restore failed the same way in
   parallel and passed alone. The known contention below, not the feature. Backup restore's runs saw 134/137 at 36 MB and
@@ -396,7 +424,9 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   is contention on the one SQLite writer, not the specs, and the content recovery run's API log shows how: a write's commit
   throws `SQLite Error 5: 'database is locked'` at once, not after the provider's retry, and is answered as a 500 - or as a
   false 409 where an endpoint maps every `DbUpdateException` to a conflict (entity type update: "name taken").
-- 29 migrations, latest `AddWorldRules` - additive: `WorldRules`, its FTS5 index and three triggers; no existing table rebuilt.
+- 30 migrations, latest `AddRuleValidation` - additive: `ValidationTerms`, `WorldRuleValidations`, `TimelineEntryValidations`;
+  nothing rebuilt. `RuleValidationMigrationTests` walks it down and up on a file and reads every trigger back. Before it,
+  `AddWorldRules` - additive: `WorldRules`, its FTS5 index and three triggers; no existing table rebuilt.
   `WorldRuleMigrationTests` walks it down and up on a file and reads every search trigger back. Before it, `AddUniverseSearchIndex` - raw SQL: three FTS5 tables filled from existing rows, 21 triggers, and the
   lore index rows holding a marker character removed for the backfill; the snapshot gains two keyless match types.
   `UniverseSearchMigrationTests` walks it down and up on a file and reads every trigger back. Before it, `AddIdeas` - additive:
@@ -411,9 +441,9 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 - No automated test reaches Cloudflare and none can: the API host registers an in-process object
   store, Playwright runs against `Media:Provider=InMemory`, and the R2 adapter tests answer the SDK
   from an in-process HTTP handler. That covers profile photos too - they use the same store.
-- Eight rules in `src/Lorex.Api/Features/CanonIntegrity/Rules/`: three structural (Medium), three
-  chronological (High), which compare across named eras, and two relationship constraints (Medium).
-  Behaviour: ADR 0010, 0011, 0012, 0022, 0023.
+- Nine rules in `src/Lorex.Api/Features/CanonIntegrity/Rules/`: three structural (Medium), three
+  chronological (High), which compare across named eras, two relationship constraints (Medium) and one world rule check
+  (Medium). Behaviour: ADR 0010, 0011, 0012, 0022, 0023, 0034.
 
 ## Remote
 
@@ -465,9 +495,13 @@ tool has changed the picture.
 - **Backup restore deferred** - not gaps: restoring over or merging into a universe, partial/selective restore, account-wide
   backup, scheduled/cloud backups, encryption, import from other tools, repair by hand or AI, a background job or resumable
   upload. ADR 0032.
-- **World Rules deferred** - Phase 4 step 2 owns Timeline-based Canon validation and its first structured pattern; later: the
-  node/tree rule builder, rule findings and a Canon subject kind, an enabled state if validation needs one. Not planned: reading
-  rule prose for meaning, a DSL, AI over rules, priorities/categories/tags, saved versions, permanent delete. ADR 0033.
+- **World Rules deferred** - later: the node/tree rule builder (owner idea, undecided), an enabled state if checks prove they need
+  one. Not planned: reading rule prose for meaning, a DSL, AI over rules, priorities/categories/tags, saved versions, permanent
+  delete. ADR 0033.
+- **Timeline rule validation deferred** - not gaps: any second pattern, conditions/operators/AND-OR, actions, priorities, rule
+  dependencies, simulation; a Canon diagnostic category for "cannot check"; term descriptions, hierarchies, merging, scoping a
+  method to an event kind, bulk-assigning moment details; stale-save protection for moments; restore-preview counts for terms and
+  checks. A check is only as complete as the details authors record, and says so. ADR 0034.
 - **Content recovery deferred** - not gaps: recovered drafts for forms, drafts synced across browsers or devices, merging a
   draft into a newer save, a restored chapter taking back the scenes it held. ADR 0029.
 - **Relationship life-state constraints** (an end alive at the link's date) wait for dated

@@ -26,6 +26,10 @@ public static class CanonIntegritySetup
         services.AddScoped<ICanonIntegrityRule, CanonTimelineBeforeBirthRule>();
         services.AddScoped<ICanonIntegrityRule, CanonTimelineAfterDeathRule>();
 
+        // World rule checks. Only a rule the author gave a structured check is read, through explicit ids on the rule and on
+        // each moment; a rule that is words only is invisible to it (ADR 0034).
+        services.AddScoped<ICanonIntegrityRule, CanonWorldRuleOccurrenceRule>();
+
         services.AddScoped<CanonIntegrityEvaluator>();
 
         // The one place a High finding is allowed to stop something happening. Scoped, because

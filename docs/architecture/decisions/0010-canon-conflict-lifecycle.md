@@ -98,3 +98,7 @@ the target lives in one of several tables. Only kinds the current rules produce 
   the rule's order and `Fingerprint` is derived from them, byte for byte the hash it always was, so no stored conflict changes.
   A restore gives every record a new id, and re-applies a backup's dismissals by hashing each restored finding's ids translated
   back to the ones the backup used - which needs the ids, not just the hash.
+- **A finding may be identified by a set, and a finding may be about a world rule** (2026-09-15, ADR 0034). `CanonFinding.UnorderedFrom`
+  says from which position its ids are a set; the hash puts those in one canonical order itself, so the same set is the same key
+  under any ids - which is what keeps a dismissal re-applicable after a restore. Null is the ordered hash, byte for byte, so no stored
+  conflict changes. `CanonSubjectKind.WorldRule` (4) is the fifth subject kind, named only while the rule is live, as an entry is.

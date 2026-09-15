@@ -59,6 +59,7 @@ export const CanonSubjectKind = {
   Relationship: 1,
   TimelineEntry: 2,
   EntityField: 3,
+  WorldRule: 4,
 } as const
 
 export type CanonSubjectKindValue = (typeof CanonSubjectKind)[keyof typeof CanonSubjectKind]
@@ -68,6 +69,7 @@ export const SUBJECT_KIND_LABELS: Record<CanonSubjectKindValue, string> = {
   [CanonSubjectKind.Relationship]: 'Relationship',
   [CanonSubjectKind.TimelineEntry]: 'Moment',
   [CanonSubjectKind.EntityField]: 'Field',
+  [CanonSubjectKind.WorldRule]: 'World rule',
 }
 
 /** `name` is null when the record has gone and the universe has not been evaluated since. */

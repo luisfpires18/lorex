@@ -4,6 +4,7 @@ import { Field } from '../components/Field'
 import { RelationshipTypeManager } from '../components/RelationshipTypeManager'
 import { TypeIcon } from '../components/TypeIcon'
 import { TypeIconPicker } from '../components/TypeIconPicker'
+import { ValidationTermManager } from '../components/ValidationTermManager'
 import { ApiError } from '../lib/api'
 import {
   addField,
@@ -440,6 +441,8 @@ export default function UniverseTypes() {
       </div>
 
       <RelationshipTypeManager universeId={universe.id} />
+
+      <ValidationTermManager universeId={universe.id} />
     </article>
   )
 }

@@ -1,8 +1,14 @@
+import type {
+  WorldRuleCheck,
+  WorldRuleValidation,
+  WorldRuleValidationInput,
+} from '../ruleValidation/types'
+
 /** The bounds a world rule is held to, mirrored from the API's `WorldRuleLimits` so a form says so before a save. */
 export const WORLD_RULE_TITLE_MAX_LENGTH = 200
 export const WORLD_RULE_DESCRIPTION_MAX_LENGTH = 10_000
 
-/** A list row: a rule's title and the start of its description, never all of it. */
+/** A list row: a rule's title and the start of its description, never all of it, and whether it carries a timeline check. */
 export interface WorldRuleSummary {
   id: string
   title: string
@@ -10,6 +16,7 @@ export interface WorldRuleSummary {
   isExcerptShortened: boolean
   createdAt: string
   updatedAt: string
+  hasCheck: boolean
 }
 
 export interface WorldRulePage {
@@ -21,8 +28,9 @@ export interface WorldRulePage {
 }
 
 /**
- * One rule, whole: what the author wrote and when. Nothing derived travels with it - no status, no finding, no "valid" flag -
- * because nothing reads a rule's words (ADR 0033).
+ * One rule, whole: what the author wrote and when. A rule's words are never read (ADR 0033). Only a rule the author gave an
+ * explicit timeline check carries `validation`, and with it `check` - what counting that check finds now, derived and never
+ * stored (ADR 0034). A rule that is words only carries neither.
  */
 export interface WorldRuleDetail {
   id: string
@@ -30,11 +38,14 @@ export interface WorldRuleDetail {
   description: string
   createdAt: string
   updatedAt: string
+  validation: WorldRuleValidation | null
+  check: WorldRuleCheck | null
 }
 
-/** A create, or a whole save naming the `updatedAt` it was written over. */
+/** A create, or a whole save naming the `updatedAt` it was written over, with the rule's check. */
 export interface WorldRuleInput {
   title: string
   description: string
   expectedUpdatedAt: string | null
+  validation: WorldRuleValidationInput
 }

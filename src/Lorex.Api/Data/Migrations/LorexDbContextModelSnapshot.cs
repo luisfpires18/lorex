@@ -1048,6 +1048,93 @@ namespace Lorex.Api.Data.Migrations
                     b.ToTable("RelationshipTypes", (string)null);
                 });
 
+            modelBuilder.Entity("Lorex.Api.Features.RuleValidation.TimelineEntryValidation", b =>
+                {
+                    b.Property<Guid>("TimelineEntryId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("EventKindTermId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("MethodTermId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ParticipantEntityId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("TimelineEntryId");
+
+                    b.HasIndex("EventKindTermId");
+
+                    b.HasIndex("MethodTermId");
+
+                    b.HasIndex("ParticipantEntityId");
+
+                    b.ToTable("TimelineEntryValidations", (string)null);
+                });
+
+            modelBuilder.Entity("Lorex.Api.Features.RuleValidation.ValidationTerm", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UniverseId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UniverseId", "Kind", "NormalizedName")
+                        .IsUnique();
+
+                    b.ToTable("ValidationTerms", (string)null);
+                });
+
+            modelBuilder.Entity("Lorex.Api.Features.RuleValidation.WorldRuleValidation", b =>
+                {
+                    b.Property<Guid>("WorldRuleId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("EventKindTermId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("MaxOccurrences")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("MethodTermId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("WorldRuleId");
+
+                    b.HasIndex("EventKindTermId");
+
+                    b.HasIndex("MethodTermId");
+
+                    b.ToTable("WorldRuleValidations", (string)null);
+                });
+
             modelBuilder.Entity("Lorex.Api.Features.Search.UniverseSearchMatch", b =>
                 {
                     b.Property<int>("Field")
@@ -2108,6 +2195,76 @@ namespace Lorex.Api.Data.Migrations
                     b.Navigation("Universe");
                 });
 
+            modelBuilder.Entity("Lorex.Api.Features.RuleValidation.TimelineEntryValidation", b =>
+                {
+                    b.HasOne("Lorex.Api.Features.RuleValidation.ValidationTerm", "EventKindTerm")
+                        .WithMany()
+                        .HasForeignKey("EventKindTermId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Lorex.Api.Features.RuleValidation.ValidationTerm", "MethodTerm")
+                        .WithMany()
+                        .HasForeignKey("MethodTermId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Lorex.Api.Features.Lore.LoreEntity", "ParticipantEntity")
+                        .WithMany()
+                        .HasForeignKey("ParticipantEntityId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Lorex.Api.Features.Timeline.TimelineEntry", "TimelineEntry")
+                        .WithOne("Validation")
+                        .HasForeignKey("Lorex.Api.Features.RuleValidation.TimelineEntryValidation", "TimelineEntryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EventKindTerm");
+
+                    b.Navigation("MethodTerm");
+
+                    b.Navigation("ParticipantEntity");
+
+                    b.Navigation("TimelineEntry");
+                });
+
+            modelBuilder.Entity("Lorex.Api.Features.RuleValidation.ValidationTerm", b =>
+                {
+                    b.HasOne("Lorex.Api.Features.Universes.Universe", "Universe")
+                        .WithMany()
+                        .HasForeignKey("UniverseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Universe");
+                });
+
+            modelBuilder.Entity("Lorex.Api.Features.RuleValidation.WorldRuleValidation", b =>
+                {
+                    b.HasOne("Lorex.Api.Features.RuleValidation.ValidationTerm", "EventKindTerm")
+                        .WithMany()
+                        .HasForeignKey("EventKindTermId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Lorex.Api.Features.RuleValidation.ValidationTerm", "MethodTerm")
+                        .WithMany()
+                        .HasForeignKey("MethodTermId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Lorex.Api.Features.WorldRules.WorldRule", "WorldRule")
+                        .WithOne("Validation")
+                        .HasForeignKey("Lorex.Api.Features.RuleValidation.WorldRuleValidation", "WorldRuleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EventKindTerm");
+
+                    b.Navigation("MethodTerm");
+
+                    b.Navigation("WorldRule");
+                });
+
             modelBuilder.Entity("Lorex.Api.Features.Stories.Chapter", b =>
                 {
                     b.HasOne("Lorex.Api.Features.Stories.Story", "Story")
@@ -2469,6 +2626,13 @@ namespace Lorex.Api.Data.Migrations
             modelBuilder.Entity("Lorex.Api.Features.Timeline.TimelineEntry", b =>
                 {
                     b.Navigation("EntityLinks");
+
+                    b.Navigation("Validation");
+                });
+
+            modelBuilder.Entity("Lorex.Api.Features.WorldRules.WorldRule", b =>
+                {
+                    b.Navigation("Validation");
                 });
 #pragma warning restore 612, 618
         }

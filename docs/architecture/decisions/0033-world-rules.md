@@ -131,3 +131,17 @@ exactly what it is here: text. Prose is never parsed into a pattern, and no patt
 - A rule is only as checkable as the explicit structure a later feature gives it. Until then the API and the screen say plainly
   that it is words.
 - `AddWorldRules` is additive; rolling it back discards every rule, because the schema before it had no room for one.
+
+## Amendment - a rule's explicit check (2026-09-15, ADR 0034)
+
+The attachment point is used as this ADR said it would be: a rule may carry one structured check in a shape of its own,
+`WorldRuleValidations`, keyed by the rule's id. What does not change is the boundary - **a rule's words still mean nothing**, and a
+rule without a check is still exactly the text described above.
+
+- A rule's detail carries `validation` and a derived `check` only when it has a check; a list row says `hasCheck`. "No status, no
+  finding, no valid flag" still holds for a rule that is words only.
+- Saving, deleting or restoring a rule that has or gets a check reconciles Canon in the same transaction; a words-only rule's routes
+  still reconcile nothing, and `WorldRuleEndpointTests` still holds them to that.
+- The editor gains "Check against the timeline" below the description; the list lede and the editor lede now say that only a check
+  is ever counted. The screens mention validation for exactly that reason.
+- `CanonSubjectKind` gains `WorldRule`: a finding may now be about a rule.

@@ -26,7 +26,7 @@ public sealed class EntityArticleBackupTests(LorexApiFactory factory) : IClassFi
         var world = await BuildArticles(client, universe.Id);
 
         var backup = await Backup(client, universe.Id);
-        Assert.Equal(12, backup.FormatVersion);
+        Assert.Equal(13, backup.FormatVersion);
         Assert.Equal(UniverseBackup.CurrentVersion, backup.FormatVersion);
 
         var entities = backup.Payload.Entities.ToDictionary(entity => entity.Id);

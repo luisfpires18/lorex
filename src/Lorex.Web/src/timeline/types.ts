@@ -1,4 +1,5 @@
 import type { CanonStatusValue } from '../lore/types'
+import type { TimelineValidation, TimelineValidationInput } from '../ruleValidation/types'
 
 /** Mirrors the backend enum. What a moment actually claims about when it happened. */
 export const DateKind = {
@@ -90,6 +91,9 @@ export interface TimelineEntry {
   entities: TimelineEntityLink[]
   createdAt: string
   updatedAt: string
+
+  /** The optional details World Rule checks read, or null for an ordinary moment (ADR 0034). */
+  validation: TimelineValidation | null
 }
 
 export interface TimelineEntryPage {
@@ -116,6 +120,9 @@ export interface TimelineEntryInput {
   entityIds: string[]
   startEraId: string | null
   endEraId: string | null
+
+  /** Left out, a save keeps the stored details; all three parts null removes them. */
+  validation?: TimelineValidationInput
 }
 
 export interface TimelineQuery {

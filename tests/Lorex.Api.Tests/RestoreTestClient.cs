@@ -398,6 +398,24 @@ internal static partial class RestoreTestClient
         await WorldRuleTestClient.DeleteRule(client, u, binnedRule.Id);
         await WorldRuleTestClient.CreateRule(client, elsewhere.Id, "Another world's rule", "Belongs elsewhere.");
 
+        // A rule with a check the warden's two Canon returns break - that finding dismissed - a return with no participant it
+        // cannot count, and a method nothing names.
+        var returning = await RuleValidationTestClient.EventKind(client, u, "Return from the tide");
+        var saltRite = await RuleValidationTestClient.Method(client, u, "Salt rite");
+        await RuleValidationTestClient.Method(client, u, "Unused method 北の門");
+        await RuleValidationTestClient.CreateCheckedRule(client, u, "The tide returns no one twice", RuleValidationTestClient.Limit(returning.Id, saltRite.Id, 1), "Words.");
+        foreach (var (moment, year, participant) in new[] { ("Alenna walks out of the sea", 20, (Guid?)warden.Id), ("Alenna walks out of the sea again", 30, warden.Id), ("Someone walks out of the sea", 40, null) })
+        {
+            await RuleValidationTestClient.CreateMoment(
+                client,
+                u,
+                new TimelineEntryRequest(moment, null, CanonStatus.Canon, TimelineDateKind.Exact, year, null, null, null, null, null, null, [], afterTheFall, null,
+                    RuleValidationTestClient.Details(returning.Id, saltRite.Id, participant)));
+        }
+
+        var twice = Assert.Single(await RuleValidationTestClient.Findings(client, u));
+        (await client.PostAsync($"/api/universes/{u}/canon-conflicts/{twice.Id}/dismiss", null)).EnsureSuccessStatusCode();
+
         return new RichWorld(
             universe, warden.Id, mentor.Id, coast.Id, lostHeir.Id, story, abandoned, arrival, departure, coldOpen, council, vote,
             cutScene, arc.Id, learns.Id, hides.Id, floating.Id, binned.Id, afterTheFall, picture);
@@ -441,6 +459,21 @@ internal static partial class RestoreTestClient
             foreach (var member in members)
             {
                 node?.AsObject().Remove(member);
+            }
+        }
+
+        if (version < 13)
+        {
+            Drop(payload, "validationTerms");
+
+            foreach (var rule in payload["worldRules"]?.AsArray() ?? [])
+            {
+                Drop(rule, "validation");
+            }
+
+            foreach (var entry in payload["timelineEntries"]!.AsArray())
+            {
+                Drop(entry, "validation");
             }
         }
 
@@ -627,9 +660,12 @@ internal static partial class RestoreTestClient
         (await client.PostAsJsonAsync(
             $"/api/universes/{u}/relationships",
             new RelationshipRequest(rules.Id, warden.Id, coast, CanonStatus.Canon, null, null, null))).EnsureSuccessStatusCode();
+        var returning = await RuleValidationTestClient.EventKind(client, u, "Return");
+        var rite = await RuleValidationTestClient.Method(client, u, "Rite");
         (await client.PostAsJsonAsync(
             $"/api/universes/{u}/timeline",
-            new TimelineEntryRequest("The Accord", null, CanonStatus.Canon, TimelineDateKind.Exact, 45, null, null, null, null, null, null, [warden.Id], era)))
+            new TimelineEntryRequest("The Accord", null, CanonStatus.Canon, TimelineDateKind.Exact, 45, null, null, null, null, null, null, [warden.Id], era,
+                Validation: RuleValidationTestClient.Details(returning.Id, rite.Id, warden.Id))))
             .EnsureSuccessStatusCode();
 
         var story = await CreateStory(client, u, "The Long Winter");
@@ -642,6 +678,7 @@ internal static partial class RestoreTestClient
         await IdeaTestClient.CreateIdea(client, "Maybe the city floats", "Nobody below.", u, [IdeaTestClient.Ref(IdeaReferenceKind.Scene, first)]);
 
         await WorldRuleTestClient.CreateRule(client, u, "The Veil holds", "Plain.");
+        await RuleValidationTestClient.CreateCheckedRule(client, u, "Returns once", RuleValidationTestClient.Limit(returning.Id, rite.Id, 1));
 
         return new PlainWorld(universe, warden.Id, story, picture);
     }
@@ -680,6 +717,7 @@ internal static partial class RestoreTestClient
             .ToDictionary(item => item.Id, item => item.Name);
         var beats = stories.SelectMany(story => (story.PlotArcs ?? []).SelectMany(arc => arc.Beats.Select(beat => (beat.Id, Name: $"{story.Title}/{arc.Title}/{beat.Title}"))))
             .ToDictionary(item => item.Id, item => item.Name);
+        var terms = (payload.ValidationTerms ?? []).ToDictionary(term => term.Id, term => $"{term.Kind}:{term.Name}");
 
         static string N(Dictionary<Guid, string> names, Guid? id) =>
             id is not { } value ? "-" : names.TryGetValue(value, out var name) ? name : "(not in this backup)";
@@ -760,7 +798,15 @@ internal static partial class RestoreTestClient
 
         foreach (var entry in payload.TimelineEntries.OrderBy(entry => entry.Title, StringComparer.Ordinal))
         {
-            lines.Add($"moment {entry.Title} description={entry.Description} canon={entry.CanonStatus} {entry.DateKind} {N(eras, entry.StartEraId)} {entry.StartYear}/{entry.StartMonth}/{entry.StartDay} to {N(eras, entry.EndEraId)} {entry.EndYear}/{entry.EndMonth}/{entry.EndDay} label={entry.EraLabel} {T(entry.CreatedAt)} {T(entry.UpdatedAt)} participants={L(entry.ParticipantEntityIds.Select(id => N(entities, id)))}");
+            var details = entry.Validation is { } described
+                ? $"{N(terms, described.EventKindTermId)}/{N(terms, described.MethodTermId)}/{N(entities, described.ParticipantEntityId)}"
+                : "-";
+            lines.Add($"moment {entry.Title} description={entry.Description} canon={entry.CanonStatus} {entry.DateKind} {N(eras, entry.StartEraId)} {entry.StartYear}/{entry.StartMonth}/{entry.StartDay} to {N(eras, entry.EndEraId)} {entry.EndYear}/{entry.EndMonth}/{entry.EndDay} label={entry.EraLabel} {T(entry.CreatedAt)} {T(entry.UpdatedAt)} participants={L(entry.ParticipantEntityIds.Select(id => N(entities, id)))} details={details}");
+        }
+
+        foreach (var term in (payload.ValidationTerms ?? []).OrderBy(term => term.Kind).ThenBy(term => term.Name, StringComparer.Ordinal))
+        {
+            lines.Add($"term {term.Kind} {term.Name} {T(term.CreatedAt)} {T(term.UpdatedAt)}");
         }
 
         foreach (var story in stories.OrderBy(story => story.Title, StringComparer.Ordinal))
@@ -816,7 +862,10 @@ internal static partial class RestoreTestClient
 
         foreach (var rule in (payload.WorldRules ?? []).OrderBy(rule => rule.Title, StringComparer.Ordinal))
         {
-            lines.Add($"world rule {rule.Title} description={rule.Description} deleted={T(rule.DeletedAt)} {T(rule.CreatedAt)} {T(rule.UpdatedAt)}");
+            var check = rule.Validation is { } limit
+                ? $"{limit.Kind} {N(terms, limit.EventKindTermId)} {N(terms, limit.MethodTermId)} {limit.MaxOccurrences}"
+                : "-";
+            lines.Add($"world rule {rule.Title} description={rule.Description} deleted={T(rule.DeletedAt)} {T(rule.CreatedAt)} {T(rule.UpdatedAt)} check={check}");
         }
 
         foreach (var conflict in payload.DismissedConflicts.Select(conflict => $"dismissed {conflict.RuleCode} {conflict.Severity} {T(conflict.DismissedAt)}").Order(StringComparer.Ordinal))

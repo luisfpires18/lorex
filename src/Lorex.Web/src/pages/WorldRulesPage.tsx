@@ -19,8 +19,9 @@ export interface WorldRulesListNotice {
  * A universe's World Rules: explicit statements, in the author's words, about how the world works (ADR 0033).
  *
  * A rule book, not a board. Rules are listed by title, so a rule's place says nothing about how much it matters, and each
- * row is its title and a line of what it says. Nothing here says a rule holds, is checked or is broken - a rule is what was
- * written, and saving one changes nothing else in the world. The page lives in the address, so Back and a reload keep it.
+ * row is its title and a line of what it says. A rule's words are never read; a row says only whether the author gave the rule
+ * a timeline check (ADR 0034), and what that check finds is on the rule itself. The page lives in the address, so Back and a
+ * reload keep it.
  */
 export default function WorldRulesPage() {
   const { universe } = useOutletContext<WorkspaceContext>()
@@ -72,8 +73,8 @@ export default function WorldRulesPage() {
             World Rules
           </h2>
           <p className="chron__lede">
-            Explicit statements about how this universe works, kept exactly as you write them.
-            Saving a rule changes nothing else in your world.
+            Explicit statements about how this universe works, kept exactly as you write them. Lorex
+            never reads their words; only a timeline check you give a rule is counted.
           </p>
         </div>
         <Link className="button button--icon" to={`${basePath}/new`} data-testid="new-world-rule">
@@ -137,6 +138,11 @@ export default function WorldRulesPage() {
                 </p>
               ) : null}
               <p className="rulerow__meta">
+                {rule.hasCheck ? (
+                  <span className="rulerow__check" data-testid="world-rule-has-check">
+                    Checked against the timeline ·{' '}
+                  </span>
+                ) : null}
                 Updated <time dateTime={rule.updatedAt}>{formatDate(rule.updatedAt)}</time>
               </p>
             </li>

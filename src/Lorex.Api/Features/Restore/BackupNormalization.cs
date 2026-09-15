@@ -1,6 +1,7 @@
 using Lorex.Api.Features.Export;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Relationships;
+using Lorex.Api.Features.RuleValidation;
 using Lorex.Api.Features.Stories;
 
 namespace Lorex.Api.Features.Restore;
@@ -33,6 +34,8 @@ namespace Lorex.Api.Features.Restore;
 /// (<c>AddContentRecovery</c>, ADR 0029).</item>
 /// <item>Versions 1-10: no ideas.</item>
 /// <item>Versions 1-11: no world rules (<c>AddWorldRules</c>, ADR 0033).</item>
+/// <item>Versions 1-12: no event kinds or methods, no rule checked, no moment described (<c>AddRuleValidation</c>, ADR 0034). In
+/// every version, a check of kind <c>None</c> is no check and a moment's details with no part are no details.</item>
 /// </list>
 ///
 /// One thing is normalized for every version: the live rows of each ordered collection are numbered
@@ -54,14 +57,26 @@ internal static class BackupNormalization
             : [.. payload.RelationshipTypes.Select(type => type is null
                 ? null!
                 : type with { AgeOrder = RelationshipAgeOrder.None, MinAgeDifferenceYears = null, MaxAgeDifferenceYears = null })],
-        TimelineEntries = version >= 4 || payload.TimelineEntries is null
+        TimelineEntries = version >= 13 || payload.TimelineEntries is null
             ? payload.TimelineEntries!
-            : [.. payload.TimelineEntries.Select(entry => entry is null ? null! : entry with { StartEraId = null, EndEraId = null })],
+            : [.. payload.TimelineEntries.Select(entry => entry is null
+                ? null!
+                : entry with
+                {
+                    StartEraId = version >= 4 ? entry.StartEraId : null,
+                    EndEraId = version >= 4 ? entry.EndEraId : null,
+                    Validation = null,
+                })],
         Stories = version >= 5 && payload.Stories is not null
             ? [.. payload.Stories.Select(story => story is null ? null! : ProjectStory(story, version))]
             : null,
         Ideas = version >= 11 ? payload.Ideas : null,
-        WorldRules = version >= 12 ? payload.WorldRules : null,
+        WorldRules = version < 12 || payload.WorldRules is null
+            ? null
+            : version >= 13
+                ? payload.WorldRules
+                : [.. payload.WorldRules.Select(rule => rule is null ? null! : rule with { Validation = null })],
+        ValidationTerms = version >= 13 ? payload.ValidationTerms : null,
     };
 
     private static BackupEntity ProjectEntity(BackupEntity entity, int version) => entity with
@@ -125,7 +140,13 @@ internal static class BackupNormalization
         Entities = [.. payload.Entities.Select(entity => NormalizeEntity(entity, version))],
         Stories = [.. (payload.Stories ?? []).Select(story => NormalizeStory(story, version))],
         Ideas = payload.Ideas ?? [],
-        WorldRules = payload.WorldRules ?? [],
+        WorldRules = [.. (payload.WorldRules ?? []).Select(rule => rule.Validation is { Kind: WorldRuleValidationKind.None } ? rule with { Validation = null } : rule)],
+        ValidationTerms = payload.ValidationTerms ?? [],
+        TimelineEntries =
+        [
+            .. payload.TimelineEntries.Select(entry =>
+                entry.Validation is { EventKindTermId: null, MethodTermId: null, ParticipantEntityId: null } ? entry with { Validation = null } : entry),
+        ],
         DismissedConflicts = [.. payload.DismissedConflicts.DistinctBy(conflict => conflict.Fingerprint, StringComparer.Ordinal)],
     };
 

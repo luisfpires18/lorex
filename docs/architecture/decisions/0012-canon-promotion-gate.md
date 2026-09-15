@@ -132,3 +132,13 @@ Everything in the payload is inside the universe the caller has already proved t
   explicit rule list: visible in one place, not inferred.
 - The gate reads severity from the finding, not from the recorded conflict, so a rule whose
   severity changes changes what blocks, with no data migration.
+
+## Amendment - world rule checks (2026-09-15, ADR 0034)
+
+`CANON-WORLD-001` is Medium, so it never refuses a write. Timeline create and update stay gated and now carry a moment's
+validation details in the same write. Reconciled but not gated, each for the reason in the table above:
+
+| Path | Why not gated | Why still reconciled |
+| --- | --- | --- |
+| world rule create, update, delete, restore - only while the rule has or gets a check | A check is the author's configuration, and its rule is Medium. | It opens, rewords or resolves what the check finds. A rule that is words only reconciles nothing (ADR 0033). |
+| validation term rename | A name decides no match. | A finding quotes the term's name, which is not in its fingerprint. |

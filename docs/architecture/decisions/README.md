@@ -37,8 +37,9 @@ One ADR per durable decision. Rationale lives in the ADR, never here.
 | 0031 | A universe is searched across its recorded content from one persistent bar, over derived FTS5 indexes | [0031-universe-search.md](0031-universe-search.md) |
 | 0032 | A backup is restored as a new universe: validated first, every id new, the account's own | [0032-backup-restore.md](0032-backup-restore.md) |
 | 0033 | A world rule is a universe's own statement of how its world works, and means nothing to Lorex by itself | [0033-world-rules.md](0033-world-rules.md) |
+| 0034 | A world rule may carry one explicit check, counted against the explicit details of Canon moments | [0034-timeline-rule-validation.md](0034-timeline-rule-validation.md) |
 
-All accepted. Next number: `0034`.
+All accepted. Next number: `0035`.
 
 Known limitations are recorded in the ADR that owns them - cross-era ordering on the plain
 reckoning in 0009 and 0011, and years written before a universe named its eras, the listing's
@@ -62,5 +63,6 @@ restoring a chapter with the scenes it once held - in 0029, and what ideas delib
 versions, cross-universe references - and the unassigned ideas no universe backup can hold, in 0030, and what the universe
 search leaves out - account-wide search, unassigned ideas, substrings, a pinned bar, the triggers the model cannot see - in 0031, and
 what a restore does not do - overwrite, merge, account-wide or partial restores, background jobs - and the writer lock a very large
-one holds, in 0032, and what a world rule deliberately is not - checked, ordered, prioritised, versioned or read for meaning - and the
-Canon validation it leaves to Phase 4's next step, in 0033.
+one holds, in 0032, and what a world rule deliberately is not - ordered, prioritised, versioned or read for meaning - in 0033, and
+what a rule's check deliberately is not - a second pattern, a builder, a condition tree, a diagnostic finding, a stale-save token for
+moments - and that it is only as complete as the details authors record, in 0034.

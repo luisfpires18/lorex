@@ -382,6 +382,20 @@ public static class CanonIntegrityEndpoints
             }
         }
 
+        if (wanted.TryGetValue(CanonSubjectKind.WorldRule, out var ruleIds))
+        {
+            // Live rules only, as for entries: a rule in the Trash has no page to open, and naming it would link into a 404.
+            var found = await db.WorldRules.AsNoTracking()
+                .Where(rule => rule.UniverseId == universeId && rule.DeletedAt == null && ruleIds.Contains(rule.Id))
+                .Select(rule => new { rule.Id, rule.Title })
+                .ToListAsync(cancellationToken);
+
+            foreach (var rule in found)
+            {
+                names[(CanonSubjectKind.WorldRule, rule.Id)] = rule.Title;
+            }
+        }
+
         return names;
     }
 }
