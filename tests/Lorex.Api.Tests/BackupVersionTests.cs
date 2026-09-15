@@ -33,6 +33,7 @@ public sealed class BackupVersionTests(LorexApiFactory factory) : IClassFixture<
     [InlineData(10)]
     [InlineData(11)]
     [InlineData(12)]
+    [InlineData(13)]
     public async Task A_backup_of_every_version_restores_with_what_that_version_carried(int version)
     {
         var client = await SignedIn(_factory, $"version-{version}");
@@ -120,7 +121,13 @@ public sealed class BackupVersionTests(LorexApiFactory factory) : IClassFixture<
         Assert.Equal(version >= 11 ? 1 : 0, copy.Ideas!.Count);
 
         // World rules from 12.
-        Assert.Equal(version >= 12 ? ["The Veil holds"] : [], copy.WorldRules!.Select(rule => rule.Title));
+        Assert.Equal(version >= 12 ? ["Returns once", "The Veil holds"] : [], copy.WorldRules!.Select(rule => rule.Title));
+
+        // Event kinds, methods, a rule's check and a moment's details from 13. Before it, none: no rule is checked and no moment
+        // described, and nothing is guessed from the rule called "Returns once" or the moment's participants.
+        Assert.Equal(version >= 13 ? ["Return", "Rite"] : [], copy.ValidationTerms!.Select(term => term.Name));
+        Assert.Equal(version >= 13, copy.WorldRules!.Any(rule => rule.Validation is not null));
+        Assert.Equal(version >= 13 ? warden.Id : (Guid?)null, moment.Validation?.ParticipantEntityId);
     }
 
     [Fact]

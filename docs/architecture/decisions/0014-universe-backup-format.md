@@ -6,8 +6,9 @@ Status: accepted (2026-09-09), amended 2026-09-10 (version 3: the file became an
 within version 4), 2026-09-13 (version 5: stories), 2026-09-13 (version 6: chapters), 2026-09-13
 (version 7: plot), 2026-09-13 (version 8: scene prose), 2026-09-13 (version 9: entry articles and their
 history), 2026-09-14 (version 10: story content in the Trash, and a manuscript's saved versions), 2026-09-14 (version 11:
-the ideas that belong to a universe), 2026-09-14 (a backup can be restored - ADR 0032; the format is unchanged), and 2026-09-15
-(version 12: a universe's world rules - ADR 0033)
+the ideas that belong to a universe), 2026-09-14 (a backup can be restored - ADR 0032; the format is unchanged), 2026-09-15
+(version 12: a universe's world rules - ADR 0033), and 2026-09-15 (version 13: world rule checks, event kinds and methods, and a
+moment's validation details - ADR 0034)
 
 ## Context
 
@@ -199,6 +200,17 @@ title then id. It fails the test the way stories and ideas did: a rule's words a
 the file and restore the universe with every rule silently gone. Nothing derived is carried - no search index row, and no
 validation state, since none exists. A file at version 11 or earlier has no `worldRules`; it reads as null and means none. The
 importer reads versions 1 to 12 and writes each rule into the new universe under a new id, its marker and moments kept (ADR 0032
+amendment).
+
+**Version 13 (2026-09-15) carries world rule checks** (ADR 0034). `payload.validationTerms` holds the universe's event kinds and
+methods - `id`, `kind`, `name`, `createdAt`, `updatedAt` - event kinds first, each by name then id; each world rule gains
+`validation` (`kind`, `eventKindTermId`, `methodTermId`, `maxOccurrences`, or null), and each timeline entry gains `validation`
+(`eventKindTermId`, `methodTermId`, `participantEntityId`, each nullable, or null). It is a bump, and not the case relationship
+constraints were within version 4: those were a check a reader could skip losing nothing an author wrote, while a term's name is
+authored and a moment's details record what kind of event it was, by what means and whose, which nothing derives again - a version
+12 reader would restore the world with all of it silently gone. Nothing derived is carried: no normalized name, no check state, no
+pending or resolved finding; a dismissal is carried as ever, and a restore re-applies it to the finding counted again. A file at
+version 12 or earlier has none of these members; each reads as null and means none. The importer reads versions 1 to 13 (ADR 0032
 amendment).
 
 **Search indexes are never in a backup** (ADR 0016, ADR 0031). They are derived - Lorex produces them again from the

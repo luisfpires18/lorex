@@ -3,6 +3,7 @@ using Lorex.Api.Features.Chronology;
 using Lorex.Api.Features.Ideas;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Relationships;
+using Lorex.Api.Features.RuleValidation;
 using Lorex.Api.Features.Stories;
 using Lorex.Api.Features.Timeline;
 
@@ -120,8 +121,17 @@ public sealed record UniverseBackup(
     /// authored, so a version 11 reader would parse the file and restore the universe with every rule silently gone - the loss
     /// versions 5 and 11 were bumped for. A file at version 11 or earlier has no <c>worldRules</c>; it reads as null, which means
     /// none.
+    ///
+    /// 13 - A world rule may carry one structured check, and a moment structured details for it, both naming the universe's own
+    /// event kinds and methods by id (ADR 0034). <see cref="UniverseBackupPayload.ValidationTerms"/> carries that vocabulary,
+    /// <see cref="BackupWorldRule.Validation"/> a rule's check and <see cref="BackupTimelineEntry.Validation"/> a moment's details.
+    /// Nullable, but not ignorable. A relationship constraint was added within version 4 because a reader that skipped it lost a
+    /// check and nothing an author wrote; this is not that case. A term's name is authored, and a moment's details are recorded
+    /// facts about the world - what kind of event it was, by what means, and whose - that nothing derives again: a version 12
+    /// reader would parse the file and restore the universe with all of them silently gone. A file at version 12 or earlier has
+    /// none of these members; each reads as null, which means no terms, no rule checked and no moment described.
     /// </summary>
-    public const int CurrentVersion = 12;
+    public const int CurrentVersion = 13;
 
     public static UniverseBackup Of(UniverseBackupPayload payload, DateTime generatedAt) =>
         new(FormatName, CurrentVersion, generatedAt, payload);
@@ -144,6 +154,9 @@ public sealed record UniverseBackup(
 ///
 /// <paramref name="WorldRules"/> is every world rule of the universe, live ones first (since version 12). Empty means none;
 /// absent - null, in any earlier file - means the same thing.
+///
+/// <paramref name="ValidationTerms"/> is the universe's event kinds and methods, event kinds first, each by name (since version
+/// 13). Empty means none; absent - null, in any earlier file - means the same thing.
 /// </summary>
 public sealed record UniverseBackupPayload(
     BackupUniverse Universe,
@@ -157,7 +170,8 @@ public sealed record UniverseBackupPayload(
     IReadOnlyList<BackupStory>? Stories,
     IReadOnlyList<BackupDismissedConflict> DismissedConflicts,
     IReadOnlyList<BackupIdea>? Ideas,
-    IReadOnlyList<BackupWorldRule>? WorldRules);
+    IReadOnlyList<BackupWorldRule>? WorldRules,
+    IReadOnlyList<BackupValidationTerm>? ValidationTerms = null);
 
 /// <summary>
 /// The universe itself. <c>OwnerId</c> is deliberately absent: it names an Identity row that
@@ -446,6 +460,9 @@ public sealed record BackupRelationship(
 /// <paramref name="StartEraId"/> and <paramref name="EndEraId"/> name the era each year is counted
 /// in, on a universe with eras (version 4). Null means a plain signed year, and then
 /// <paramref name="EraLabel"/> is the free-text label that reckoning allows.
+///
+/// <paramref name="Validation"/> is the moment's structured details for world rule checks, or null for a moment with none (since
+/// version 13).
 /// </summary>
 public sealed record BackupTimelineEntry(
     Guid Id,
@@ -464,7 +481,15 @@ public sealed record BackupTimelineEntry(
     string? EraLabel,
     DateTime CreatedAt,
     DateTime UpdatedAt,
-    IReadOnlyList<Guid> ParticipantEntityIds);
+    IReadOnlyList<Guid> ParticipantEntityIds,
+    BackupTimelineValidation? Validation = null);
+
+/// <summary>
+/// A moment's structured details for world rule checks (since version 13): an event kind and a method from this file's
+/// <see cref="UniverseBackupPayload.ValidationTerms"/>, and a participant from its entries - each by id, each optional. No name is
+/// carried, and nothing here is derived from the moment's title or its linked entries: the participant is its own reference.
+/// </summary>
+public sealed record BackupTimelineValidation(Guid? EventKindTermId, Guid? MethodTermId, Guid? ParticipantEntityId);
 
 /// <summary>
 /// One story, with its chapters and scenes alongside it so neither travels apart from the story it is
@@ -650,6 +675,10 @@ public sealed record BackupIdeaReference(IdeaReferenceKind Kind, Guid Id);
 /// when the rule was moved to the Trash, or null while it is live; a rule in the Trash travels whole, because it can still be
 /// restored. The importer (ADR 0032) gives the rule a new id in the universe being restored, keeps its marker and moments, and
 /// its search index is derived again from the row.
+///
+/// <paramref name="Validation"/> is the rule's structured check, or null for a rule that is words only (since version 13). What the
+/// check finds is never carried: it is counted again from the restored moments, and a Canon finding it raised is derived again,
+/// with its dismissal re-applied like any other.
 /// </summary>
 public sealed record BackupWorldRule(
     Guid Id,
@@ -657,7 +686,29 @@ public sealed record BackupWorldRule(
     string Description,
     DateTime CreatedAt,
     DateTime UpdatedAt,
-    DateTime? DeletedAt);
+    DateTime? DeletedAt,
+    BackupWorldRuleValidation? Validation = null);
+
+/// <summary>
+/// A world rule's structured check (since version 13): the one supported pattern, the event kind and method it limits by id from
+/// this file's <see cref="UniverseBackupPayload.ValidationTerms"/>, and the limit.
+/// </summary>
+public sealed record BackupWorldRuleValidation(
+    WorldRuleValidationKind Kind,
+    Guid EventKindTermId,
+    Guid MethodTermId,
+    int MaxOccurrences);
+
+/// <summary>
+/// One event kind or method of the universe (since version 13). The id is preserved because checks and moments name it; the kind
+/// is explicit, and the name is what an author reads. Two terms of one kind never share a name, compared case-insensitively.
+/// </summary>
+public sealed record BackupValidationTerm(
+    Guid Id,
+    ValidationTermKind Kind,
+    string Name,
+    DateTime CreatedAt,
+    DateTime UpdatedAt);
 
 /// <summary>
 /// A position on the universe's line: the era the year is counted in - null on the plain reckoning -

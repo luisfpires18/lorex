@@ -163,6 +163,8 @@ export function EntityPicker({
 
   const wrapper = useRef<HTMLDivElement>(null)
   const list = useRef<HTMLUListElement>(null)
+  const input = useRef<HTMLInputElement>(null)
+  const focusInput = useRef(false)
   const { results, isSearching, active, setActive } = useEntitySearch(
     universeId,
     query,
@@ -172,6 +174,15 @@ export function EntityPicker({
 
   useCloseOnOutside(wrapper, isOpen, () => setIsOpen(false))
   useKeepListInView(list, isOpen, results.length)
+
+  // Change removes the button that was pressed, so the focus follows to the search box that replaces it rather than falling
+  // to the page.
+  useEffect(() => {
+    if (focusInput.current && !value) {
+      focusInput.current = false
+      input.current?.focus()
+    }
+  })
 
   function choose(item: EntitySummary) {
     onChange({ id: item.id, name: item.name })
@@ -192,6 +203,7 @@ export function EntityPicker({
             className="button button--quiet"
             type="button"
             onClick={() => {
+              focusInput.current = true
               onChange(null)
               setIsOpen(true)
             }}
@@ -204,6 +216,7 @@ export function EntityPicker({
         <>
           <input
             id={inputId}
+            ref={input}
             className="field__input"
             type="text"
             role="combobox"

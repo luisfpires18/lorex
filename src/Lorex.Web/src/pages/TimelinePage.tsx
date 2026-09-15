@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useOutletContext } from 'react-router-dom'
+import { Link, useOutletContext, useSearchParams } from 'react-router-dom'
 import { EntityPicker, type EntityChoice } from '../components/EntityPicker'
 import { TimelineEntryForm } from '../components/TimelineEntryForm'
 import { findEra, formatChronologyYear, formatSignedYear } from '../chronology/format'
 import { ApiError } from '../lib/api'
 import { CANON_LABELS, CANON_ORDER, type CanonStatusValue } from '../lore/types'
-import { deleteTimelineEntry, listTimelineEntries } from '../timeline/api'
+import { deleteTimelineEntry, getTimelineEntry, listTimelineEntries } from '../timeline/api'
 import { formatTimelineDate, groupTimeline } from '../timeline/format'
 import { DATE_KIND_LABELS, type TimelineEntry, type TimelineEntryPage } from '../timeline/types'
 import type { WorkspaceContext } from './UniverseWorkspace'
@@ -27,6 +27,52 @@ export default function TimelinePage() {
   const [form, setForm] = useState<FormState>({ mode: 'closed' })
   const [message, setMessage] = useState<string | null>(null)
   const [reloads, setReloads] = useState(0)
+  const [params, setParams] = useSearchParams()
+  const linkedMoment = params.get('moment')
+
+  // `?moment=<id>` opens that moment's editor wherever it sits in the chronology - the address a Canon finding or a rule's check
+  // links to. The moment is read by id inside this universe, so an id from anywhere else simply is not here.
+  useEffect(() => {
+    if (!linkedMoment) return
+    const controller = new AbortController()
+
+    getTimelineEntry(universe.id, linkedMoment, controller.signal)
+      .then((entry) => setForm({ mode: 'edit', entry }))
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return
+        setMessage(
+          error instanceof ApiError && error.status === 404
+            ? 'That moment is no longer on this timeline.'
+            : 'That moment could not be opened.',
+        )
+        setParams(
+          (current) => {
+            const next = new URLSearchParams(current)
+            next.delete('moment')
+            return next
+          },
+          { replace: true },
+        )
+      })
+
+    return () => {
+      controller.abort()
+    }
+  }, [universe.id, linkedMoment, setParams])
+
+  function closeForm() {
+    setForm({ mode: 'closed' })
+    if (linkedMoment) {
+      setParams(
+        (current) => {
+          const next = new URLSearchParams(current)
+          next.delete('moment')
+          return next
+        },
+        { replace: true },
+      )
+    }
+  }
 
   useEffect(() => {
     const controller = new AbortController()
@@ -141,6 +187,23 @@ export default function TimelinePage() {
               )
             })}
           </ul>
+        ) : null}
+
+        {entry.validation ? (
+          <p className="moment__validation" data-testid={`moment-validation-${entry.title}`}>
+            <span className="moment__validationlabel">Validation details</span>
+            <span dir="auto">
+              {[
+                entry.validation.eventKind?.name,
+                entry.validation.method ? `by ${entry.validation.method.name}` : null,
+                entry.validation.participant
+                  ? `for ${entry.validation.participant.name}${entry.validation.participant.isTrashed ? ' (in Trash)' : ''}`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
+          </p>
         ) : null}
 
         <div className="moment__tools">
@@ -366,9 +429,9 @@ export default function TimelinePage() {
           universeId={universe.id}
           entry={form.mode === 'edit' ? form.entry : null}
           chronology={chronology}
-          onClose={() => setForm({ mode: 'closed' })}
+          onClose={closeForm}
           onSaved={() => {
-            setForm({ mode: 'closed' })
+            closeForm()
             reload()
           }}
         />

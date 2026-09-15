@@ -1,4 +1,5 @@
 using Lorex.Api.Features.Lore;
+using Lorex.Api.Features.RuleValidation;
 
 namespace Lorex.Api.Features.Timeline;
 
@@ -11,6 +12,9 @@ namespace Lorex.Api.Features.Timeline;
 /// eras each year is counted in. A universe that names eras requires them on every dated
 /// moment and refuses <paramref name="EraLabel"/>; one that does not refuses them and keeps
 /// plain signed years with an optional label, exactly as before eras existed.
+///
+/// <paramref name="Validation"/> is the moment's optional structured details for world rule checks (ADR 0034). Left out, a save
+/// keeps what is stored; all three parts absent removes them. An ordinary moment never needs them.
 /// </summary>
 public sealed record TimelineEntryRequest(
     string? Title,
@@ -26,7 +30,8 @@ public sealed record TimelineEntryRequest(
     string? EraLabel,
     IReadOnlyList<Guid>? EntityIds,
     Guid? StartEraId = null,
-    Guid? EndEraId = null);
+    Guid? EndEraId = null,
+    TimelineValidationRequest? Validation = null);
 
 /// <summary>
 /// The chronology of one entry, already normalized. The components come back as numbers
@@ -66,6 +71,10 @@ public sealed record TimelineEntityLink(
     CanonStatus CanonStatus,
     bool IsTrashed);
 
+/// <summary>
+/// One moment. <paramref name="Validation"/> is its structured details for world rule checks, or null for the ordinary moment that
+/// has none (ADR 0034).
+/// </summary>
 public sealed record TimelineEntryResponse(
     Guid Id,
     string Title,
@@ -74,7 +83,8 @@ public sealed record TimelineEntryResponse(
     TimelineDate Date,
     IReadOnlyList<TimelineEntityLink> Entities,
     DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    TimelineValidationResponse? Validation = null);
 
 public sealed record TimelineEntryPage(
     IReadOnlyList<TimelineEntryResponse> Items,

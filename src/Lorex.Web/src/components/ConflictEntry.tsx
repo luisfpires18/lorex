@@ -96,17 +96,39 @@ export function ConflictEntry({ universeId, conflict, isBusy, onDismiss, onReope
 }
 
 /**
- * A named subject, linked when it has a page of its own. Only an entry does. A null name
- * means the record has gone and the universe has not been evaluated since, which is worth
- * saying plainly rather than showing a link into nothing.
+ * A named subject, linked when it has a place of its own: an entry, a world rule, and a moment -
+ * which opens in the timeline's own editor. A null name means the record has gone, or is in the
+ * Trash, and the universe has not been evaluated since, which is worth saying plainly rather than
+ * showing a link into nothing.
  */
 function subjectName(universeId: string, subject: CanonConflictSubject) {
   if (subject.name === null) {
     return <span className="finding__gone">no longer here</span>
   }
 
-  if (subject.kind === CanonSubjectKind.Entity) {
-    return <Link to={`/app/universes/${universeId}/lore/${subject.subjectId}`}>{subject.name}</Link>
+  const base = `/app/universes/${universeId}`
+  const path =
+    subject.kind === CanonSubjectKind.Entity
+      ? `${base}/lore/${subject.subjectId}`
+      : subject.kind === CanonSubjectKind.WorldRule
+        ? `${base}/world-rules/${subject.subjectId}`
+        : subject.kind === CanonSubjectKind.TimelineEntry
+          ? `${base}/timeline?moment=${subject.subjectId}`
+          : null
+
+  if (subject.kind === CanonSubjectKind.Entity && path) {
+    return <Link to={path}>{subject.name}</Link>
+  }
+
+  if (path) {
+    return (
+      <span>
+        <Link to={path} dir="auto" data-testid={`finding-link-${subject.role}`}>
+          {subject.name}
+        </Link>
+        <span className="finding__kind"> · {SUBJECT_KIND_LABELS[subject.kind].toLowerCase()}</span>
+      </span>
+    )
   }
 
   return (

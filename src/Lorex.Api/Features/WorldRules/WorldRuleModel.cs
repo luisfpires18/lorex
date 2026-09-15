@@ -1,3 +1,4 @@
+using Lorex.Api.Features.RuleValidation;
 using Lorex.Api.Features.Universes;
 
 namespace Lorex.Api.Features.WorldRules;
@@ -40,4 +41,10 @@ public sealed class WorldRule
 
     /// <summary>When the rule was moved to the Trash, or null while it is live. A rule in the Trash is kept whole.</summary>
     public DateTime? DeletedAt { get; set; }
+
+    /// <summary>
+    /// The one structured check the author attached, or null for a rule that is words only (ADR 0034). Configured explicitly,
+    /// part by part; never derived from <see cref="Title"/> or <see cref="Description"/>.
+    /// </summary>
+    public WorldRuleValidation? Validation { get; set; }
 }

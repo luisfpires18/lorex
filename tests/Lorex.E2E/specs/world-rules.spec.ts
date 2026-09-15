@@ -452,14 +452,15 @@ test.describe('world rules', () => {
       expect(box.x + box.width, id).toBeLessThanOrEqual(391)
     }
 
-    // The keyboard moves from the title to the description, and the focus shows: the box takes the accent.
+    // The keyboard moves from the title to the description, and the focus shows: the box takes the accent. The edge eases
+    // over 120ms, so it is read until it has moved rather than in the frame the focus lands in.
     const focused = page.getByTestId('world-rule-description')
     const edge = () => focused.evaluate((element) => getComputedStyle(element).borderTopColor)
     await page.getByTestId('world-rule-title').focus()
     const unfocused = await edge()
     await page.keyboard.press('Tab')
     await expect(focused).toBeFocused()
-    expect(await edge()).not.toBe(unfocused)
+    await expect.poll(edge).not.toBe(unfocused)
 
     // A new rule on a phone.
     await page.goto(`${base}/world-rules/new`)

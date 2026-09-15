@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChronologyPointFields, type ChronologyPointPart } from './ChronologyPointFields'
-import { EntityMultiPicker, type EntityChoice } from './EntityPicker'
+import { EntityMultiPicker, EntityPicker, type EntityChoice } from './EntityPicker'
 import { CanonBlockNotice } from './CanonBlockNotice'
+import { ValidationTermSelect } from './ValidationTermSelect'
 import { blockingFindingsOf } from '../canon/blocked'
 import type { CanonBlockingFinding } from '../canon/types'
 import { namesEras } from '../chronology/format'
 import type { Chronology } from '../chronology/types'
 import { ApiError } from '../lib/api'
 import { CANON_LABELS, CANON_ORDER, CanonStatus, type CanonStatusValue } from '../lore/types'
+import { ValidationTermKind } from '../ruleValidation/types'
+import { useValidationTerms } from '../ruleValidation/useValidationTerms'
 import { createTimelineEntry, updateTimelineEntry } from '../timeline/api'
 import {
   DATE_KIND_HINTS,
@@ -38,12 +41,23 @@ interface MomentDraft {
   endEraId: string
   eraLabel: string
   entities: EntityChoice[]
+  /** The validation details, each chosen on its own: an event kind and a method by id, and a participant. */
+  eventKindId: string
+  methodId: string
+  participant: EntityChoice | null
 }
 
 /** The six chronology boxes, named so one handler can serve all of them. */
 type ComponentKey = 'startYear' | 'startMonth' | 'startDay' | 'endYear' | 'endMonth' | 'endDay'
 
 type EraKey = 'startEraId' | 'endEraId'
+
+/** The field error keys a refused save's details carry, as the API client lowercases them. */
+const DETAIL_ERROR_KEYS = {
+  eventKind: 'validation.eventkindid',
+  method: 'validation.methodid',
+  participant: 'validation.participantentityid',
+} as const
 
 const EMPTY: MomentDraft = {
   title: '',
@@ -60,6 +74,9 @@ const EMPTY: MomentDraft = {
   endEraId: '',
   eraLabel: '',
   entities: [],
+  eventKindId: '',
+  methodId: '',
+  participant: null,
 }
 
 function numberText(value: number | null) {
@@ -67,6 +84,8 @@ function numberText(value: number | null) {
 }
 
 function draftFrom(entry: TimelineEntry): MomentDraft {
+  const details = entry.validation
+
   return {
     title: entry.title,
     description: entry.description ?? '',
@@ -88,6 +107,16 @@ function draftFrom(entry: TimelineEntry): MomentDraft {
       id: link.entityId,
       name: link.isTrashed ? `${link.name} (in Trash)` : link.name,
     })),
+    eventKindId: details?.eventKind?.id ?? '',
+    methodId: details?.method?.id ?? '',
+    participant: details?.participant
+      ? {
+          id: details.participant.entityId,
+          name: details.participant.isTrashed
+            ? `${details.participant.name} (in Trash)`
+            : details.participant.name,
+        }
+      : null,
   }
 }
 
@@ -124,6 +153,9 @@ interface TimelineEntryFormProps {
  * On a universe that names its eras, each year is chosen with its era beside it and the
  * free-text label of the plain reckoning is gone. On one that names none, the form is exactly
  * what it always was.
+ *
+ * Validation details sit folded at the foot (ADR 0034): an ordinary moment never needs them, and nothing in them is filled in
+ * from the title, the description or who took part.
  */
 export function TimelineEntryForm({
   universeId,
@@ -139,6 +171,13 @@ export function TimelineEntryForm({
   const [message, setMessage] = useState<string | null>(null)
   const [blocked, setBlocked] = useState<CanonBlockingFinding[] | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(() => entry?.validation != null)
+  const {
+    terms,
+    failed: termsFailed,
+    add: addTerm,
+    reload: reloadTerms,
+  } = useValidationTerms(universeId)
 
   const reckonsInEras = namesEras(chronology)
 
@@ -206,6 +245,12 @@ export function TimelineEntryForm({
       startEraId: reckonsInEras && isDatedKind ? trimmed(draft.startEraId) : null,
       endEraId: reckonsInEras && isRangeKind ? trimmed(draft.endEraId) : null,
       entityIds: draft.entities.map((choice) => choice.id),
+      // Always sent whole: all three empty removes the details.
+      validation: {
+        eventKindId: trimmed(draft.eventKindId),
+        methodId: trimmed(draft.methodId),
+        participantEntityId: draft.participant?.id ?? null,
+      },
     }
 
     try {
@@ -223,6 +268,9 @@ export function TimelineEntryForm({
         setBlocked(blocking)
       } else if (error instanceof ApiError) {
         setFieldErrors(error.fieldErrors)
+        if (Object.values(DETAIL_ERROR_KEYS).some((key) => error.fieldErrors[key])) {
+          setDetailsOpen(true)
+        }
         setMessage(
           Object.keys(error.fieldErrors).length === 0
             ? error.message
@@ -238,6 +286,7 @@ export function TimelineEntryForm({
 
   const isRange = draft.dateKind === DateKind.Range
   const isDated = draft.dateKind !== DateKind.Unknown
+  const detailCount = [draft.eventKindId, draft.methodId, draft.participant].filter(Boolean).length
 
   function point(
     prefix: 'start' | 'end',
@@ -449,6 +498,83 @@ export function TimelineEntryForm({
             onChange={(entities) => edit({ entities })}
             error={fieldErrors.entityids}
           />
+
+          <details
+            className="moment__details"
+            open={detailsOpen}
+            onToggle={(event) => setDetailsOpen(event.currentTarget.open)}
+            data-testid="moment-validation"
+          >
+            <summary data-testid="moment-validation-toggle">
+              Validation details
+              {detailCount > 0 ? (
+                <span className="moment__detailscount"> · {detailCount} set</span>
+              ) : (
+                <span className="moment__detailscount"> · optional</span>
+              )}
+            </summary>
+
+            <div className="moment__detailsbody">
+              <p className="field__hint">
+                Only World Rules with a timeline check read these, and only these: nothing is taken
+                from the title, the description or who took part. Most moments need none.
+              </p>
+
+              {termsFailed ? (
+                <p className="form__message" role="alert">
+                  The event kinds and methods could not be read.{' '}
+                  <button className="button button--quiet" type="button" onClick={reloadTerms}>
+                    Try again
+                  </button>
+                </p>
+              ) : null}
+
+              <ValidationTermSelect
+                universeId={universeId}
+                kind={ValidationTermKind.EventKind}
+                label="Event kind"
+                terms={terms}
+                value={draft.eventKindId}
+                selectedName={
+                  entry?.validation?.eventKind?.id === draft.eventKindId
+                    ? entry.validation.eventKind.name
+                    : null
+                }
+                emptyLabel="None"
+                onChange={(eventKindId) => edit({ eventKindId })}
+                onCreated={addTerm}
+                error={fieldErrors[DETAIL_ERROR_KEYS.eventKind]}
+                testId="moment-event-kind"
+              />
+
+              <ValidationTermSelect
+                universeId={universeId}
+                kind={ValidationTermKind.Method}
+                label="Method"
+                terms={terms}
+                value={draft.methodId}
+                selectedName={
+                  entry?.validation?.method?.id === draft.methodId
+                    ? entry.validation.method.name
+                    : null
+                }
+                emptyLabel="None"
+                onChange={(methodId) => edit({ methodId })}
+                onCreated={addTerm}
+                error={fieldErrors[DETAIL_ERROR_KEYS.method]}
+                testId="moment-method"
+              />
+
+              <EntityPicker
+                label="Participant"
+                universeId={universeId}
+                value={draft.participant}
+                onChange={(participant) => edit({ participant })}
+                placeholder="Whose event this is"
+                error={fieldErrors[DETAIL_ERROR_KEYS.participant]}
+              />
+            </div>
+          </details>
         </div>
 
         <footer className="drawer__actions">

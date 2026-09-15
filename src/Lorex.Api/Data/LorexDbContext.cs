@@ -5,6 +5,7 @@ using Lorex.Api.Features.Ideas;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Profile;
 using Lorex.Api.Features.Relationships;
+using Lorex.Api.Features.RuleValidation;
 using Lorex.Api.Features.Stories;
 using Lorex.Api.Features.Timeline;
 using Lorex.Api.Features.Universes;
@@ -104,6 +105,12 @@ public class LorexDbContext(DbContextOptions<LorexDbContext> options)
     public DbSet<IdeaPlotBeatReference> IdeaPlotBeatReferences => Set<IdeaPlotBeatReference>();
 
     public DbSet<WorldRule> WorldRules => Set<WorldRule>();
+
+    public DbSet<ValidationTerm> ValidationTerms => Set<ValidationTerm>();
+
+    public DbSet<WorldRuleValidation> WorldRuleValidations => Set<WorldRuleValidation>();
+
+    public DbSet<TimelineEntryValidation> TimelineEntryValidations => Set<TimelineEntryValidation>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

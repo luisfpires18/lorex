@@ -6,6 +6,7 @@ using Lorex.Api.Features.Ideas;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Media;
 using Lorex.Api.Features.Relationships;
+using Lorex.Api.Features.RuleValidation;
 using Lorex.Api.Features.Stories;
 using Lorex.Api.Features.Timeline;
 using Lorex.Api.Features.Universes;
@@ -204,7 +205,9 @@ internal static partial class BackupValidation
         }
 
         count += payload.Ideas!.Sum(idea => 1L + idea.References.Count);
-        count += payload.WorldRules!.Count;
+        count += payload.WorldRules!.Sum(rule => rule.Validation is null ? 1L : 2L);
+        count += payload.ValidationTerms!.Count;
+        count += payload.TimelineEntries.Count(entry => entry.Validation is not null);
 
         return (int)Math.Min(count, int.MaxValue);
     }
@@ -235,6 +238,7 @@ internal static partial class BackupValidation
         private readonly Dictionary<Guid, Guid> _sceneStory = [];
         private readonly HashSet<Guid> _arcs = [];
         private readonly HashSet<Guid> _beats = [];
+        private readonly Dictionary<Guid, ValidationTermKind> _terms = [];
         private readonly HashSet<string> _referencedMedia = new(StringComparer.Ordinal);
 
         public void Run()
@@ -258,6 +262,7 @@ internal static partial class BackupValidation
             var dismissed = Required(payload.DismissedConflicts, "the dismissed Canon conflicts");
             var ideas = Required(payload.Ideas, "the list of ideas", since: 11);
             var worldRules = Required(payload.WorldRules, "the list of world rules", since: 12);
+            var terms = Required(payload.ValidationTerms, "the list of event kinds and methods", since: 13);
 
             // Everything that can be referenced is listed first, so a reference checked below can
             // point anywhere in the file regardless of order.
@@ -267,6 +272,7 @@ internal static partial class BackupValidation
             RegisterEntities(entities);
             RegisterRelationshipTypes(relationshipTypes);
             RegisterStories(stories);
+            RegisterValidationTerms(terms);
 
             foreach (var entity in entities)
             {
@@ -812,6 +818,17 @@ internal static partial class BackupValidation
                     Add(BackupIssueCodes.Duplicate, $"{what} names the same participant twice.");
                 }
             }
+
+            if (entry.Validation is { } details)
+            {
+                Term(details.EventKindTermId, ValidationTermKind.EventKind, $"{what} is described with an event kind the backup does not hold.");
+                Term(details.MethodTermId, ValidationTermKind.Method, $"{what} is described with a method the backup does not hold.");
+
+                if (details.ParticipantEntityId is { } participant)
+                {
+                    Reference(_entities.ContainsKey(participant), $"{what} is described with a participant the backup does not hold.");
+                }
+            }
         }
 
         // ---------- Stories ----------
@@ -1140,6 +1157,62 @@ internal static partial class BackupValidation
             else
             {
                 Text(rule.Description, WorldRuleLimits.DescriptionMaxLength, $"{what}'s description");
+            }
+
+            // A check's shape only: a pattern Lorex knows, terms of the right kind in the file, a limit it can count to.
+            if (rule.Validation is { } check
+                && Defined(check.Kind, $"{what}'s check")
+                && check.Kind != WorldRuleValidationKind.None)
+            {
+                Term(check.EventKindTermId, ValidationTermKind.EventKind, $"{what}'s check limits an event kind the backup does not hold.");
+                Term(check.MethodTermId, ValidationTermKind.Method, $"{what}'s check limits a method the backup does not hold.");
+
+                if (check.MaxOccurrences is < 1 or > RuleValidationLimits.MaxOccurrencesCeiling)
+                {
+                    Add(BackupIssueCodes.InvalidValue, $"{what}'s check has a limit that is not a whole number from 1 to {RuleValidationLimits.MaxOccurrencesCeiling:N0}.");
+                }
+            }
+        }
+
+        // ---------- Event kinds and methods ----------
+
+        /// <summary>Each term's id, kind and name, and no two of one kind an author could not tell apart. Nothing a name says is judged.</summary>
+        private void RegisterValidationTerms(IReadOnlyList<BackupValidationTerm> terms)
+        {
+            var names = new HashSet<(ValidationTermKind, string)>();
+
+            foreach (var term in terms)
+            {
+                if (term is null)
+                {
+                    Missing("an event kind or method");
+                    continue;
+                }
+
+                var what = $"The event kind or method {Quote(term.Name)}";
+                Register(term.Id, what);
+                var named = Text(term.Name, RuleValidationLimits.TermNameMaxLength, $"{what}'s name", required: true);
+
+                if (!Defined(term.Kind, $"{what}'s kind"))
+                {
+                    continue;
+                }
+
+                _terms[term.Id] = term.Kind;
+
+                if (named && !names.Add((term.Kind, ValidationTerm.Normalize(term.Name))))
+                {
+                    Add(BackupIssueCodes.Duplicate, $"{what} has the same name as another {ValidationTermEndpoints.Word(term.Kind)}.");
+                }
+            }
+        }
+
+        /// <summary>A reference to a term in the file, of exactly the kind named. Absent is allowed; a term of the other kind is not there.</summary>
+        private void Term(Guid? termId, ValidationTermKind kind, string message)
+        {
+            if (termId is { } id)
+            {
+                Reference(_terms.TryGetValue(id, out var found) && found == kind, message);
             }
         }
 

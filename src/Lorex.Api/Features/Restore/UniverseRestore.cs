@@ -6,6 +6,7 @@ using Lorex.Api.Features.Export;
 using Lorex.Api.Features.Ideas;
 using Lorex.Api.Features.WorldRules;
 using Lorex.Api.Features.Lore;
+using Lorex.Api.Features.RuleValidation;
 using Lorex.Api.Features.Media;
 using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.Stories;
@@ -157,6 +158,11 @@ internal sealed class RestoreIdentity
         foreach (var rule in payload.WorldRules!)
         {
             yield return rule.Id;
+        }
+
+        foreach (var term in payload.ValidationTerms!)
+        {
+            yield return term.Id;
         }
     }
 }
@@ -383,6 +389,7 @@ internal sealed partial class UniverseRestore(
             AddStories(payload, ids, universeId);
             AddIdeas(payload, ids, universeId, ownerId);
             AddWorldRules(payload, ids, universeId);
+            AddRuleValidation(payload, ids, universeId);
 
             await db.SaveChangesAsync(cancellationToken);
         }
@@ -897,6 +904,57 @@ internal sealed partial class UniverseRestore(
         }
     }
 
+    /// <summary>
+    /// The universe's event kinds and methods, each rule's check and each moment's details (ADR 0034), every id through the one map -
+    /// so a check or a moment can only ever name a term, rule, moment or entry of the restored universe. What a check finds is not
+    /// written: Canon, evaluated below, counts it again from the restored moments.
+    /// </summary>
+    private void AddRuleValidation(UniverseBackupPayload payload, RestoreIdentity ids, Guid universeId)
+    {
+        foreach (var term in payload.ValidationTerms!)
+        {
+            db.ValidationTerms.Add(new ValidationTerm
+            {
+                Id = ids.Map(term.Id),
+                UniverseId = universeId,
+                Kind = term.Kind,
+                Name = term.Name,
+                NormalizedName = ValidationTerm.Normalize(term.Name),
+                CreatedAt = term.CreatedAt,
+                UpdatedAt = term.UpdatedAt,
+            });
+        }
+
+        foreach (var rule in payload.WorldRules!)
+        {
+            if (rule.Validation is { } check)
+            {
+                db.WorldRuleValidations.Add(new WorldRuleValidation
+                {
+                    WorldRuleId = ids.Map(rule.Id),
+                    Kind = check.Kind,
+                    EventKindTermId = ids.Map(check.EventKindTermId),
+                    MethodTermId = ids.Map(check.MethodTermId),
+                    MaxOccurrences = check.MaxOccurrences,
+                });
+            }
+        }
+
+        foreach (var entry in payload.TimelineEntries)
+        {
+            if (entry.Validation is { } details)
+            {
+                db.TimelineEntryValidations.Add(new TimelineEntryValidation
+                {
+                    TimelineEntryId = ids.Map(entry.Id),
+                    EventKindTermId = ids.Map(details.EventKindTermId),
+                    MethodTermId = ids.Map(details.MethodTermId),
+                    ParticipantEntityId = ids.Map(details.ParticipantEntityId),
+                });
+            }
+        }
+    }
+
     // ---------- Canon ----------
 
     /// <summary>
@@ -929,7 +987,7 @@ internal sealed partial class UniverseRestore(
 
         foreach (var finding in findings.Values)
         {
-            var original = CanonFingerprint.Of(finding.RuleCode, finding.FingerprintIds.Select(ids.Source));
+            var original = CanonFingerprint.Of(finding.RuleCode, finding.FingerprintIds.Select(ids.Source), finding.UnorderedFrom);
 
             if (dismissedAt.TryGetValue(original, out var moment))
             {

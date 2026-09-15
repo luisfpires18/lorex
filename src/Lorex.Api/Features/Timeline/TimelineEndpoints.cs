@@ -3,6 +3,7 @@ using Lorex.Api.Data;
 using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Chronology;
 using Lorex.Api.Features.Lore;
+using Lorex.Api.Features.RuleValidation;
 using Lorex.Api.Features.Universes;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -146,6 +147,12 @@ public static class TimelineEndpoints
             });
         }
 
+        if (request.Validation is { } details
+            && await RuleValidationInput.ValidateMomentAsync(db, universeId, details, null, cancellationToken) is { } detailErrors)
+        {
+            return Results.ValidationProblem(detailErrors);
+        }
+
         var now = DateTime.UtcNow;
         var entry = new TimelineEntry
         {
@@ -157,6 +164,11 @@ public static class TimelineEndpoints
         };
 
         Apply(entry, request);
+
+        if (request.Validation is { } chosen)
+        {
+            RuleValidationInput.ApplyMoment(db, entry, chosen);
+        }
 
         foreach (var id in entityIds)
         {
@@ -203,6 +215,7 @@ public static class TimelineEndpoints
     {
         var entry = await db.TimelineEntries
             .Include(candidate => candidate.EntityLinks)
+            .Include(candidate => candidate.Validation)
             .FirstOrDefaultAsync(
                 candidate => candidate.Id == entryId && candidate.UniverseId == universeId,
                 cancellationToken);
@@ -228,9 +241,22 @@ public static class TimelineEndpoints
             });
         }
 
+        if (request.Validation is { } details
+            && await RuleValidationInput.ValidateMomentAsync(
+                db, universeId, details, entry.Validation?.ParticipantEntityId, cancellationToken) is { } detailErrors)
+        {
+            return Results.ValidationProblem(detailErrors);
+        }
+
         entry.Title = TimelineValidation.Normalize(request.Title)!;
         Apply(entry, request);
         entry.UpdatedAt = DateTime.UtcNow;
+
+        // Left out of the request, the stored details stand: a client that knows nothing of them cannot erase them.
+        if (request.Validation is { } chosen)
+        {
+            RuleValidationInput.ApplyMoment(db, entry, chosen);
+        }
 
         // The request carries the whole participant set, so the stored links are made to
         // match it: anything absent is dropped, anything new is added, and a link that was
@@ -416,7 +442,15 @@ public static class TimelineEndpoints
         Guid? EndEraId,
         List<TimelineEntityLink> Entities,
         DateTime CreatedAt,
-        DateTime UpdatedAt);
+        DateTime UpdatedAt,
+        bool HasValidation,
+        Guid? EventKindId,
+        string? EventKindName,
+        Guid? MethodId,
+        string? MethodName,
+        Guid? ParticipantId,
+        string? ParticipantName,
+        bool IsParticipantTrashed);
 
     private static System.Linq.Expressions.Expression<Func<TimelineEntry, Row>> Projection() =>
         entry => new Row(
@@ -448,7 +482,15 @@ public static class TimelineEndpoints
                     link.Entity.DeletedAt != null))
                 .ToList(),
             entry.CreatedAt,
-            entry.UpdatedAt);
+            entry.UpdatedAt,
+            entry.Validation != null,
+            entry.Validation!.EventKindTermId,
+            entry.Validation.EventKindTerm!.Name,
+            entry.Validation.MethodTermId,
+            entry.Validation.MethodTerm!.Name,
+            entry.Validation.ParticipantEntityId,
+            entry.Validation.ParticipantEntity!.Name,
+            entry.Validation.ParticipantEntity.DeletedAt != null);
 
     private static TimelineEntryResponse Map(Row row) =>
         new(
@@ -471,5 +513,13 @@ public static class TimelineEndpoints
                 row.EndEraId),
             row.Entities,
             row.CreatedAt,
-            row.UpdatedAt);
+            row.UpdatedAt,
+            row.HasValidation
+                ? new TimelineValidationResponse(
+                    row.EventKindId is { } eventKind ? new ValidationTermReference(eventKind, row.EventKindName!) : null,
+                    row.MethodId is { } method ? new ValidationTermReference(method, row.MethodName!) : null,
+                    row.ParticipantId is { } participant
+                        ? new TimelineValidationParticipant(participant, row.ParticipantName!, row.IsParticipantTrashed)
+                        : null)
+                : null);
 }

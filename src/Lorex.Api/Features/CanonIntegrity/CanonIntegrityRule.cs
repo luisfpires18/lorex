@@ -24,6 +24,10 @@ public sealed record CanonFindingSubject(CanonSubjectKind Kind, Guid SubjectId, 
 /// the finding rather than only hashed away because a restore gives every record a new id
 /// (ADR 0032): to re-apply a dismissal a backup recorded under the old ids, the importer hashes
 /// the same ids translated back, which only works if it can see which ids went in.
+///
+/// <paramref name="UnorderedFrom"/>, when set, says the ids from that position on are a set rather than a sequence - the moments a
+/// world rule check counted, say (ADR 0034). The hash puts them in one canonical order itself, so the same set is the same key
+/// whatever ids its records carry: before a restore and after it, where every id is new and sorts differently.
 /// </summary>
 public sealed record CanonFinding(
     string RuleCode,
@@ -31,9 +35,10 @@ public sealed record CanonFinding(
     IReadOnlyList<Guid> FingerprintIds,
     string Title,
     string Explanation,
-    IReadOnlyList<CanonFindingSubject> Subjects)
+    IReadOnlyList<CanonFindingSubject> Subjects,
+    int? UnorderedFrom = null)
 {
-    public string Fingerprint { get; } = CanonFingerprint.Of(RuleCode, FingerprintIds);
+    public string Fingerprint { get; } = CanonFingerprint.Of(RuleCode, FingerprintIds, UnorderedFrom);
 }
 
 /// <summary>
@@ -98,4 +103,19 @@ public static class CanonFingerprint
     /// </summary>
     public static string Of(string ruleCode, IEnumerable<Guid> ids) =>
         From(ruleCode, [.. ids.Select(Id)]);
+
+    /// <summary>
+    /// As <see cref="Of(string, IEnumerable{Guid})"/>, with the ids from <paramref name="unorderedFrom"/> on hashed as a set: in
+    /// the ordinal order of their invariant form. Null is exactly the ordered hash, so no stored fingerprint changes.
+    /// </summary>
+    public static string Of(string ruleCode, IEnumerable<Guid> ids, int? unorderedFrom)
+    {
+        if (unorderedFrom is not { } from)
+        {
+            return Of(ruleCode, ids);
+        }
+
+        var parts = ids.Select(Id).ToList();
+        return From(ruleCode, [.. parts.Take(from), .. parts.Skip(from).Order(StringComparer.Ordinal)]);
+    }
 }

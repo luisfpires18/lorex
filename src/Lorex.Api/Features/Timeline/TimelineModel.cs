@@ -1,5 +1,6 @@
 using Lorex.Api.Features.Chronology;
 using Lorex.Api.Features.Lore;
+using Lorex.Api.Features.RuleValidation;
 using Lorex.Api.Features.Universes;
 
 namespace Lorex.Api.Features.Timeline;
@@ -103,6 +104,13 @@ public sealed class TimelineEntry
     public DateTime UpdatedAt { get; set; }
 
     public ICollection<TimelineEntryLink> EntityLinks { get; } = [];
+
+    /// <summary>
+    /// The optional structured details world rule checks read - event kind, method, participant - or null for an ordinary
+    /// moment (ADR 0034). Separate from <see cref="EntityLinks"/>: an entry taking part is not the check's participant unless
+    /// the author chose it there too.
+    /// </summary>
+    public TimelineEntryValidation? Validation { get; set; }
 }
 
 /// <summary>

@@ -428,9 +428,13 @@ public sealed class BackupRestoreTests(LorexApiFactory factory) : IClassFixture<
                 before.Select(conflict => (conflict.RuleCode, conflict.Status)).Order(),
                 after.Select(conflict => (conflict.RuleCode, conflict.Status)).Order());
 
-            var dismissed = Assert.Single(after, conflict => conflict.Status == CanonConflictStatus.Dismissed);
-            Assert.Equal("CANON-REL-001", dismissed.RuleCode);
-            Assert.Equal(before.Single(conflict => conflict.Status == CanonConflictStatus.Dismissed).UpdatedAt, dismissed.UpdatedAt);
+            // A world rule check's finding is identified by a set of moments whose ids all changed, and is dismissed again too.
+            Assert.Equal(
+                before.Where(conflict => conflict.Status == CanonConflictStatus.Dismissed).Select(conflict => (conflict.RuleCode, conflict.UpdatedAt)).Order(),
+                after.Where(conflict => conflict.Status == CanonConflictStatus.Dismissed).Select(conflict => (conflict.RuleCode, conflict.UpdatedAt)).Order());
+            Assert.Equal(
+                ["CANON-REL-001", "CANON-WORLD-001"],
+                after.Where(conflict => conflict.Status == CanonConflictStatus.Dismissed).Select(conflict => conflict.RuleCode).Order(StringComparer.Ordinal));
             Assert.Contains(after, conflict => conflict.Status == CanonConflictStatus.Pending);
         });
     }

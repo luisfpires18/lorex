@@ -51,6 +51,9 @@ public enum CanonSubjectKind
     /// entity is saved, so its id would churn, while the definition's id is stable.
     /// </summary>
     EntityField = 3,
+
+    /// <summary>A world rule whose structured check a finding is about (ADR 0034). Named only while the rule is live.</summary>
+    WorldRule = 4,
 }
 
 /// <summary>

@@ -216,3 +216,20 @@ Format version 12 adds a universe's world rules (ADR 0033, ADR 0014), and the im
   are written directly in the one transaction; the search triggers index them as they land. Twice is two independent sets.
 - **The preview** counts `worldRules` and `worldRulesInTrash`; the restore screen shows a World Rules line and counts rules in
   "In the Trash".
+
+## Amendment - format version 13: world rule checks (2026-09-15)
+
+Format version 13 adds a universe's event kinds and methods, each rule's check and each moment's details (ADR 0034, ADR 0014), and
+the importer learned it in the same change: `BackupFormatSupport.MaxVersion` is 13.
+
+- **Versions.** Every version 1 to 13 restores. Projection: before 13 there are no terms, no check and no details, even in a file
+  carrying them. Normalization: none means empty; a check of kind `None` is no check, and details with no part are none. A version
+  13 file without `validationTerms` is refused as incomplete.
+- **Validation.** Each term's id is registered with every other id; its kind is known, its name present and within 80 characters,
+  and no two terms of one kind share a name case-insensitively. A check's kind is known, its event kind and method are terms of
+  exactly those kinds in the file, and its limit is 1 to 10,000. A moment's event kind and method, when set, are terms of their kind
+  in the file, and its participant an entry in the file. Nothing a name says is judged.
+- **Identity and writing.** Terms get new ids from `RestoreIdentity`; every check and set of details is written with its rule's,
+  moment's, terms' and participant's new ids, so none can point outside the new universe. No check state is read or written.
+- **Canon.** Evaluated after the rows as ever. A world rule finding is fingerprinted over a set of moments whose ids all changed;
+  `CanonFinding.UnorderedFrom` makes the translated set hash to the backup's key, so its dismissal is re-applied like any other.

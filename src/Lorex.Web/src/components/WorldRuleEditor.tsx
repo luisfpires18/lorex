@@ -2,9 +2,20 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Trash2 } from 'lucide-react'
 import { ActionIcon } from './ActionIcon'
+import { WorldRuleCheckSection } from './WorldRuleCheckSection'
+import {
+  CHECK_ERROR_KEYS,
+  NO_CHECK,
+  checkDraftFrom,
+  checkInput,
+  sameCheck,
+  type CheckDraft,
+} from '../ruleValidation/checkDraft'
 import { ApiError } from '../lib/api'
 import { formatDateTime } from '../lib/dates'
 import { useLeaveGuard } from '../lib/leaveGuard'
+import type { WorldRuleCheck, WorldRuleValidation } from '../ruleValidation/types'
+import { WorldRuleValidationKind } from '../ruleValidation/types'
 import {
   createWorldRule,
   deleteWorldRule,
@@ -25,21 +36,44 @@ type LoadState =
 interface Fields {
   title: string
   description: string
+  check: CheckDraft
 }
 
-/** The rule as the API last confirmed it: what "unsaved" is measured against, and what the next save names. */
+/** The rule as the API last confirmed it: what "unsaved" is measured against, what the next save names, and what its check finds. */
 interface Stored extends Fields {
   updatedAt: string | null
+  validation: WorldRuleValidation | null
+  found: WorldRuleCheck | null
+}
+
+const EMPTY_STORED: Stored = {
+  title: '',
+  description: '',
+  check: NO_CHECK,
+  updatedAt: null,
+  validation: null,
+  found: null,
 }
 
 const count = new Intl.NumberFormat('en')
 
 function sameFields(a: Fields, b: Fields) {
-  return a.title === b.title && a.description === b.description
+  return a.title === b.title && a.description === b.description && sameCheck(a.check, b.check)
+}
+
+function fieldsOf(stored: Stored): Fields {
+  return { title: stored.title, description: stored.description, check: stored.check }
 }
 
 function storedFrom(rule: WorldRuleDetail): Stored {
-  return { title: rule.title, description: rule.description, updatedAt: rule.updatedAt }
+  return {
+    title: rule.title,
+    description: rule.description,
+    check: checkDraftFrom(rule.validation),
+    updatedAt: rule.updatedAt,
+    validation: rule.validation,
+    found: rule.check,
+  }
 }
 
 /** The stored moment a stale save's refusal reports, when it carries one. */
@@ -63,10 +97,11 @@ interface WorldRuleEditorProps {
 }
 
 /**
- * One world rule: a title and an optional plain-text description. The same short form for a new rule and a saved one.
+ * One world rule: a title, an optional plain-text description, and an optional check against the timeline. The same short form
+ * for a new rule and a saved one.
  *
- * A rule is written in the author's words and means nothing to Lorex. Nothing saved here changes lore, a story, the timeline
- * or Canon, and nothing on this screen says a rule holds, is checked or is broken (ADR 0033).
+ * A rule's words mean nothing to Lorex (ADR 0033): nothing is read out of them. Only a check the author sets part by part is ever
+ * counted, and what the saved check finds is shown beside it in words - including that it could not count everything (ADR 0034).
  *
  * Saving is explicit: Save, or Ctrl+S / Cmd+S. A rule is unsaved until the API confirms it, so a failed save changes nothing
  * on screen. A save over a rule saved from another tab or device since this one opened is refused, and the author chooses:
@@ -92,8 +127,8 @@ export function WorldRuleEditor({
 
   const [load, setLoad] = useState<LoadState>(isNew ? { kind: 'ready' } : { kind: 'loading' })
   const [reads, setReads] = useState(0)
-  const [stored, setStored] = useState<Stored>({ title: '', description: '', updatedAt: null })
-  const [draft, setDraft] = useState<Fields>({ title: '', description: '' })
+  const [stored, setStored] = useState<Stored>(EMPTY_STORED)
+  const [draft, setDraft] = useState<Fields>(fieldsOf(EMPTY_STORED))
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
@@ -112,7 +147,7 @@ export function WorldRuleEditor({
       .then((rule) => {
         const next = storedFrom(rule)
         setStored(next)
-        setDraft({ title: next.title, description: next.description })
+        setDraft(fieldsOf(next))
         setLoad({ kind: 'ready' })
       })
       .catch((error: unknown) => {
@@ -136,19 +171,35 @@ export function WorldRuleEditor({
 
   const isReady = load.kind === 'ready'
   const isDirty =
-    isReady && (isNew ? draft.title !== '' || draft.description !== '' : !sameFields(draft, stored))
+    isReady &&
+    (isNew
+      ? draft.title !== '' ||
+        draft.description !== '' ||
+        draft.check.kind !== WorldRuleValidationKind.None
+      : !sameFields(draft, stored))
   const isTooLong = draft.description.length > WORLD_RULE_DESCRIPTION_MAX_LENGTH
 
   const name = draft.title.trim() || stored.title || 'This rule'
   useLeaveGuard(isDirty ? `“${name}” has unsaved changes. Leave without saving them?` : null)
 
-  function edit(change: Partial<Fields>) {
+  function edit(change: Partial<Omit<Fields, 'check'>>) {
     setDraft((current) => ({ ...current, ...change }))
     const changed = Object.keys(change)
     if (changed.some((field) => fieldErrors[field])) {
       setFieldErrors((current) => {
         const next = { ...current }
         for (const field of changed) delete next[field]
+        return next
+      })
+    }
+  }
+
+  function editCheck(change: Partial<CheckDraft>) {
+    setDraft((current) => ({ ...current, check: { ...current.check, ...change } }))
+    if (Object.values(CHECK_ERROR_KEYS).some((key) => fieldErrors[key])) {
+      setFieldErrors((current) => {
+        const next = { ...current }
+        for (const key of Object.values(CHECK_ERROR_KEYS)) delete next[key]
         return next
       })
     }
@@ -171,7 +222,12 @@ export function WorldRuleEditor({
     setFieldErrors({})
     setConflict(null)
 
-    const input = { title: sent.title.trim(), description: sent.description, expectedUpdatedAt }
+    const input = {
+      title: sent.title.trim(),
+      description: sent.description,
+      expectedUpdatedAt,
+      validation: checkInput(sent.check),
+    }
 
     try {
       if (isNew) {
@@ -184,9 +240,7 @@ export function WorldRuleEditor({
       setStored(next)
       // What was sent is now saved - its title trimmed. Anything typed while the save was in flight is still unsaved, and
       // stays.
-      setDraft((current) =>
-        sameFields(current, sent) ? { title: next.title, description: next.description } : current,
-      )
+      setDraft((current) => (sameFields(current, sent) ? fieldsOf(next) : current))
       setAnnouncement('Saved.')
     } catch (error: unknown) {
       if (error instanceof ApiError && error.status === 409 && error.code === WORLD_RULE_CHANGED) {
@@ -327,8 +381,8 @@ export function WorldRuleEditor({
           {isNew ? 'New rule' : stored.title}
         </h2>
         <p className="rule__lede">
-          A rule of how this world works, in your own words. Saving it changes nothing else in the
-          universe.
+          A rule of how this world works, in your own words. Lorex never reads them, and saving
+          changes nothing else in the universe; only a timeline check you set below is ever counted.
           {!isNew && stored.updatedAt ? (
             <>
               {' '}
@@ -451,6 +505,16 @@ export function WorldRuleEditor({
             </p>
           ) : null}
         </div>
+
+        <WorldRuleCheckSection
+          universeId={universeId}
+          value={draft.check}
+          onChange={editCheck}
+          stored={stored.validation}
+          found={stored.found}
+          isDirty={isDirty}
+          errors={fieldErrors}
+        />
 
         <div className="manuscript__bar rule__bar">
           <p
