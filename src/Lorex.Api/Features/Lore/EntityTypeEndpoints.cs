@@ -101,7 +101,7 @@ public static class EntityTypeEndpoints
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsUniqueViolation(failure))
         {
             return NameTaken();
         }
@@ -152,7 +152,7 @@ public static class EntityTypeEndpoints
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsUniqueViolation(failure))
         {
             return NameTaken();
         }
@@ -257,7 +257,7 @@ public static class EntityTypeEndpoints
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsUniqueViolation(failure))
         {
             return FieldNameTaken();
         }
@@ -417,7 +417,7 @@ public static class EntityTypeEndpoints
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsUniqueViolation(failure))
         {
             return FieldNameTaken();
         }

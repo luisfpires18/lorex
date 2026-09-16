@@ -155,7 +155,7 @@ public static class ChronologyEndpoints
 
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsConstraintViolation(failure))
         {
             // The in-use check above answers every ordinary request. Reaching here means something
             // was dated in an era between that check and the delete, and the foreign key held.

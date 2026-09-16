@@ -28,8 +28,8 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   `assets/brand/lorex-icon.png` is the one source, unaltered, and `scripts/render-icons.py` now
   resamples it into every shipped asset rather than reading geometry out of an SVG. The source has
   genuine transparency; the checkerboard a viewer shows is the viewer's.
-  - **The icons keep the master's transparency** (`fix/transparent-app-icons`, **not merged, not
-    pushed**). The first cut put every platform-facing asset on `--paper`, because 62% of the
+  - **The icons keep the master's transparency** (`fix/transparent-app-icons`, merged into `dev`
+    at `1b94d92`). The first cut put every platform-facing asset on `--paper`, because 62% of the
     artwork is darker than luminance 40; in a dark tab strip that is a pale tile, which the owner
     saw straight away. Rendered against a browser's own tab greys, the transparent mark is
     legible at 16px anyway. The ground survives only where transparency is not a choice: the
@@ -83,7 +83,7 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     dependency `lucide-react`. ADR 0020.
   - **Every workspace screen fills the content column** (`fix/lore-desktop-width`,
     `fix/lore-full-width-actions` and `fix/center-workspace-canvas` merged, then
-    `fix/full-width-workspace`, **not merged, not pushed**). `.canvas` is its padding and nothing
+    `fix/full-width-workspace`, merged into `dev` at `34646c0`). `.canvas` is its padding and nothing
     else: the 60rem cap, the centring that existed only for that cap, and the Lore-only
     `canvas--full` modifier with its route check are all gone. Readability is local where it
     matters - the article and editor surface at 62ch, a summary at 58ch, a settings section at
@@ -107,8 +107,8 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     in a line. The same `ImageCropDialog` frames both.
   - **A universe backup still holds no account data.** Format version 3 is untouched: no `users/`
     entry, no account id, no asset id. Pinned by a test.
-- **Account menu and upload progress** (`fix/profile-account-menu-progress`, **not merged, not
-  pushed**). Four owner notes from live DEV.
+- **Account menu and upload progress** (`fix/profile-account-menu-progress`, merged into `dev`
+  at `f3b11de`). Four owner notes from live DEV.
   - **The account is global chrome, not a universe section.** Profile is gone from the beige
     sidebar; one `AccountMenu` - a circular avatar opening onto the username, the email, View
     profile and Sign out - sits at the foot of the black rail, and the same component replaced the
@@ -161,9 +161,25 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - The gap is `UniverseChronology.YearsBetween`: the signed difference inside one era or the plain
     reckoning, `a + b - 1` from a countdown era into the ascending era after it, unknown otherwise.
   - Edited inside the relation kind form on the Types screen. Backup stays version 4, additively.
+- **Maintenance pass** (`chore/overnight-maintenance` from `dev` `91629ba`, committed, not merged, not pushed). No new
+  product behaviour, no migration, no backup change. Five fixes, each measured:
+  - **Every page route is fetched when it is first opened.** One 1,064 kB script became an entry of 318 kB and a chunk
+    per screen; `/login` now downloads 322 kB where it downloaded 1,064 kB, and Vite's large-chunk warning is gone. The
+    rich-text editor is the whole reason: it is 438 kB and lives on one screen. `UniverseWorkspace` and its overview stay
+    imported directly - splitting the chrome would only mean fetching the frame before the frame can say what to fetch.
+  - Each screen sits behind **its own keyed `Suspense`**. Without the key React holds the outgoing screen while the next
+    one is fetched, which kept a left editor mounted past the moment its author answered "yes, leave" - a second, empty
+    browser prompt, caught by `content-recovery.spec.ts`. Screens that are one component over several addresses share a
+    key, so an entry, a story and an idea keep their state exactly as before.
+  - **The Types screen no longer reports the read it cancelled itself.** Under `StrictMode` the first effect's abort set
+    "The types could not be loaded." on every development open, above a list that had loaded. The whole repository was
+    audited for the pattern; this was the only one. Pinned by `lore.spec.ts`.
+  - **A database failure is classified before it is translated** (`Data/DatabaseFailures.cs`, 28 catch sites). See Baseline.
+  - `lore.spec.ts` typed into the article editor without waiting for it to hold the caret, losing the first words of a
+    run in 3 of 40 repeats before the split and 9 of 40 after it, 0 of 80 once it waits the way every other spec does.
 - **Phase 4 - World Rules & Family Trees - COMPLETE** (owner-sequenced, unnumbered branches): 1. World Rules - merged.
-  2. Timeline-based Canon validation - merged. 3. Family Trees - committed, **not merged, not pushed**.
-- **Phase 4 - Family Trees** (`feat/family-trees` from `dev` `02118ca`, committed, **not merged, not pushed**). Phase 4's last
+  2. Timeline-based Canon validation - merged. 3. Family Trees - merged.
+- **Phase 4 - Family Trees** (`feat/family-trees` from `dev` `02118ca`, merged into `dev` at `91629ba`). Phase 4's last
   feature: family connections an author records explicitly, and the relatives that follow from them. ADR 0035 (ADR 0008, 0014,
   0023, 0032 amended).
   - `RelationshipTypes.FamilySemantic`: `None` | `BiologicalParent` | `AdoptiveParent`, on the stored direction - source parent,
@@ -433,7 +449,7 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 
 ## Baseline
 
-- **979 API integration tests, 155 Playwright tests**, green. Family Trees full Playwright run on the dev database: 151/155 -
+- **986 API integration tests, 155 Playwright tests**, green. Family Trees full Playwright run on the dev database: 151/155 -
   canon, content-recovery, pwa and type-filter, none of which touches a family tree; all four passed on a serial rerun, which
   itself lost one canon test at sign-up, and canon passed 6/6 alone. Two genuine failures were found and fixed first: the restore
   screen's preview still expected "Version 13", and the "newer Lorex" file it refuses was written at version 14, which the format
@@ -444,12 +460,23 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   Prettier has to be pointed at that config explicitly. CI runs all of it.
 - The test host no longer migrates itself, so every API test boots through the same startup path a
   deployment uses.
+- **The SQLite contention is the database, not the worker count** (measured on `chore/overnight-maintenance`,
+  16 logical processors, so eight browsers). Against a database the suite builds for itself, all 155 passed three runs
+  out of three with nothing logged about a locked database. Against a copy of the long-lived development one, two runs
+  out of two lost tests and logged `SQLite Error 5`, and running the same suite at four workers logged it just as
+  often - two more tests lost, at 1.7x the wall clock. So the worker count is left at Playwright's default and `LOREX_E2E_DB` - new, and the knob that
+  actually matters - points a run at a database of its own. `LOREX_E2E_WORKERS` exists for a machine that wants telling.
+  Numbers: `tests/Lorex.E2E/README.md`.
+  - The mechanism, from the API log: a write's commit throws `database is locked` at once rather than after the
+    provider's retry, and is answered as a 500. Once, the throw came from `SqliteConnection.Deactivate()` as the
+    connection went back to the pool, and every later rent of that handle then failed to open with `unable to
+    delete/modify collation sequence due to active statements` - one lock poisoning a pooled connection. Known, not
+    fixed: fixing it is a persistence decision, which is Phase 023's.
+  - It is **no longer reported as a false 409**. An endpoint that translated every `DbUpdateException` into its own
+    refusal now translates only the constraint it was written for - `Data/DatabaseFailures.cs` - so a locked database
+    fails as a failure instead of telling the author a free name is taken.
 - Under a full parallel Playwright run, `auth.spec.ts` "rejects a wrong password" intermittently
-  times out (it navigates to `/login` without awaiting sign-out), and a full run loses one to four of a rotating pick of
-  canon, type-filter, mobile, universes, relationships or account-menu, each file green on its own. Known, not fixed. It
-  is contention on the one SQLite writer, not the specs, and the content recovery run's API log shows how: a write's commit
-  throws `SQLite Error 5: 'database is locked'` at once, not after the provider's retry, and is answered as a 500 - or as a
-  false 409 where an endpoint maps every `DbUpdateException` to a conflict (entity type update: "name taken").
+  times out (it navigates to `/login` without awaiting sign-out).
 - 31 migrations, latest `AddRelationshipFamilySemantics` - one additive column on `RelationshipTypes`, defaulting to no family
   meaning; the rollback uses SQLite's native `DROP COLUMN` so nothing that points at the table is rebuilt under it.
   `FamilySemanticMigrationTests` walks it down and up on a file over kinds called parent, mother and father, and reads every

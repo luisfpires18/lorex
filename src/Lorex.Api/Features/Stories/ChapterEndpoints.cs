@@ -131,7 +131,7 @@ public static class ChapterEndpoints
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsConstraintViolation(failure))
         {
             // Two chapters appended to one story at once both reached for the same place, and the
             // unique order index held. Nothing was written.
@@ -257,7 +257,7 @@ public static class ChapterEndpoints
             story.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsConstraintViolation(failure))
         {
             return OrderChanged();
         }
@@ -321,7 +321,7 @@ public static class ChapterEndpoints
             story.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsConstraintViolation(failure))
         {
             return OrderChanged();
         }

@@ -60,7 +60,12 @@ export default function UniverseTypes() {
     const controller = new AbortController()
     listEntityTypes(universe.id, controller.signal)
       .then(setTypes)
-      .catch(() => setMessage('The types could not be loaded.'))
+      .catch(() => {
+        // Leaving the screen aborts this read. That is not a failure to report: the message
+        // belongs to a request that was answered badly, not to one Lorex cancelled itself.
+        if (controller.signal.aborted) return
+        setMessage('The types could not be loaded.')
+      })
     return () => {
       controller.abort()
     }

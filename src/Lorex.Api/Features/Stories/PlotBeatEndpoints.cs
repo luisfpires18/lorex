@@ -135,7 +135,7 @@ public static class PlotBeatEndpoints
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsConstraintViolation(failure))
         {
             // Two beats appended to one arc at once both reached for the same place - or the arc, or a scene the
             // beat links, was deleted in between. Nothing was written.
@@ -263,7 +263,7 @@ public static class PlotBeatEndpoints
 
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsConstraintViolation(failure))
         {
             return PlotArcEndpoints.OrderChanged();
         }
@@ -323,7 +323,7 @@ public static class PlotBeatEndpoints
             story.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsConstraintViolation(failure))
         {
             return PlotArcEndpoints.OrderChanged();
         }
@@ -385,7 +385,7 @@ public static class PlotBeatEndpoints
             story.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsConstraintViolation(failure))
         {
             return PlotArcEndpoints.OrderChanged();
         }

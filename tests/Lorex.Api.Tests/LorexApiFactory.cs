@@ -74,6 +74,13 @@ public sealed class TestCommandFaults : DbCommandInterceptor
 {
     public Func<DbCommand, bool>? FailWhen { get; set; }
 
+    /// <summary>
+    /// What a picked command fails with. The default stands for "something went wrong down there";
+    /// a test proving how a particular database failure is classified supplies its own.
+    /// </summary>
+    public Func<Exception> FailWith { get; set; } =
+        static () => new InvalidOperationException("A test failed this command on purpose.");
+
     public override InterceptionResult<DbDataReader> ReaderExecuting(
         DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result)
     {
@@ -120,7 +127,7 @@ public sealed class TestCommandFaults : DbCommandInterceptor
     {
         if (FailWhen?.Invoke(command) == true)
         {
-            throw new InvalidOperationException("A test failed this command on purpose.");
+            throw FailWith();
         }
     }
 }

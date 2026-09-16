@@ -99,7 +99,7 @@ public static class ValidationTermEndpoints
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsUniqueViolation(failure))
         {
             // The unique index settles two creates racing for one name.
             return NameTaken(request.Kind, name);
@@ -176,7 +176,7 @@ public static class ValidationTermEndpoints
             {
                 await db.SaveChangesAsync(cancellationToken);
             }
-            catch (DbUpdateException)
+            catch (DbUpdateException failure) when (DatabaseFailures.IsUniqueViolation(failure))
             {
                 return NameTaken(term.Kind, name);
             }
