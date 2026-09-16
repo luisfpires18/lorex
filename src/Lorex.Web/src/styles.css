@@ -5281,6 +5281,11 @@ a.lorechip--pov:focus-visible .lorechip__name {
   margin-top: 0.5rem;
 }
 
+/* A tool's shorter label, drawn only where the whole one would push the row onto a second line. */
+.manuscript__toolshort {
+  display: none;
+}
+
 .manuscript__text {
   display: block;
   width: 100%;
@@ -5485,6 +5490,25 @@ a.lorechip--pov:focus-visible .lorechip__name {
 }
 
 @media (max-width: 640px) {
+  /* The scene's tools keep to one line, so the text box stays on the first screen: three whole labels need more than
+     a 390px column, and a second row of tools is a row of prose gone. "Manuscript history" shows as "History" - this
+     is the manuscript - and keeps its whole name. */
+  .manuscript__toolname {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .manuscript__toolshort {
+    display: inline;
+  }
+
   .manuscript__text {
     height: clamp(18rem, calc(100dvh - 12rem), 60rem);
     padding: 0.9rem 1rem;
