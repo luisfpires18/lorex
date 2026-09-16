@@ -161,7 +161,16 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - The gap is `UniverseChronology.YearsBetween`: the signed difference inside one era or the plain
     reckoning, `a + b - 1` from a countdown era into the ascending era after it, unknown otherwise.
   - Edited inside the relation kind form on the Types screen. Backup stays version 4, additively.
-- **Maintenance pass** (`chore/overnight-maintenance` from `dev` `91629ba`, committed, not merged, not pushed). No new
+- **DEV deploys unblocked** (`fix/ci-mobile-story-workspace` from `dev` `9e8c187`, committed, not merged, not pushed).
+  Deploy DEV #27-#34 (content recovery onwards) never deployed: CI's End to end job failed one test every run, identically
+  on all three attempts - `story-workspace.spec.ts` "prose at 390px", editor top 649.7, then 653 against 644. Not flaky, not
+  SQLite, not the workflow. Content recovery put a third tool, "Manuscript history", in the manuscript's tool row; at 390px
+  the three labels need 387px of a 350px column, so the row wrapped and pushed the text box 30px down. Windows fonts hid it
+  (632.6, a second row too, but 11px under the line); CI's DejaVu did not.
+  - Below 640px that tool reads "History" and keeps its whole accessible name, so the row keeps one line. Editor top at
+    390px under CI's fonts 653 -> 622.8; the spec now also asserts the three tools share a line under their full names.
+  - CI's geometry is reproducible locally: `tests/Lorex.E2E/README.md`. Workflows unchanged; Deploy still needs Validate.
+- **Maintenance pass** (`chore/overnight-maintenance` from `dev` `91629ba`, merged into `dev` at `9e8c187`). No new
   product behaviour, no migration, no backup change. Five fixes, each measured:
   - **Every page route is fetched when it is first opened.** One 1,064 kB script became an entry of 318 kB and a chunk
     per screen; `/login` now downloads 322 kB where it downloaded 1,064 kB, and Vite's large-chunk warning is gone. The

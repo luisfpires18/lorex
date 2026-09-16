@@ -474,6 +474,23 @@ test.describe('story workspace', () => {
       const editor = page.getByTestId('manuscript-editor')
       await expect(editor).not.toHaveValue('')
       expect(await scrollsSideways(page), `manuscript at ${width}px`).toBe(false)
+
+      // The scene's three tools keep to one line, each under its whole name: a second row of them is prose pushed off
+      // a phone's first screen.
+      const editScene = (await page.getByTestId('manuscript-edit-scene').boundingBox())!
+      for (const [testId, name] of [
+        ['manuscript-show-scene', 'Show in Scenes'],
+        ['manuscript-history-toggle', 'Manuscript history'],
+      ] as const) {
+        const tool = page.getByTestId(testId)
+        await expect(tool, `${name} at ${width}px`).toHaveAccessibleName(name)
+        const box = (await tool.boundingBox())!
+        expect(box.x + box.width, `${name} at ${width}px`).toBeLessThanOrEqual(edge)
+        expect(box.y, `${name} shares Edit scene's line at ${width}px`).toBeLessThan(
+          editScene.y + editScene.height,
+        )
+      }
+
       const editorBox = (await editor.boundingBox())!
       expect(editorBox.y, `prose at ${width}px`).toBeLessThanOrEqual(height - 200)
 

@@ -334,7 +334,10 @@ export function ManuscriptEditor({
               data-testid="manuscript-history-toggle"
             >
               <ActionIcon icon={History} />
-              Manuscript history
+              <span className="manuscript__toolname">Manuscript history</span>
+              <span className="manuscript__toolshort" aria-hidden="true">
+                History
+              </span>
             </button>
           ) : null}
         </div>

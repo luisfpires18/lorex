@@ -50,3 +50,25 @@ The default was measured rather than assumed, on 16 logical processors, so eight
 
 Halving the workers left the contention exactly where it was and took 1.7x as long, so nothing
 below Playwright's default is committed as the default. CI still runs one worker.
+
+## Laying out a page the way CI does
+
+A layout assertion can pass on Windows or macOS and fail on CI every time, because the fonts differ:
+Lorex ships no web font, so a Linux runner draws its interface text in DejaVu, which is wider, and
+a label that fits a 390px row here wraps there. A retry never changes that. To see CI's geometry, keep the
+servers local and borrow a Linux browser - Playwright's own image at the version in
+`package-lock.json`, plus the one font family the runner has and the image does not:
+
+```
+docker run -d --name lorex-pw --init --ipc=host -p 3131:3131 mcr.microsoft.com/playwright:v1.63.0-noble /bin/sh -c "cd /tmp && npx -y playwright@1.63.0 run-server --port 3131 --host 0.0.0.0"
+docker exec lorex-pw sh -c "apt-get update -qq && apt-get install -y -qq fonts-dejavu-core"
+PW_TEST_CONNECT_WS_ENDPOINT=ws://127.0.0.1:3131/ PW_TEST_CONNECT_EXPOSE_NETWORK='<loopback>' CI=1 npm test
+```
+
+Without `fonts-dejavu-core` the image draws in Liberation and lands between Windows and CI. With it,
+the manuscript's phone layout measured to the pixel what CI reported. A spec that reads a file it
+downloaded through `download.path()` fails this way by construction - Playwright gives no local
+path for a remote browser's download - so run those without the two variables. Start the container
+from PowerShell rather than Git Bash, which rewrites `/bin/sh` into a Windows path. The image is
+3.5 GB unpacked; a pull that once ran out of disk left layers that crashed Chromium on launch, and
+removing the image and pulling it again is what cured it.
