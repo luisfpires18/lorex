@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
+using Lorex.Api.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -100,7 +101,7 @@ public static class AuthEndpoints
         {
             result = await userManager.CreateAsync(user, password);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsUniqueViolation(failure))
         {
             // Two registrations for the same username or email can pass the checks above
             // concurrently; the unique indexes settle it and one of them lands here.

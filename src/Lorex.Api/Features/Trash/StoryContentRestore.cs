@@ -293,7 +293,7 @@ internal static class StoryContentRestore
             await db.SaveChangesAsync(cancellationToken);
             return true;
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsConstraintViolation(failure))
         {
             return false;
         }

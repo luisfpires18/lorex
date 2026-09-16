@@ -153,7 +153,7 @@ public static partial class UniverseEndpoints
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsUniqueViolation(failure))
         {
             // The unique index settles a concurrent create of the same name.
             return NameTakenProblem();
@@ -205,7 +205,7 @@ public static partial class UniverseEndpoints
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsUniqueViolation(failure))
         {
             return NameTakenProblem();
         }

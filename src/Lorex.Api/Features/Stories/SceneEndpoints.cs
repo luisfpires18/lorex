@@ -158,7 +158,7 @@ public static class SceneEndpoints
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsConstraintViolation(failure))
         {
             // Two scenes appended to one container at once both reached for the same place, and the
             // unique order index held - or the chapter was deleted in between. Nothing was written.
@@ -270,7 +270,7 @@ public static class SceneEndpoints
 
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsConstraintViolation(failure))
         {
             return OrderChanged();
         }
@@ -357,7 +357,7 @@ public static class SceneEndpoints
             story.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsConstraintViolation(failure))
         {
             return OrderChanged();
         }
@@ -416,7 +416,7 @@ public static class SceneEndpoints
             story.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsConstraintViolation(failure))
         {
             return OrderChanged();
         }
@@ -487,7 +487,7 @@ public static class SceneEndpoints
             story.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsConstraintViolation(failure))
         {
             return OrderChanged();
         }

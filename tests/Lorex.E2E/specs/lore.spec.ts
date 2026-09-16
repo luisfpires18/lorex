@@ -39,6 +39,18 @@ function card(page: Page, name: string) {
   return page.locator(`[data-testid="entity-card"][data-entity-name="${name}"]`)
 }
 
+/**
+ * Types an article, waiting for the editor to hold the caret first.
+ *
+ * "Write the article" replaces the button with an editor that focuses itself once it exists, which is
+ * a moment after the click. Typing into the click, as this file used to, races that moment and drops
+ * whatever was typed before it: the same wait every other spec that writes prose already does.
+ */
+async function writeArticle(page: Page, text: string) {
+  await expect(page.getByTestId('lore-editor')).toBeFocused()
+  await page.keyboard.type(text)
+}
+
 test.describe('lore', () => {
   test('build an entry with fields, tags, aliases and an article, then find it again', async ({
     page,
@@ -46,9 +58,11 @@ test.describe('lore', () => {
     await signUp(page)
     await newUniverse(page, unique('Ashen Reach '))
 
-    // A new universe ships with the default types.
+    // A new universe ships with the default types, and reading them says nothing went wrong.
+    // The screen used to report the read it cancelled itself as a failure the author could see.
     await page.getByTestId('workspace-types').click()
     await expect(page.getByTestId('type-list')).toContainText('Character')
+    await expect(page.getByTestId('types-error')).toHaveCount(0)
 
     // Add a custom type with two structured fields.
     await page.getByLabel('New type').fill('Starship')
@@ -92,7 +106,7 @@ test.describe('lore', () => {
 
     // The article is written on the entry once it exists, and saved on its own.
     await page.getByTestId('article-write').click()
-    await page.keyboard.type('She was built for running, and never once for fighting.')
+    await writeArticle(page, 'She was built for running, and never once for fighting.')
     await page.getByTestId('article-save').click()
     await expect(page.getByTestId('article-status')).toHaveText('Saved')
     await page.getByTestId('article-done').click()
@@ -155,7 +169,7 @@ test.describe('lore', () => {
     await expect(page.getByTestId('entry-summary')).toContainText('last cartographer')
 
     await page.getByTestId('article-write').click()
-    await page.keyboard.type('She kept the tide ledger by hand.')
+    await writeArticle(page, 'She kept the tide ledger by hand.')
     await page.getByTestId('article-save').click()
     await expect(page.getByTestId('article-status')).toHaveText('Saved')
 

@@ -126,7 +126,7 @@ public static class PlotArcEndpoints
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsConstraintViolation(failure))
         {
             // Two arcs appended to one story at once both reached for the same place, and the unique order
             // index held. Nothing was written.
@@ -237,7 +237,7 @@ public static class PlotArcEndpoints
             story.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsConstraintViolation(failure))
         {
             return OrderChanged();
         }
@@ -300,7 +300,7 @@ public static class PlotArcEndpoints
             story.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException failure) when (DatabaseFailures.IsConstraintViolation(failure))
         {
             return OrderChanged();
         }

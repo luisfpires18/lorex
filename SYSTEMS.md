@@ -39,6 +39,7 @@ Repository index. Paths and one-line responsibilities only.
 | `Data/LorexDbContext.cs` | Single EF Core context; applies feature entity configurations. |
 | `Data/DatabaseSetup.cs` | SQLite registration, data-source path resolution, startup-step wiring. |
 | `Data/LorexDatabaseInitializer.cs` | Migrates once per process, and what other startup work awaits. |
+| `Data/DatabaseFailures.cs` | Whether a `DbUpdateException` was the constraint an endpoint refuses on, or an unrelated database failure. |
 | `Data/Migrations/` | EF Core migrations. |
 | `Hosting/FrontendHosting.cs` | Serving the built client from `wwwroot`, its cache headers and its fallback. |
 | `Hosting/ProxyHeaders.cs` | Honouring `X-Forwarded-Proto` behind a TLS-terminating proxy. |
@@ -194,7 +195,7 @@ Repository index. Paths and one-line responsibilities only.
 | `public/brand-mark.png` | The same mark, transparent, for use inside the product. |
 | `src/main.tsx` | React entry point. |
 | `src/pwa.ts` | Registers the service worker, in production builds only. |
-| `src/App.tsx` | Routes and providers, held by a data router with one catch-all route so history moves can be guarded. |
+| `src/App.tsx` | Routes and providers, held by a data router with one catch-all route so history moves can be guarded. Every page route is a `lazy` import behind its own keyed `Suspense`. |
 | `src/styles.css` | Design tokens, all component styles, and the narrow-screen and touch layers. |
 | `src/lib/api.ts` | Same-origin fetch wrapper and `ApiError`. |
 | `src/lib/imageCrop.ts` | The crop shape, the accepted formats and the size ceiling, shared by both pictures. |
@@ -229,7 +230,8 @@ Repository index. Paths and one-line responsibilities only.
 
 | Path | Responsibility |
 | --- | --- |
-| `Lorex.Api.Tests/LorexApiFactory.cs` | Boots the real host over in-memory SQLite; a command fault hook and a movable clock. |
+| `Lorex.Api.Tests/LorexApiFactory.cs` | Boots the real host over in-memory SQLite; a command fault hook, what it fails with, and a movable clock. |
+| `Lorex.Api.Tests/DatabaseFailureTests.cs` | Which `DbUpdateException` is a constraint and which is not, and that a locked database never claims a name is taken. |
 | `Lorex.Api.Tests/HealthEndpointTests.cs` | Backend test-infrastructure proof. |
 | `Lorex.Api.Tests/HostStartupTests.cs` | Startup on a real file: migrations before queries, backfill, forwarded scheme. |
 | `Lorex.Api.Tests/AuthEndpointTests.cs` | Registration, sign-in, session and logout. |
@@ -312,7 +314,8 @@ Repository index. Paths and one-line responsibilities only.
 | `Lorex.Api.Tests/EntityArticleEndpointTests.cs` | An article read and saved exactly, empty and cleared, the bound, refused documents, stale saves, ownership and foreign ids, independence from structured edits and entry restores, entry writes still carrying the article refused whole, versions from before, its own history and restore, the Trash, universe deletion, and no article in any other payload. |
 | `Lorex.Api.Tests/EntityArticleBackupTests.cs` | Articles in a version 9 backup: exact, with every version, cleared and trashed ones, no copy on entry revisions, determinism, and a version 8 file. |
 | `Lorex.Api.Tests/EntityArticleMigrationTests.cs` | The article migration over lore on a file: articles moved exactly with a first version, the column dropped without a rebuild, foreign keys and the search trigger intact, versions from before still readable, and a rollback with articles. |
-| `Lorex.E2E/playwright.config.ts` | Starts API + web, runs Chromium. |
+| `Lorex.E2E/playwright.config.ts` | Starts API + web, runs Chromium. `LOREX_E2E_DB` gives the run a database of its own; `LOREX_E2E_WORKERS` overrides the worker count. |
+| `Lorex.E2E/README.md` | How to run the suite, and what was measured about the two knobs. |
 | `Lorex.E2E/specs/smoke.spec.ts` | Frontend-loads smoke suite. |
 | `Lorex.E2E/specs/auth.spec.ts` | Register, sign out, guard, sign back in. |
 | `Lorex.E2E/specs/universes.spec.ts` | Create, edit, search, archive, paginate, ownership. |
