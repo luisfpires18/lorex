@@ -542,7 +542,7 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
 
       <header className="story__head">
         <h2 className="story__title" data-testid="story-title">
-          {story.title}
+          <bdi>{story.title}</bdi>
         </h2>
         <p className="story__meta">
           <span className="chip" data-testid="story-status">

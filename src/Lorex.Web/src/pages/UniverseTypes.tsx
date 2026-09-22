@@ -232,7 +232,9 @@ export default function UniverseTypes() {
               <span className="types__icon" data-testid={`type-icon-${type.name}`}>
                 <TypeIcon iconKey={type.icon} />
               </span>
-              <span className="types__name">{type.name}</span>
+              <span className="types__name">
+                <bdi>{type.name}</bdi>
+              </span>
               <span className="types__count">
                 {type.entityCount === 1 ? '1 entry' : `${type.entityCount} entries`}
               </span>
@@ -432,6 +434,7 @@ export default function UniverseTypes() {
           label="New type"
           name="new-type"
           placeholder="Starship, Language, Ritual…"
+          dir="auto"
           value={newType}
           onChange={(event) => setNewType(event.target.value)}
         />

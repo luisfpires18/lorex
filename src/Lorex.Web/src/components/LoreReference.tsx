@@ -32,7 +32,9 @@ export function LoreReference({
       ) : (
         <TypeIcon iconKey={reference.entityTypeIcon} className="lorechip__icon" />
       )}
-      <span className="lorechip__name">{reference.name}</span>
+      <span className="lorechip__name">
+        <bdi>{reference.name}</bdi>
+      </span>
     </>
   )
 

@@ -230,6 +230,7 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
         label="Reads as"
         name="reltype-name"
         placeholder="rules, parent of, married to"
+        dir="auto"
         value={draft.name}
         onChange={(event) => edit({ name: event.target.value })}
         error={fieldErrors.name}
@@ -244,6 +245,7 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
           label="Reads as, from the other side"
           name="reltype-inverse"
           placeholder="ruled by, child of"
+          dir="auto"
           value={draft.inverseName}
           onChange={(event) => edit({ inverseName: event.target.value })}
           error={fieldErrors.inversename}
@@ -481,7 +483,9 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
             return (
               <li className="types__row" key={type.id} data-reltype-name={type.name}>
                 <div className="types__head">
-                  <span className="types__name">{type.name}</span>
+                  <span className="types__name">
+                    <bdi>{type.name}</bdi>
+                  </span>
                   <span className="types__count">
                     {type.relationshipCount === 1
                       ? '1 relation'

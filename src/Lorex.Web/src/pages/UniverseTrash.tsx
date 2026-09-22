@@ -243,7 +243,7 @@ export default function UniverseTrash() {
                     <span className="trash__kind" data-testid="trash-kind">
                       {kind}
                     </span>
-                    {item.name}
+                    <bdi>{item.name}</bdi>
                   </p>
                   <p className="trash__meta">
                     {whereItWas(item)} · removed {formatDateTime(item.trashedAt)}

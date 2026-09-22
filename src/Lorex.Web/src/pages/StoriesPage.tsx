@@ -91,7 +91,7 @@ export default function StoriesPage() {
               data-title={story.title}
             >
               <Link className="storyrow__title" to={story.id}>
-                {story.title}
+                <bdi>{story.title}</bdi>
               </Link>
               <p className="storyrow__meta">
                 <span className="chip">{STORY_STATUS_LABELS[story.status]}</span>

@@ -129,6 +129,7 @@ export function StoryForm({ universeId, story, onClose, onSaved }: StoryFormProp
               className="field__input"
               ref={title}
               type="text"
+              dir="auto"
               placeholder="The Long Winter"
               value={draft.title}
               onChange={(event) => edit({ title: event.target.value })}

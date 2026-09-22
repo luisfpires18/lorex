@@ -334,8 +334,8 @@ export function RestoreBackup({ onCancel, onRestored }: RestoreBackupProps) {
             <dl className="restore__facts">
               <div className="restore__fact">
                 <dt>Universe</dt>
-                <dd dir="auto" data-testid="restore-universe-name">
-                  {stage.validation.preview.universeName}
+                <dd data-testid="restore-universe-name">
+                  <bdi>{stage.validation.preview.universeName}</bdi>
                 </dd>
               </div>
               <div className="restore__fact">

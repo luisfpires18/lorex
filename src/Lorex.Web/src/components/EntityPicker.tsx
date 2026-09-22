@@ -198,7 +198,9 @@ export function EntityPicker({
 
       {value ? (
         <p className="picker__chosen">
-          <span className="picker__chosenname">{value.name}</span>
+          <span className="picker__chosenname">
+            <bdi>{value.name}</bdi>
+          </span>
           <button
             className="button button--quiet"
             type="button"
@@ -263,8 +265,12 @@ export function EntityPicker({
                     onClick={() => choose(item)}
                     data-testid={`picker-option-${item.name}`}
                   >
-                    <span className="picker__name">{item.name}</span>
-                    <span className="picker__kind">{item.entityTypeName}</span>
+                    <span className="picker__name">
+                      <bdi>{item.name}</bdi>
+                    </span>
+                    <span className="picker__kind">
+                      <bdi>{item.entityTypeName}</bdi>
+                    </span>
                   </button>
                 </li>
               ))}
@@ -364,7 +370,7 @@ export function EntityMultiPicker({
       <div className="tokens" data-testid="participants">
         {value.map((choice) => (
           <span className="token" key={choice.id}>
-            {choice.name}
+            <bdi>{choice.name}</bdi>
             <button
               type="button"
               className="token__remove"
@@ -416,8 +422,12 @@ export function EntityMultiPicker({
                 onClick={() => choose(item)}
                 data-testid={`participant-option-${item.name}`}
               >
-                <span className="picker__name">{item.name}</span>
-                <span className="picker__kind">{item.entityTypeName}</span>
+                <span className="picker__name">
+                  <bdi>{item.name}</bdi>
+                </span>
+                <span className="picker__kind">
+                  <bdi>{item.entityTypeName}</bdi>
+                </span>
               </button>
             </li>
           ))}

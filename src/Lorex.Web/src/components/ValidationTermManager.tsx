@@ -236,8 +236,8 @@ export function ValidationTermManager({ universeId }: { universeId: string }) {
                       ) : (
                         <li className="types__row" key={term.id} data-term-name={term.name}>
                           <div className="types__head">
-                            <span className="types__name" dir="auto">
-                              {term.name}
+                            <span className="types__name">
+                              <bdi>{term.name}</bdi>
                             </span>
                             <span className="types__count">{usage(term)}</span>
                             <button

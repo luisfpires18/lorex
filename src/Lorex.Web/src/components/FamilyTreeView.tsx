@@ -174,8 +174,8 @@ export function FamilyTreeView({ universeId, tree, onFocus }: Props) {
                           name={focal.name}
                           image={focal.image}
                         />
-                        <p className="familynode__name" dir="auto">
-                          {focal.name}
+                        <p className="familynode__name">
+                          <bdi>{focal.name}</bdi>
                         </p>
                       </div>
                       <p className="familynode__kind">
@@ -268,8 +268,8 @@ function Card({ member, universeId, onFocus, register }: CardProps) {
           name={node.name}
           image={node.image}
         />
-        <span className="familynode__name" dir="auto">
-          {node.name}
+        <span className="familynode__name">
+          <bdi>{node.name}</bdi>
         </span>
         <span className="familynode__action">Show this family</span>
       </button>

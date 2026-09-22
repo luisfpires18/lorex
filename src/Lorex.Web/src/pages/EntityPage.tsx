@@ -13,6 +13,7 @@ import { EntityArticleSection } from '../components/EntityArticle'
 import { EntityHistory } from '../components/EntityHistory'
 import { EntityImageField, type PendingImage } from '../components/EntityImageField'
 import { FieldInput } from '../components/FieldInputs'
+import { NameList } from '../components/NameList'
 import { RelationshipSection } from '../components/RelationshipSection'
 import { emptyValue } from '../lore/document'
 import { entityImageUrl, setEntityImage } from '../lore/images'
@@ -458,7 +459,7 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
             </select>
           ) : (
             <span className="entry__type" data-testid="entry-type">
-              {detail?.entityTypeName ?? selectedType?.name}
+              <bdi>{detail?.entityTypeName ?? selectedType?.name}</bdi>
             </span>
           )}
 
@@ -485,19 +486,20 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
             className="entry__nameinput"
             aria-label="Name"
             placeholder="Name this"
+            dir="auto"
             value={draft.name}
             onChange={(event) => setDraft({ ...draft, name: event.target.value })}
           />
         ) : (
           <h2 className="entry__name" data-testid="entry-name">
-            {detail?.name}
+            <bdi>{detail?.name}</bdi>
           </h2>
         )}
         {fieldErrors.name ? <p className="field__error">{fieldErrors.name}</p> : null}
 
         {!isEditing && (detail?.aliases.length ?? 0) > 0 ? (
           <p className="entry__aliases" data-testid="entry-aliases">
-            also known as {detail!.aliases.join(', ')}
+            also known as <NameList names={detail!.aliases} />
           </p>
         ) : null}
 

@@ -53,7 +53,9 @@ export function PlotArcSection({
         <h4 className="plotarc__title" id={headingId} data-testid="plot-arc-heading">
           <span className="plotarc__number">{arcNumber(index)}</span>
           <span className="plotarc__dash"> — </span>
-          <span className="plotarc__name">{arc.title}</span>
+          <span className="plotarc__name">
+            <bdi>{arc.title}</bdi>
+          </span>
         </h4>
         {beatCount > 0 ? (
           <p className="plotarc__meta" data-testid="plot-arc-beat-count">

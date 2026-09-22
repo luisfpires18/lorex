@@ -125,7 +125,11 @@ export function ManuscriptPanel({
             data-testid="manuscript-outline-toggle"
           >
             <span className="msoutline__togglelabel">{isOpen ? 'Close scenes' : 'Scenes'}</span>
-            <span className="msoutline__current">{selected?.title ?? 'Choose a scene'}</span>
+            {/* Its own direction, not a <bdi>: the title is cut with an ellipsis, and the clipping
+                element's direction is what puts the cut at the end of a right-to-left title. */}
+            <span className="msoutline__current" dir="auto">
+              {selected?.title ?? 'Choose a scene'}
+            </span>
           </button>
 
           <div
@@ -167,7 +171,7 @@ export function ManuscriptPanel({
                             data-testid="manuscript-outline-scene"
                             data-title={scene.title}
                           >
-                            {scene.title}
+                            <bdi>{scene.title}</bdi>
                           </NavLink>
                         </li>
                       ))}

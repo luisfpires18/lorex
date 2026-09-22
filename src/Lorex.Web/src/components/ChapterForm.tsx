@@ -144,6 +144,7 @@ export function ChapterForm({
               className="field__input"
               ref={title}
               type="text"
+              dir="auto"
               placeholder="Arrival"
               value={draft.title}
               onChange={(event) => edit({ title: event.target.value })}

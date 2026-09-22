@@ -282,7 +282,7 @@ export function ManuscriptEditor({
           <span className="manuscript__position">{where.position}</span>
         </p>
         <h4 className="manuscript__title" id={titleId} data-testid="manuscript-scene-title">
-          {scene.title}
+          <bdi>{scene.title}</bdi>
         </h4>
 
         {hasContext ? (

@@ -175,6 +175,7 @@ export function PlotBeatForm({
               className="field__input"
               ref={title}
               type="text"
+              dir="auto"
               placeholder="The capital is breached"
               value={draft.title}
               onChange={(event) => edit({ title: event.target.value })}

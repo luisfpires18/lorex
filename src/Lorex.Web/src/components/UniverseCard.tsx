@@ -19,7 +19,9 @@ export function UniverseCard({ universe }: { universe: UniverseSummary }) {
     >
       <span className="plate__spine" aria-hidden="true" />
       <span className="plate__body">
-        <span className="plate__name">{universe.name}</span>
+        <span className="plate__name">
+          <bdi>{universe.name}</bdi>
+        </span>
         {universe.description ? (
           <span className="plate__description">{universe.description}</span>
         ) : (

@@ -385,17 +385,21 @@ export function RelationshipSection({
               </li>
             ) : (
               <li className="relation" key={view.id} data-relation-label={view.label}>
-                <p className="relation__label">{view.label}</p>
+                <p className="relation__label">
+                  <bdi>{view.label}</bdi>
+                </p>
 
                 <div className="relation__body">
                   <Link
                     className="relation__name"
                     to={`/app/universes/${universeId}/lore/${view.relatedEntityId}`}
                   >
-                    {view.relatedEntityName}
+                    <bdi>{view.relatedEntityName}</bdi>
                   </Link>
                   <p className="relation__meta">
-                    <span className="relation__kind">{view.relatedEntityTypeName}</span>
+                    <span className="relation__kind">
+                      <bdi>{view.relatedEntityTypeName}</bdi>
+                    </span>
                     {formatSpan(view.startDate, view.endDate) ? (
                       <span className="relation__span">
                         {formatSpan(view.startDate, view.endDate)}

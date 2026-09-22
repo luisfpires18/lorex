@@ -189,7 +189,7 @@ export function SceneCard({
 
         <Title className="scene__title" id={titleId}>
           <span className="visually-hidden">Scene {index + 1}: </span>
-          {scene.title}
+          <bdi>{scene.title}</bdi>
         </Title>
 
         {scene.summary ? <p className="scene__summary">{scene.summary}</p> : null}
