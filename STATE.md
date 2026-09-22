@@ -501,11 +501,39 @@ Two issues, both from actual use; the owner's testing log lives outside this rep
     duplicate is still listed, editable and removable, by its author. The family tree collapses links that say
     the same thing while deriving, so it draws one line and lists one child; that is a read and deletes nothing.
 
+## Stabilization pass 002 - authored text direction
+
+Branch `fix/user-text-directionality`, off `dev` at `13dd9a9`. Presentation only: no API, schema, backup, search or
+route change. Found in Pass 001's visual check: the entry title declared no direction, so an Arabic or Hebrew title was
+laid out left to right - worst when mixed with Latin, numbers or brackets: "آكرون — 12 / Wright" drew its number at the
+far end. The same gap was on every title older than universe search.
+
+- **The rule:** whatever an author titled or named is isolated in a `<bdi>` inside the element that lays it out. It reads
+  in its own direction while the header, card or row keeps Lorex's left-to-right layout, so an RTL title sits exactly
+  where any title sits. `dir="auto"` on the element itself only where a `<bdi>` cannot do it: title and name fields, and
+  an element that cuts its text with an ellipsis, so that its end is what is cut. `NameList` isolates each alias of
+  "also known as …" - left alone, two RTL aliases ran together and swapped places.
+- Applied to entries (header, card, history, relations, pickers), universes, stories, chapters, scenes, arcs, beats, lore
+  and plot chips, the manuscript's title and outline, moments and their cast, entry types, relation kinds and event kinds,
+  the Trash, ideas and Canon subjects. The earlier `dir="auto"` on World Rules, family tree names, event kinds and the
+  restore preview gave the whole box the direction, which pushed an RTL name to its far side; they isolate the same way
+  now. Search results keep theirs: their titles are line-clamped.
+- **Seen and not changed:** summaries, premises, descriptions, notes and excerpts, the article and the manuscript are
+  prose and still inherit left to right - an Arabic sentence's full stop lands on the wrong side, and a mixed paragraph
+  reorders as the titles did. No CSS forces it; the same isolation is the fix, owed as its own task. So are lines built
+  as one string ("Chapter 1 — … · Scene 1 of 2", "Ideas in “…”"), `confirm()` prompts, native `<select>` options and
+  token chips.
+- `text-direction.spec.ts`: five tests, each failing on the code before the fix.
+
 ## Baseline
 
-- **999 API integration tests, 161 Playwright tests**, green. Stabilization pass 001's full Playwright run, on a
-  database of its own (`LOREX_E2E_DB`), at Playwright's default workers: **161/161, no failure and nothing logged about
-  a locked database**. The whole API suite is green in Release too. Before it, the Family Trees full run on the dev database: 151/155 -
+- **999 API integration tests, 166 Playwright tests**, green. Stabilization pass 002's full Playwright runs, each on a
+  fresh database of its own (`LOREX_E2E_DB`), at Playwright's default workers: **166/166 twice, nothing logged about a
+  locked database**. A first run, seconds after the dev server was started, lost three tests in its first thirty
+  seconds - auth, canon, entity-image - each to a fetch that never reached the page (a blank document, a lazily imported
+  screen that failed to load, a workspace read); no lock was logged, and all three passed alone. No backend change, so
+  the API suite and the Release build were not rerun; Pass 001 ran both green, and its full Playwright run was 161/161.
+  Before those, the Family Trees full run on the dev database: 151/155 -
   canon, content-recovery, pwa and type-filter, none of which touches a family tree; all four passed on a serial rerun, which
   itself lost one canon test at sign-up, and canon passed 6/6 alone. Two genuine failures were found and fixed first: the restore
   screen's preview still expected "Version 13", and the "newer Lorex" file it refuses was written at version 14, which the format

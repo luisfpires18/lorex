@@ -69,7 +69,7 @@ export function PlotBeatItem({
       <div className="beat__body">
         <h5 className="beat__title" id={titleId}>
           <span className="visually-hidden">Beat {index + 1}: </span>
-          {beat.title}
+          <bdi>{beat.title}</bdi>
         </h5>
 
         {beat.description ? <p className="beat__description">{beat.description}</p> : null}
@@ -92,7 +92,9 @@ export function PlotBeatItem({
                     data-testid="plot-beat-scene"
                     data-title={scene.title}
                   >
-                    <span className="lorechip__name">{scene.title}</span>
+                    <span className="lorechip__name">
+                      <bdi>{scene.title}</bdi>
+                    </span>
                     {chapters.length > 0 ? (
                       <span className="lorechip__note beat__where">
                         {containerNumber(chapters, scene.chapterId)}

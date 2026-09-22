@@ -238,6 +238,7 @@ export function SceneForm({
               className="field__input"
               ref={title}
               type="text"
+              dir="auto"
               placeholder="The Council"
               value={draft.title}
               onChange={(event) => edit({ title: event.target.value })}

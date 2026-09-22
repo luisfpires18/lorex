@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { LoreArticle } from './LoreEditor'
 import { CanonBlockNotice } from './CanonBlockNotice'
+import { NameList } from './NameList'
 import { blockingFindingsOf } from '../canon/blocked'
 import type { CanonBlockingFinding } from '../canon/types'
 import { findEra, formatChronologyYear, formatSignedYear, withEraLabel } from '../chronology/format'
@@ -202,7 +203,9 @@ export function EntityHistory({
                 </p>
                 <p className="version__meta">
                   <span>Version {revision.number}</span>
-                  <span>{revision.name}</span>
+                  <span>
+                    <bdi>{revision.name}</bdi>
+                  </span>
                   <span>{CANON_LABELS[revision.canonStatus]}</span>
                   {revision.kind === RevisionKind.Restored ? (
                     <span>
@@ -267,13 +270,17 @@ function Snapshot({
 }) {
   return (
     <>
-      <h4 className="snapshot__name">{revision.name}</h4>
+      <h4 className="snapshot__name">
+        <bdi>{revision.name}</bdi>
+      </h4>
       <p className="snapshot__kind">
-        {revision.entityTypeName} &middot; {CANON_LABELS[revision.canonStatus]}
+        <bdi>{revision.entityTypeName}</bdi> &middot; {CANON_LABELS[revision.canonStatus]}
       </p>
 
       {revision.aliases.length > 0 ? (
-        <p className="entry__aliases">also known as {revision.aliases.join(', ')}</p>
+        <p className="entry__aliases">
+          also known as <NameList names={revision.aliases} />
+        </p>
       ) : null}
 
       {revision.summary ? <p className="entry__summary">{revision.summary}</p> : null}

@@ -142,6 +142,7 @@ export function PlotArcForm({
               className="field__input"
               ref={title}
               type="text"
+              dir="auto"
               placeholder="Fall of the King"
               value={draft.title}
               onChange={(event) => edit({ title: event.target.value })}

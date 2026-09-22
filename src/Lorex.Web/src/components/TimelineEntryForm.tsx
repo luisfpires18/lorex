@@ -375,6 +375,7 @@ export function TimelineEntryForm({
               className="field__input"
               ref={title}
               type="text"
+              dir="auto"
               placeholder="Frodo leaves the Shire"
               value={draft.title}
               onChange={(event) => edit({ title: event.target.value })}

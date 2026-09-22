@@ -144,7 +144,9 @@ export default function TimelinePage() {
           </span>
         </p>
 
-        <h4 className="moment__title">{entry.title}</h4>
+        <h4 className="moment__title">
+          <bdi>{entry.title}</bdi>
+        </h4>
 
         {entry.description ? <p className="moment__account">{entry.description}</p> : null}
 
@@ -171,7 +173,7 @@ export default function TimelinePage() {
                   {link.isTrashed ? (
                     <span className="moment__player moment__player--trashed">
                       {dot}
-                      {link.name} (in Trash)
+                      <bdi>{link.name}</bdi> (in Trash)
                     </span>
                   ) : (
                     <Link
@@ -180,7 +182,7 @@ export default function TimelinePage() {
                       title={link.entityTypeName}
                     >
                       {dot}
-                      {link.name}
+                      <bdi>{link.name}</bdi>
                     </Link>
                   )}
                 </li>

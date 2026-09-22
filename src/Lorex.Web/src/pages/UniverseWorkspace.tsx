@@ -171,9 +171,13 @@ export default function UniverseWorkspace() {
         <span className="rail__seal" aria-hidden="true" />
 
         {/* Only rendered into the narrow layout, where the sidebar head is folded away:
-            the bar has to keep saying which universe and which section this is. */}
+            the bar has to keep saying which universe and which section this is. The name carries its own
+            direction rather than a <bdi>, because it is cut with an ellipsis: only the clipping element's
+            direction puts the cut at the end of a name written right to left, not at its start. */}
         <p className="rail__where" data-testid="workspace-where">
-          <span className="rail__universe">{universe.name}</span>
+          <span className="rail__universe" dir="auto">
+            {universe.name}
+          </span>
           <span className="rail__section">{currentSection(pathname, id)}</span>
           {universe.isArchived ? <span className="rail__archived">Archived</span> : null}
         </p>
@@ -210,7 +214,7 @@ export default function UniverseWorkspace() {
             All universes
           </Link>
           <h1 className="sidebar__name" data-testid="workspace-name">
-            {universe.name}
+            <bdi>{universe.name}</bdi>
           </h1>
           {universe.isArchived ? <span className="sidebar__archived">Archived</span> : null}
         </div>

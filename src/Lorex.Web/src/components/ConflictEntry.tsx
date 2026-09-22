@@ -117,14 +117,18 @@ function subjectName(universeId: string, subject: CanonConflictSubject) {
           : null
 
   if (subject.kind === CanonSubjectKind.Entity && path) {
-    return <Link to={path}>{subject.name}</Link>
+    return (
+      <Link to={path}>
+        <bdi>{subject.name}</bdi>
+      </Link>
+    )
   }
 
   if (path) {
     return (
       <span>
-        <Link to={path} dir="auto" data-testid={`finding-link-${subject.role}`}>
-          {subject.name}
+        <Link to={path} data-testid={`finding-link-${subject.role}`}>
+          <bdi>{subject.name}</bdi>
         </Link>
         <span className="finding__kind"> · {SUBJECT_KIND_LABELS[subject.kind].toLowerCase()}</span>
       </span>
@@ -133,7 +137,7 @@ function subjectName(universeId: string, subject: CanonConflictSubject) {
 
   return (
     <span title={SUBJECT_KIND_LABELS[subject.kind]}>
-      {subject.name}
+      <bdi>{subject.name}</bdi>
       <span className="finding__kind"> · {SUBJECT_KIND_LABELS[subject.kind].toLowerCase()}</span>
     </span>
   )

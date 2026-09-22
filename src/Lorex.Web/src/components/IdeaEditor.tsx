@@ -563,7 +563,7 @@ export function IdeaEditor({
           {listLabel}
         </Link>
         <h2 className="idea__heading" id={headingId} data-testid="idea-heading">
-          {isNew ? 'New idea' : stored.title}
+          {isNew ? 'New idea' : <bdi>{stored.title}</bdi>}
         </h2>
         <p className="idea__lede">
           A possibility, not lore. Nothing saved here changes your world.
@@ -665,6 +665,7 @@ export function IdeaEditor({
             ref={titleInput}
             className="field__input idea__title"
             type="text"
+            dir="auto"
             value={draft.title}
             maxLength={IDEA_TITLE_MAX_LENGTH}
             placeholder="Maybe this city floats"
@@ -785,14 +786,16 @@ export function IdeaEditor({
                     <span className="idearef__kind">{kind}</span>
                     <span className="idearef__what">
                       {reference.isInTrash || draft.universeId === null ? (
-                        <span className="idearef__name">{reference.name}</span>
+                        <span className="idearef__name">
+                          <bdi>{reference.name}</bdi>
+                        </span>
                       ) : (
                         <Link
                           className="idearef__name"
                           to={referencePath(draft.universeId, reference)}
                           data-testid="idea-reference-open"
                         >
-                          {reference.name}
+                          <bdi>{reference.name}</bdi>
                         </Link>
                       )}
                       {context ? <span className="idearef__context">{context}</span> : null}

@@ -125,11 +125,10 @@ export default function WorldRulesPage() {
             >
               <Link
                 className="rulerow__title"
-                dir="auto"
                 to={`${basePath}/${rule.id}`}
                 data-testid="world-rule-open"
               >
-                {rule.title}
+                <bdi>{rule.title}</bdi>
               </Link>
               {rule.excerpt ? (
                 <p className="rulerow__excerpt" dir="auto" data-testid="world-rule-excerpt">

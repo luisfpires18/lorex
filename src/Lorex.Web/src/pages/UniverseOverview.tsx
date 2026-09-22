@@ -9,7 +9,7 @@ export default function UniverseOverview() {
     <article className="overview">
       <header className="overview__head">
         <h2 className="overview__title" data-testid="overview-name">
-          {universe.name}
+          <bdi>{universe.name}</bdi>
         </h2>
         {universe.description ? (
           <p className="overview__description">{universe.description}</p>

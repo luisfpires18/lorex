@@ -316,14 +316,16 @@ export function IdeasBrowser({ universe, basePath }: IdeasBrowserProps) {
             >
               <div className="idearow__main">
                 {deleted ? (
-                  <p className="idearow__title">{idea.title}</p>
+                  <p className="idearow__title">
+                    <bdi>{idea.title}</bdi>
+                  </p>
                 ) : (
                   <Link
                     className="idearow__title"
                     to={`${basePath}/${idea.id}`}
                     data-testid="idea-open"
                   >
-                    {idea.title}
+                    <bdi>{idea.title}</bdi>
                   </Link>
                 )}
                 {idea.excerpt ? (

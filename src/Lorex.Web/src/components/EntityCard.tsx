@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { EntityPortrait } from './EntityPortrait'
+import { NameList } from './NameList'
 import { CANON_LABELS, type EntitySummary } from '../lore/types'
 
 /**
@@ -22,7 +23,9 @@ export function EntityCard({ universeId, entity }: { universeId: string; entity:
       data-entity-name={entity.name}
     >
       <span className="dossier__head">
-        <span className="dossier__type">{entity.entityTypeName}</span>
+        <span className="dossier__type">
+          <bdi>{entity.entityTypeName}</bdi>
+        </span>
         <span className="dossier__canon" data-canon={entity.canonStatus}>
           {CANON_LABELS[entity.canonStatus]}
         </span>
@@ -37,10 +40,14 @@ export function EntityCard({ universeId, entity }: { universeId: string; entity:
         />
 
         <span className="dossier__titletext">
-          <span className="dossier__name">{entity.name}</span>
+          <span className="dossier__name">
+            <bdi>{entity.name}</bdi>
+          </span>
 
           {entity.aliases.length > 0 ? (
-            <span className="dossier__aliases">also {entity.aliases.join(', ')}</span>
+            <span className="dossier__aliases">
+              also <NameList names={entity.aliases} />
+            </span>
           ) : null}
         </span>
       </span>

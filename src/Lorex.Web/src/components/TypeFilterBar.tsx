@@ -90,7 +90,9 @@ export function TypeFilterBar({
             <span className="typebar__icon">
               <TypeIcon iconKey={type.icon} />
             </span>
-            <span className="typebar__name">{type.name}</span>
+            <span className="typebar__name">
+              <bdi>{type.name}</bdi>
+            </span>
           </button>
         ))}
       </div>

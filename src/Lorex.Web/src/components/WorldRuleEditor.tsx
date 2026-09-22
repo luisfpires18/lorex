@@ -377,8 +377,8 @@ export function WorldRuleEditor({
         <Link className="rule__back" to={listPath} data-testid="world-rule-back">
           World Rules
         </Link>
-        <h2 className="rule__heading" id={headingId} dir="auto" data-testid="world-rule-heading">
-          {isNew ? 'New rule' : stored.title}
+        <h2 className="rule__heading" id={headingId} data-testid="world-rule-heading">
+          {isNew ? 'New rule' : <bdi>{stored.title}</bdi>}
         </h2>
         <p className="rule__lede">
           A rule of how this world works, in your own words. Lorex never reads them, and saving

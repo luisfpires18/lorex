@@ -79,6 +79,7 @@ export function UniverseForm({
         autoFocus
         required
         maxLength={120}
+        dir="auto"
         value={name}
         error={fieldErrors.name}
         onChange={(event) => setName(event.target.value)}

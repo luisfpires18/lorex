@@ -107,9 +107,9 @@ export function SceneBeats({
               data-testid={`${testId}-plot-beat`}
             >
               <span className="lorechip__name">
-                {beat.arcTitle}
+                <bdi>{beat.arcTitle}</bdi>
                 <span className="plotchip__arrow"> → </span>
-                {beat.beatTitle}
+                <bdi>{beat.beatTitle}</bdi>
               </span>
             </Link>
           </li>

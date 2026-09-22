@@ -55,7 +55,9 @@ export function ChapterSection({
         <h4 className="chapter__title" id={headingId} data-testid="chapter-heading">
           <span className="chapter__number">{chapterNumber(index)}</span>
           <span className="chapter__dash"> — </span>
-          <span className="chapter__name">{chapter.title}</span>
+          <span className="chapter__name">
+            <bdi>{chapter.title}</bdi>
+          </span>
         </h4>
         {sceneCount > 0 ? (
           <p className="chapter__meta" data-testid="chapter-scene-count">

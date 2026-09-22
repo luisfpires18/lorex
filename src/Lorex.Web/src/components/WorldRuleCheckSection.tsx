@@ -246,11 +246,8 @@ function CheckState({
         <ul className="rulecheck__list" data-testid="world-rule-check-uncounted">
           {found.uncounted.map((moment) => (
             <li key={moment.timelineEntryId}>
-              <Link
-                to={`/app/universes/${universeId}/timeline?moment=${moment.timelineEntryId}`}
-                dir="auto"
-              >
-                {moment.title}
+              <Link to={`/app/universes/${universeId}/timeline?moment=${moment.timelineEntryId}`}>
+                <bdi>{moment.title}</bdi>
               </Link>{' '}
               — {UNCOUNTED_REASON_LABELS[moment.reason]}
             </li>
