@@ -101,31 +101,48 @@ test.describe('on a phone', () => {
     await expect(page.getByTestId('entry-name')).toHaveText('Veyra Alkenmoor')
     await expectNoSidewaysScroll(page, 'dossier')
 
-    // ---- The action the screen exists for is in reach ----
+    // ---- The actions the screen exists for are in reach ----
 
-    // A dossier is the tallest screen in the product. Unscrolled, at the very top of it,
-    // Edit is still on screen - which is the whole point of the sticky footer.
-    const actions = page.locator('.entry__actions')
-    await expect(actions).toHaveCSS('position', 'sticky')
-    const box = (await actions.boundingBox())!
+    // An entry is the tallest screen in the product, and everything that acts on the entry is in
+    // its header rather than under whatever was written. So at the top of one, unscrolled, all of
+    // it is on screen - and it stays there however long the article grows, because none of it is
+    // below the article any more.
     const viewport = page.viewportSize()!
-    expect(box.y, 'Edit is below the fold at the top of a dossier').toBeLessThan(viewport.height)
-    expect(box.y + box.height).toBeGreaterThan(0)
-
-    // Each action still answers to its own name, is a target a thumb can hit, and keeps its icon
-    // beside its label rather than pushing the label onto a second line.
-    for (const name of ['Edit', 'Move to Trash']) {
-      const action = actions.getByRole('button', { name, exact: true })
-      const target = (await action.boundingBox())!
-      expect(target.height, `${name} is smaller than a thumb`).toBeGreaterThanOrEqual(44)
-      expect(target.height, `${name} wrapped onto a second line`).toBeLessThan(60)
+    for (const testId of ['edit-entity', 'entity-family-tree', 'trash-entity']) {
+      const target = (await page.getByTestId(testId).boundingBox())!
+      expect(target.y + target.height, `${testId} is below the fold`).toBeLessThanOrEqual(
+        viewport.height,
+      )
+      expect(target.height, `${testId} is smaller than a thumb`).toBeGreaterThanOrEqual(44)
+      expect(target.height, `${testId} wrapped onto a second line`).toBeLessThan(60)
     }
 
-    // And it works from there, without scrolling to find it.
+    // The entry's own views are three ordinary links, on one line, and the one being read says so.
+    const views = page.getByTestId('entry-views')
+    await expect(views.getByRole('link')).toHaveCount(3)
+    await expect(page.getByTestId('entry-view-article')).toHaveAttribute('aria-current', 'page')
+    const strip = (await views.boundingBox())!
+    expect(strip.height, 'the three views wrapped onto a second line').toBeLessThan(60)
+
+    // Each of them is a place, reached and left the way any other page is.
+    await page.getByTestId('entry-view-relations').click()
+    await page.waitForURL(/\/lore\/[0-9a-f-]+\/relations$/)
+    await expect(page.getByTestId('entry-view-relations')).toHaveAttribute('aria-current', 'page')
+    await expectNoSidewaysScroll(page, 'relations')
+    await page.goBack()
+    await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
+
+    // And Edit works from the header, without scrolling to find it. The form it opens keeps its own
+    // bar stuck to the bottom edge, which is where Save belongs while a form is being filled in.
     await page.getByTestId('edit-entity').click()
+    const actions = page.locator('.entry__actions')
+    await expect(actions).toHaveCSS('position', 'sticky')
+    const bar = (await actions.boundingBox())!
+    expect(bar.y, 'the save bar is below the fold').toBeLessThan(viewport.height)
     await page.getByLabel('Name').fill('Veyra of Ironvale')
     await page.getByTestId('save-entity').click()
     await expect(page.getByTestId('entry-name')).toHaveText('Veyra of Ironvale')
+    await expectNoSidewaysScroll(page, 'entry after an edit')
 
     // ---- A complex view: the chronology, through the drawer ----
 

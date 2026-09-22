@@ -182,3 +182,52 @@ with the excerpt, opening the entry at `#article` with the focus on the Article 
 article holding U+E000 or U+E001 could mark the wrong words - is closed: the index writes those two characters as spaces,
 so no author's text can be read back as a marker. "Story and manuscript text are still never indexed" is superseded for
 the universe search; the Lore search is unchanged.
+
+## Amendment - the entry's three views (2026-09-22)
+
+Found by using Lorex to migrate a real world into it. The entry page worked and read badly: the type and the Canon
+control floated above a title they did not obviously belong to, the picture sat at one edge of a band that was mostly
+empty beside it, Relations and History stacked under the article so that an entry grew to whatever its author had
+written, and the entry's own Edit, Family tree and Move to Trash were at the bottom of all of it. No schema, API,
+Canon, backup or search change - a hierarchy fix and a routing one.
+
+**One header, and everything that acts on the entry is in it.** "Lore / Character" as one line of metadata above the
+title, the Canon control at its far end, then the name, the aliases and the summary. Under that, one bar: the entry's
+views on the left and Edit, Family tree and Move to Trash on the right, quiet buttons, the Trash one quieter still and
+turning to the danger colour only under the pointer. The bar sits above the article, so none of it depends on how long
+the entry has grown, and all of it is on screen unscrolled at 390px and at 1440px. Canon's semantics, wording and
+one-click promotion are untouched. Nothing in any of it reads the entry's type.
+
+**Article, Relations and History are three addresses.** `/lore/{id}` is the article and stays the default, so every
+existing deep link - a search result's `#article`, a family tree's Open entry, a relation's other end, a Canon finding,
+a scene's lore chip, the Trash - lands exactly where it did. `/lore/{id}/relations` and `/lore/{id}/history` are the
+other two. They are routed links with `aria-current="page"`, not a tablist: each one reloads, is linkable, and the
+browser's Back leaves it. Nothing is shown on two views at once, and each view reads only what it needs, so the article
+route no longer fetches relations and revisions nobody asked for. No new stored field: which view is open is in the
+address and nowhere else.
+
+**The domain boundary between the two histories is kept exactly.** The article's own history is still under the
+article, on the Article view. History is the entry's structured versions, and still says the article keeps its own.
+Neither was merged and neither learned about the other.
+
+**The entry's form belongs to the Article view.** Edit is in the header, so it can be pressed from any of the three; it
+opens the form where the details it edits are shown. While the form is open the views step aside, and while the article
+is being written the entry's tools step aside - the one-editor rule above, unchanged. The consequence, which is
+deliberate: Family tree and Move to Trash are not on the page while an article is being written, so the one way out of
+an entry that is not a link cannot be taken with unsaved writing behind it.
+
+**Unsaved writing is asked about exactly as it was.** `useLeaveGuard` watches every same-origin link in the capture
+phase, and the views are ordinary links, so switching to Relations or History asks the same question once, keeps the
+address and the text when the author stays, and lets the recovery copy go only when they choose to leave. No second
+dialog, and `HistoryLeaveGuard` still holds Back and Forward.
+
+**The picture is placed rather than banded.** It is the article's, centred in the article's column and shrink-wrapped
+by its own border, bounded by `max-height: min(22rem, 45vh)` and the column's width. Only maxima are set, so a portrait
+is held to a readable height, a landscape to the column, and a small picture is shown at its own size rather than blown
+up. The space it will take is still reserved before it loads - from the `width` and `height` attributes it already
+carried, which is what the fixed band was for. An entry with no picture has no plate at all.
+
+## Amendment - relationships are stored once (2026-09-22)
+
+The duplicate rule that ADR 0008 now carries is why an entry's Relations view cannot show the same connection twice,
+and why the family tree draws one line where a database written before the rule holds two. Nothing about an article.

@@ -44,6 +44,7 @@ public sealed class CanonFamilyLoopRule : ICanonIntegrityRule
                 && relationship.TargetEntity.CanonStatus == CanonStatus.Canon)
             .Select(relationship => new Row(
                 relationship.Id,
+                relationship.RelationshipTypeId,
                 relationship.SourceEntityId,
                 relationship.SourceEntity!.Name,
                 relationship.TargetEntityId,
@@ -64,7 +65,8 @@ public sealed class CanonFamilyLoopRule : ICanonIntegrityRule
             .ToDictionary(entry => entry.Id, entry => entry.Name);
 
         var loops = FamilyTreeDerivation.Loops(
-            rows.Select(row => new FamilyLink(row.RelationshipId, row.ParentId, row.ChildId, row.Semantic)));
+            rows.Select(row => new FamilyLink(
+                row.RelationshipId, row.RelationshipTypeId, row.ParentId, row.ChildId, row.Semantic)));
 
         return [.. loops.Select(loop => Finding(loop, links, names))];
     }
@@ -120,6 +122,7 @@ public sealed class CanonFamilyLoopRule : ICanonIntegrityRule
 
     private sealed record Row(
         Guid RelationshipId,
+        Guid RelationshipTypeId,
         Guid ParentId,
         string ParentName,
         Guid ChildId,

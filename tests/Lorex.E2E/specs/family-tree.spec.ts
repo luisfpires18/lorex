@@ -229,7 +229,7 @@ test.describe('family tree', () => {
     await expect(node(page, 'Mara')).toHaveCount(0)
 
     // The relation itself is untouched: it is still on the entry, under its own wording.
-    await page.goto(`/app/universes/${universeId}/lore/${mara}`)
+    await page.goto(`/app/universes/${universeId}/lore/${mara}/relations`)
     await expect(page.getByTestId('relationship-list')).toContainText('parent of')
   })
 

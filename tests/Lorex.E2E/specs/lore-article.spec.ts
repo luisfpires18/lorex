@@ -176,7 +176,12 @@ test.describe('lore article', () => {
     await page.getByTestId('save-entity').click()
     await expect(page.getByTestId('entry-summary')).toContainText('drowned coast')
     expect(await readArticle(page, universeId, entityId)).toEqual(before)
+
+    // The entry's versions are their own view, and say so: the article's history is not in them.
+    await page.getByTestId('entry-view-history').click()
     await expect(page.getByTestId('history-article-note')).toContainText('its own history')
+    await expect(page.getByTestId('article-history-toggle')).toHaveCount(0)
+    await page.getByTestId('entry-view-article').click()
 
     // Search finds a word only the article holds, and says where it was found.
     await page.getByTestId('workspace-lore').click()

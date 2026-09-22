@@ -456,9 +456,56 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     folds into a disclosure. `useLeaveGuard` asks before a link or page unload drops unsaved prose; Back/Forward too since ADR 0028's amendment.
   - Backup format version 8: a v7 reader would lose every word. ADR 0014.
 
+## Stabilization pass 001 - real-world UX
+
+Not a phase. AI work is not active. Lorex is being used to migrate a real world into it, and what that
+turns up is fixed here. Branch `fix/entity-detail-and-relationship-integrity`, off `dev` at `d1f04ca`.
+Two issues, both from actual use; the owner's testing log lives outside this repository.
+
+- **UX-001 - the entry page reads as one record.** Hierarchy and routing, no schema, API, Canon, backup or
+  search change. ADR 0028's amendment is authoritative.
+  - One header: "Lore / Character" as metadata above the title, the Canon control at its far end, then the
+    name, aliases and summary. Under it one bar - the entry's views on the left, Edit, Family tree and Move
+    to Trash on the right, the Trash one quiet and turning danger-coloured only under the pointer. All of it
+    above the article, so all of it is on screen unscrolled at 390px and 1440px however long the entry grows.
+  - Three addresses: `/lore/{id}` (Article, the default), `/lore/{id}/relations`, `/lore/{id}/history`. Routed
+    links with `aria-current="page"`, not a tablist. Every existing deep link lands where it did. No stored
+    "selected view" anywhere - it is in the address and nowhere else.
+  - The two histories stay two: the article's own is under the article, on the Article view; History is the
+    entry's structured versions and still says so.
+  - `useLeaveGuard` already watched every same-origin link, so the views are guarded with no new code: one
+    question per departure, the text kept when the author stays. While the article is being written the entry's
+    tools step aside, as they always have, so Move to Trash - the one way out that is not a link - cannot be
+    taken with unsaved writing behind it.
+  - The picture is centred in the article's column, shrink-wrapped by its own border, bounded by
+    `max-height: min(22rem, 45vh)`. Only maxima, so a small picture is shown at its own size. Space is still
+    reserved before it loads, from the `width`/`height` attributes rather than from a fixed band. No picture,
+    no plate.
+- **BUG-001 - a relationship is stored once.** The same biological parent link could be recorded twice, once in
+  Relations and once from the family tree, and the tree then showed the same child twice. ADR 0008's amendment
+  is authoritative.
+  - Identity: `UniverseId` + `RelationshipTypeId` + `SourceEntityId` + `TargetEntityId`, by id, never by a
+    kind's wording. Canon status, notes and dates describe the one link rather than telling it from another and
+    are deliberately out of the key. A symmetric kind's reversed pair is the same link, because it is stored
+    once for that reason.
+  - Enforced on the relationship routes, creates and edits alike: 409 `relationship_already_exists`, carrying
+    the id of the link already there. That is every way one is created - Relations, the family tree's Add family
+    connection, and a hand-written request. Both forms already showed a refusal's own words, so the frontend
+    needed no change.
+  - **No unique index, deliberately.** Databases written before the rule hold duplicates their authors wrote,
+    and the only way to make an index fit them is to delete those rows. Restore is the same argument: a v1-v14
+    backup may carry duplicates the importer accepted, and it still restores exactly as it did, because a
+    restore writes rows rather than posting to the route. The cost, bounded and stated: two creates racing each
+    other can both read no duplicate and both write, on a database SQLite gives one writer.
+  - Nothing is cleaned up. No migration, no backup version bump - this adds no authored field. A stored
+    duplicate is still listed, editable and removable, by its author. The family tree collapses links that say
+    the same thing while deriving, so it draws one line and lists one child; that is a read and deletes nothing.
+
 ## Baseline
 
-- **986 API integration tests, 155 Playwright tests**, green. Family Trees full Playwright run on the dev database: 151/155 -
+- **999 API integration tests, 161 Playwright tests**, green. Stabilization pass 001's full Playwright run, on a
+  database of its own (`LOREX_E2E_DB`), at Playwright's default workers: **161/161, no failure and nothing logged about
+  a locked database**. The whole API suite is green in Release too. Before it, the Family Trees full run on the dev database: 151/155 -
   canon, content-recovery, pwa and type-filter, none of which touches a family tree; all four passed on a serial rerun, which
   itself lost one canon test at sign-up, and canon passed 6/6 alone. Two genuine failures were found and fixed first: the restore
   screen's preview still expected "Version 13", and the "newer Lorex" file it refuses was written at version 14, which the format

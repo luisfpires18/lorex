@@ -55,6 +55,11 @@ function entryUrl(universeId: string, entityId: string) {
   return `/app/universes/${universeId}/lore/${entityId}`
 }
 
+/** An entry's Relations view, which is where its links are read and written. */
+function relationsUrl(universeId: string, entityId: string) {
+  return `${entryUrl(universeId, entityId)}/relations`
+}
+
 // ---------- Setup through the API, for what a test is not about ----------
 
 /** Gives the Character type a Born field that declares a birth year, and returns the type's id. */
@@ -193,7 +198,7 @@ async function link(
   reading: string,
   targetName: string,
 ) {
-  await page.goto(entryUrl(universeId, sourceId))
+  await page.goto(relationsUrl(universeId, sourceId))
   await page.getByTestId('add-relationship').click()
   await page.getByLabel('Reading').selectOption({ label: reading })
   await page.getByTestId('picker-input').click()

@@ -1954,6 +1954,17 @@ a {
   margin-bottom: 1.5rem;
 }
 
+/* On an entry the crumb is one word beside the type, inside the header, so it reads as the entry's
+   own metadata rather than as a line hovering above the page. The story page keeps the margin. */
+.entry__kind .entry__crumbs {
+  margin-bottom: 0;
+}
+
+.entry__kind .entry__crumbs::after {
+  content: '\2009/\2009';
+  color: var(--muted);
+}
+
 .entry__crumbs a {
   color: var(--muted);
   text-decoration: none;
@@ -1969,12 +1980,19 @@ a {
   padding-bottom: 1.5rem;
 }
 
+/* Where the entry says what it is: the crumb back to the lore, the type, and the Canon control pushed
+   to the far end. One line on a desktop, two on a phone, and the same three things either way. */
 .entry__kind {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  gap: 0.35rem 1rem;
   flex-wrap: wrap;
+}
+
+/* Scoped: `.canon` is also the relation and family-connection forms' status control, where it is an
+   ordinary field and must not be pushed anywhere. */
+.entry__kind .canon {
+  margin-left: auto;
 }
 
 .entry__type {
@@ -2073,30 +2091,34 @@ a {
   border-color: var(--accent);
 }
 
-/* The full picture, under the title and above the two columns. It is placed here rather than
-   in the rail on purpose: the rail drops below the article on a narrow screen, which would put
-   a character's portrait several thousand pixels beneath their name on a phone.
+/* The full picture, opening the article it belongs to. It is placed here rather than in the rail on
+   purpose: the rail drops below the article on a narrow screen, which would put a character's portrait
+   several thousand pixels beneath their name on a phone.
 
-   A band of fixed height rather than a box that fits the image, for two reasons. It reserves
-   its space before the picture has loaded, so the article never jumps down the page as one
-   arrives - an image sized by its own content cannot do that, because its intrinsic size is
-   zero until the bytes are in. And it gives every entry the same rhythm, so a tall portrait
-   and a wide landscape read as the same kind of plate rather than as two different layouts. */
+   The plate is the picture, not a band the picture sits in. A fixed-height band left a tall portrait as
+   a strip at one edge with the rest of the row empty, which read as an accident rather than a placement.
+   Shrink-wrapped and centred in the article's column instead: the border is on the picture, the space
+   around it is even, and an entry with no picture has no plate at all rather than an empty one.
+
+   Nothing jumps as it loads. The `width` and `height` attributes give the browser the picture's shape
+   before a byte of it arrives, so the room it will take is already reserved - which is what the band was
+   for, done by the picture's own proportions instead of by one number for every entry.
+
+   Bounded, never stretched: `max-height` holds a portrait to a readable height and `max-width` holds a
+   landscape inside the column, and because only maxima are set a small picture is shown at its own size
+   rather than blown up to fill a frame. */
 .entry__plate {
-  margin: 2rem 0 0;
-  height: 22rem;
-  max-height: 55vh;
+  margin: 0 auto;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .entry__plate img {
   display: block;
-  height: 100%;
   width: auto;
+  height: auto;
   max-width: 100%;
-  /* Contain, never crop: the dossier is where the author looks at the whole picture. Anchored
-     left, because the plate sits in a left-aligned column of prose. */
-  object-fit: contain;
-  object-position: left center;
+  max-height: min(22rem, 45vh);
   border: 1px solid var(--rule);
   background: var(--surface);
 }
@@ -2307,12 +2329,73 @@ a {
   border-top: 1px solid var(--rule);
 }
 
+/* One bar under the identity: the entry's three views on the left, and what can be done to the entry
+   itself on the right. The story page's bar, which is the same idea one screen over. */
+.entry__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.6rem 1.5rem;
+  margin-top: 1.25rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.entry__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding-bottom: 0.45rem;
+}
+
+/* A link styled as a button is still a link, and would otherwise carry an underline the buttons
+   beside it do not. The story page's tools say the same thing one screen over. */
+.entry__tools a.button--quiet {
+  text-decoration: none;
+}
+
+/* Available, and plainly the last of the three. No border and the muted ink every quiet label uses,
+   turning to the danger colour only under the pointer that is about to press it. */
+.entry__trash.button--quiet {
+  border-color: transparent;
+  color: var(--muted);
+}
+
+.entry__trash.button--quiet:hover:not(:disabled),
+.entry__trash.button--quiet:focus-visible {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
 .entry__layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 16rem;
   gap: 2.5rem;
   margin-top: 2rem;
   align-items: start;
+}
+
+/* The article's column: the picture, then the prose. One box so the picture centres on the article's
+   measure rather than on the whole page, which is what left it stranded beside an empty rail. */
+.entry__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  min-width: 0;
+}
+
+/* Relations and History are the page when they are open, so the rule each one draws above itself -
+   which separated it from the article when all three were stacked - would only double the bar's. */
+.entry__view {
+  margin-top: 0.5rem;
+}
+
+.entry__view > .relations,
+.entry__view > .history {
+  margin-top: 1.5rem;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .entry__blank {
@@ -2381,11 +2464,11 @@ a {
   border-top: 1px solid var(--rule);
 }
 
-/* A dossier is the tallest screen in the product: article, relations and history put
-   Edit and Move to Trash - and, in the editor, Save and Cancel - three thousand pixels
-   below the fold on a phone. Sticking the footer to the bottom edge keeps the one action
-   the screen exists for in reach at any scroll position, and because it is sticky rather
-   than fixed it still sits in the flow and releases at the end of the page. */
+/* The entry's form is long - a picture, aliases, tags and every field its type declares - so on a
+   phone Save and Cancel sit a long way down it. Sticking the bar to the bottom edge keeps them in
+   reach at any scroll position, and because it is sticky rather than fixed it still sits in the flow
+   and releases at the end of the form. The entry's own actions are not here and never come back: they
+   are in the header, which is what stopped them depending on how much had been written. */
 @media (max-width: 860px) {
   .entry__actions {
     position: sticky;
@@ -3550,10 +3633,12 @@ a {
     gap: 2rem;
   }
 
-  /* Shorter, so the picture introduces the article on a phone instead of filling the screen
-     and pushing every word of it below the fold. */
-  .entry__plate {
-    height: 15rem;
+  /* Shorter, so the picture introduces the article on a phone instead of filling the screen and
+     pushing every word of it below the fold. A maximum, not a height: the plate is the picture
+     now, and pinning the figure to a height the picture does not have either leaves dead space
+     under a landscape or lets a portrait run straight over the article beneath it. */
+  .entry__plate img {
+    max-height: 15rem;
   }
 
   .entry__rail {
@@ -4834,15 +4919,18 @@ a.lorechip--pov:focus-visible .lorechip__name {
 
 /* ---------- A story's views, and its plot ---------- */
 
-/* Scenes | Plot | Manuscript: plain links in the story's bar, the current one underlined on the bar's own rule. Links,
-   not tabs, because each view has its own address. */
-.storyviews {
+/* Scenes | Plot | Manuscript, and Article | Relations | History: plain links in the page's bar, the current one underlined
+   on the bar's own rule. Links, not tabs, because each view has its own address - so Back, a reload and a shared link all
+   land where the reader was, and `aria-current` says which one that is without a tablist's keyboard contract. */
+.storyviews,
+.entryviews {
   display: flex;
   flex-wrap: wrap;
   gap: 0 1.6rem;
 }
 
-.storyviews__link {
+.storyviews__link,
+.entryviews__link {
   margin-bottom: -1px;
   padding: 0.45rem 0.05rem;
   border-bottom: 2px solid transparent;
@@ -4852,23 +4940,28 @@ a.lorechip--pov:focus-visible .lorechip__name {
 }
 
 @media (max-width: 640px) {
-  .storyviews {
+  .storyviews,
+  .entryviews {
     column-gap: 1.15rem;
   }
 }
 
 .storyviews__link:hover,
-.storyviews__link:focus-visible {
+.storyviews__link:focus-visible,
+.entryviews__link:hover,
+.entryviews__link:focus-visible {
   color: var(--ink);
 }
 
-.storyviews__link[aria-current='page'] {
+.storyviews__link[aria-current='page'],
+.entryviews__link[aria-current='page'] {
   color: var(--ink);
   border-bottom-color: var(--accent);
 }
 
 @media (pointer: coarse) {
-  .storyviews__link {
+  .storyviews__link,
+  .entryviews__link {
     display: inline-flex;
     align-items: center;
     min-height: 2.75rem;

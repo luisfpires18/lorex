@@ -159,8 +159,8 @@ export function EntityHistory({
       </div>
 
       <p className="history__quiet" data-testid="history-article-note">
-        Versions of this entry&rsquo;s details. The article keeps its own history, under the
-        article.
+        Versions of this entry&rsquo;s details. The article keeps its own history, on the Article
+        view.
       </p>
 
       {carriesImages ? (
