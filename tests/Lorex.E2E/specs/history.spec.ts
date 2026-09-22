@@ -51,16 +51,22 @@ test.describe('history', () => {
     await page.getByTestId('save-entity').click()
     await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
 
-    // Creating the entry is its first version.
+    // Creating the entry is its first version. History is the entry's third view, at its own address.
+    await page.getByTestId('entry-view-history').click()
+    await page.waitForURL(/\/lore\/[0-9a-f-]+\/history$/)
     await expect(version(page, 1)).toContainText('Created')
     await expect(page.getByTestId('history-list').locator('li')).toHaveCount(1)
 
-    // An edit adds one, and says what moved without diffing anything.
+    // Edit is in the entry's header, so it is pressed from here - and opens the form where the
+    // details it edits are shown, which is the Article view.
     await page.getByTestId('edit-entity').click()
+    await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
     await page.getByLabel('Summary').fill('Warden of the drowned coast, and its last cartographer.')
     await page.getByTestId('save-entity').click()
     await expect(page.getByTestId('entry-summary')).toContainText('last cartographer')
 
+    // An edit adds a version, and says what moved without diffing anything.
+    await page.getByTestId('entry-view-history').click()
     await expect(page.getByTestId('history-list').locator('li')).toHaveCount(2)
     await expect(version(page, 2)).toContainText('Changed the summary')
 

@@ -104,6 +104,14 @@ function Root() {
               <Route path="lore" element={asSection('lore', <LorePage />)} />
               <Route path="lore/new" element={asSection('entry', <EntityPage />)} />
               <Route path="lore/:entityId" element={asSection('entry', <EntityPage />)} />
+              <Route
+                path="lore/:entityId/relations"
+                element={asSection('entry', <EntityPage view="relations" />)}
+              />
+              <Route
+                path="lore/:entityId/history"
+                element={asSection('entry', <EntityPage view="history" />)}
+              />
               <Route path="family-tree" element={asSection('family-tree', <FamilyTreePage />)} />
               <Route
                 path="family-tree/:entityId"

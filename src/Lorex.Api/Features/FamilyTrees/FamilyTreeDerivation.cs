@@ -5,6 +5,7 @@ namespace Lorex.Api.Features.FamilyTrees;
 /// <summary>One explicit parent link, reduced to what derivation reads: ids and the family meaning. Never a name.</summary>
 public sealed record FamilyLink(
     Guid RelationshipId,
+    Guid RelationshipTypeId,
     Guid ParentEntityId,
     Guid ChildEntityId,
     RelationshipFamilySemantic Semantic);
@@ -36,7 +37,7 @@ public static class FamilyTreeDerivation
 {
     public static DerivedFamily Relatives(Guid focalEntityId, IEnumerable<FamilyLink> links)
     {
-        var distinct = links.DistinctBy(link => link.RelationshipId).ToList();
+        var distinct = Distinct(links);
         var byChild = distinct.ToLookup(link => link.ChildEntityId);
         var byParent = distinct.ToLookup(link => link.ParentEntityId);
 
@@ -68,7 +69,7 @@ public static class FamilyTreeDerivation
     /// </summary>
     public static IReadOnlyList<DerivedLoop> Loops(IEnumerable<FamilyLink> links)
     {
-        var distinct = links.DistinctBy(link => link.RelationshipId).ToList();
+        var distinct = Distinct(links);
         var successors = distinct
             .GroupBy(link => link.ParentEntityId)
             .ToDictionary(
@@ -168,6 +169,28 @@ public static class FamilyTreeDerivation
     }
 
     private static IReadOnlyList<Guid> Path(params FamilyLink[] steps) => [.. steps.Select(step => step.RelationshipId)];
+
+    /// <summary>
+    /// The links to walk: each row once, and each connection once.
+    /// </summary>
+    /// <remarks>
+    /// The second of those is for stored data alone. Nothing can author the same kind between the same two
+    /// entries twice any more - the relationship routes refuse it - but databases written before that rule
+    /// existed hold pairs that were, and those rows stay exactly where their author put them: readable in
+    /// Relations, editable, removable. A tree simply stops drawing the same connection twice and stops
+    /// listing the same person as a child twice, which is all the duplicate was ever visible as.
+    ///
+    /// Same kind, same pair, same way round - the relationship routes' rule, by id, so two different kinds
+    /// that happen to carry the same family meaning stay two connections and are both drawn. Ordered before
+    /// the collapse so the row that survives is the same row on every read.
+    /// </remarks>
+    private static List<FamilyLink> Distinct(IEnumerable<FamilyLink> links) =>
+    [
+        .. links
+            .DistinctBy(link => link.RelationshipId)
+            .OrderBy(link => Key(link.RelationshipId), StringComparer.Ordinal)
+            .DistinctBy(link => (link.RelationshipTypeId, link.ParentEntityId, link.ChildEntityId)),
+    ];
 
     /// <summary>
     /// One relative per entry, never the focal entry, each path once. Ordered by id here; whoever names them orders them by name.

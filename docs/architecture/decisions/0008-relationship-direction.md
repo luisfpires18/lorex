@@ -54,3 +54,48 @@ is judged on: the meaning says the source is the parent and the target the child
 is needed to write a link from the child's side - the kind's own inverse name is what reads it back that way.
 A symmetric kind may not carry a family meaning, for the reason it may not carry an age order (ADR 0023): it
 says neither end is special. The family tree reads these rows and writes none of its own.
+
+## Amendment - one link, stored once (2026-09-22)
+
+Found by using Lorex to migrate a real world into it: the same biological parent link could be recorded twice -
+once in an entry's Relations, once from the family tree's Add family connection - and the tree then showed the
+same child twice. Two rows, one connection, and nothing refused either.
+
+**What makes two links the same link.** The kind between the same two ends the same way round: `UniverseId`,
+`RelationshipTypeId`, `SourceEntityId`, `TargetEntityId`. Read from ids alone, never from a kind's wording,
+which means nothing here for the reason it means nothing to a family tree or an age order.
+
+Everything else a link carries describes that one link rather than telling it from another. Its Canon status is
+how settled it is, and one link cannot be both settled and not. Its notes are what is worth remembering about
+it, and the same connection recorded twice with different notes is one connection whose notes were split in
+half. Its dates are the span it held, and a link that resumed is an edit to that span rather than a second
+edge - which is also why the dates are deliberately out of the key: leaving them in would let the very
+duplicate this refuses through, by typing a date into one of them.
+
+Two links between the same pair stay legal whenever anything in that key differs: a second kind ("raised"
+beside "bore", "commander of" beside "member of"), two kinds that happen to carry the same family meaning
+("mother of" and "father of"), or the other direction for a kind where direction means something. The one place
+direction does not mean anything is a symmetric kind, whose two readings are one sentence and which this
+decision stores once for exactly that reason - so for one of those, the reversed pair is the same link and is
+refused too.
+
+**Where it is enforced, and why not in the database.** On the relationship routes, for creates and for edits
+alike: an edit that re-points one end or changes the kind can arrive at a copy of its neighbour just as surely
+as a create can. Both answer 409 with the code `relationship_already_exists` and the id of the link that is
+already there, so a client can offer to open the one the author meant. That covers every way a relationship is
+ever created - an entry's Relations, the family tree's Add family connection, and a request written by hand -
+because all three post to the same route.
+
+Not a unique index, and this is the trade. Every database written before this rule may already hold duplicates
+that an author authored, and a migration adding the index would fail against exactly those databases. The only
+way to make it fit is to delete rows a person wrote, which is not ours to do. A restore is the same argument
+from the other side: a backup from v1-v14 may carry duplicates the importer accepted at the time, and it still
+restores exactly as it did, because the restore writes rows rather than posting to this route. So the route is
+the rule. The cost is bounded and stated: two creates racing each other can both read no duplicate and both
+write, on a database SQLite gives one writer and one person is authoring into.
+
+**What already exists is left alone.** No migration, no cleanup, no backup format change - this adds no authored
+field. A duplicate already stored is a stored row like any other: both are listed in Relations, both are
+editable, and either can be removed, by the author, deliberately. The one thing that changes for them is the
+family tree, which collapses links that say the same thing when it derives a family, so a duplicate is drawn
+once and a child is listed once. That is a read, decided the same way on every read, and it deletes nothing.

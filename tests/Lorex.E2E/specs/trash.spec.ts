@@ -65,7 +65,7 @@ test.describe('trash', () => {
     const warden = await newEntry(page, universeId, 'Gatewarden', 'Keeper of the high wall.')
     const gate = await newEntry(page, universeId, 'Northern Gate')
 
-    await page.goto(`/app/universes/${universeId}/lore/${warden}`)
+    await page.goto(`/app/universes/${universeId}/lore/${warden}/relations`)
     await page.getByTestId('add-relationship').click()
     await page.getByLabel('Reading').selectOption({ label: 'keeps' })
     await page.getByTestId('picker-input').click()
@@ -101,7 +101,7 @@ test.describe('trash', () => {
     await expect(page.getByTestId('entity-missing')).toBeVisible()
 
     // The relationship went with it - hidden, not destroyed, which is the next assertion.
-    await page.goto(`/app/universes/${universeId}/lore/${warden}`)
+    await page.goto(`/app/universes/${universeId}/lore/${warden}/relations`)
     await expect(page.getByTestId('relations-empty')).toBeVisible()
 
     // One click, from the Trash.
@@ -117,9 +117,10 @@ test.describe('trash', () => {
     await expect(page.getByTestId('entry-name')).toHaveText('Northern Gate')
 
     // ...and the connection came back with it, from both readings, without being re-authored.
+    await page.goto(`/app/universes/${universeId}/lore/${gate}/relations`)
     await expect(page.locator('[data-relation-label="kept by"]')).toContainText('Gatewarden')
 
-    await page.goto(`/app/universes/${universeId}/lore/${warden}`)
+    await page.goto(`/app/universes/${universeId}/lore/${warden}/relations`)
     await expect(page.locator('[data-relation-label="keeps"]')).toContainText('Northern Gate')
   })
 })

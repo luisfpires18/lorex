@@ -29,9 +29,26 @@ namespace Lorex.Api.Features.Relationships;
 /// Reconciling is a separate question from gating, and the answer here is yes: a Medium
 /// finding is still a finding, and the conflict table has to describe the relationship that
 /// was just written rather than the one that was there before.
+///
+/// One link is stored once. A create or an edit that would leave two rows saying the same thing is
+/// refused as 409 <c>relationship_already_exists</c> - see <see cref="FindDuplicateAsync"/> for what
+/// "the same thing" is. It is enforced here rather than by a unique index, because every database
+/// written before this rule existed may already hold duplicates an author authored, and no migration
+/// of ours is going to delete those to make an index fit. So this route is the rule, and it is the
+/// only way a relationship is ever created: the entry's Relations view and the family tree's Add
+/// connection both post here, and a restore deliberately does not, so a backup written before the
+/// rule still restores exactly as it always did.
+///
+/// What that costs, and it is the whole cost: two creates racing each other can both read no
+/// duplicate and both write. SQLite takes one writer at a time, so the window is the gap between this
+/// read and that write, on a database one person is authoring into. A duplicate that does land is a
+/// stored row like any other - shown, editable, removable, and drawn once by a family tree.
 /// </summary>
 public static class RelationshipEndpoints
 {
+    /// <summary>The refusal an exact duplicate gets, so a client can tell it from any other conflict.</summary>
+    public const string DuplicateCode = "relationship_already_exists";
+
     public static IEndpointRouteBuilder MapRelationshipEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/universes/{universeId:guid}/relationships")
@@ -131,6 +148,11 @@ public static class RelationshipEndpoints
             return Results.ValidationProblem(unresolved);
         }
 
+        if (await FindDuplicateAsync(db, universeId, request, null, cancellationToken) is { } existing)
+        {
+            return AlreadyExists(existing);
+        }
+
         var now = DateTime.UtcNow;
         var relationship = new LoreRelationship
         {
@@ -200,6 +222,14 @@ public static class RelationshipEndpoints
         if (await ResolveReferencesAsync(db, universeId, request, cancellationToken) is { } unresolved)
         {
             return Results.ValidationProblem(unresolved);
+        }
+
+        // An edit can arrive at a link that is already stored just as surely as a create can - re-point one
+        // end, or change the kind, and it becomes a copy of its neighbour. Same rule, same refusal, and this
+        // row is not its own duplicate.
+        if (await FindDuplicateAsync(db, universeId, request, relationshipId, cancellationToken) is { } existing)
+        {
+            return AlreadyExists(existing);
         }
 
         relationship.RelationshipTypeId = request.RelationshipTypeId;
@@ -273,6 +303,68 @@ public static class RelationshipEndpoints
                 && candidate.SourceEntity!.DeletedAt == null
                 && candidate.TargetEntity!.DeletedAt == null,
             cancellationToken);
+
+    // ---------- Duplicates ----------
+
+    /// <summary>
+    /// The link this request would be a second copy of, if there is one.
+    /// </summary>
+    /// <remarks>
+    /// A relationship is the same relationship as another when it is the same kind between the same two ends,
+    /// the same way round: <c>UniverseId</c>, <c>RelationshipTypeId</c>, <c>SourceEntityId</c>,
+    /// <c>TargetEntityId</c>. That is the whole of its identity, and it is read from ids alone - never from a
+    /// kind's wording, which means nothing here as it means nothing to a family tree or an age order.
+    ///
+    /// Everything else a link carries describes that one link rather than distinguishing it. Its Canon status
+    /// is how settled it is, and one link cannot be both settled and not. Its notes are what is worth
+    /// remembering about it, and the same connection recorded twice with different notes is one connection
+    /// whose notes were split in half. Its dates are the span it held, and a link that resumed is an edit to
+    /// that span, not a second edge - which is also why the dates are deliberately out of the key: leaving
+    /// them in would let the very duplicate this exists to refuse through, by typing a date into one of them.
+    ///
+    /// Two links between the same pair stay perfectly legal when anything in that key differs: a different
+    /// kind ("adoptive parent" beside "biological parent", "commander of" beside "member of"), or the other
+    /// direction for a kind where direction means something. The one place direction does not mean anything
+    /// is a symmetric kind, whose two readings are the same sentence and which is stored once for exactly
+    /// that reason (ADR 0008) - so for one of those, the reversed pair is the same link and is refused too.
+    ///
+    /// Scoped to the universe the caller has already been proved to own, so a tuple stored in another
+    /// universe - or another account's - is not a conflict here and its existence is never disclosed.
+    /// </remarks>
+    private static async Task<Guid?> FindDuplicateAsync(
+        LorexDbContext db,
+        Guid universeId,
+        RelationshipRequest request,
+        Guid? excluding,
+        CancellationToken cancellationToken) =>
+        await db.Relationships.AsNoTracking()
+            .Where(candidate => candidate.UniverseId == universeId
+                && candidate.RelationshipTypeId == request.RelationshipTypeId
+                && (excluding == null || candidate.Id != excluding)
+                && ((candidate.SourceEntityId == request.SourceEntityId
+                        && candidate.TargetEntityId == request.TargetEntityId)
+                    || (candidate.RelationshipType!.IsSymmetric
+                        && candidate.SourceEntityId == request.TargetEntityId
+                        && candidate.TargetEntityId == request.SourceEntityId)))
+            .OrderBy(candidate => candidate.CreatedAt)
+            .Select(candidate => (Guid?)candidate.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    /// <summary>
+    /// The refusal for a link that is already stored. It names the link that is there, so a client can offer
+    /// to open the one the author meant rather than only saying no.
+    /// </summary>
+    private static IResult AlreadyExists(Guid relationshipId) =>
+        Results.Problem(
+            title: "Relationship already exists",
+            detail: "This relationship already exists. Edit the one that is already there, "
+                + "or choose a different connection.",
+            statusCode: StatusCodes.Status409Conflict,
+            extensions: new Dictionary<string, object?>
+            {
+                ["code"] = DuplicateCode,
+                ["relationshipId"] = relationshipId,
+            });
 
     // ---------- Ownership ----------
 

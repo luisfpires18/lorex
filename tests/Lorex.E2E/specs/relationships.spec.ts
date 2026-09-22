@@ -68,8 +68,12 @@ async function newEntry(page: Page, universeId: string, name: string) {
   return page.url().split('/').pop()!
 }
 
+/**
+ * An entry's Relations view, which is where every relation in this file is read and written. It is an
+ * address of its own, so these tests go straight to it rather than opening the entry and clicking.
+ */
 function entryUrl(universeId: string, entityId: string) {
-  return `/app/universes/${universeId}/lore/${entityId}`
+  return `/app/universes/${universeId}/lore/${entityId}/relations`
 }
 
 /** One row in the Relations list, found by the wording it carries on this entry. */

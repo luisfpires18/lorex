@@ -65,6 +65,11 @@ function entryUrl(universeId: string, entityId: string) {
   return `/app/universes/${universeId}/lore/${entityId}`
 }
 
+/** An entry's Relations view, which is where its links are read and written. */
+function relationsUrl(universeId: string, entityId: string) {
+  return `${entryUrl(universeId, entityId)}/relations`
+}
+
 // ---------- Authoring through the UI ----------
 
 interface EntryInput {
@@ -145,7 +150,7 @@ async function link(
   targetName: string,
   canon: keyof typeof Canon,
 ) {
-  await page.goto(entryUrl(universeId, sourceId))
+  await page.goto(relationsUrl(universeId, sourceId))
   await page.getByTestId('add-relationship').click()
   await page.getByLabel('Reading').selectOption({ label: reading })
   await page.getByTestId('picker-input').click()
@@ -652,7 +657,7 @@ test.describe('canon integrity', () => {
     await expect(finding(page, 'warded')).toBeVisible()
 
     // Deleting the relationship takes the finding away with it, without an Evaluate.
-    await page.goto(entryUrl(universeId, warden))
+    await page.goto(relationsUrl(universeId, warden))
     page.once('dialog', (dialog) => void dialog.accept())
     await page.getByTestId('delete-relationship-Hollow Gate').click()
     await expect(page.getByTestId('relations-empty')).toBeVisible()

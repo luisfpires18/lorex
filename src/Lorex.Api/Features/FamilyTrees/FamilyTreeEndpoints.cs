@@ -73,7 +73,10 @@ public static class FamilyTreeEndpoints
                 .ToListAsync(cancellationToken);
 
         var rows = near.Concat(far).DistinctBy(row => row.RelationshipId).ToList();
-        var links = rows.Select(row => new FamilyLink(row.RelationshipId, row.ParentEntityId, row.ChildEntityId, row.Semantic)).ToList();
+        var links = rows
+            .Select(row => new FamilyLink(
+                row.RelationshipId, row.RelationshipTypeId, row.ParentEntityId, row.ChildEntityId, row.Semantic))
+            .ToList();
         var family = FamilyTreeDerivation.Relatives(entityId, links);
 
         // Only links a relative's path walks are drawn or checked for a circle, so the tree says nothing about a link it does

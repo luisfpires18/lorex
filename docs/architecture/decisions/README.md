@@ -66,4 +66,5 @@ search leaves out - account-wide search, unassigned ideas, substrings, a pinned 
 what a restore does not do - overwrite, merge, account-wide or partial restores, background jobs - and the writer lock a very large
 one holds, in 0032, and what a world rule deliberately is not - ordered, prioritised, versioned or read for meaning - in 0033, and
 what a rule's check deliberately is not - a second pattern, a builder, a condition tree, a diagnostic finding, a stale-save token for
-moments - and that it is only as complete as the details authors record, in 0034.
+moments - and that it is only as complete as the details authors record, in 0034, and the duplicate relationships an older
+database may already hold, which nothing deletes and no unique index refuses, in 0008.

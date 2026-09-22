@@ -540,6 +540,7 @@ test.describe('an entry with a picture', () => {
     await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
 
     // Nothing here has ever had a picture, so the note would only be noise.
+    await page.getByTestId('entry-view-history').click()
     await expect(page.getByTestId('history-image-note')).toHaveCount(0)
 
     await page.getByTestId('edit-entity').click()
@@ -548,6 +549,7 @@ test.describe('an entry with a picture', () => {
     await page.getByRole('button', { name: 'Cancel' }).click()
 
     // The version is there, it says what moved, and the panel says what a restore will not do.
+    await page.getByTestId('entry-view-history').click()
     await expect(
       page.getByTestId('history-list').getByTestId('version-what').first(),
     ).toContainText('the image')
