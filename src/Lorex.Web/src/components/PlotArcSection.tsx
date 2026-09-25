@@ -64,7 +64,7 @@ export function PlotArcSection({
         ) : null}
 
         {arc.description ? (
-          <p className="plotarc__description" data-testid="plot-arc-description">
+          <p className="plotarc__description prose" data-testid="plot-arc-description">
             {arc.description}
           </p>
         ) : null}

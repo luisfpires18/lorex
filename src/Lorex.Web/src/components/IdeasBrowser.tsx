@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { Plus } from 'lucide-react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { ActionIcon } from './ActionIcon'
+import { Quoted } from './NameList'
 import { listAllUniverses, listIdeas, restoreIdea } from '../ideas/api'
 import type { IdeaPage, IdeaSummary } from '../ideas/types'
 import { formatDate, formatDateTime } from '../lib/dates'
@@ -12,8 +13,8 @@ type LoadState =
 
 /** What the last restore did, and the way to the idea it brought back. */
 interface Outcome {
-  text: string
-  link: { to: string; label: string } | null
+  text: ReactNode
+  link: { to: string; label: ReactNode } | null
 }
 
 /** What an idea's editor says it did before handing back to the list. */
@@ -154,13 +155,34 @@ export function IdeasBrowser({ universe, basePath }: IdeasBrowserProps) {
     try {
       const restored = await restoreIdea(idea.id)
       setOutcome({
-        text: restored.universe
-          ? `“${restored.title}” is back in your ideas, in “${restored.universe.name}”.`
-          : `“${restored.title}” is back in your ideas.`,
-        link: { to: `${basePath}/${restored.id}`, label: `Open “${restored.title}”` },
+        text: restored.universe ? (
+          <>
+            <Quoted text={restored.title} /> is back in your ideas, in{' '}
+            <Quoted text={restored.universe.name} />.
+          </>
+        ) : (
+          <>
+            <Quoted text={restored.title} /> is back in your ideas.
+          </>
+        ),
+        link: {
+          to: `${basePath}/${restored.id}`,
+          label: (
+            <>
+              Open <Quoted text={restored.title} />
+            </>
+          ),
+        },
       })
     } catch {
-      setOutcome({ text: `“${idea.title}” could not be restored. Try again.`, link: null })
+      setOutcome({
+        text: (
+          <>
+            <Quoted text={idea.title} /> could not be restored. Try again.
+          </>
+        ),
+        link: null,
+      })
     } finally {
       setRestoring(null)
       setReads((current) => current + 1)
@@ -179,9 +201,14 @@ export function IdeasBrowser({ universe, basePath }: IdeasBrowserProps) {
             Ideas
           </h2>
           <p className="chron__lede">
-            {universe
-              ? `Possibilities for “${universe.name}”. An idea is never lore: nothing here changes the world.`
-              : 'Possibilities, kept apart from your lore. An idea can belong to a universe, or to none.'}
+            {universe ? (
+              <>
+                Possibilities for <Quoted text={universe.name} />. An idea is never lore: nothing
+                here changes the world.
+              </>
+            ) : (
+              'Possibilities, kept apart from your lore. An idea can belong to a universe, or to none.'
+            )}
           </p>
           {universe ? (
             <p className="ideas__all">
@@ -200,7 +227,8 @@ export function IdeasBrowser({ universe, basePath }: IdeasBrowserProps) {
       {notice && !deleted ? (
         <div className="notice ideas__notice" data-testid="ideas-deleted-notice">
           <p role="status">
-            “{notice.title}” was deleted. It is in Recently deleted, where you can restore it.
+            <Quoted text={notice.title} /> was deleted. It is in Recently deleted, where you can
+            restore it.
           </p>
         </div>
       ) : null}
@@ -329,7 +357,7 @@ export function IdeasBrowser({ universe, basePath }: IdeasBrowserProps) {
                   </Link>
                 )}
                 {idea.excerpt ? (
-                  <p className="idearow__excerpt" data-testid="idea-excerpt">
+                  <p className="idearow__excerpt prose" data-testid="idea-excerpt">
                     {idea.excerpt}
                     {idea.isExcerptShortened ? '…' : null}
                   </p>

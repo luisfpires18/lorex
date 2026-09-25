@@ -513,7 +513,7 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
             onChange={(event) => setDraft({ ...draft, summary: event.target.value })}
           />
         ) : detail?.summary ? (
-          <p className="entry__summary" data-testid="entry-summary">
+          <p className="entry__summary prose" data-testid="entry-summary">
             {detail.summary}
           </p>
         ) : null}
@@ -698,7 +698,7 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
                     {detail!.fields.map((value) => (
                       <div className="facts__row" key={value.fieldDefinitionId}>
                         <dt className="facts__key">{value.name}</dt>
-                        <dd className="facts__value">{renderFact(value, chronology)}</dd>
+                        <dd className="facts__value prose">{renderFact(value, chronology)}</dd>
                       </div>
                     ))}
                   </dl>

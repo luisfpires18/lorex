@@ -266,7 +266,9 @@ export default function UniverseTypes() {
               ) : null}
             </div>
 
-            {type.description ? <p className="types__description">{type.description}</p> : null}
+            {type.description ? (
+              <p className="types__description prose">{type.description}</p>
+            ) : null}
 
             {iconTypeId === type.id ? (
               <div className="types__iconpanel">

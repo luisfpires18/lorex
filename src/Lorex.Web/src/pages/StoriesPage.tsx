@@ -97,7 +97,7 @@ export default function StoriesPage() {
                 <span className="chip">{STORY_STATUS_LABELS[story.status]}</span>
                 <span data-testid="story-scene-count">{sceneCountLabel(story.sceneCount)}</span>
               </p>
-              {story.premise ? <p className="storyrow__premise">{story.premise}</p> : null}
+              {story.premise ? <p className="storyrow__premise prose">{story.premise}</p> : null}
             </li>
           ))}
         </ul>

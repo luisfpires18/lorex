@@ -1,8 +1,9 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Trash2, X } from 'lucide-react'
 import { ActionIcon } from './ActionIcon'
 import { IdeaReferencePicker } from './IdeaReferencePicker'
+import { Quoted } from './NameList'
 import { RecoveredDraft } from './RecoveredDraft'
 import { useAuth } from '../auth/useAuth'
 import {
@@ -129,7 +130,7 @@ interface IdeaEditorProps {
   contextUniverse: { id: string; name: string } | null
   /** Where this idea's list is, for the way back. */
   listPath: string
-  listLabel: string
+  listLabel: ReactNode
   onCreated: (idea: IdeaDetail) => void
   onDeleted: (idea: { id: string; title: string }) => void
 }
@@ -519,7 +520,9 @@ export function IdeaEditor({
   if (load.kind === 'elsewhere') {
     return (
       <div className="empty" data-testid="idea-not-in-universe">
-        <p className="empty__line">This idea is not in “{contextUniverse?.name}”.</p>
+        <p className="empty__line">
+          This idea is not in <Quoted text={contextUniverse?.name ?? ''} />.
+        </p>
         <p className="empty__hint">
           It belongs to another universe, or to none, so it does not open here.{' '}
           <Link to={`/app/ideas/${ideaId}`}>Open it in all ideas</Link>, or go back to{' '}
@@ -577,9 +580,14 @@ export function IdeaEditor({
         </p>
         {belongsElsewhere ? (
           <p className="idea__elsewhere" data-testid="idea-elsewhere">
-            {stored.universe
-              ? `This idea belongs to “${stored.universe.name}”, not to “${contextUniverse.name}”.`
-              : `This idea belongs to no universe.`}{' '}
+            {stored.universe ? (
+              <>
+                This idea belongs to <Quoted text={stored.universe.name} />, not to{' '}
+                <Quoted text={contextUniverse.name} />.
+              </>
+            ) : (
+              'This idea belongs to no universe.'
+            )}{' '}
             <Link to={`/app/ideas/${ideaId}`}>Open it in all ideas</Link>
           </p>
         ) : null}
@@ -593,7 +601,7 @@ export function IdeaEditor({
             savedUpdatedAt={stored.updatedAt}
             preview={
               <div
-                className="recovery__prose idea__preview"
+                className="recovery__prose idea__preview prose"
                 role="region"
                 aria-label="The recovered draft"
                 tabIndex={0}

@@ -283,7 +283,7 @@ function Snapshot({
         </p>
       ) : null}
 
-      {revision.summary ? <p className="entry__summary">{revision.summary}</p> : null}
+      {revision.summary ? <p className="entry__summary prose">{revision.summary}</p> : null}
 
       {/* Only a version recorded before the article kept its own history holds a copy of it, and a restore never
           applies that copy - so it is shown as what it is, and a version without one says nothing about the article. */}
@@ -301,7 +301,7 @@ function Snapshot({
           {revision.fields.map((value) => (
             <div className="facts__row" key={value.fieldDefinitionId}>
               <dt className="facts__key">{value.name}</dt>
-              <dd className="facts__value">{renderRevisionFact(value, chronology)}</dd>
+              <dd className="facts__value prose">{renderRevisionFact(value, chronology)}</dd>
             </div>
           ))}
         </dl>

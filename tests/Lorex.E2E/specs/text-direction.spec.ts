@@ -718,3 +718,403 @@ test.describe('text direction', () => {
     await expectIsolated(page.getByTestId('story-title'), Text.numbers)
   })
 })
+
+// ---------- Prose: summaries, descriptions, the article and the manuscript ----------
+
+/**
+ * Prose is laid out paragraph by paragraph: each one in the direction of its own first letter, and aligned to that
+ * direction's start, while everything of Lorex's around it stays where it is. One direction for the whole block would
+ * let the first paragraph decide for the rest, so an Arabic paragraph after an English one would still read left to
+ * right - which is why these are several paragraphs, not one.
+ */
+const Prose = {
+  arabic: 'آكرون رايت ذهب إلى المدينة.',
+  hebrew: 'אהרן רייט הלך אל העיר.',
+  mixed: 'آكرون — 12 / Wright قال: نعم!',
+  latinThenRtl: 'Wright met آكرون في المدينة.',
+  english: 'The northern gate remained closed.',
+  year: 'آكرون قال: نعم! ثم عاد إلى المدينة عام 1204.',
+  after: 'Wright remained outside.',
+}
+
+/** Whether an element lays its text out paragraph by paragraph, in each one's own direction. */
+function isParagraphwise(element: Locator) {
+  return element.evaluate((node) => getComputedStyle(node).unicodeBidi)
+}
+
+/** Which side of `element`'s content box the written `text` starts from: where its paragraph is aligned. */
+function sideOf(element: Locator, text: string) {
+  return element.evaluate((node, wanted) => {
+    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT)
+    for (let current = walker.nextNode(); current; current = walker.nextNode()) {
+      const at = (current.textContent ?? '').indexOf(wanted)
+      if (at < 0) continue
+      const range = document.createRange()
+      range.setStart(current, at)
+      range.setEnd(current, at + wanted.length)
+      const drawn = range.getBoundingClientRect()
+      const box = (node as Element).getBoundingClientRect()
+      const style = getComputedStyle(node as Element)
+      const left = box.left + parseFloat(style.paddingLeft) + parseFloat(style.borderLeftWidth)
+      const right = box.right - parseFloat(style.paddingRight) - parseFloat(style.borderRightWidth)
+      if (Math.abs(drawn.left - left) < 2) return 'left'
+      if (Math.abs(right - drawn.right) < 2) return 'right'
+      return 'neither'
+    }
+    throw new Error(`"${wanted}" is not on the page`)
+  }, text)
+}
+
+test.describe('authored prose direction', () => {
+  test.use({ viewport: { width: 1440, height: 900 } })
+
+  test("an entry's summary and article read paragraph by paragraph, are saved exactly as typed, and leave the header alone", async ({
+    page,
+  }) => {
+    await signUp(page)
+    const universeId = await seedUniverse(page, unique('Gate '))
+    const entityId = (
+      await post(page, `/api/universes/${universeId}/entities`, {
+        entityTypeId: await characterTypeId(page, universeId),
+        name: 'Akron Wright',
+        summary: Prose.mixed,
+        canonStatus: Canon.canon,
+        aliases: [],
+        tags: [],
+        fields: [],
+      })
+    ).id
+    await page.goto(`/app/universes/${universeId}/lore/${entityId}`)
+
+    // ---- The summary: right to left, its number and Latin name where they were written, its mark at its end ----
+
+    const summary = page.getByTestId('entry-summary')
+    await expect(summary).toHaveText(Prose.mixed)
+    expect(await isParagraphwise(summary)).toBe('plaintext')
+    // Inherited left to right, the mark hung off the right and the number was thrown to the far end.
+    expect(await drawnOrder(summary, ['!', 'قال', 'Wright', '12', 'آكرون'])).toEqual([
+      '!',
+      'قال',
+      'Wright',
+      '12',
+      'آكرون',
+    ])
+    expect(await sideOf(summary, Prose.mixed)).toBe('right')
+    await expectLorexStaysLeftToRight(page, [
+      page.locator('.entry__kind'),
+      page.getByRole('group', { name: 'Canon status' }),
+      page.getByTestId('entry-views'),
+      page.locator('.entry__tools'),
+    ])
+    const [edit, family] = await lefts(
+      page.getByTestId('edit-entity'),
+      page.getByTestId('entity-family-tree'),
+    )
+    expect(family).toBeGreaterThan(edit)
+
+    // ---- The article, written in the editor: English, Arabic, mixed, Hebrew, English ----
+
+    await page.getByTestId('article-write').click()
+    const editor = page.getByTestId('lore-editor')
+    await expect(editor).toBeFocused()
+    const typed = [Prose.english, Prose.year, Prose.mixed, Prose.hebrew, Prose.after]
+    for (const [index, paragraph] of typed.entries()) {
+      if (index > 0) await page.keyboard.press('Enter')
+      await page.keyboard.type(paragraph)
+    }
+    // While it is written, each paragraph already reads in its own direction.
+    const writing = editor.locator('p')
+    await expect(writing).toHaveText(typed)
+    expect(await isParagraphwise(writing.nth(1))).toBe('plaintext')
+    expect(await sideOf(writing.nth(0), Prose.english)).toBe('left')
+    expect(await sideOf(writing.nth(1), Prose.year)).toBe('right')
+
+    await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().endsWith('/article') &&
+          response.request().method() === 'PUT' &&
+          response.ok(),
+      ),
+      page.keyboard.press('ControlOrMeta+s'),
+    ])
+    await expect(page.getByTestId('article-status')).toHaveText('Saved')
+
+    // Stored exactly as typed: no mark, no direction, nothing added to the document.
+    const stored = (await (
+      await page.request.get(`/api/universes/${universeId}/entities/${entityId}/article`)
+    ).json()) as { content: string }
+    const saved = JSON.parse(stored.content) as {
+      content: { type: string; attrs?: unknown; content: { text: string }[] }[]
+    }
+    expect(saved.content.map((block) => block.type)).toEqual(typed.map(() => 'paragraph'))
+    expect(saved.content.map((block) => block.content[0].text)).toEqual(typed)
+    expect(stored.content).not.toContain('"dir"')
+    expect(stored.content).not.toMatch(/[‎‏‪-‮⁦-⁩]/)
+
+    // ---- Read back after a reload ----
+
+    await page.reload()
+    const read = page.getByTestId('lore-article').locator('p')
+    await expect(read).toHaveText(typed)
+    expect(await sideOf(read.nth(0), Prose.english)).toBe('left')
+    expect(await sideOf(read.nth(1), Prose.year)).toBe('right')
+    expect(await sideOf(read.nth(2), Prose.mixed)).toBe('right')
+    expect(await sideOf(read.nth(3), Prose.hebrew)).toBe('right')
+    expect(await sideOf(read.nth(4), Prose.after)).toBe('left')
+    // The full stop ends the Arabic sentence on its left, and the year is where it was written.
+    expect(await drawnOrder(read.nth(1), ['.', '1204', 'آكرون'])).toEqual(['.', '1204', 'آكرون'])
+    expect(await drawnOrder(read.nth(2), ['!', 'Wright', '12', 'آكرون'])).toEqual([
+      '!',
+      'Wright',
+      '12',
+      'آكرون',
+    ])
+    expect(await drawnOrder(read.nth(3), ['.', 'אהרן'])).toEqual(['.', 'אהרן'])
+    expect(await scrollsSideways(page)).toBe(false)
+  })
+
+  test("an article's heading, marks, lists and quotes keep their formatting and each reads in its own direction", async ({
+    page,
+  }) => {
+    await signUp(page)
+    const universeId = await seedUniverse(page, unique('Lists '))
+    const entityId = await seedEntity(page, universeId, 'Akron Wright')
+    const text = (value: string, marks?: { type: string }[]) => ({
+      type: 'text',
+      text: value,
+      marks,
+    })
+    const paragraph = (...content: object[]) => ({ type: 'paragraph', content })
+    const response = await page.request.put(
+      `/api/universes/${universeId}/entities/${entityId}/article`,
+      {
+        data: {
+          content: JSON.stringify({
+            type: 'doc',
+            content: [
+              { type: 'heading', attrs: { level: 2 }, content: [text('البيت السابع 7')] },
+              paragraph(text('آكرون '), text('(Wright)', [{ type: 'bold' }]), text(' عاد.')),
+              {
+                type: 'bulletList',
+                content: [
+                  { type: 'listItem', content: [paragraph(text(Prose.hebrew))] },
+                  { type: 'listItem', content: [paragraph(text(Prose.latinThenRtl))] },
+                ],
+              },
+              { type: 'blockquote', content: [paragraph(text(Prose.arabic))] },
+            ],
+          }),
+          expectedUpdatedAt: null,
+        },
+      },
+    )
+    expect(response.ok()).toBe(true)
+
+    await page.goto(`/app/universes/${universeId}/lore/${entityId}`)
+    const article = page.getByTestId('lore-article')
+    await expect(article.locator('h2')).toHaveText('البيت السابع 7')
+    expect(await sideOf(article.locator('h2'), 'البيت السابع 7')).toBe('right')
+    await expect(article.locator('strong')).toHaveText('(Wright)')
+    expect(await sideOf(article.locator('p').first(), 'آكرون')).toBe('right')
+
+    const items = article.locator('li p')
+    await expect(items).toHaveText([Prose.hebrew, Prose.latinThenRtl])
+    expect(await sideOf(items.nth(0), Prose.hebrew)).toBe('right')
+    expect(await sideOf(items.nth(1), Prose.latinThenRtl)).toBe('left')
+    const quote = article.locator('blockquote p')
+    expect(await sideOf(quote, Prose.arabic)).toBe('right')
+    expect(await drawnOrder(quote, ['.', 'آكرون'])).toEqual(['.', 'آكرون'])
+
+    // The list and the quote are Lorex's blocks: they stay inside the column and do not turn around.
+    expect(await computedDirection(article.locator('ul'))).toBe('ltr')
+    expect(await computedDirection(article.locator('blockquote'))).toBe('ltr')
+    const column = (await article.boundingBox())!
+    for (const block of [article.locator('ul'), article.locator('blockquote')]) {
+      const box = (await block.boundingBox())!
+      expect(box.x).toBeGreaterThanOrEqual(column.x - 1)
+      expect(box.x + box.width).toBeLessThanOrEqual(column.x + column.width + 1)
+    }
+  })
+
+  test("the manuscript reads paragraph by paragraph while written, saves exactly, and its heading keeps Lorex's words in order", async ({
+    page,
+  }) => {
+    await signUp(page)
+    const universeId = await seedUniverse(page, unique('Tide '))
+    const storyId = await seedStory(page, universeId, 'The Gate')
+    const chapter = await post(page, `/api/universes/${universeId}/stories/${storyId}/chapters`, {
+      title: 'آكرون (Wright)',
+      summary: null,
+      notes: null,
+    })
+    const scene = (title: string) =>
+      post(page, `/api/universes/${universeId}/stories/${storyId}/scenes`, {
+        title,
+        summary: null,
+        notes: null,
+        povEntityId: null,
+        chronology: null,
+        entityIds: [],
+        chapterId: chapter.id,
+      })
+    const first = await scene('Night')
+    await scene('Morning')
+    await page.goto(`/app/universes/${universeId}/stories/${storyId}/manuscript/${first.id}`)
+
+    // ---- "Chapter 1 — … · Scene 1 of 2": Lorex's words first and last, the author's title isolated between ----
+
+    const where = page.getByTestId('manuscript-where')
+    await expect(where).toHaveText('Chapter 1 — آكرون (Wright) · Scene 1 of 2')
+    await expectIsolated(where, 'آكرون (Wright)')
+    // Left in one run with the words around it, the title's bracket went to the wrong side of its Latin name.
+    expect(await drawnOrder(where, ['Chapter', 'Wright', 'آكرون', 'Scene'])).toEqual([
+      'Chapter',
+      'Wright',
+      'آكرون',
+      'Scene',
+    ])
+    const outline = page.getByTestId('manuscript-outline-heading')
+    await expectIsolated(outline, 'آكرون (Wright)')
+    expect(await drawnOrder(outline, ['Chapter', 'Wright', 'آكرون'])).toEqual([
+      'Chapter',
+      'Wright',
+      'آكرون',
+    ])
+
+    // ---- The text: typed, saved from the keyboard, read back exactly ----
+
+    const editor = page.getByTestId('manuscript-editor')
+    expect(await isParagraphwise(editor)).toBe('plaintext')
+    expect(await computedDirection(editor)).toBe('ltr')
+    const prose = [Prose.english, Prose.year, Prose.after, Prose.hebrew].join('\n\n')
+    await editor.click()
+    await page.keyboard.type(prose)
+    await expect(editor).toHaveValue(prose)
+
+    // The caret still moves through the text logically.
+    const caret = () => editor.evaluate((field: HTMLTextAreaElement) => field.selectionStart)
+    await page.keyboard.press('ControlOrMeta+Home')
+    expect(await caret()).toBe(0)
+    await page.keyboard.press('ControlOrMeta+End')
+    expect(await caret()).toBe(prose.length)
+
+    await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().endsWith('/manuscript') &&
+          response.request().method() === 'PUT' &&
+          response.ok(),
+      ),
+      page.keyboard.press('ControlOrMeta+s'),
+    ])
+    await expect(page.getByTestId('manuscript-status')).toHaveText('Saved')
+    const stored = (await (
+      await page.request.get(
+        `/api/universes/${universeId}/stories/${storyId}/scenes/${first.id}/manuscript`,
+      )
+    ).json()) as { content: string }
+    expect(stored.content).toBe(prose)
+
+    await page.reload()
+    await expect(page.getByTestId('manuscript-editor')).toHaveValue(prose)
+    await expectLorexStaysLeftToRight(page, [
+      page.getByTestId('story-views'),
+      page.locator('.manuscript__tools'),
+      page.locator('.manuscript__bar'),
+    ])
+    expect(await scrollsSideways(page)).toBe(false)
+  })
+
+  test("a sentence of Lorex's that names something keeps its words in order around the name", async ({
+    page,
+  }) => {
+    await signUp(page)
+    const name = 'آكرون (Wright)'
+    const universeId = await seedUniverse(page, name)
+    const idea = await post(page, '/api/ideas', {
+      title: 'مدينة عائمة',
+      body: [Prose.english, Prose.year].join('\n'),
+      universeId,
+      references: [],
+      expectedUpdatedAt: null,
+    })
+
+    // ---- "Ideas in “…”": the way back from an idea ----
+
+    await page.goto(`/app/universes/${universeId}/ideas/${idea.id}`)
+    const back = page.getByTestId('idea-back')
+    await expect(back).toHaveText(`Ideas in “${name}”`)
+    await expectIsolated(back, name)
+    expect(await drawnOrder(back, ['Ideas', 'Wright', 'آكرون'])).toEqual([
+      'Ideas',
+      'Wright',
+      'آكرون',
+    ])
+    // Its body is a field of prose like any other.
+    expect(await isParagraphwise(page.getByLabel('Body'))).toBe('plaintext')
+
+    // ---- The list's lede says the same ----
+
+    await page.goto(`/app/universes/${universeId}/ideas`)
+    const lede = page.locator('.chron__lede')
+    await expectIsolated(lede, name)
+    expect(await drawnOrder(lede, ['Possibilities', 'Wright', 'آكرون', 'never'])).toEqual([
+      'Possibilities',
+      'Wright',
+      'آكرون',
+      'never',
+    ])
+  })
+
+  test.describe('on a phone', () => {
+    test.use({ viewport: { width: 390, height: 844 } })
+
+    test("a story's premise and a scene's summary read paragraph by paragraph and wrap inside the column", async ({
+      page,
+    }) => {
+      await signUp(page)
+      const universeId = await seedUniverse(page, unique('Shore '))
+      const premise = [Prose.english, Prose.year, Prose.after].join('\n')
+      const storyId = (
+        await post(page, `/api/universes/${universeId}/stories`, {
+          title: 'The Gate',
+          premise,
+          status: 0,
+        })
+      ).id
+      await post(page, `/api/universes/${universeId}/stories/${storyId}/scenes`, {
+        title: 'Night',
+        summary: `${Text.long} ${Prose.mixed}`,
+        notes: null,
+        povEntityId: null,
+        chronology: null,
+        entityIds: [],
+        chapterId: null,
+      })
+
+      await page.goto(`/app/universes/${universeId}/stories/${storyId}`)
+      const shown = page.getByTestId('story-premise')
+      await expect(shown).toHaveText(premise)
+      expect(await sideOf(shown, Prose.english)).toBe('left')
+      expect(await sideOf(shown, Prose.year)).toBe('right')
+      expect(await sideOf(shown, Prose.after)).toBe('left')
+
+      const summary = page.locator('.scene__summary')
+      expect(await isParagraphwise(summary)).toBe('plaintext')
+      expect(await summary.evaluate((node) => node.getClientRects().length)).toBeGreaterThan(0)
+      expect(await sideOf(summary, 'آكرون رايت')).toBe('right')
+      const box = (await summary.boundingBox())!
+      expect(box.x + box.width).toBeLessThanOrEqual(390)
+      expect(await scrollsSideways(page)).toBe(false)
+
+      // The story's own controls are where they always are.
+      const [scenes, plot, manuscript] = await lefts(
+        page.getByTestId('story-view-scenes'),
+        page.getByTestId('story-view-plot'),
+        page.getByTestId('story-view-manuscript'),
+      )
+      expect(isIncreasing([scenes, plot, manuscript])).toBe(true)
+    })
+  })
+})

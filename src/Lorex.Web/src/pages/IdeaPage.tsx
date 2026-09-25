@@ -1,5 +1,6 @@
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { IdeaEditor } from '../components/IdeaEditor'
+import { Quoted } from '../components/NameList'
 import type { IdeasListNotice } from '../components/IdeasBrowser'
 import { IdeasHome } from './IdeasPage'
 import type { WorkspaceContext } from './UniverseWorkspace'
@@ -28,7 +29,15 @@ export default function IdeaPage({ inUniverse = false, isNew = false }: IdeaPage
       defaultUniverseId={universe?.id ?? null}
       contextUniverse={universe ? { id: universe.id, name: universe.name } : null}
       listPath={listPath}
-      listLabel={universe ? `Ideas in “${universe.name}”` : 'All ideas'}
+      listLabel={
+        universe ? (
+          <>
+            Ideas in <Quoted text={universe.name} />
+          </>
+        ) : (
+          'All ideas'
+        )
+      }
       // A new idea opens where it lives: in this universe when it is this universe's, otherwise among all ideas - a universe's
       // Ideas only open its own.
       onCreated={(idea) =>

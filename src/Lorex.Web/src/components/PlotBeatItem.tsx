@@ -72,7 +72,7 @@ export function PlotBeatItem({
           <bdi>{beat.title}</bdi>
         </h5>
 
-        {beat.description ? <p className="beat__description">{beat.description}</p> : null}
+        {beat.description ? <p className="beat__description prose">{beat.description}</p> : null}
 
         {linkedScenes.length > 0 ? (
           <div className="beat__refs">

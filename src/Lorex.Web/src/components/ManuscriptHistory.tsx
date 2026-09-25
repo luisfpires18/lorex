@@ -266,7 +266,7 @@ export function ManuscriptHistory({
                       <p className="entry__blank">No text in this version.</p>
                     ) : (
                       <div
-                        className="mshistory__text"
+                        className="mshistory__text prose"
                         role="region"
                         aria-label={`Text of version ${revision.number}`}
                         tabIndex={0}

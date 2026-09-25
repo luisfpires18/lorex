@@ -72,9 +72,15 @@ function familySummary(familySemantic: FamilySemanticValue) {
 
 /** How a type reads from each side, in the author's own words. */
 function reading(type: RelationshipType) {
-  return type.isSymmetric
-    ? `${type.name}, both ways`
-    : `${type.name} one way, ${type.inverseName ?? type.name} the other`
+  return type.isSymmetric ? (
+    <>
+      <bdi>{type.name}</bdi>, both ways
+    </>
+  ) : (
+    <>
+      <bdi>{type.name}</bdi> one way, <bdi>{type.inverseName ?? type.name}</bdi> the other
+    </>
+  )
 }
 
 /** Blank is no gap; anything else must be a whole number of years, 0 or more. */
@@ -534,7 +540,9 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
                     {family}
                   </p>
                 ) : null}
-                {type.description ? <p className="types__description">{type.description}</p> : null}
+                {type.description ? (
+                  <p className="types__description prose">{type.description}</p>
+                ) : null}
               </li>
             )
           })}

@@ -1,4 +1,5 @@
 import { useEffect, useId, useState, type KeyboardEvent } from 'react'
+import { Quoted } from './NameList'
 import { ApiError } from '../lib/api'
 import {
   createValidationTerm,
@@ -180,7 +181,7 @@ export function ValidationTermManager({ universeId }: { universeId: string }) {
                         <li className="types__row" key={term.id}>
                           <div className="terms__rename">
                             <label className="field__label" htmlFor={`${groupId}-rename`}>
-                              Rename “{term.name}”
+                              Rename <Quoted text={term.name} />
                             </label>
                             <div className="termselect__row">
                               <input

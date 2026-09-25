@@ -66,7 +66,7 @@ export function ChapterSection({
         ) : null}
 
         {chapter.summary ? (
-          <p className="chapter__summary" data-testid="chapter-summary">
+          <p className="chapter__summary prose" data-testid="chapter-summary">
             {chapter.summary}
           </p>
         ) : null}
