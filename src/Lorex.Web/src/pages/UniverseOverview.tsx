@@ -12,7 +12,7 @@ export default function UniverseOverview() {
           <bdi>{universe.name}</bdi>
         </h2>
         {universe.description ? (
-          <p className="overview__description">{universe.description}</p>
+          <p className="overview__description prose">{universe.description}</p>
         ) : (
           <p className="overview__description overview__description--empty">
             No description yet. Settings is where you give this world its opening line.

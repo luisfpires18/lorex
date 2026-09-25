@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { History, LocateFixed, Pencil } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ActionIcon } from './ActionIcon'
@@ -38,7 +38,7 @@ interface ManuscriptEditorProps {
   scene: Scene
   chronology: Chronology
   /** Where the scene is told: its container ("Chapter 2 — Arrival", none in a story without chapters) and "Scene 1 of 3". */
-  where: { container: string | null; position: string }
+  where: { container: ReactNode; position: string }
   /** The plot beats that point at this scene. Shown only: the plot owns those links. */
   beats: SceneBeatReference[]
   /** Opens the scene's own form. Its planning is edited there, never here. */
@@ -278,7 +278,7 @@ export function ManuscriptEditor({
     >
       <header className="manuscript__head">
         <p className="manuscript__where" data-testid="manuscript-where">
-          {where.container ? `${where.container} · ` : null}
+          {where.container ? <>{where.container} · </> : null}
           <span className="manuscript__position">{where.position}</span>
         </p>
         <h4 className="manuscript__title" id={titleId} data-testid="manuscript-scene-title">
@@ -409,7 +409,7 @@ export function ManuscriptEditor({
                     <p className="entry__blank">No text in this draft.</p>
                   ) : (
                     <div
-                      className="recovery__prose"
+                      className="recovery__prose prose"
                       role="region"
                       aria-label="Text of the recovered draft"
                       tabIndex={0}

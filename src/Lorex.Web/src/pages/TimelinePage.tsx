@@ -148,7 +148,7 @@ export default function TimelinePage() {
           <bdi>{entry.title}</bdi>
         </h4>
 
-        {entry.description ? <p className="moment__account">{entry.description}</p> : null}
+        {entry.description ? <p className="moment__account prose">{entry.description}</p> : null}
 
         {entry.entities.length > 0 ? (
           <ul className="moment__cast">
@@ -194,16 +194,21 @@ export default function TimelinePage() {
         {entry.validation ? (
           <p className="moment__validation" data-testid={`moment-validation-${entry.title}`}>
             <span className="moment__validationlabel">Validation details</span>
-            <span dir="auto">
-              {[
-                entry.validation.eventKind?.name,
-                entry.validation.method ? `by ${entry.validation.method.name}` : null,
-                entry.validation.participant
-                  ? `for ${entry.validation.participant.name}${entry.validation.participant.isTrashed ? ' (in Trash)' : ''}`
-                  : null,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
+            <span>
+              {entry.validation.eventKind ? <bdi>{entry.validation.eventKind.name}</bdi> : null}
+              {entry.validation.method ? (
+                <>
+                  {entry.validation.eventKind ? ' · ' : null}by{' '}
+                  <bdi>{entry.validation.method.name}</bdi>
+                </>
+              ) : null}
+              {entry.validation.participant ? (
+                <>
+                  {entry.validation.eventKind || entry.validation.method ? ' · ' : null}for{' '}
+                  <bdi>{entry.validation.participant.name}</bdi>
+                  {entry.validation.participant.isTrashed ? ' (in Trash)' : null}
+                </>
+              ) : null}
             </span>
           </p>
         ) : null}

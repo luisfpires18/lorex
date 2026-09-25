@@ -23,7 +23,7 @@ export function UniverseCard({ universe }: { universe: UniverseSummary }) {
           <bdi>{universe.name}</bdi>
         </span>
         {universe.description ? (
-          <span className="plate__description">{universe.description}</span>
+          <span className="plate__description prose">{universe.description}</span>
         ) : (
           <span className="plate__description plate__description--empty">No description yet</span>
         )}

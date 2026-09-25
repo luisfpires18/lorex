@@ -16,3 +16,12 @@ export function NameList({ names }: { names: string[] }) {
     </Fragment>
   ))
 }
+
+/** “…”: one name an author wrote, quoted inside a sentence of Lorex's own and isolated the same way. */
+export function Quoted({ text }: { text: string }) {
+  return (
+    <>
+      “<bdi>{text}</bdi>”
+    </>
+  )
+}

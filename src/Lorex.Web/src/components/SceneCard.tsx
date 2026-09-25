@@ -2,15 +2,18 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { ArrowDown, ArrowRightLeft, ArrowUp, PenLine, Pencil, Trash } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ActionIcon } from './ActionIcon'
+import { ContainerName } from './ContainerName'
 import { SceneBeats, SceneLore, SceneStamp } from './SceneContext'
 import type { Chronology } from '../chronology/types'
+import { chapterLabel, UNCHAPTERED } from '../stories/format'
 import type { SceneBeatReference } from '../stories/structure'
 import type { Scene } from '../stories/types'
 
 /** A container a scene can be moved into: a chapter, or Unchaptered when `chapterId` is null. */
 export interface MoveTarget {
   chapterId: string | null
-  label: string
+  /** The chapter's place and title; null for Unchaptered. */
+  chapter: { index: number; title: string } | null
 }
 
 /**
@@ -89,7 +92,7 @@ function MoveToMenu({
       {open ? (
         <div className="movemenu__panel" id={panelId} data-testid="scene-move-to-panel">
           <p className="movemenu__label" id={`${panelId}-label`}>
-            Move “{scene.title}” to
+            Move “<bdi>{scene.title}</bdi>” to
           </p>
           <ul className="movemenu__list" aria-labelledby={`${panelId}-label`}>
             {targets.map((target, index) => (
@@ -103,9 +106,13 @@ function MoveToMenu({
                     onChoose(target.chapterId)
                   }}
                   data-testid="scene-move-to-option"
-                  data-target={target.label}
+                  data-target={
+                    target.chapter
+                      ? chapterLabel(target.chapter.index, target.chapter.title)
+                      : UNCHAPTERED
+                  }
                 >
-                  {target.label}
+                  <ContainerName chapter={target.chapter} />
                 </button>
               </li>
             ))}
@@ -192,7 +199,7 @@ export function SceneCard({
           <bdi>{scene.title}</bdi>
         </Title>
 
-        {scene.summary ? <p className="scene__summary">{scene.summary}</p> : null}
+        {scene.summary ? <p className="scene__summary prose">{scene.summary}</p> : null}
 
         <SceneLore universeId={universeId} scene={scene} testId="scene" />
         <SceneBeats universeId={universeId} storyId={scene.storyId} beats={beats} testId="scene" />

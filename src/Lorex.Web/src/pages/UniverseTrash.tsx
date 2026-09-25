@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { blockingFindingsOf } from '../canon/blocked'
 import type { CanonBlockingFinding } from '../canon/types'
 import { CanonBlockNotice } from '../components/CanonBlockNotice'
+import { Quoted } from '../components/NameList'
 import { formatDateTime } from '../lib/dates'
 import { CANON_LABELS } from '../lore/types'
 import { listTrash, restoredPath, restoreFromTrash } from '../trash/api'
@@ -20,58 +21,96 @@ type LoadState =
 
 /** What the last restore did, and the way to what it brought back. */
 interface Outcome {
-  text: string
-  link: { to: string; label: string } | null
+  text: ReactNode
+  link: { to: string; label: ReactNode } | null
 }
 
 /** Where a row was, in the words the author knows it by. */
 function whereItWas(item: TrashItem) {
   switch (item.kind) {
     case TrashKind.Entry:
-      return [
-        item.entityTypeName,
-        item.canonStatus === null ? null : CANON_LABELS[item.canonStatus],
-      ]
-        .filter(Boolean)
-        .join(' · ')
+      return (
+        <>
+          {item.entityTypeName ? <bdi>{item.entityTypeName}</bdi> : null}
+          {item.entityTypeName && item.canonStatus !== null ? ' · ' : null}
+          {item.canonStatus === null ? null : CANON_LABELS[item.canonStatus]}
+        </>
+      )
     case TrashKind.Story:
       return 'A whole story, with everything in it'
     case TrashKind.PlotBeat:
-      return `In the arc “${item.plotArcTitle ?? ''}” of “${item.storyTitle ?? ''}”`
+      return (
+        <>
+          In the arc <Quoted text={item.plotArcTitle ?? ''} /> of{' '}
+          <Quoted text={item.storyTitle ?? ''} />
+        </>
+      )
     case TrashKind.WorldRule:
       return 'In World Rules'
     default:
-      return `In “${item.storyTitle ?? ''}”`
+      return (
+        <>
+          In <Quoted text={item.storyTitle ?? ''} />
+        </>
+      )
   }
 }
 
 /** Why a row cannot come back yet, if it cannot. */
 function blockedText(item: TrashItem) {
   if (item.blockedBy === TrashBlock.StoryInTrash) {
-    return `Its story, “${item.storyTitle ?? ''}”, is in the Trash too. Restore the story first.`
+    return (
+      <>
+        Its story, <Quoted text={item.storyTitle ?? ''} />, is in the Trash too. Restore the story
+        first.
+      </>
+    )
   }
   if (item.blockedBy === TrashBlock.ArcInTrash) {
-    return `Its arc, “${item.plotArcTitle ?? ''}”, is in the Trash too. Restore the arc first.`
+    return (
+      <>
+        Its arc, <Quoted text={item.plotArcTitle ?? ''} />, is in the Trash too. Restore the arc
+        first.
+      </>
+    )
   }
   return null
 }
 
 function backText(item: TrashItem) {
+  const name = <Quoted text={item.name} />
   switch (item.kind) {
     case TrashKind.Entry:
-      return `“${item.name}” is back in your lore.`
+      return <>{name} is back in your lore.</>
     case TrashKind.Story:
-      return `“${item.name}” is back in your stories.`
+      return <>{name} is back in your stories.</>
     case TrashKind.Chapter:
-      return `The chapter “${item.name}” is back in “${item.storyTitle ?? ''}”, after its other chapters. No scene was moved into it.`
+      return (
+        <>
+          The chapter {name} is back in <Quoted text={item.storyTitle ?? ''} />, after its other
+          chapters. No scene was moved into it.
+        </>
+      )
     case TrashKind.Scene:
-      return `The scene “${item.name}” is back in “${item.storyTitle ?? ''}”.`
+      return (
+        <>
+          The scene {name} is back in <Quoted text={item.storyTitle ?? ''} />.
+        </>
+      )
     case TrashKind.PlotArc:
-      return `The arc “${item.name}” is back in “${item.storyTitle ?? ''}”.`
+      return (
+        <>
+          The arc {name} is back in <Quoted text={item.storyTitle ?? ''} />.
+        </>
+      )
     case TrashKind.PlotBeat:
-      return `The beat “${item.name}” is back in “${item.plotArcTitle ?? ''}”.`
+      return (
+        <>
+          The beat {name} is back in <Quoted text={item.plotArcTitle ?? ''} />.
+        </>
+      )
     case TrashKind.WorldRule:
-      return `The world rule “${item.name}” is back in World Rules.`
+      return <>The world rule {name} is back in World Rules.</>
   }
 }
 
@@ -133,7 +172,14 @@ export default function UniverseTrash() {
       await restoreFromTrash(universe.id, item)
       setOutcome({
         text: backText(item),
-        link: { to: restoredPath(universe.id, item), label: `Open “${item.name}”` },
+        link: {
+          to: restoredPath(universe.id, item),
+          label: (
+            <>
+              Open <Quoted text={item.name} />
+            </>
+          ),
+        },
       })
 
       // A restore empties the last row of a page as often as not, so step back rather than
@@ -152,7 +198,14 @@ export default function UniverseTrash() {
         setBlocked(findings)
       } else {
         setOutcome({
-          text: error instanceof Error ? error.message : `“${item.name}” could not be restored.`,
+          text:
+            error instanceof Error ? (
+              error.message
+            ) : (
+              <>
+                <Quoted text={item.name} /> could not be restored.
+              </>
+            ),
           link: null,
         })
       }

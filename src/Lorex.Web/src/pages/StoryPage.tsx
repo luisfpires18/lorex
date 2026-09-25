@@ -252,10 +252,10 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
 
   const targets: MoveTarget[] = hasChapters
     ? [
-        { chapterId: null, label: UNCHAPTERED },
+        { chapterId: null, chapter: null },
         ...chapters.map((chapter, index) => ({
           chapterId: chapter.id,
-          label: chapterLabel(index, chapter.title),
+          chapter: { index, title: chapter.title },
         })),
       ]
     : []
@@ -554,7 +554,7 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
           <span>{sceneCountLabel(scenes.length)}</span>
         </p>
         {view === 'scenes' && story.premise ? (
-          <p className="story__premise" data-testid="story-premise">
+          <p className="story__premise prose" data-testid="story-premise">
             {story.premise}
           </p>
         ) : null}

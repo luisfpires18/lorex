@@ -2,6 +2,7 @@ import { useEffect, useId, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Link, useLocation, useOutletContext, useSearchParams } from 'react-router-dom'
 import { ActionIcon } from '../components/ActionIcon'
+import { Quoted } from '../components/NameList'
 import { formatDate } from '../lib/dates'
 import { listWorldRules } from '../worldRules/api'
 import type { WorldRulePage } from '../worldRules/types'
@@ -86,7 +87,7 @@ export default function WorldRulesPage() {
       {notice ? (
         <div className="notice rules__notice" data-testid="world-rules-deleted-notice">
           <p role="status">
-            “{notice.title}” was moved to the Trash.{' '}
+            <Quoted text={notice.title} /> was moved to the Trash.{' '}
             <Link to={trashPath}>Restore it from the Trash</Link> if you need it back.
           </p>
         </div>

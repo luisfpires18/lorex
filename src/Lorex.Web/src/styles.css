@@ -73,6 +73,16 @@ a {
   outline-offset: 3px;
 }
 
+/* Prose an author wrote - a summary, a description, notes, the article, the manuscript. Each paragraph is laid out
+   and aligned in the direction of its own first letter, so an Arabic paragraph after an English one reads right to
+   left and keeps its full stop, numbers and Latin names where they were written. Nothing around it changes. Not
+   `dir="auto"`: that decides once, from the first paragraph, for all of them. Every textarea holds prose. */
+textarea,
+.prose,
+:is(.editor__surface, .article__body) :is(p, h1, h2, h3, h4, h5, h6) {
+  unicode-bidi: plaintext;
+}
+
 /* The Lorex symbol. One size rule per place it appears, and nothing else: no tile, no border,
    no recolouring. The artwork is transparent, so whatever surface it sits on shows through. */
 .brandmark {

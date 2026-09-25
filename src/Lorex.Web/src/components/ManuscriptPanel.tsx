@@ -1,8 +1,9 @@
 import { useId, useRef, useState } from 'react'
 import { Link, Navigate, NavLink } from 'react-router-dom'
+import { ContainerName } from './ContainerName'
 import { ManuscriptEditor } from './ManuscriptEditor'
 import type { Chronology } from '../chronology/types'
-import { chapterLabel, containerLabel, UNCHAPTERED } from '../stories/format'
+import { UNCHAPTERED } from '../stories/format'
 import { beatsByScene, readingOrder, scenesIn } from '../stories/structure'
 import type { Chapter, PlotArc, Scene, StoryDetail } from '../stories/types'
 
@@ -22,8 +23,12 @@ interface ManuscriptPanelProps {
 /** Where a scene is told: its chapter or Unchaptered - none in a story without chapters - and "Scene 1 of 3" inside it. */
 function whereOf(chapters: Chapter[], scenes: Scene[], scene: Scene) {
   const container = scenesIn(scenes, scene.chapterId)
+  const index = chapters.findIndex((chapter) => chapter.id === scene.chapterId)
   return {
-    container: chapters.length > 0 ? containerLabel(chapters, scene.chapterId) : null,
+    container:
+      chapters.length > 0 ? (
+        <ContainerName chapter={index < 0 ? null : { index, title: chapters[index].title }} />
+      ) : null,
     position: `Scene ${container.findIndex((candidate) => candidate.id === scene.id) + 1} of ${container.length}`,
   }
 }
@@ -90,7 +95,7 @@ export function ManuscriptPanel({
           : []),
         ...chapters.map((chapter, index) => ({
           key: chapter.id,
-          label: chapterLabel(index, chapter.title),
+          label: <ContainerName chapter={{ index, title: chapter.title }} />,
           scenes: scenesIn(scenes, chapter.id),
         })),
       ]

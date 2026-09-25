@@ -1,5 +1,6 @@
 import { useId, useState } from 'react'
-import { chapterLabel, containerNumber, UNCHAPTERED } from '../stories/format'
+import { ContainerName } from './ContainerName'
+import { containerNumber, UNCHAPTERED } from '../stories/format'
 import { readingOrder, scenesIn } from '../stories/structure'
 import type { Chapter, Scene } from '../stories/types'
 
@@ -42,7 +43,7 @@ export function SceneReferencePicker({
     { key: 'unchaptered', label: UNCHAPTERED, scenes: scenesIn(scenes, null) },
     ...chapters.map((chapter, index) => ({
       key: chapter.id,
-      label: chapterLabel(index, chapter.title),
+      label: <ContainerName chapter={{ index, title: chapter.title }} />,
       scenes: scenesIn(scenes, chapter.id),
     })),
   ]

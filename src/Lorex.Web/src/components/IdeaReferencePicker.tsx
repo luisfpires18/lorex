@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { Quoted } from './NameList'
 import { listReferenceTargets, referenceContext } from '../ideas/api'
 import {
   IDEA_REFERENCE_KIND_LABELS,
@@ -114,7 +115,13 @@ export function IdeaReferencePicker({
       <div className="drawer__panel">
         <header className="drawer__head">
           <p className="drawer__eyebrow">
-            {universeName ? `In “${universeName}”` : 'In this idea’s universe'}
+            {universeName ? (
+              <>
+                In <Quoted text={universeName} />
+              </>
+            ) : (
+              'In this idea’s universe'
+            )}
           </p>
           <h2 className="drawer__title" id={headingId}>
             Add a reference

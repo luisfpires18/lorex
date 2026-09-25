@@ -518,21 +518,42 @@ far end. The same gap was on every title older than universe search.
   the Trash, ideas and Canon subjects. The earlier `dir="auto"` on World Rules, family tree names, event kinds and the
   restore preview gave the whole box the direction, which pushed an RTL name to its far side; they isolate the same way
   now. Search results keep theirs: their titles are line-clamped.
-- **Seen and not changed:** summaries, premises, descriptions, notes and excerpts, the article and the manuscript are
-  prose and still inherit left to right - an Arabic sentence's full stop lands on the wrong side, and a mixed paragraph
-  reorders as the titles did. No CSS forces it; the same isolation is the fix, owed as its own task. So are lines built
-  as one string ("Chapter 1 — … · Scene 1 of 2", "Ideas in “…”"), `confirm()` prompts, native `<select>` options and
-  token chips.
+- **Seen and not changed:** summaries, descriptions, the article, the manuscript and lines built as one string - all
+  fixed in Pass 003 below. Still open: `confirm()` prompts, native `<select>` options and token chips.
 - `text-direction.spec.ts`: five tests, each failing on the code before the fix.
+
+## Stabilization pass 003 - authored prose direction
+
+Branch `fix/authored-prose-directionality`, off `dev` at `7186fa5`. Presentation only: no API, schema, backup, search,
+route or stored-text change. Pass 002's owed task: prose inherited Lorex's left to right, so an Arabic summary's full stop
+sat on the wrong side and "آكرون — 12 / Wright قال: نعم!" threw its number to the far end.
+
+- **Prose is laid out paragraph by paragraph:** `unicode-bidi: plaintext`, one rule in `styles.css`, on every
+  `textarea`, on `.prose`, and on the article's paragraphs and headings (editor, read view, history, recovery - all one
+  ProseMirror surface). Each paragraph takes the direction of its own first letter and aligns to that side; nothing of
+  Lorex's moves. `dir="auto"` was measured first and rejected: it decides once, from the first paragraph, so an Arabic
+  paragraph after an English one still read left to right. On a textarea the two are the same thing - the UA gives
+  `textarea[dir=auto]` exactly this rule. The TipTap schema, extensions and stored JSON are untouched.
+- `.prose` marks summaries, premises, descriptions, notes, excerpts, fact values, and the manuscript and idea previews.
+- **Sentences of Lorex's that name something** isolate the name, as Pass 002 isolates titles: `ContainerName` ("Chapter 1 —
+  <bdi>…</bdi>", the manuscript's where-line, its outline, the scene picker, Move to…), `Quoted` beside `NameList`
+  ("Ideas in “…”", the Ideas lede and notices, the Trash's rows and outcomes, the World Rules notice, a term's rename
+  label), a relation kind's reading and a moment's validation line - which had wrapped the whole sentence in `dir="auto"`.
+  Visually hidden announcements are left as strings.
+- **Limits seen after the fix:** a list's bullet and a quote's rule stay on Lorex's left while an RTL item or quote is
+  right-aligned - CSS cannot turn the block without knowing the text's direction, and a stored direction was out of scope.
+  An empty paragraph starts left to right until its first letter is typed. The server's idea and rule excerpts join
+  paragraphs into one, so the first letter decides a mixed excerpt.
+- `text-direction.spec.ts`: five more tests - summary, article written and read, lists and quotes, the manuscript, a
+  composed sentence, and prose on a phone - each failing on the code before the fix.
 
 ## Baseline
 
-- **999 API integration tests, 166 Playwright tests**, green. Stabilization pass 002's full Playwright runs, each on a
-  fresh database of its own (`LOREX_E2E_DB`), at Playwright's default workers: **166/166 twice, nothing logged about a
-  locked database**. A first run, seconds after the dev server was started, lost three tests in its first thirty
-  seconds - auth, canon, entity-image - each to a fetch that never reached the page (a blank document, a lazily imported
-  screen that failed to load, a workspace read); no lock was logged, and all three passed alone. No backend change, so
-  the API suite and the Release build were not rerun; Pass 001 ran both green, and its full Playwright run was 161/161.
+- **999 API integration tests, 171 Playwright tests**, green. Stabilization pass 003's full Playwright run on a fresh
+  database of its own (`LOREX_E2E_DB`), at Playwright's default workers: **171/171, nothing logged about a locked
+  database**. No backend change, so the API suite and the Release build were not rerun. Pass 002's runs were 166/166
+  twice; a first run, seconds after the dev server was started, lost three tests to fetches that never reached the page,
+  no lock logged, all three green alone. Pass 001 ran both green, and its full Playwright run was 161/161.
   Before those, the Family Trees full run on the dev database: 151/155 -
   canon, content-recovery, pwa and type-filter, none of which touches a family tree; all four passed on a serial rerun, which
   itself lost one canon test at sign-up, and canon passed 6/6 alone. Two genuine failures were found and fixed first: the restore

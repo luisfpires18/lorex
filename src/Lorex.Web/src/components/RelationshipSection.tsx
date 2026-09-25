@@ -406,7 +406,7 @@ export function RelationshipSection({
                       </span>
                     ) : null}
                   </p>
-                  {view.notes ? <p className="relation__notes">{view.notes}</p> : null}
+                  {view.notes ? <p className="relation__notes prose">{view.notes}</p> : null}
                 </div>
 
                 <div className="relation__tools">
