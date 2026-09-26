@@ -154,9 +154,9 @@ export function EntityHistory({
   return (
     <section className="history" aria-labelledby="history-heading">
       <div className="history__head">
-        <h3 className="history__title" id="history-heading">
+        <h2 className="history__title" id="history-heading">
           History
-        </h3>
+        </h2>
       </div>
 
       <p className="history__quiet" data-testid="history-article-note">
@@ -270,9 +270,9 @@ function Snapshot({
 }) {
   return (
     <>
-      <h4 className="snapshot__name">
+      <h3 className="snapshot__name">
         <bdi>{revision.name}</bdi>
-      </h4>
+      </h3>
       <p className="snapshot__kind">
         <bdi>{revision.entityTypeName}</bdi> &middot; {CANON_LABELS[revision.canonStatus]}
       </p>

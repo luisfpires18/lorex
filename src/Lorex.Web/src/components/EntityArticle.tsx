@@ -359,9 +359,9 @@ export function EntityArticleSection({
     >
       <div className="article__head">
         {/* Focusable by script only, so arriving at the article puts a keyboard and a screen reader on its heading. */}
-        <h3 className="article__title" id={headingId} tabIndex={-1} data-arrival-focus>
+        <h2 className="article__title" id={headingId} tabIndex={-1} data-arrival-focus>
           Article
-        </h3>
+        </h2>
         {isReady && !isEditing && hasArticle ? (
           <button
             ref={startButton}
@@ -434,7 +434,10 @@ export function EntityArticleSection({
           <LoreArticle content={stored.content} />
         ) : (
           <div className="article__empty" data-testid="article-empty">
-            <p className="entry__blank">No article yet.</p>
+            <p className="article__emptyline">No article yet.</p>
+            <p className="article__emptyhint">
+              Everything worth telling about <bdi>{entityName}</bdi> beyond its facts belongs here.
+            </p>
             <button
               ref={startButton}
               className="button button--icon"

@@ -2947,14 +2947,20 @@ a.button--danger:visited {
   color: var(--muted);
 }
 
-/* ---------- Entry: the lore article ---------- */
+/* ---------- Entry: the lore article ----------
+
+   A page in the author's reference book. The name leads, set large in the display face; above it,
+   quietly, where it lives - "Lore / Character" - and how settled it is. Under it one bar: the entry's
+   three views, and what can be done to it, Edit first and everything that only manages it in ⋯.
+   Then the page itself: the article at a reading measure, and beside it the picture and the facts,
+   the way a reference volume sets an infobox. */
 
 .entry {
   --entry-accent: var(--accent);
 }
 
 .entry__crumbs {
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   margin-bottom: 1.5rem;
 }
 
@@ -2975,21 +2981,16 @@ a.button--danger:visited {
 }
 
 .entry__crumbs a:hover {
-  color: var(--accent);
+  color: var(--ink);
   text-decoration: underline;
 }
 
-.entry__head {
-  border-bottom: 1px solid var(--rule);
-  padding-bottom: 1.5rem;
-}
-
-/* Where the entry says what it is: the crumb back to the lore, the type, and the Canon control pushed
-   to the far end. One line on a desktop, two on a phone, and the same three things either way. */
+/* Where the entry says what it is: the crumb back to the lore, the type (itself a link to that type's
+   list), and the Canon control at the far end. One line on a desktop, two on a phone. */
 .entry__kind {
   display: flex;
   align-items: center;
-  gap: 0.35rem 1rem;
+  gap: var(--space-2) var(--space-3);
   flex-wrap: wrap;
 }
 
@@ -3000,8 +3001,12 @@ a.button--danger:visited {
 }
 
 .entry__type {
-  font-size: 0.8rem;
-  letter-spacing: 0.08em;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--ink);
   text-decoration: none;
 }
 
@@ -3009,33 +3014,75 @@ a.button--danger:visited {
   text-decoration: underline;
 }
 
-.entry__typepick {
-  max-width: 12rem;
+.entry__typeicon {
+  flex: none;
+  width: 0.9rem;
+  height: 0.9rem;
+  color: color-mix(in srgb, var(--type-accent, var(--muted)) 65%, var(--ink));
 }
 
+.entry__typepick {
+  width: auto;
+  max-width: 14rem;
+}
+
+/* How settled something is, as a choice on the page: a sunken track, the chosen step raised with its
+   glyph and word. Never the ink fill, which would make the status louder than the name. */
 .canon {
-  display: flex;
-  border: 1px solid var(--border-control);
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  box-shadow: inset 0 0 0 1px var(--rule);
 }
 
 .canon__step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  min-height: 1.75rem;
+  padding: 0 var(--space-3);
   border: 0;
+  border-radius: calc(var(--radius-sm) - 2px);
   background: transparent;
-  padding: 0.3rem 0.75rem;
   font: inherit;
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
   color: var(--muted);
   cursor: pointer;
-  border-right: 1px solid var(--rule-strong);
+  transition:
+    background-color var(--duration-1) var(--ease),
+    color var(--duration-1) var(--ease);
 }
 
-.canon__step:last-child {
-  border-right: 0;
+.canon__step::before {
+  content: '';
+  flex: none;
+  width: 0.55rem;
+  height: 0.55rem;
+  border: 1.5px solid currentcolor;
+  border-radius: var(--radius-full);
+}
+
+.canon__step[data-canon='1']::before {
+  background: linear-gradient(90deg, currentcolor 50%, transparent 50%);
+}
+
+.canon__step[data-canon='2']::before {
+  background: currentcolor;
+}
+
+.canon__step:hover:not(:disabled) {
+  color: var(--ink);
 }
 
 .canon__step[aria-pressed='true'] {
-  background: var(--ink);
-  color: var(--surface);
+  background: var(--raised);
+  color: var(--ink);
+  font-weight: 500;
+  box-shadow:
+    var(--shadow-1),
+    0 0 0 1px var(--rule);
 }
 
 .canon__step:disabled {
@@ -3046,89 +3093,412 @@ a.button--danger:visited {
 .entry__name {
   font-family: var(--display);
   font-weight: 400;
-  font-size: clamp(2rem, 4vw, 2.9rem);
+  font-size: var(--text-document);
   line-height: 1.1;
-  margin: 0.75rem 0 0;
+  margin: var(--space-3) 0 0;
+  overflow-wrap: anywhere;
 }
 
+/* The name as a document title while the form is open: ruled, not boxed, in the name's own size. */
 .entry__nameinput {
   width: 100%;
-  margin-top: 0.75rem;
+  max-width: 46rem;
+  margin-top: var(--space-3);
   border: 0;
   border-bottom: 1px solid var(--border-control);
   background: transparent;
   color: var(--ink);
   font-family: var(--display);
-  font-size: clamp(2rem, 4vw, 2.9rem);
+  font-size: var(--text-document);
   line-height: 1.2;
-  padding: 0 0 0.25rem;
+  padding: 0 0 var(--space-1);
 }
 
 .entry__nameinput:focus {
   outline: none;
   border-bottom-color: var(--accent);
+  box-shadow: 0 1px 0 0 var(--accent);
 }
 
 .entry__aliases {
-  margin: 0.5rem 0 0;
-  font-style: italic;
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-ui);
   color: var(--muted);
 }
 
 .entry__summary {
-  margin: 1rem 0 0;
+  margin: var(--space-3) 0 0;
   max-width: 58ch;
-  font-size: 1.05rem;
-  line-height: 1.65;
+  font-size: 1.0625rem;
+  line-height: 1.6;
 }
 
 .entry__summaryinput {
   width: 100%;
-  margin-top: 1rem;
+  max-width: 46rem;
+  margin-top: var(--space-4);
   border: 1px solid var(--border-control);
-  background: transparent;
+  border-radius: var(--radius-sm);
+  background: var(--raised);
   color: var(--ink);
   font: inherit;
   line-height: 1.6;
-  padding: 0.5rem 0.6rem;
+  padding: 0.5rem 0.75rem;
   resize: vertical;
 }
 
 .entry__summaryinput:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
-/* The full picture, opening the article it belongs to. It is placed here rather than in the rail on
-   purpose: the rail drops below the article on a narrow screen, which would put a character's portrait
-   several thousand pixels beneath their name on a phone.
+/* One bar under the identity: the entry's three views on the left, and what can be done to the entry
+   itself on the right. The story page's bar, which is the same idea one screen over. */
+.entry__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-6);
+  margin-top: var(--space-6);
+  border-bottom: 1px solid var(--rule);
+}
 
-   The plate is the picture, not a band the picture sits in. A fixed-height band left a tall portrait as
-   a strip at one edge with the rest of the row empty, which read as an accident rather than a placement.
-   Shrink-wrapped and centred in the article's column instead: the border is on the picture, the space
-   around it is even, and an entry with no picture has no plate at all rather than an empty one.
+.entry__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  padding-bottom: var(--space-2);
+}
 
-   Nothing jumps as it loads. The `width` and `height` attributes give the browser the picture's shape
-   before a byte of it arrives, so the room it will take is already reserved - which is what the band was
-   for, done by the picture's own proportions instead of by one number for every entry.
+/* ---------- The entry's page: article, picture, facts ----------
 
-   Bounded, never stretched: `max-height` holds a portrait to a readable height and `max-width` holds a
-   landscape inside the column, and because only maxima are set a small picture is shown at its own size
-   rather than blown up to fill a frame. */
-.entry__plate {
-  margin: 0 auto;
+   Desktop: the article at its measure on the left; on the right, the picture and then the facts, as
+   an infobox. A picture wider than it is tall would be a strip in that column, so it spans the page
+   above both instead, bounded in height so it introduces the article rather than replacing it. The
+   picture is always the original, shown whole: only maxima are set, so nothing is cropped,
+   stretched or blown up past its own size, and its `width`/`height` reserve its shape before it
+   loads. No picture, no column - the facts take its place. */
+
+.entry__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 46rem) minmax(15rem, 20rem);
+  grid-template-areas: 'main rail';
+  justify-content: start;
+  align-items: start;
+  gap: var(--space-6) var(--space-7);
+  margin-top: var(--space-6);
+}
+
+.entry__layout[data-picture='true'][data-shape='portrait'],
+.entry__layout[data-picture='true'][data-shape='square'] {
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    'main media'
+    'main rail';
+}
+
+.entry__layout[data-picture='true'][data-shape='landscape'] {
+  grid-template-areas:
+    'media media'
+    'main rail';
+}
+
+.entry__media {
+  grid-area: media;
+  position: relative;
   width: fit-content;
   max-width: 100%;
+  margin: 0;
 }
 
-.entry__plate img {
+.entry__media img {
   display: block;
   width: auto;
   height: auto;
   max-width: 100%;
-  max-height: min(22rem, 45vh);
+  max-height: min(36rem, 75vh);
   border: 1px solid var(--rule);
-  background: var(--surface);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow: var(--shadow-1);
+}
+
+.entry__layout[data-shape='landscape'] .entry__media img {
+  max-height: min(26rem, 52vh);
+}
+
+/* Over the picture's corner, on its own small plate so it reads on a light or a dark picture. */
+.entry__expand {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  background: color-mix(in srgb, var(--raised) 88%, transparent);
+  color: var(--ink);
+  box-shadow: var(--shadow-1);
+}
+
+.entry__expand:hover:not(:disabled) {
+  background: var(--raised);
+}
+
+.entry__main {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-7);
+  min-width: 0;
+}
+
+.entry__rail {
+  grid-area: rail;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* Relations and History are the page when they are open, so the rule each one draws above itself -
+   which separated it from the article when all three were stacked - would only double the bar's. */
+.entry__view {
+  margin-top: 0.5rem;
+}
+
+.entry__view > .relations,
+.entry__view > .history {
+  margin-top: 1.5rem;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.entry__blank {
+  color: var(--muted);
+}
+
+.rail__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.rail__heading {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.rail__meta {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* The facts a type records, on the sunken paper an infobox is set on. */
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+
+.facts__row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.facts__key {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.facts__value {
+  margin: 0;
+  font-size: var(--text-ui);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- The entry's form ----------
+
+   One column at a form's measure, in the order an author thinks of an entry: the name and summary
+   in the header as they will be read, then the picture, then its other names and tags, then what its
+   type records. Headings and space group them; no box around each field. */
+
+.entryform {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-7);
+  max-width: 46rem;
+  margin-top: var(--space-7);
+}
+
+.entryform__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--rule);
+}
+
+.entryform__heading {
+  margin: 0;
+  font-size: var(--text-ui);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.entryform__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+  gap: var(--space-5) var(--space-6);
+  align-items: start;
+}
+
+.entryform__note {
+  margin: 0;
+  font-size: var(--text-ui);
+  color: var(--muted);
+}
+
+/* The form's bar: its state in words on the left, Cancel and Save on the right. It holds to the bottom
+   of the screen while the form is longer than it is, and settles at the form's end. */
+.entry__actions.actionbar {
+  max-width: 46rem;
+  margin-top: var(--space-7);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+}
+
+.actionbar__status {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.actionbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+/* ---------- The picture, whole ----------
+
+   `ImageViewer`: the original on a dark neutral ground in either scheme, so light and dark artwork
+   both keep their edges, fitted inside the window with room for its name and Close above it. */
+
+.viewer {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+  border: 0;
+  background: transparent;
+  color: #f0ece3;
+  overflow: hidden;
+}
+
+.viewer[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.viewer::backdrop {
+  background: rgb(14 14 15 / 0.95);
+}
+
+.viewer__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+}
+
+.viewer__title {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--display);
+  font-size: var(--text-item);
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viewer__close {
+  background: rgb(255 255 255 / 0.1);
+  color: #f0ece3;
+}
+
+.viewer__close:hover:not(:disabled) {
+  background: rgb(255 255 255 / 0.2);
+  color: #fff;
+}
+
+.viewer__close:focus-visible {
+  outline-color: #f0ece3;
+}
+
+.viewer__stage {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  place-items: center;
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.viewer__image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: calc(100dvh - 4.5rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  object-fit: contain;
+  outline: 1px solid rgb(255 255 255 / 0.12);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .viewer[open] {
+    animation: viewer-in 160ms var(--ease);
+  }
+}
+
+@keyframes viewer-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Nothing behind the picture scrolls while it is open. */
+html:has(.viewer[open]) {
+  overflow: hidden;
+}
+
+.imagefield {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* The square the cards will show, at a size worth judging a crop by. */
+.imagefield .portrait {
+  width: 5.5rem;
+  height: 5.5rem;
+  border-radius: var(--radius-md);
 }
 
 .imagefield__row {
@@ -3337,161 +3707,6 @@ a.button--danger:visited {
   border-top: 1px solid var(--rule);
 }
 
-/* One bar under the identity: the entry's three views on the left, and what can be done to the entry
-   itself on the right. The story page's bar, which is the same idea one screen over. */
-.entry__bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 0.6rem 1.5rem;
-  margin-top: 1.25rem;
-  border-bottom: 1px solid var(--rule);
-}
-
-.entry__tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  padding-bottom: 0.45rem;
-}
-
-/* A link styled as a button is still a link, and would otherwise carry an underline the buttons
-   beside it do not. The story page's tools say the same thing one screen over. */
-.entry__tools a.button--quiet {
-  text-decoration: none;
-}
-
-/* Available, and plainly the last of the three. No border and the muted ink every quiet label uses,
-   turning to the danger colour only under the pointer that is about to press it. */
-.entry__trash.button--quiet {
-  border-color: transparent;
-  background: transparent;
-  color: var(--muted);
-}
-
-.entry__trash.button--quiet:hover:not(:disabled),
-.entry__trash.button--quiet:focus-visible {
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
-.entry__layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 16rem;
-  gap: 2.5rem;
-  margin-top: 2rem;
-  align-items: start;
-}
-
-/* The article's column: the picture, then the prose. One box so the picture centres on the article's
-   measure rather than on the whole page, which is what left it stranded beside an empty rail. */
-.entry__main {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-  min-width: 0;
-}
-
-/* Relations and History are the page when they are open, so the rule each one draws above itself -
-   which separated it from the article when all three were stacked - would only double the bar's. */
-.entry__view {
-  margin-top: 0.5rem;
-}
-
-.entry__view > .relations,
-.entry__view > .history {
-  margin-top: 1.5rem;
-  padding-top: 0;
-  border-top: 0;
-}
-
-.entry__blank {
-  color: var(--muted);
-  font-style: italic;
-}
-
-.entry__rail {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-  border-left: 1px solid var(--rule);
-  padding-left: 1.5rem;
-}
-
-.rail__block {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.rail__heading {
-  margin: 0;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-}
-
-.rail__meta {
-  margin: 0;
-  font-size: 0.75rem;
-  color: var(--muted);
-}
-
-.facts {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.facts__row {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-}
-
-.facts__key {
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-}
-
-.facts__value {
-  margin: 0;
-  font-size: 0.95rem;
-  overflow-wrap: anywhere;
-}
-
-.entry__actions {
-  display: flex;
-  gap: 0.75rem;
-  margin-top: 2.5rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--rule);
-}
-
-/* The entry's form is long - a picture, aliases, tags and every field its type declares - so on a
-   phone Save and Cancel sit a long way down it. Sticking the bar to the bottom edge keeps them in
-   reach at any scroll position, and because it is sticky rather than fixed it still sits in the flow
-   and releases at the end of the form. The entry's own actions are not here and never come back: they
-   are in the header, which is what stopped them depending on how much had been written. */
-@media (max-width: 860px) {
-  .entry__actions {
-    position: sticky;
-    bottom: 0;
-    z-index: 20;
-    margin: 2rem -1.25rem 0;
-    padding: 0.8rem 1.25rem;
-    padding-bottom: max(0.8rem, env(safe-area-inset-bottom));
-    /* Paper rather than surface: the bar passes over the article, and the app already
-       separates one plane from another by which of the two it is painted on. */
-    background: var(--paper);
-  }
-}
-
 /* ---------- Tiptap ---------- */
 
 /* The box hugs the measure its text is set to - the 62ch below, plus the surface's own padding -
@@ -3596,6 +3811,13 @@ a.button--danger:visited {
   margin-top: 0.35rem;
 }
 
+/* A list item is one paragraph in the stored document; its own paragraph spacing would put a blank
+   line between every bullet. */
+.editor__surface li > p,
+.article__body li > p {
+  margin: 0;
+}
+
 .editor__surface p.is-editor-empty:first-child::before {
   content: 'Write the lore.';
   color: var(--muted);
@@ -3618,9 +3840,8 @@ a.button--danger:visited {
 
 .article__title {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
   font-weight: 600;
-  letter-spacing: 0.05em;
   color: var(--muted);
 }
 
@@ -3656,15 +3877,30 @@ a.button--danger:visited {
   }
 }
 
+/* Not written yet: said once, with the one way to begin - a quiet sheet at the article's measure, never
+   larger than the entry it belongs to. */
 .article__empty {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.75rem;
+  gap: var(--space-2);
+  max-width: calc(62ch + 2.5rem);
+  padding: var(--space-6);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow: inset 0 0 0 1px var(--rule);
 }
 
-.article__empty .entry__blank {
+.article__emptyline {
   margin: 0;
+  font-family: var(--display);
+  font-size: var(--text-section);
+  line-height: 1.25;
+}
+
+.article__emptyhint {
+  margin: 0 0 var(--space-2);
+  color: var(--muted);
 }
 
 .article__note {
@@ -4106,23 +4342,24 @@ a.button--danger:visited {
 
 /* ---------- Relations ----------
 
-  A relation is a sentence about the entry you are reading: a wording, then the thing it
-  points at. Rows are set like glosses in a reference volume — the wording sits in a
-  right-aligned column against a hairline spine, the entry it names carries the display
-  face. No cards, no shadows: the rules do the separating.
+  A relation is a sentence about the entry you are reading. The wording - "Child of", "Member of" -
+  is said once, as a small heading over the entries it gathers; each entry is a row with its tile,
+  its name in the display face, its type and status, and its notes. What can be done to a link is in
+  its ⋯ menu, so the rows read as information rather than as a row of controls.
 */
 
 .relations {
   margin-top: 2.5rem;
   padding-top: 1.5rem;
   border-top: 1px solid var(--rule);
+  max-width: 52rem;
 }
 
 .relations__head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--space-3) var(--space-4);
   flex-wrap: wrap;
 }
 
@@ -4130,48 +4367,57 @@ a.button--danger:visited {
   margin: 0;
   font-family: var(--display);
   font-weight: 400;
-  font-size: 1.35rem;
+  font-size: var(--text-section);
 }
 
 .relations__quiet {
-  margin: 0.75rem 0 0;
+  margin: var(--space-4) 0 0;
   color: var(--muted);
-  font-style: italic;
   max-width: 52ch;
 }
 
-.relations__list {
+.relations__list,
+.relations__rows {
   list-style: none;
-  margin: 1.25rem 0 0;
+  margin: 0;
   padding: 0;
-  border-top: 1px solid var(--rule);
+}
+
+.relations__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin-top: var(--space-6);
+}
+
+.relations__reading {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 .relations__editing {
-  border-bottom: 1px solid var(--rule);
-  padding: 1rem 0;
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--rule);
 }
 
 .relation {
   display: grid;
-  grid-template-columns: minmax(5rem, 9rem) minmax(0, 1fr) auto;
-  gap: 0 1.25rem;
+  grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+  gap: 0 var(--space-3);
   align-items: start;
-  padding: 0.9rem 0;
-  border-bottom: 1px solid var(--rule);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--rule);
 }
 
-.relation__label {
-  margin: 0;
-  padding-right: 1.25rem;
-  border-right: 1px solid var(--rule-strong);
-  min-height: 1.5rem;
-  text-align: right;
-  font-family: var(--display);
-  font-style: italic;
-  font-size: 0.95rem;
-  color: var(--muted);
-  overflow-wrap: anywhere;
+.relations__rows > :first-child {
+  border-top: 0;
+}
+
+.relation__tile {
+  border-radius: var(--radius-sm);
 }
 
 .relation__body {
@@ -4180,7 +4426,7 @@ a.button--danger:visited {
 
 .relation__name {
   font-family: var(--display);
-  font-size: 1.15rem;
+  font-size: var(--text-item);
   line-height: 1.25;
   color: var(--ink);
   text-decoration: none;
@@ -4194,49 +4440,22 @@ a.button--danger:visited {
 }
 
 .relation__meta {
-  margin: 0.15rem 0 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.15rem 0.85rem;
-  font-size: 0.75rem;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
   color: var(--muted);
-}
-
-.relation__kind {
-  letter-spacing: 0.04em;
 }
 
 .relation__notes {
-  margin: 0.4rem 0 0;
-  font-size: 0.9rem;
-  font-style: italic;
+  margin: var(--space-2) 0 0;
+  max-width: 58ch;
+  font-size: var(--text-ui);
+  line-height: 1.5;
   color: var(--muted);
-  max-width: 54ch;
   overflow-wrap: anywhere;
-}
-
-.relation__tools {
-  display: flex;
-  align-items: center;
-  gap: 0.15rem 0.9rem;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-/* Boxed controls on every row would out-shout the rows themselves, so the two actions
-   are set as quiet text and only the status keeps its outline. */
-.relation__tools .button--quiet {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-
-.relation__tools .button--quiet:hover:not(:disabled) {
-  color: var(--accent);
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
 }
 
 /* ---------- Relation form ---------- */
@@ -4311,8 +4530,8 @@ a.button--danger:visited {
 .history__quiet {
   margin: 0.75rem 0 0;
   color: var(--muted);
-  font-style: italic;
-  max-width: 52ch;
+  font-size: var(--text-ui);
+  max-width: 58ch;
 }
 
 .history__list {
@@ -4331,15 +4550,15 @@ a.button--danger:visited {
   border-bottom: 1px solid var(--rule);
 }
 
+/* When, in the margin: a date is metadata, set small and in figures that line up down the list. */
 .version__when {
   margin: 0;
-  padding-right: 1.25rem;
-  border-right: 1px solid var(--rule-strong);
+  padding: 0.2rem 1.25rem 0 0;
+  border-right: 1px solid var(--rule);
   min-height: 1.5rem;
   text-align: right;
-  font-family: var(--display);
-  font-style: italic;
-  font-size: 0.95rem;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
   color: var(--muted);
   overflow-wrap: anywhere;
 }
@@ -4351,7 +4570,7 @@ a.button--danger:visited {
 .version__what {
   margin: 0;
   font-family: var(--display);
-  font-size: 1.1rem;
+  font-size: var(--text-item);
   line-height: 1.3;
   color: var(--ink);
   overflow-wrap: anywhere;
@@ -4361,11 +4580,14 @@ a.button--danger:visited {
    rather than repeated. */
 .version__now {
   margin-left: 0.6rem;
-  font-family: inherit;
-  font-style: italic;
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
-  color: var(--muted);
+  padding: 0.05rem 0.4rem;
+  border-radius: var(--radius-xs);
+  background: var(--accent-wash);
+  font-family: var(--ui);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--ink);
+  vertical-align: 0.15em;
 }
 
 .version__meta {
@@ -4373,7 +4595,7 @@ a.button--danger:visited {
   display: flex;
   flex-wrap: wrap;
   gap: 0.15rem 0.85rem;
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 
@@ -4609,50 +4831,36 @@ a.button--danger:visited {
   .reltype__gaps {
     grid-template-columns: minmax(0, 1fr);
   }
-
-  .relation {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.35rem;
-  }
-
-  .relation__label {
-    padding-right: 0;
-    border-right: 0;
-    text-align: left;
-    min-height: 0;
-  }
-
-  .relation__tools {
-    justify-content: flex-start;
-    margin-top: 0.5rem;
-  }
 }
 
 /* ---------- Narrow screens ---------- */
 
 @media (max-width: 1100px) {
-  .entry__layout {
-    /* minmax(0, 1fr), not 1fr: a bare 1fr column grows to its content's narrowest width, and one long unbroken word
-       in an article - an address, a name run together - would push the whole entry wider than the screen. */
+  /* One column: the picture first, bounded so the article still starts on the first screen of a
+     phone, then the article, then the facts. minmax(0, 1fr), not 1fr: one long unbroken word in an
+     article must not push the entry wider than the screen. */
+  .entry__layout,
+  .entry__layout[data-picture='true'][data-shape='portrait'],
+  .entry__layout[data-picture='true'][data-shape='square'],
+  .entry__layout[data-picture='true'][data-shape='landscape'] {
     grid-template-columns: minmax(0, 1fr);
-    gap: 2rem;
+    grid-template-rows: none;
+    grid-template-areas:
+      'media'
+      'main'
+      'rail';
   }
 
-  /* Shorter, so the picture introduces the article on a phone instead of filling the screen and
-     pushing every word of it below the fold. A maximum, not a height: the plate is the picture
-     now, and pinning the figure to a height the picture does not have either leaves dead space
-     under a landscape or lets a portrait run straight over the article beneath it. */
-  .entry__plate img {
-    max-height: 15rem;
+  .entry__media {
+    margin-inline: auto;
   }
 
-  .entry__rail {
-    border-left: 0;
-    border-top: 1px solid var(--rule);
-    padding-left: 0;
-    padding-top: 1.5rem;
+  .entry__media img,
+  .entry__layout[data-shape='landscape'] .entry__media img {
+    max-height: min(22rem, 50vh);
   }
 }
+
 /* ---------- Narrow screens ---------- */
 
 @media (max-width: 900px) {
@@ -7109,7 +7317,6 @@ a.lorechip--pov:focus-visible .lorechip__name {
    would break the paragraph. */
 
 @media (pointer: coarse) {
-  .relation__tools .button--quiet,
   .moment__tools .button--quiet,
   .version__tools .button--quiet,
   .finding__tools .button--quiet,

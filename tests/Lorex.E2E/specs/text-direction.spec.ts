@@ -254,7 +254,7 @@ test.describe('text direction', () => {
     const views = ['entry-view-article', 'entry-view-relations', 'entry-view-history'].map((id) =>
       page.getByTestId(id),
     )
-    const tools = ['edit-entity', 'entity-family-tree', 'trash-entity'].map((id) =>
+    const tools = ['edit-entity', 'entity-family-tree', 'entity-actions'].map((id) =>
       page.getByTestId(id),
     )
     expect(isIncreasing(await lefts(...views))).toBe(true)
@@ -275,8 +275,12 @@ test.describe('text direction', () => {
     await page.getByTestId('entry-view-relations').click()
     await page.waitForURL(`${url}/relations`)
     await expectIsolated(page.getByTestId('entry-name'), Text.numbers)
+    // The reading is said once, as the heading over the links it gathers.
+    await expectIsolated(
+      page.getByTestId('relationship-list').locator('.relations__reading').first(),
+      'والد',
+    )
     const relation = page.getByTestId('relationship-list').locator('li.relation').first()
-    await expectIsolated(relation.locator('.relation__label'), 'والد')
     await expectIsolated(relation.locator('.relation__name'), Text.hebrew)
 
     await page.getByTestId('entry-view-history').click()

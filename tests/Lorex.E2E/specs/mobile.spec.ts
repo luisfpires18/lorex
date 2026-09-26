@@ -108,7 +108,7 @@ test.describe('on a phone', () => {
     // it is on screen - and it stays there however long the article grows, because none of it is
     // below the article any more.
     const viewport = page.viewportSize()!
-    for (const testId of ['edit-entity', 'entity-family-tree', 'trash-entity']) {
+    for (const testId of ['edit-entity', 'entity-family-tree', 'entity-actions']) {
       const target = (await page.getByTestId(testId).boundingBox())!
       expect(target.y + target.height, `${testId} is below the fold`).toBeLessThanOrEqual(
         viewport.height,

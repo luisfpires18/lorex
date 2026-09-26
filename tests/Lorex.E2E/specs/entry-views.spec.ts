@@ -162,7 +162,7 @@ test.describe('entry views', () => {
 
     // Unscrolled, at the top of an entry with a long article: all three, on screen.
     const viewport = page.viewportSize()!
-    for (const testId of ['edit-entity', 'entity-family-tree', 'trash-entity']) {
+    for (const testId of ['edit-entity', 'entity-family-tree', 'entity-actions']) {
       const box = (await page.getByTestId(testId).boundingBox())!
       expect(box.y + box.height, `${testId} is below the fold`).toBeLessThanOrEqual(viewport.height)
     }
@@ -172,8 +172,15 @@ test.describe('entry views', () => {
       viewport.height,
     )
 
-    // Move to Trash is there and named, and is the quiet one of the three.
+    // Move to Trash is there and named, but kept out of the way: last, in the entry's ⋯ menu.
+    await expect(page.getByTestId('trash-entity')).toHaveCount(0)
+    await expect(page.getByTestId('entity-actions')).toHaveAccessibleName(
+      'More actions for Akron Wright of the Seventh Hearth',
+    )
+    await page.getByTestId('entity-actions').click()
     await expect(page.getByTestId('trash-entity')).toHaveText(/Move to Trash/)
+    await page.keyboard.press('Escape')
+    await expect(page.getByTestId('trash-entity')).toHaveCount(0)
 
     // ---- Three views, three addresses ----
 
@@ -288,7 +295,7 @@ test.describe('entry views', () => {
     // which is why pressing Edit cannot put a second form on the page beside it.
     await expect(page.getByTestId('edit-entity')).toHaveCount(0)
     await expect(page.getByTestId('entity-family-tree')).toHaveCount(0)
-    await expect(page.getByTestId('trash-entity')).toHaveCount(0)
+    await expect(page.getByTestId('entity-actions')).toHaveCount(0)
 
     // Leaving: asked once, not twice, and the view changes.
     page.once('dialog', (dialog) => {
@@ -303,7 +310,7 @@ test.describe('entry views', () => {
     // one way out of the entry that is not a link - Move to Trash - can never be taken while there
     // is unsaved writing for the guard to miss: it is not on the page until the writing is done with.
     await expect(page.getByTestId('entity-family-tree')).toBeVisible()
-    await expect(page.getByTestId('trash-entity')).toBeVisible()
+    await expect(page.getByTestId('entity-actions')).toBeVisible()
   })
 
   test('an entry with no picture has no empty column where one would be', async ({ page }) => {

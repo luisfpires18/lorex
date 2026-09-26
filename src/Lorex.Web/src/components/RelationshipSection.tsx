@@ -18,6 +18,10 @@ import {
 } from '../relationships/types'
 import { CANON_LABELS, CANON_ORDER, CanonStatus, type CanonStatusValue } from '../lore/types'
 import { StatusBadge } from './StatusBadge'
+import { ActionIcon } from './ActionIcon'
+import { ActionMenu } from './ActionMenu'
+import { EntityTile } from './EntityTile'
+import { Pencil, Plus, Trash } from 'lucide-react'
 
 interface RelationDraft {
   typeId: string
@@ -45,6 +49,21 @@ function labelFor(types: RelationshipType[], typeId: string, useInverse: boolean
   const type = types.find((candidate) => candidate.id === typeId)
   if (!type) return ''
   return useInverse && !type.isSymmetric ? (type.inverseName ?? type.name) : type.name
+}
+
+/**
+ * The links in the order they came, gathered under how each reads from this entry - "Child of",
+ * "Member of" - so a reading is said once above its entries rather than beside every one. Grouped by
+ * the words shown, never by what a kind is called.
+ */
+function byReading(views: RelationshipView[]) {
+  const groups = new Map<string, RelationshipView[]>()
+  for (const view of views) {
+    const group = groups.get(view.label)
+    if (group) group.push(view)
+    else groups.set(view.label, [view])
+  }
+  return [...groups.entries()]
 }
 
 function draftFromView(view: RelationshipView): RelationDraft {
@@ -339,16 +358,17 @@ export function RelationshipSection({
   return (
     <section className="relations" aria-labelledby="relations-heading">
       <div className="relations__head">
-        <h3 className="relations__title" id="relations-heading">
+        <h2 className="relations__title" id="relations-heading">
           Relations
-        </h3>
+        </h2>
         {types.length > 0 && !isAdding && !editingId ? (
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             onClick={openAdd}
             data-testid="add-relationship"
           >
+            <ActionIcon icon={Plus} />
             Add relation
           </button>
         ) : null}
@@ -379,59 +399,83 @@ export function RelationshipSection({
         </p>
       ) : (
         <ul className="relations__list" data-testid="relationship-list">
-          {views.map((view) =>
-            editingId === view.id ? (
-              <li className="relations__editing" key={view.id}>
-                {form}
-              </li>
-            ) : (
-              <li className="relation" key={view.id} data-relation-label={view.label}>
-                <p className="relation__label">
-                  <bdi>{view.label}</bdi>
-                </p>
+          {byReading(views).map(([label, group]) => (
+            <li className="relations__group" key={label}>
+              <h3 className="relations__reading">
+                <bdi>{label}</bdi>
+              </h3>
+              <ul className="relations__rows">
+                {group.map((view) =>
+                  editingId === view.id ? (
+                    <li className="relations__editing" key={view.id}>
+                      {form}
+                    </li>
+                  ) : (
+                    <li className="relation" key={view.id} data-relation-label={view.label}>
+                      <EntityTile
+                        className="relation__tile"
+                        universeId={universeId}
+                        entityId={view.relatedEntityId}
+                        image={null}
+                        typeIcon={view.relatedEntityTypeIcon}
+                        typeAccent={view.relatedEntityTypeAccentColor}
+                      />
 
-                <div className="relation__body">
-                  <Link
-                    className="relation__name"
-                    to={`/app/universes/${universeId}/lore/${view.relatedEntityId}`}
-                  >
-                    <bdi>{view.relatedEntityName}</bdi>
-                  </Link>
-                  <p className="relation__meta">
-                    <span className="relation__kind">
-                      <bdi>{view.relatedEntityTypeName}</bdi>
-                    </span>
-                    {formatSpan(view.startDate, view.endDate) ? (
-                      <span className="relation__span">
-                        {formatSpan(view.startDate, view.endDate)}
-                      </span>
-                    ) : null}
-                  </p>
-                  {view.notes ? <p className="relation__notes prose">{view.notes}</p> : null}
-                </div>
+                      <div className="relation__body">
+                        <Link
+                          className="relation__name"
+                          to={`/app/universes/${universeId}/lore/${view.relatedEntityId}`}
+                        >
+                          <bdi>{view.relatedEntityName}</bdi>
+                        </Link>
+                        <p className="relation__meta">
+                          <span className="relation__kind">
+                            <bdi>{view.relatedEntityTypeName}</bdi>
+                          </span>
+                          <StatusBadge
+                            step={view.canonStatus}
+                            label={CANON_LABELS[view.canonStatus]}
+                          />
+                          {formatSpan(view.startDate, view.endDate) ? (
+                            <span className="relation__span">
+                              {formatSpan(view.startDate, view.endDate)}
+                            </span>
+                          ) : null}
+                        </p>
+                        {view.notes ? <p className="relation__notes prose">{view.notes}</p> : null}
+                      </div>
 
-                <div className="relation__tools">
-                  <StatusBadge step={view.canonStatus} label={CANON_LABELS[view.canonStatus]} />
-                  <button
-                    className="button button--quiet"
-                    type="button"
-                    onClick={() => openEdit(view)}
-                    data-testid={`edit-relationship-${view.relatedEntityName}`}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    className="button button--quiet"
-                    type="button"
-                    onClick={() => remove(view)}
-                    data-testid={`delete-relationship-${view.relatedEntityName}`}
-                  >
-                    Remove
-                  </button>
-                </div>
-              </li>
-            ),
-          )}
+                      <ActionMenu
+                        className="relation__menu"
+                        label={`More actions for ${view.label} ${view.relatedEntityName}`}
+                        triggerTestId={`relationship-actions-${view.relatedEntityName}`}
+                      >
+                        <button
+                          className="actionmenu__item"
+                          type="button"
+                          onClick={() => openEdit(view)}
+                          data-testid={`edit-relationship-${view.relatedEntityName}`}
+                        >
+                          <ActionIcon icon={Pencil} />
+                          Edit relation
+                        </button>
+                        <hr className="actionmenu__divider" />
+                        <button
+                          className="actionmenu__item actionmenu__item--danger"
+                          type="button"
+                          onClick={() => void remove(view)}
+                          data-testid={`delete-relationship-${view.relatedEntityName}`}
+                        >
+                          <ActionIcon icon={Trash} />
+                          Remove relation
+                        </button>
+                      </ActionMenu>
+                    </li>
+                  ),
+                )}
+              </ul>
+            </li>
+          ))}
         </ul>
       )}
     </section>

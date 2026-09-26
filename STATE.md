@@ -48,7 +48,7 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   `<type>/<description>` branches: Phase 2 Story, Phase 3, and now Phase 4.
   **Phase 023 - Production Hardening / PostgreSQL - remains deferred** and is not started; the
   next numbered phase resumes only when the owner says so.
-- **Design refactor: 001 (audit), 002 (app shell, shared foundation) and 003 (Lore browsing) done; 004-007 to come.**
+- **Design refactor: 001 (audit), 002 (app shell), 003 (Lore browsing) and 004 (entity experience) done; 005-007 to come.**
   See Design refactor below.
 - **Entry images** (`feat/entity-images-r2`, merged into `dev`). An entry may carry one picture:
   uploaded through the API, decoded and thumbnailed server-side, stored as two objects in one
@@ -591,12 +591,24 @@ Canon change; the Lore list gains query parameters in 003 and nothing else touch
     now "Filter entries" with a filter icon, in one row with a status `.segmented`; on a phone both fold behind
     "Filters". Create sits at the bottom edge on a phone. First card: 437 -> 307px at 1440, ~713 -> 260px at 390.
   - Also fixed: on a phone the sticky bar stretched to fill a short page.
-- **Next: 004 Entity experience.** Then 005 Story, 006 Worldbuilding, 007 Polish (contract section 15).
+- **004 - Entity experience** (`refactor/entity-experience` off `dev` at `665892a`, committed, not merged, not pushed).
+  Presentation only: no API, schema, backup, image, article or relationship change.
+  - Header: "Lore / [icon] Type" (the type links to its Lore list by id), the Canon control as a quiet track with
+    glyphs, the name at the document size. The bar: views; Edit, Family tree, and ⋯ holding Move to Trash.
+  - The picture is the original, placed by its own proportions - beside the article with the facts for portrait and
+    square, above it for landscape - and "View full image" opens `ImageViewer`, a native modal dialog showing it
+    whole (Escape, Close, surround, Tab kept inside, focus returned). Cards keep the thumbnail.
+  - Article: a quiet empty panel with Write the article; lists no longer a blank line apart. Relations grouped under
+    their reading with type tiles, Edit and Remove in each row's ⋯. History without italics, dates in the margin.
+  - The form takes the page: sections, and a sticky bar that says whether anything changed, Cancel before Save.
+  - Seen, not changed: the entry form has no leave guard of its own - the article editor does, and it still holds.
+- **Next: 005 Story workspace.** Then 006 Worldbuilding, 007 Polish (contract section 15).
 - `design/` is not a type `branching.md` lists; 001 used it because the owner named the branch. 002 uses `refactor/`.
 
 ## Baseline
 
-- **999 API integration tests, 175 Playwright tests**, green. Design refactor 003's full run on a fresh database: **175/175**
+- **999 API integration tests, 179 Playwright tests**, green. Design refactor 004's full run on a fresh database: **179/179**
+  (175 plus `entity-page.spec.ts`'s four). 003's was 175/175
   (`type-filter.spec.ts` rewritten around the type navigation, same count). 002's was 175/175 (171 plus `shell.spec.ts`'s four). No backend change, so the API suite and Release build were not rerun.
   Stabilization pass 003's full Playwright run on a fresh
   database of its own (`LOREX_E2E_DB`), at Playwright's default workers: **171/171, nothing logged about a locked

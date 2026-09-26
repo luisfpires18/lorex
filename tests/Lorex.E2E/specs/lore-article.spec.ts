@@ -171,7 +171,9 @@ test.describe('lore article', () => {
     // The entry's structured edit leaves the article exactly as it was, and one editor is open at a time.
     const before = await readArticle(page, universeId, entityId)
     await page.getByTestId('edit-entity').click()
-    await expect(page.getByTestId('article-edit')).toBeDisabled()
+    // The form takes the page while it is open, so the article's own editor cannot be started beside it.
+    await expect(page.getByTestId('entry-form')).toBeVisible()
+    await expect(page.getByTestId('article-edit')).toHaveCount(0)
     await page.getByLabel('Summary').fill('Warden of the drowned coast.')
     await page.getByTestId('save-entity').click()
     await expect(page.getByTestId('entry-summary')).toContainText('drowned coast')

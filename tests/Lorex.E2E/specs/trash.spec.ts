@@ -83,6 +83,7 @@ test.describe('trash', () => {
       expect(dialog.message()).toContain('restore')
       void dialog.accept()
     })
+    await page.getByTestId('entity-actions').click()
     await page.getByTestId('trash-entity').click()
 
     // Removing it lands on the Trash, where it is listed as recoverable.

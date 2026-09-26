@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Link,
   NavLink,
@@ -8,17 +8,20 @@ import {
   useParams,
   useSearchParams,
 } from 'react-router-dom'
-import { Check, Network, Pencil, Trash, X } from 'lucide-react'
+import { Check, Maximize2, Network, Pencil, Trash, X } from 'lucide-react'
 import { ActionIcon } from '../components/ActionIcon'
+import { ActionMenu } from '../components/ActionMenu'
 import { EntityArticleSection } from '../components/EntityArticle'
 import { EntityHistory } from '../components/EntityHistory'
 import { EntityImageField, type PendingImage } from '../components/EntityImageField'
 import { FieldInput } from '../components/FieldInputs'
+import { ImageViewer } from '../components/ImageViewer'
 import { NameList } from '../components/NameList'
 import { RelationshipSection } from '../components/RelationshipSection'
 import { emptyValue } from '../lore/document'
 import { entityImageUrl, setEntityImage } from '../lore/images'
 import { TokenInput } from '../components/TokenInput'
+import { TypeIcon } from '../components/TypeIcon'
 import { blockingFindingsOf } from '../canon/blocked'
 import type { CanonBlockingFinding } from '../canon/types'
 import { formatChronologyYear } from '../chronology/format'
@@ -156,6 +159,18 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
   // holding the other's state.
   const [historyKey, setHistoryKey] = useState(0)
 
+  // The full picture is page state, not an address: opening it is never a step Back has to undo.
+  const [isViewing, setIsViewing] = useState(false)
+  const expandButton = useRef<HTMLButtonElement>(null)
+
+  // Back to the button that opened it, once the viewer has gone - after the dialog's own close, which
+  // would otherwise have the last word on where the focus lands.
+  const wasViewing = useRef(false)
+  useEffect(() => {
+    if (wasViewing.current && !isViewing) expandButton.current?.focus()
+    wasViewing.current = isViewing
+  }, [isViewing])
+
   useEffect(() => {
     const controller = new AbortController()
 
@@ -219,6 +234,17 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
   const selectedType = useMemo(
     () => types.find((type) => type.id === draft?.entityTypeId) ?? null,
     [types, draft?.entityTypeId],
+  )
+
+  // Whether the open form differs from what is stored - said in the form's bar, in words.
+  const isDirty = useMemo(
+    () =>
+      isFormOpen &&
+      !isNew &&
+      detail !== null &&
+      draft !== null &&
+      JSON.stringify(draft) !== JSON.stringify(draftFromDetail(detail)),
+    [isFormOpen, isNew, detail, draft],
   )
 
   // A link to `#article` - a search result whose words were in the article - lands on it once the entry is on screen:
@@ -467,12 +493,20 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
             <Link
               className="entry__type"
               to={`/app/universes/${universe.id}/lore?type=${detail?.entityTypeId ?? draft.entityTypeId}`}
+              style={
+                selectedType?.accentColor
+                  ? { ['--type-accent' as string]: selectedType.accentColor }
+                  : undefined
+              }
               data-testid="entry-type"
             >
+              <TypeIcon iconKey={selectedType?.icon ?? null} className="entry__typeicon" />
               <bdi>{detail?.entityTypeName ?? selectedType?.name}</bdi>
             </Link>
           )}
 
+          {/* How settled the entry is, changed in one press. A choice, not an action: the chosen step is
+              raised paper with its glyph and word, never a filled block louder than the name. */}
           <div className="canon" role="group" aria-label="Canon status">
             {CANON_ORDER.map((option) => (
               <button
@@ -491,6 +525,18 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
           </div>
         </div>
 
+        {isEditing ? (
+          // The screen still has its one heading while the name is a field.
+          <h1 className="visually-hidden">
+            {isNew ? (
+              'New entry'
+            ) : (
+              <>
+                Editing <bdi>{detail?.name}</bdi>
+              </>
+            )}
+          </h1>
+        ) : null}
         {isEditing ? (
           <input
             className="entry__nameinput"
@@ -529,10 +575,10 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
         ) : null}
       </header>
 
-      {/* One bar under the identity: where in the entry you are, and what you can do to the entry itself.
-          Neither belongs at the foot of a page whose length is whatever the author wrote. It is not drawn
-          while the entry's own form is open - there is one editor at a time, and it has its own bar - nor
-          while the article is being written, for the same reason. */}
+      {/* One bar under the identity: where in the entry you are, and what you can do to the entry itself -
+          Edit first, Family tree beside it, and everything that manages rather than reads in the ⋯ menu,
+          Move to Trash last. Not drawn while the entry's own form is open, nor while the article is
+          being written: one editor, and one set of tools, at a time. */}
       {!isNew && !isEditing ? (
         <div className="entry__bar">
           <nav className="views" aria-label="Entry views" data-testid="entry-views">
@@ -558,7 +604,7 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
           {isWritingArticle ? null : (
             <div className="entry__tools">
               <button
-                className="button button--quiet button--icon"
+                className="button button--secondary"
                 type="button"
                 onClick={startEditing}
                 disabled={isSaving}
@@ -570,23 +616,28 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
               {/* Offered on every entry: family is recorded by the author, never inferred from what an
                   entry is. An entry with no family connections opens an empty tree that says so. */}
               <Link
-                className="button button--quiet button--icon"
+                className="button button--text"
                 to={`/app/universes/${universe.id}/family-tree/${entityId}`}
                 data-testid="entity-family-tree"
               >
                 <ActionIcon icon={Network} />
                 Family tree
               </Link>
-              <button
-                className="button button--quiet button--icon entry__trash"
-                type="button"
-                onClick={moveToTrash}
-                disabled={isSaving}
-                data-testid="trash-entity"
+              <ActionMenu
+                label={`More actions for ${detail?.name ?? 'this entry'}`}
+                triggerTestId="entity-actions"
               >
-                <ActionIcon icon={Trash} />
-                Move to Trash
-              </button>
+                <button
+                  className="actionmenu__item actionmenu__item--danger"
+                  type="button"
+                  onClick={() => void moveToTrash()}
+                  disabled={isSaving}
+                  data-testid="trash-entity"
+                >
+                  <ActionIcon icon={Trash} />
+                  Move to Trash
+                </button>
+              </ActionMenu>
             </div>
           )}
         </div>
@@ -604,77 +655,50 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
         </p>
       ) : null}
 
-      {view === 'article' ? (
-        <div className="entry__layout">
-          <div className="entry__main">
-            {!isEditing && detail?.image ? (
-              <figure className="entry__plate" data-testid="entry-image">
-                <img
-                  src={entityImageUrl(universe.id, detail.id, detail.image, 'original')}
-                  alt={detail.name}
-                  // The original's own dimensions, which give the browser the picture's shape before a byte
-                  // of it has loaded: the space it will occupy is reserved from its own aspect ratio, so the
-                  // article never jumps down the page as one arrives.
-                  width={detail.image.width}
-                  height={detail.image.height}
-                  decoding="async"
-                />
-              </figure>
-            ) : null}
+      {isEditing ? (
+        <div className="entryform" data-testid="entry-form">
+          <section className="entryform__section">
+            <EntityImageField
+              universeId={universe.id}
+              entityId={isNew ? null : entityId}
+              image={detail?.image ?? null}
+              pending={pendingImage}
+              onPending={setPendingImage}
+              onChanged={(image) => {
+                setDetail((current) => (current ? { ...current, image } : current))
+                // An image change is a version like any other, so the history is read again
+                // rather than left sitting one write behind.
+                setHistoryKey((key) => key + 1)
+              }}
+              disabled={isSaving}
+            />
+          </section>
 
-            {isNew ? (
-              <section className="entry__article" aria-label="Article">
-                <p className="entry__blank">
-                  Once the entry is created, you can write its article here.
-                </p>
-              </section>
-            ) : (
-              <EntityArticleSection
-                key={entityId}
-                universeId={universe.id}
-                entityId={entityId}
-                entityName={detail?.name ?? ''}
-                canEdit={!isEditing}
-                onEditingChange={setIsWritingArticle}
-                onSaved={articleSaved}
-              />
-            )}
-          </div>
+          <section className="entryform__section">
+            <h2 className="entryform__heading">Other names and tags</h2>
+            <TokenInput
+              label="Aliases"
+              name="aliases"
+              placeholder="Other names"
+              values={draft.aliases}
+              onChange={(aliases) => setDraft({ ...draft, aliases })}
+            />
+            <TokenInput
+              label="Tags"
+              name="tags"
+              placeholder="Add a tag"
+              values={draft.tags}
+              onChange={(tags) => setDraft({ ...draft, tags })}
+            />
+          </section>
 
-          <aside className="entry__rail">
-            {isEditing ? (
-              <>
-                <EntityImageField
-                  universeId={universe.id}
-                  entityId={isNew ? null : entityId}
-                  image={detail?.image ?? null}
-                  pending={pendingImage}
-                  onPending={setPendingImage}
-                  onChanged={(image) => {
-                    setDetail((current) => (current ? { ...current, image } : current))
-                    // An image change is a version like any other, so the history beside it is
-                    // read again rather than left sitting one write behind.
-                    setHistoryKey((key) => key + 1)
-                  }}
-                  disabled={isSaving}
-                />
-
-                <TokenInput
-                  label="Aliases"
-                  name="aliases"
-                  placeholder="Other names"
-                  values={draft.aliases}
-                  onChange={(aliases) => setDraft({ ...draft, aliases })}
-                />
-                <TokenInput
-                  label="Tags"
-                  name="tags"
-                  placeholder="Add a tag"
-                  values={draft.tags}
-                  onChange={(tags) => setDraft({ ...draft, tags })}
-                />
-
-                {(selectedType?.fields ?? []).map((definition) => (
+          {(selectedType?.fields.length ?? 0) > 0 ? (
+            <section className="entryform__section">
+              <h2 className="entryform__heading">
+                What a <bdi>{selectedType?.name}</bdi> records
+              </h2>
+              <div className="entryform__fields">
+                {selectedType!.fields.map((definition) => (
                   <div key={definition.id}>
                     <FieldInput
                       definition={definition}
@@ -695,41 +719,92 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
                     ) : null}
                   </div>
                 ))}
-              </>
-            ) : (
-              <>
-                {(detail?.fields.length ?? 0) > 0 ? (
-                  <dl className="facts" data-testid="entry-fields">
-                    {detail!.fields.map((value) => (
-                      <div className="facts__row" key={value.fieldDefinitionId}>
-                        <dt className="facts__key">{value.name}</dt>
-                        <dd className="facts__value prose">{renderFact(value, chronology)}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                ) : null}
+              </div>
+            </section>
+          ) : null}
 
-                {(detail?.tags.length ?? 0) > 0 ? (
-                  <div className="rail__block">
-                    <h3 className="rail__heading">Tags</h3>
-                    <p className="dossier__tags" data-testid="entry-tags">
-                      {detail!.tags.map((tag) => (
-                        <span className="chip" key={tag}>
-                          {tag}
-                        </span>
-                      ))}
-                    </p>
-                  </div>
-                ) : null}
+          {isNew ? (
+            <p className="entryform__note">The article is written on the entry once it exists.</p>
+          ) : null}
+        </div>
+      ) : view === 'article' ? (
+        <div
+          className="entry__layout"
+          data-picture={detail?.image ? 'true' : 'false'}
+          data-shape={detail?.image ? pictureShape(detail.image) : undefined}
+        >
+          {detail?.image ? (
+            <figure className="entry__media" data-testid="entry-image">
+              <img
+                src={entityImageUrl(universe.id, detail.id, detail.image, 'original')}
+                alt={detail.name}
+                // The original's own dimensions, which give the browser the picture's shape before a byte
+                // of it has loaded: the space it will occupy is reserved from its own aspect ratio, so the
+                // article never jumps down the page as one arrives.
+                width={detail.image.width}
+                height={detail.image.height}
+                decoding="async"
+              />
+              <button
+                ref={expandButton}
+                className="iconbutton entry__expand"
+                type="button"
+                onClick={() => setIsViewing(true)}
+                aria-label="View full image"
+                title="View full image"
+                data-testid="entry-image-expand"
+              >
+                <Maximize2 aria-hidden="true" focusable="false" strokeWidth={1.75} />
+              </button>
+            </figure>
+          ) : null}
 
-                {detail ? (
-                  <p className="rail__meta">
-                    Created {formatDate(detail.createdAt)}, last changed{' '}
-                    {formatDate(detail.updatedAt)}
-                  </p>
-                ) : null}
-              </>
+          <div className="entry__main">
+            {isNew ? null : (
+              <EntityArticleSection
+                key={entityId}
+                universeId={universe.id}
+                entityId={entityId}
+                entityName={detail?.name ?? ''}
+                canEdit={!isEditing}
+                onEditingChange={setIsWritingArticle}
+                onSaved={articleSaved}
+              />
             )}
+          </div>
+
+          <aside className="entry__rail" aria-label="Details">
+            {(detail?.fields.length ?? 0) > 0 ? (
+              <dl className="facts" data-testid="entry-fields">
+                {detail!.fields.map((value) => (
+                  <div className="facts__row" key={value.fieldDefinitionId}>
+                    <dt className="facts__key">{value.name}</dt>
+                    <dd className="facts__value prose">{renderFact(value, chronology)}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
+
+            {(detail?.tags.length ?? 0) > 0 ? (
+              <div className="rail__block">
+                <h2 className="rail__heading">Tags</h2>
+                <p className="dossier__tags" data-testid="entry-tags">
+                  {detail!.tags.map((tag) => (
+                    <span className="chip" key={tag}>
+                      {tag}
+                    </span>
+                  ))}
+                </p>
+              </div>
+            ) : null}
+
+            {detail ? (
+              <p className="rail__meta">
+                Created {formatDate(detail.createdAt)}
+                <br />
+                Last changed {formatDate(detail.updatedAt)}
+              </p>
+            ) : null}
           </aside>
         </div>
       ) : view === 'relations' ? (
@@ -752,40 +827,65 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
         </div>
       )}
 
-      {/* The form's own bar, and the only thing left at the foot of the page: Save and Cancel belong at the
-          end of what is being filled in. On a phone it sticks to the bottom edge, as it always has. */}
+      {/* The form's own bar: what state the form is in on the left, Cancel and Save on the right. It holds
+          to the bottom of the screen while the form is longer than it, and settles at the form's end. */}
       {isEditing ? (
-        <footer className="entry__actions">
-          <button
-            className="button button--icon"
-            type="button"
-            onClick={save}
-            disabled={isSaving}
-            data-testid="save-entity"
-          >
-            <ActionIcon icon={Check} />
-            {isSaving ? 'Saving' : isNew ? 'Create entry' : 'Save changes'}
-          </button>
-          {!isNew ? (
+        <footer className="entry__actions actionbar">
+          <p className="actionbar__status" role="status" data-testid="entry-form-status">
+            {isNew ? 'New entry' : isDirty ? 'Unsaved changes' : 'No changes yet'}
+          </p>
+          <div className="actionbar__actions">
+            {!isNew ? (
+              <button
+                className="button button--secondary"
+                type="button"
+                onClick={() => {
+                  if (detail) setDraft(draftFromDetail(detail))
+                  setIsEditing(false)
+                  setMessage(null)
+                  setFieldErrors({})
+                  setBlocked(null)
+                }}
+              >
+                <ActionIcon icon={X} />
+                Cancel
+              </button>
+            ) : null}
             <button
-              className="button button--quiet button--icon"
+              className="button"
               type="button"
-              onClick={() => {
-                if (detail) setDraft(draftFromDetail(detail))
-                setIsEditing(false)
-                setMessage(null)
-                setFieldErrors({})
-                setBlocked(null)
-              }}
+              onClick={save}
+              disabled={isSaving}
+              aria-busy={isSaving}
+              data-testid="save-entity"
             >
-              <ActionIcon icon={X} />
-              Cancel
+              <ActionIcon icon={Check} />
+              {isSaving ? 'Saving' : isNew ? 'Create entry' : 'Save changes'}
             </button>
-          ) : null}
+          </div>
         </footer>
+      ) : null}
+
+      {isViewing && detail?.image ? (
+        <ImageViewer
+          src={entityImageUrl(universe.id, detail.id, detail.image, 'original')}
+          name={detail.name}
+          width={detail.image.width}
+          height={detail.image.height}
+          onClose={() => setIsViewing(false)}
+        />
       ) : null}
     </article>
   )
+}
+
+/**
+ * Whether a picture sits beside the article (taller than wide, or near square) or spans the page above
+ * it (clearly wider than tall). Read from the original's stored dimensions; nothing is cropped either way.
+ */
+function pictureShape(image: { width: number; height: number }) {
+  const ratio = image.width / image.height
+  return ratio > 1.25 ? 'landscape' : ratio < 0.9 ? 'portrait' : 'square'
 }
 
 /**
