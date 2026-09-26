@@ -6,6 +6,7 @@ import { UniverseForm } from '../components/UniverseForm'
 import { downloadUniverseBackup } from '../export/api'
 import { discardUniverseDrafts } from '../lib/localDrafts'
 import { deleteUniverse, setUniverseArchived, updateUniverse } from '../universes/api'
+import { PageHeader } from '../components/PageHeader'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
 export default function UniverseSettings() {
@@ -65,10 +66,10 @@ export default function UniverseSettings() {
 
   return (
     <article className="settings">
-      <h2 className="settings__title">Settings</h2>
+      <PageHeader title="Settings" />
 
       <section className="settings__section">
-        <h3 className="settings__heading">Details</h3>
+        <h2 className="settings__heading">Details</h2>
         {saved ? (
           <p className="settings__saved" role="status" data-testid="settings-saved">
             Saved.
@@ -98,7 +99,7 @@ export default function UniverseSettings() {
       />
 
       <section className="settings__section">
-        <h3 className="settings__heading">Backup</h3>
+        <h2 className="settings__heading">Backup</h2>
         <p className="settings__note">
           Download this universe as a single archive: its entries and their articles, types and
           fields, tags, relationships, the timeline, its world rules, every entry&rsquo;s history,
@@ -134,7 +135,7 @@ export default function UniverseSettings() {
       </section>
 
       <section className="settings__section">
-        <h3 className="settings__heading">{universe.isArchived ? 'Restore' : 'Archive'}</h3>
+        <h2 className="settings__heading">{universe.isArchived ? 'Restore' : 'Archive'}</h2>
         <p className="settings__note">
           {universe.isArchived
             ? 'This universe is archived. Restoring puts it back in your active list.'
@@ -153,7 +154,7 @@ export default function UniverseSettings() {
 
       {universe.isArchived ? (
         <section className="settings__section settings__section--danger">
-          <h3 className="settings__heading">Delete</h3>
+          <h2 className="settings__heading">Delete</h2>
           <p className="settings__note">
             Deleting removes this universe and everything in it. There is no undo.
           </p>

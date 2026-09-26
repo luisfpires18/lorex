@@ -10,6 +10,7 @@ import { linkSentence } from '../familyTree/reading'
 import type { FamilyTree } from '../familyTree/types'
 import { listRelationshipTypes } from '../relationships/api'
 import { FamilySemantic, type RelationshipType } from '../relationships/types'
+import { PageHeader } from '../components/PageHeader'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
 /**
@@ -104,18 +105,11 @@ export default function FamilyTreePage() {
 
   return (
     <section className="family" aria-labelledby={headingId} data-testid="family-tree-page">
-      <header className="chron__head">
-        <div>
-          <h2 className="chron__title" id={headingId}>
-            Family Tree
-          </h2>
-          <p className="chron__lede">
-            Parents, grandparents, siblings, children and grandchildren, worked out from the
-            connections you have recorded. Only a relation kind you have given a family meaning
-            counts.
-          </p>
-        </div>
-      </header>
+      <PageHeader
+        title="Family Tree"
+        titleId={headingId}
+        lede="Parents, grandparents, siblings, children and grandchildren, worked out from the connections you have recorded. Only a relation kind you have given a family meaning counts."
+      />
 
       <div className="family__picker">
         <EntityPicker

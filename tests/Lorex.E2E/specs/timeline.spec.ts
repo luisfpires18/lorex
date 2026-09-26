@@ -424,7 +424,7 @@ test.describe('timeline', () => {
     await addMoment(page, { title: 'The muster', kind: 'exact', startYear: '3018' })
 
     await expect.poll(() => momentOrder(page)).toEqual(['The muster', 'The crowning'])
-    await expect(moment(page, 'The crowning').locator('.chip')).toHaveText('Idea')
+    await expect(moment(page, 'The crowning').locator('.statusbadge')).toHaveText('Idea')
 
     // The drawer opens on what was written, not on an empty form.
     await page.getByTestId('edit-moment-The crowning').click()
@@ -448,12 +448,14 @@ test.describe('timeline', () => {
     await expect(moment(page, 'The crowning of Aragorn').locator('.moment__when')).toHaveText(
       '3017.05',
     )
-    await expect(moment(page, 'The crowning of Aragorn').locator('.chip')).toHaveText('Canon')
+    await expect(moment(page, 'The crowning of Aragorn').locator('.statusbadge')).toHaveText(
+      'Canon',
+    )
 
     // Canon status, the new date and the cast all survive a reload.
     await page.reload()
     const crowning = moment(page, 'The crowning of Aragorn')
-    await expect(crowning.locator('.chip')).toHaveText('Canon')
+    await expect(crowning.locator('.statusbadge')).toHaveText('Canon')
     await expect(crowning.locator('.moment__when')).toHaveText('3017.05')
     await expect(crowning.locator('.moment__account')).toHaveText('A king returns.')
     await expect(crowning.locator('.moment__cast')).toContainText('Aragorn')

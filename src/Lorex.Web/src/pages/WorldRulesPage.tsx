@@ -6,6 +6,8 @@ import { Quoted } from '../components/NameList'
 import { formatDate } from '../lib/dates'
 import { listWorldRules } from '../worldRules/api'
 import type { WorldRulePage } from '../worldRules/types'
+import { EmptyState } from '../components/EmptyState'
+import { PageHeader } from '../components/PageHeader'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
 type LoadState =
@@ -68,21 +70,17 @@ export default function WorldRulesPage() {
 
   return (
     <section className="rules" aria-labelledby={headingId} data-testid="world-rules">
-      <header className="chron__head rules__head">
-        <div>
-          <h2 className="chron__title" id={headingId}>
-            World Rules
-          </h2>
-          <p className="chron__lede">
-            Explicit statements about how this universe works, kept exactly as you write them. Lorex
-            never reads their words; only a timeline check you give a rule is counted.
-          </p>
-        </div>
-        <Link className="button button--icon" to={`${basePath}/new`} data-testid="new-world-rule">
-          <ActionIcon icon={Plus} />
-          New rule
-        </Link>
-      </header>
+      <PageHeader
+        title="World Rules"
+        titleId={headingId}
+        lede="Explicit statements about how this universe works, kept exactly as you write them. Lorex never reads their words; only a timeline check you give a rule is counted."
+        actions={
+          <Link className="button" to={`${basePath}/new`} data-testid="new-world-rule">
+            <ActionIcon icon={Plus} />
+            New rule
+          </Link>
+        }
+      />
 
       {notice ? (
         <div className="notice rules__notice" data-testid="world-rules-deleted-notice">
@@ -151,32 +149,29 @@ export default function WorldRulesPage() {
       ) : null}
 
       {result && result.items.length === 0 && result.totalCount === 0 ? (
-        <div className="empty" data-testid="world-rules-empty">
-          <p className="empty__line">No world rules yet.</p>
-          <p className="empty__hint">
-            World Rules define explicit constraints for how this universe works: “Teleportation
-            cannot cross the Veil.” “A bonded dragon dies if its rider dies.”
-          </p>
-          <Link
-            className="button button--icon empty__action"
-            to={`${basePath}/new`}
-            data-testid="empty-new-world-rule"
-          >
-            <ActionIcon icon={Plus} />
-            New rule
-          </Link>
-        </div>
+        <EmptyState
+          testId="world-rules-empty"
+          title="No world rules yet."
+          hint="World Rules define explicit constraints for how this universe works: “Teleportation cannot cross the Veil.” “A bonded dragon dies if its rider dies.”"
+          action={
+            <Link className="button" to={`${basePath}/new`} data-testid="empty-new-world-rule">
+              <ActionIcon icon={Plus} />
+              New rule
+            </Link>
+          }
+        />
       ) : null}
 
       {result && result.items.length === 0 && result.totalCount > 0 ? (
-        <div className="empty" data-testid="world-rules-page-empty">
-          <p className="empty__line">Nothing on this page.</p>
-          <p className="empty__hint">
-            <button className="button button--quiet" type="button" onClick={() => goToPage(1)}>
+        <EmptyState
+          testId="world-rules-page-empty"
+          title="Nothing on this page."
+          action={
+            <button className="button button--secondary" type="button" onClick={() => goToPage(1)}>
               Go to the first page
             </button>
-          </p>
-        </div>
+          }
+        />
       ) : null}
 
       {result && result.totalPages > 1 ? (

@@ -69,7 +69,7 @@ export default function LorePage() {
   return (
     <article className="lore">
       <header className="lore__head">
-        <h2 className="lore__title">Lore</h2>
+        <h1 className="lore__title">Lore</h1>
         <Link className="button button--icon" to="new" data-testid="new-entity">
           <ActionIcon icon={Plus} />
           New entry

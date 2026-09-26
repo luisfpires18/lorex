@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AccountMenu } from '../components/AccountMenu'
 import { BrandMark } from '../components/BrandMark'
 import { RestoreBackup } from '../components/RestoreBackup'
+import { MAIN_CONTENT_ID } from '../components/SkipLink'
 import { UniverseCard } from '../components/UniverseCard'
 import { UniverseForm } from '../components/UniverseForm'
 import { Wordmark } from '../components/Wordmark'
@@ -82,7 +83,7 @@ export default function UniversesPage() {
         </div>
       </header>
 
-      <main className="home__body">
+      <main className="home__body" id={MAIN_CONTENT_ID} tabIndex={-1}>
         <div className="home__heading">
           <h1 className="home__title">Universes</h1>
           <div className="home__actions">

@@ -212,7 +212,7 @@ test.describe('text direction', () => {
     // ---- The name: laid out right to left, so the number and the Latin word land where they were written ----
 
     const name = page.getByTestId('entry-name')
-    await expect(page.getByRole('heading', { level: 2, name: Text.numbers })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: Text.numbers })).toBeVisible()
     await expectIsolated(name, Text.numbers)
     // Inherited left to right, this drew as "12 — آكرون / Wright": the number thrown to the far end.
     expect(await drawnOrder(name, ['آكرون', '12', 'Wright'])).toEqual(['Wright', '12', 'آكرون'])
@@ -1057,7 +1057,7 @@ test.describe('authored prose direction', () => {
     // ---- The list's lede says the same ----
 
     await page.goto(`/app/universes/${universeId}/ideas`)
-    const lede = page.locator('.chron__lede')
+    const lede = page.locator('.ideas__lede')
     await expectIsolated(lede, name)
     expect(await drawnOrder(lede, ['Possibilities', 'Wright', 'آكرون', 'never'])).toEqual([
       'Possibilities',

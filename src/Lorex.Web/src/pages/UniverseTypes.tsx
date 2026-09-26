@@ -25,6 +25,7 @@ import {
   type FieldKindValue,
   type FieldSemanticValue,
 } from '../lore/types'
+import { PageHeader } from '../components/PageHeader'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
 const KIND_ORDER: FieldKindValue[] = [
@@ -214,10 +215,10 @@ export default function UniverseTypes() {
 
   return (
     <article className="types">
-      <h2 className="settings__title">Types</h2>
-      <p className="settings__note">
-        Every entry is one of these. Add your own, and give it the fields this world actually needs.
-      </p>
+      <PageHeader
+        title="Types"
+        lede="Every entry is one of these. Add your own, and give it the fields this world actually needs."
+      />
 
       {message ? (
         <p className="form__message" role="alert" data-testid="types-error">

@@ -3,7 +3,7 @@
 The implementation contract for Tasks 002-007. Produced by Design Refactor 001 (audit and
 direction) on `design/visual-system-audit`, from `dev` at `379bd8b`, 2026-09-26.
 
-**Implementation has not started.** Nothing here changes routes, APIs, schema, backups, search,
+**Implementation: 002 done** (`refactor/app-shell-shared-components`); 003-007 to come. §17's decisions are taken - §18. Nothing here changes routes, APIs, schema, backups, search,
 permissions, Canon, timeline logic or what a phone can do. The one URL addition anywhere in the
 plan is query parameters on the Lore list (§4.3).
 
@@ -1197,3 +1197,35 @@ Each is a real choice between good options.
 
 **Not in this plan, deliberately:** a theme switch, a command palette, favourites, sorting, counts per
 type, a header thumbnail beside the entry's picture, drag and drop, a gallery view, new fonts.
+
+---
+
+## 18. Decisions taken, and what 002 clarified
+
+**Owner decisions (2026-09-26), closing §17:**
+
+1. **Lore types on a phone:** A, as a compact, accessible "Type ▾" control opening every type; the desktop keeps
+   siblings visible for fast switching. Built in 003.
+2. **Overview:** A, a contents page - **without counts.** No endpoint is read only to print a number, and no count
+   API is added; a count appears only where data already on the screen provides it. None does today, so the
+   doorways carry a section's name, icon and one-line purpose. This replaces §4.7's "counts from the existing list
+   endpoints".
+3. **Corners:** A, soft - `--radius-sm` 6px controls, `--radius-md` 10px cards and panels.
+4. **Create on a phone:** A, a labelled, thumb-reachable action, sticky where the context allows, safe-area aware;
+   never a bare floating "+". Placed per screen in 003-006.
+
+**Clarified by 002's implementation (no principle changed):**
+
+- `.button--quiet` is the secondary look at the **sm** size (32px), not md: rows and bars laid out around it keep their
+  height until their own task moves them onto `.button--secondary` or `.button--text`. The alias still retires in 007.
+- The per-screen quiet re-skins (relation, version, moment and story tools) stay until 004-006, which replace those
+  rows with a main verb and an `ActionMenu`; converting them twice would be churn.
+- A disabled primary is drawn as a quiet outline everywhere, not only in an ActionBar.
+- `StatusBadge`'s middle step (Draft, Drafting) takes the accent colour as well as its half glyph, so the states an
+  author needs to notice are not the faintest; the word still carries the meaning.
+- A focused field shows the accent edge and a 3px accent halo, for keyboard and pointer alike, rather than a second
+  outline ring.
+- The universe's sections, their icons and one-line purposes live in `src/universes/sections.ts`, read by the sidebar,
+  the phone sheet and the Overview.
+- Every screen's title is its `h1` from 002, including screens whose layout waits for 003-006; their inner headings
+  are re-levelled when their task reaches them.

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 
 import { Plus } from 'lucide-react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { ActionIcon } from './ActionIcon'
+import { PageHeader } from './PageHeader'
 import { Quoted } from './NameList'
 import { listAllUniverses, listIdeas, restoreIdea } from '../ideas/api'
 import type { IdeaPage, IdeaSummary } from '../ideas/types'
@@ -195,34 +196,37 @@ export function IdeasBrowser({ universe, basePath }: IdeasBrowserProps) {
 
   return (
     <section className="ideas" aria-labelledby={headingId} data-testid="ideas">
-      <header className="chron__head ideas__head">
-        <div>
-          <h2 className="chron__title" id={headingId}>
-            Ideas
-          </h2>
-          <p className="chron__lede">
-            {universe ? (
-              <>
-                Possibilities for <Quoted text={universe.name} />. An idea is never lore: nothing
-                here changes the world.
-              </>
-            ) : (
-              'Possibilities, kept apart from your lore. An idea can belong to a universe, or to none.'
-            )}
-          </p>
-          {universe ? (
-            <p className="ideas__all">
-              <Link to="/app/ideas" data-testid="ideas-all">
-                All your ideas
-              </Link>
+      <PageHeader
+        title="Ideas"
+        titleId={headingId}
+        lede={
+          <>
+            <p className="ideas__lede">
+              {universe ? (
+                <>
+                  Possibilities for <Quoted text={universe.name} />. An idea is never lore: nothing
+                  here changes the world.
+                </>
+              ) : (
+                'Possibilities, kept apart from your lore. An idea can belong to a universe, or to none.'
+              )}
             </p>
-          ) : null}
-        </div>
-        <Link className="button button--icon" to={`${basePath}/new`} data-testid="new-idea">
-          <ActionIcon icon={Plus} />
-          New idea
-        </Link>
-      </header>
+            {universe ? (
+              <p className="ideas__all">
+                <Link to="/app/ideas" data-testid="ideas-all">
+                  All your ideas
+                </Link>
+              </p>
+            ) : null}
+          </>
+        }
+        actions={
+          <Link className="button" to={`${basePath}/new`} data-testid="new-idea">
+            <ActionIcon icon={Plus} />
+            New idea
+          </Link>
+        }
+      />
 
       {notice && !deleted ? (
         <div className="notice ideas__notice" data-testid="ideas-deleted-notice">

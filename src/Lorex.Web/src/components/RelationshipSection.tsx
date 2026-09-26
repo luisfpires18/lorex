@@ -17,6 +17,7 @@ import {
   type RelationshipView,
 } from '../relationships/types'
 import { CANON_LABELS, CANON_ORDER, CanonStatus, type CanonStatusValue } from '../lore/types'
+import { StatusBadge } from './StatusBadge'
 
 interface RelationDraft {
   typeId: string
@@ -410,9 +411,7 @@ export function RelationshipSection({
                 </div>
 
                 <div className="relation__tools">
-                  <span className="chip" data-canon={view.canonStatus}>
-                    {CANON_LABELS[view.canonStatus]}
-                  </span>
+                  <StatusBadge step={view.canonStatus} label={CANON_LABELS[view.canonStatus]} />
                   <button
                     className="button button--quiet"
                     type="button"

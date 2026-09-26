@@ -14,6 +14,8 @@ import {
   type TrashItem,
   type TrashPage,
 } from '../trash/types'
+import { EmptyState } from '../components/EmptyState'
+import { PageHeader } from '../components/PageHeader'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
 type LoadState =
@@ -219,22 +221,26 @@ export default function UniverseTrash() {
 
   return (
     <article className="trash">
-      <header className="trash__head">
-        <h2 className="trash__title">Trash</h2>
-        <p className="trash__lede">
-          What you removed from your lore, your stories and your world rules. Nothing here has been
-          erased — restoring puts each thing back with everything it held: an entry&rsquo;s article,
-          fields, history and connections; a scene&rsquo;s manuscript and its saved versions; a
-          story&rsquo;s chapters, scenes and plot; a rule&rsquo;s words.
-        </p>
-        <p className="trash__lede" data-testid="trash-ideas-pointer">
-          Deleted ideas are not here: they belong to your account, and wait in{' '}
-          <Link to={`/app/universes/${universe.id}/ideas?view=deleted`}>
-            Ideas, under Recently deleted
-          </Link>
-          .
-        </p>
-      </header>
+      <PageHeader
+        title="Trash"
+        lede={
+          <>
+            <p>
+              What you removed from your lore, your stories and your world rules. Nothing here has
+              been erased — restoring puts each thing back with everything it held: an entry&rsquo;s
+              article, fields, history and connections; a scene&rsquo;s manuscript and its saved
+              versions; a story&rsquo;s chapters, scenes and plot; a rule&rsquo;s words.
+            </p>
+            <p data-testid="trash-ideas-pointer">
+              Deleted ideas are not here: they belong to your account, and wait in{' '}
+              <Link to={`/app/universes/${universe.id}/ideas?view=deleted`}>
+                Ideas, under Recently deleted
+              </Link>
+              .
+            </p>
+          </>
+        }
+      />
 
       {blocked ? (
         <CanonBlockNotice universeId={universe.id} findings={blocked} linkSubjects={false} />
@@ -325,12 +331,11 @@ export default function UniverseTrash() {
       ) : null}
 
       {result && result.items.length === 0 ? (
-        <div className="empty" data-testid="trash-empty">
-          <p className="empty__line">The Trash is empty.</p>
-          <p className="empty__hint">
-            Anything you remove from your lore, your stories or your world rules waits here.
-          </p>
-        </div>
+        <EmptyState
+          testId="trash-empty"
+          title="The Trash is empty."
+          hint="Anything you remove from your lore, your stories or your world rules waits here."
+        />
       ) : null}
 
       {result && result.totalPages > 1 ? (

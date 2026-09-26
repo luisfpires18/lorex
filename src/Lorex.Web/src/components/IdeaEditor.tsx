@@ -565,9 +565,9 @@ export function IdeaEditor({
         <Link className="idea__back" to={listPath} data-testid="idea-back">
           {listLabel}
         </Link>
-        <h2 className="idea__heading" id={headingId} data-testid="idea-heading">
+        <h1 className="idea__heading" id={headingId} data-testid="idea-heading">
           {isNew ? 'New idea' : <bdi>{stored.title}</bdi>}
-        </h2>
+        </h1>
         <p className="idea__lede">
           A possibility, not lore. Nothing saved here changes your world.
           {!isNew && stored.updatedAt ? (

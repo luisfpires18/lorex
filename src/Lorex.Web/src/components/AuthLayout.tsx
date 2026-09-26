@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 
 import { BrandMark } from './BrandMark'
+import { MAIN_CONTENT_ID } from './SkipLink'
 import { Wordmark } from './Wordmark'
 
 interface AuthLayoutProps {
@@ -32,7 +33,7 @@ export function AuthLayout({ heading, intro, children, footer }: AuthLayoutProps
         </div>
       </aside>
 
-      <main className="auth__panel">
+      <main className="auth__panel" id={MAIN_CONTENT_ID} tabIndex={-1}>
         <div className="auth__form">
           <h1 className="auth__heading">{heading}</h1>
           <p className="auth__intro">{intro}</p>
