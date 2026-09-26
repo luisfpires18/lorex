@@ -126,14 +126,14 @@ test.describe('lore', () => {
     await page.waitForURL(/\/lore$/)
     await expect(card(page, name)).toBeVisible()
 
-    await page.getByLabel('Search', { exact: true }).fill('Grey Bird')
+    await page.getByLabel('Filter entries').fill('Grey Bird')
     await expect(card(page, name)).toBeVisible()
 
     // Words that appear nowhere but inside the article body find it too.
-    await page.getByLabel('Search', { exact: true }).fill('built for running')
+    await page.getByLabel('Filter entries').fill('built for running')
     await expect(card(page, name)).toBeVisible()
 
-    await page.getByLabel('Search', { exact: true }).fill('nothing-matches-this')
+    await page.getByLabel('Filter entries').fill('nothing-matches-this')
     await expect(page.getByTestId('entity-empty')).toBeVisible()
   })
 
@@ -209,13 +209,13 @@ test.describe('lore', () => {
     await page.waitForURL(/\/lore$/)
     await expect(page.getByTestId('entity-card')).toHaveCount(2)
 
-    const types = page.getByRole('group', { name: 'Type' })
-    await types.getByRole('button', { name: 'Location', exact: true }).click()
+    const types = page.getByRole('navigation', { name: 'Lore types' })
+    await types.getByRole('link', { name: 'Location', exact: true }).click()
     await expect(card(page, 'A Place')).toBeVisible()
     await expect(card(page, 'A Person')).toBeHidden()
 
-    await types.getByRole('button', { name: 'All', exact: true }).click()
-    await page.getByLabel('Status').selectOption({ label: 'Canon' })
+    await types.getByRole('link', { name: 'All', exact: true }).click()
+    await page.getByRole('group', { name: 'Status' }).getByRole('button', { name: 'Canon' }).click()
     await expect(card(page, 'A Person')).toBeVisible()
     await expect(card(page, 'A Place')).toBeHidden()
   })

@@ -6,6 +6,7 @@ import {
   useNavigate,
   useOutletContext,
   useParams,
+  useSearchParams,
 } from 'react-router-dom'
 import { Check, Network, Pencil, Trash, X } from 'lucide-react'
 import { ActionIcon } from '../components/ActionIcon'
@@ -112,6 +113,10 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
   const { entityId } = useParams<{ entityId: string }>()
   const navigate = useNavigate()
   const location = useLocation()
+  // A new entry opened from a Lore type (`lore/new?type=<id>`) starts in that type; the author can
+  // still change it. Read by id only, and only if this universe has that type.
+  const [searchParams] = useSearchParams()
+  const startingTypeId = searchParams.get('type')
 
   const isNew = entityId === undefined
   const [types, setTypes] = useState<EntityType[]>([])
@@ -201,7 +206,7 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
     if (editedDraft) return editedDraft
     if (!isNew || types.length === 0) return null
     return {
-      entityTypeId: types[0].id,
+      entityTypeId: types.find((type) => type.id === startingTypeId)?.id ?? types[0].id,
       name: '',
       summary: '',
       canonStatus: CanonStatus.Idea,
@@ -209,7 +214,7 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
       tags: [],
       fields: {},
     } satisfies Draft
-  }, [editedDraft, isNew, types])
+  }, [editedDraft, isNew, types, startingTypeId])
 
   const selectedType = useMemo(
     () => types.find((type) => type.id === draft?.entityTypeId) ?? null,
@@ -458,9 +463,14 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
               ))}
             </select>
           ) : (
-            <span className="entry__type" data-testid="entry-type">
+            // Back to the Lore list at this entry's type, by the type's id.
+            <Link
+              className="entry__type"
+              to={`/app/universes/${universe.id}/lore?type=${detail?.entityTypeId ?? draft.entityTypeId}`}
+              data-testid="entry-type"
+            >
               <bdi>{detail?.entityTypeName ?? selectedType?.name}</bdi>
-            </span>
+            </Link>
           )}
 
           <div className="canon" role="group" aria-label="Canon status">

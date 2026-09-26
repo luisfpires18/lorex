@@ -89,7 +89,12 @@ export function ActionMenu({
     document.addEventListener('focusin', onFocusIn)
 
     // Into the panel on opening, so the first thing Tab or a screen reader meets is its contents.
-    panel.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus()
+    // Onto the current item where the menu marks one (a place chosen from a list), else the first.
+    const items = panel.current
+    ;(
+      items?.querySelector<HTMLElement>(`[aria-current="page"]`) ??
+      items?.querySelector<HTMLElement>(FOCUSABLE)
+    )?.focus()
 
     return () => {
       document.removeEventListener('pointerdown', onPointerDown)

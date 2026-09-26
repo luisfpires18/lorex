@@ -186,7 +186,7 @@ test.describe('lore article', () => {
     // Search finds a word only the article holds, and says where it was found.
     await page.getByTestId('workspace-lore').click()
     await page.waitForURL(/\/lore$/)
-    await page.getByLabel('Search', { exact: true }).fill('Halloway')
+    await page.getByLabel('Filter entries').fill('Halloway')
     const card = page.locator('[data-testid="entity-card"][data-entity-name="Alenna Vance"]')
     const excerpt = card.getByTestId('entity-excerpt')
     await expect(excerpt).toContainText('In the article')
