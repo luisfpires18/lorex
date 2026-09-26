@@ -1,29 +1,16 @@
 import { useCallback, useEffect, useId, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 import { AccountMenu } from '../components/AccountMenu'
+import { MAIN_CONTENT_ID } from '../components/SkipLink'
 import { UniverseSearch } from '../components/UniverseSearch'
 import { getChronology } from '../chronology/api'
 import type { Chronology } from '../chronology/types'
 import { getUniverse } from '../universes/api'
+import { SECTION_GROUPS } from '../universes/sections'
 import type { UniverseDetail } from '../universes/types'
 
-/**
- * The sections a universe has, in the order the sidebar lists them. Held as data rather
- * than as markup because the narrow layout needs the same list twice: once as the list of
- * links, and once to name the section the author is currently in.
- */
-const SECTIONS = [
-  { segment: '', label: 'Overview', testId: 'workspace-overview' },
-  { segment: 'lore', label: 'Lore', testId: 'workspace-lore' },
-  { segment: 'family-tree', label: 'Family Tree', testId: 'workspace-family-tree' },
-  { segment: 'timeline', label: 'Timeline', testId: 'workspace-timeline' },
-  { segment: 'world-rules', label: 'World Rules', testId: 'workspace-world-rules' },
-  { segment: 'stories', label: 'Stories', testId: 'workspace-stories' },
-  { segment: 'ideas', label: 'Ideas', testId: 'workspace-ideas' },
-  { segment: 'canon', label: 'Canon', testId: 'workspace-canon' },
-  { segment: 'types', label: 'Types', testId: 'workspace-types' },
-  { segment: 'trash', label: 'Trash', testId: 'workspace-trash' },
-] as const
+const SECTIONS = SECTION_GROUPS.flat()
 
 type LoadState =
   | { kind: 'loading' }
@@ -54,7 +41,6 @@ function pathWithin(pathname: string, id: string | undefined) {
 /** Which section the current URL is in. `lore/:entityId` is still Lore. */
 function currentSection(pathname: string, id: string | undefined) {
   const segment = pathWithin(pathname, id).split('/')[0] ?? ''
-  if (segment === 'settings') return 'Settings'
   return SECTIONS.find((section) => section.segment === segment)?.label ?? 'Overview'
 }
 
@@ -208,37 +194,48 @@ export default function UniverseWorkspace() {
         <AccountMenu variant="rail" />
       </nav>
 
-      <aside className="sidebar" id={navId} data-open={isNavOpen ? 'true' : 'false'}>
+      <div className="sidebar" id={navId} data-open={isNavOpen ? 'true' : 'false'}>
         <div className="sidebar__head">
           <Link className="sidebar__back" to="/app">
+            <ArrowLeft className="sidebar__backicon" aria-hidden="true" focusable="false" />
             All universes
           </Link>
-          <h1 className="sidebar__name" data-testid="workspace-name">
+          {/* A name, not the screen's heading: each screen's own title is its h1. */}
+          <p className="sidebar__name" data-testid="workspace-name">
             <bdi>{universe.name}</bdi>
-          </h1>
+          </p>
           {universe.isArchived ? <span className="sidebar__archived">Archived</span> : null}
         </div>
 
-        <ul className="sidebar__nav">
-          {SECTIONS.map((section) => (
-            <li key={section.label}>
-              <NavLink
-                to={section.segment === '' ? '.' : section.segment}
-                end={section.segment === ''}
-                className="sidebar__link"
-                data-testid={section.testId}
-              >
-                {section.label}
-              </NavLink>
-            </li>
-          ))}
-          <li>
-            <NavLink to="settings" className="sidebar__link" data-testid="workspace-settings">
-              Settings
-            </NavLink>
-          </li>
-        </ul>
-      </aside>
+        <nav aria-label="Universe sections">
+          <ul className="sidebar__nav">
+            {SECTION_GROUPS.map((group) => (
+              <li className="sidebar__group" key={group[0].segment}>
+                <ul className="sidebar__links">
+                  {group.map(({ segment, label, testId, icon: Icon }) => (
+                    <li key={label}>
+                      <NavLink
+                        to={segment === '' ? '.' : segment}
+                        end={segment === ''}
+                        className="sidebar__link"
+                        data-testid={testId}
+                      >
+                        <Icon
+                          className="sidebar__icon"
+                          aria-hidden="true"
+                          focusable="false"
+                          strokeWidth={1.75}
+                        />
+                        {label}
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </div>
 
       <div className="workspace__column">
         {/* The universe's search, above every screen in it rather than on any one of them. Keyed by the universe, so a
@@ -248,7 +245,7 @@ export default function UniverseWorkspace() {
           <UniverseSearch key={universe.id} universeId={universe.id} />
         </div>
 
-        <main className="canvas">
+        <main className="canvas" id={MAIN_CONTENT_ID} tabIndex={-1}>
           <Outlet
             context={{ universe, refresh, chronology, setChronology } satisfies WorkspaceContext}
           />

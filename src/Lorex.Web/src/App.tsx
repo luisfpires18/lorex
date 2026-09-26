@@ -2,6 +2,7 @@ import { lazy, Suspense, type ReactNode } from 'react'
 import { createBrowserRouter, Navigate, Route, RouterProvider, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthProvider'
 import { RequireAuth, RequireGuest } from './auth/routes'
+import { SkipLink } from './components/SkipLink'
 import { HistoryLeaveGuard } from './lib/leaveGuard'
 import { ProfileImageProvider } from './profile/ProfileImageProvider'
 import UniverseOverview from './pages/UniverseOverview'
@@ -87,6 +88,7 @@ function Root() {
           same one, and it is read once per signed-in account rather than once per header. */}
       <ProfileImageProvider>
         <HistoryLeaveGuard />
+        <SkipLink />
         <Routes>
           <Route element={<RequireGuest />}>
             <Route path="/login" element={asScreen('login', <LoginPage />)} />

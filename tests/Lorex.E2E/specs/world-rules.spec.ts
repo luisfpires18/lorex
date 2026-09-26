@@ -146,7 +146,7 @@ test.describe('world rules', () => {
     await page.getByTestId('workspace-world-rules').click()
     await page.waitForURL(`${base}/world-rules`)
     await expect(page.getByTestId('workspace-world-rules')).toHaveAttribute('aria-current', 'page')
-    await expect(page.getByRole('heading', { name: 'World Rules', level: 2 })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'World Rules', level: 1 })).toBeVisible()
     await expect(page.getByTestId('world-rules-empty')).toContainText(
       'World Rules define explicit constraints for how this universe works',
     )

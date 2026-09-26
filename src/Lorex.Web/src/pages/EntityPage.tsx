@@ -491,9 +491,9 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
             onChange={(event) => setDraft({ ...draft, name: event.target.value })}
           />
         ) : (
-          <h2 className="entry__name" data-testid="entry-name">
+          <h1 className="entry__name" data-testid="entry-name">
             <bdi>{detail?.name}</bdi>
-          </h2>
+          </h1>
         )}
         {fieldErrors.name ? <p className="field__error">{fieldErrors.name}</p> : null}
 
@@ -525,25 +525,20 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
           while the article is being written, for the same reason. */}
       {!isNew && !isEditing ? (
         <div className="entry__bar">
-          <nav className="entryviews" aria-label="Entry views" data-testid="entry-views">
-            <NavLink
-              to={entryPath}
-              end
-              className="entryviews__link"
-              data-testid="entry-view-article"
-            >
+          <nav className="views" aria-label="Entry views" data-testid="entry-views">
+            <NavLink to={entryPath} end className="views__link" data-testid="entry-view-article">
               Article
             </NavLink>
             <NavLink
               to={`${entryPath}/relations`}
-              className="entryviews__link"
+              className="views__link"
               data-testid="entry-view-relations"
             >
               Relations
             </NavLink>
             <NavLink
               to={`${entryPath}/history`}
-              className="entryviews__link"
+              className="views__link"
               data-testid="entry-view-history"
             >
               History

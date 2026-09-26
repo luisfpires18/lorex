@@ -3,6 +3,7 @@ import { Link, useOutletContext } from 'react-router-dom'
 import { AccountMenu } from '../components/AccountMenu'
 import { BrandMark } from '../components/BrandMark'
 import { IdeasBrowser } from '../components/IdeasBrowser'
+import { MAIN_CONTENT_ID } from '../components/SkipLink'
 import { Wordmark } from '../components/Wordmark'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
@@ -26,7 +27,9 @@ export function IdeasHome({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className="home__body">{children}</main>
+      <main className="home__body" id={MAIN_CONTENT_ID} tabIndex={-1}>
+        {children}
+      </main>
     </div>
   )
 }

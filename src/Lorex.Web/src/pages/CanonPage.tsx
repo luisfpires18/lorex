@@ -21,6 +21,7 @@ import type {
 } from '../canon/types'
 import { ConflictEntry } from '../components/ConflictEntry'
 import { ApiError } from '../lib/api'
+import { PageHeader } from '../components/PageHeader'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
 type LoadState =
@@ -124,24 +125,22 @@ export default function CanonPage() {
 
   return (
     <article className="integrity">
-      <header className="integrity__head">
-        <div>
-          <h2 className="integrity__title">Canon integrity</h2>
-          <p className="integrity__lede">
-            What this world says twice, and differently. Findings are derived from your lore and
-            change nothing in it.
-          </p>
-        </div>
-        <button
-          className="button"
-          type="button"
-          onClick={() => void evaluate()}
-          disabled={isEvaluating}
-          data-testid="evaluate-canon"
-        >
-          {isEvaluating ? 'Evaluating…' : 'Evaluate'}
-        </button>
-      </header>
+      <PageHeader
+        title="Canon integrity"
+        lede="What this world says twice, and differently. Findings are derived from your lore and change nothing in it."
+        actions={
+          <button
+            className="button"
+            type="button"
+            onClick={() => void evaluate()}
+            disabled={isEvaluating}
+            aria-busy={isEvaluating}
+            data-testid="evaluate-canon"
+          >
+            {isEvaluating ? 'Evaluating…' : 'Evaluate'}
+          </button>
+        }
+      />
 
       <p className="integrity__law">
         Only a <strong>High</strong> finding refuses a save, and only the save that would create

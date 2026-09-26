@@ -8,6 +8,8 @@ import { CANON_LABELS, CANON_ORDER, type CanonStatusValue } from '../lore/types'
 import { deleteTimelineEntry, getTimelineEntry, listTimelineEntries } from '../timeline/api'
 import { formatTimelineDate, groupTimeline } from '../timeline/format'
 import { DATE_KIND_LABELS, type TimelineEntry, type TimelineEntryPage } from '../timeline/types'
+import { PageHeader } from '../components/PageHeader'
+import { StatusBadge } from '../components/StatusBadge'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
 type LoadState =
@@ -139,9 +141,7 @@ export default function TimelinePage() {
         <p className="moment__stamp">
           {stamp && !restates ? <span className="moment__when">{stamp}</span> : null}
           <span className="moment__kind">{DATE_KIND_LABELS[entry.date.kind]}</span>
-          <span className="chip" data-canon={entry.canonStatus}>
-            {CANON_LABELS[entry.canonStatus]}
-          </span>
+          <StatusBadge step={entry.canonStatus} label={CANON_LABELS[entry.canonStatus]} />
         </p>
 
         <h4 className="moment__title">
@@ -237,22 +237,20 @@ export default function TimelinePage() {
 
   return (
     <article className="chron">
-      <header className="chron__head">
-        <div>
-          <h2 className="chron__title">Timeline</h2>
-          <p className="chron__lede">
-            Everything that has happened here, in the order it happened.
-          </p>
-        </div>
-        <button
-          className="button"
-          type="button"
-          onClick={() => setForm({ mode: 'new' })}
-          data-testid="new-moment"
-        >
-          Add timeline entry
-        </button>
-      </header>
+      <PageHeader
+        title="Timeline"
+        lede="Everything that has happened here, in the order it happened."
+        actions={
+          <button
+            className="button"
+            type="button"
+            onClick={() => setForm({ mode: 'new' })}
+            data-testid="new-moment"
+          >
+            Add timeline entry
+          </button>
+        }
+      />
 
       <div className="controls">
         <div className="controls__filters">

@@ -4,6 +4,7 @@ import { useAuth } from '../auth/useAuth'
 import { AccountMenu } from '../components/AccountMenu'
 import { BrandMark } from '../components/BrandMark'
 import { ProfileAvatar } from '../components/ProfileAvatar'
+import { MAIN_CONTENT_ID } from '../components/SkipLink'
 import { Wordmark } from '../components/Wordmark'
 import { listUniverses } from '../universes/api'
 
@@ -55,7 +56,7 @@ export default function ProfilePage() {
         </div>
       </header>
 
-      <main className="home__body">
+      <main className="home__body" id={MAIN_CONTENT_ID} tabIndex={-1}>
         <article className="profile" data-testid="profile">
           <h1 className="profile__title">Profile</h1>
 

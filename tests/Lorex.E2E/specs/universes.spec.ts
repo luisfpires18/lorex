@@ -47,7 +47,11 @@ test.describe('universes', () => {
     const name = unique('Ashen Reach ')
     await createUniverse(page, name, 'A drowned continent.')
     await expect(page.getByTestId('workspace-name')).toHaveText(name)
-    await expect(page.getByText('Your lore will appear here.')).toBeVisible()
+    // The front page is the universe's contents: its name as the screen's heading, and a way into
+    // each part of it - not a placeholder claiming the lore is somewhere else.
+    await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
+    await expect(page.getByTestId('overview-lore')).toHaveAttribute('href', /\/lore$/)
+    await expect(page.getByText('Your lore will appear here.')).toHaveCount(0)
 
     // Back to the list: the new universe is on the grid.
     await page.getByRole('link', { name: 'All universes' }).click()

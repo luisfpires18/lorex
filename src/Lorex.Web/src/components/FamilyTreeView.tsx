@@ -4,6 +4,7 @@ import { EntityPortrait } from './EntityPortrait'
 import { readFamilyTree, type FamilyMember } from '../familyTree/reading'
 import { POSITION_LABELS, type FamilyPosition, type FamilyTree } from '../familyTree/types'
 import { CANON_LABELS, CanonStatus } from '../lore/types'
+import { StatusBadge } from './StatusBadge'
 import { FamilySemantic } from '../relationships/types'
 
 interface Props {
@@ -277,9 +278,7 @@ function Card({ member, universeId, onFocus, register }: CardProps) {
       <p className="familynode__kind">
         <span>{node.entityTypeName}</span>
         {node.canonStatus === CanonStatus.Canon ? null : (
-          <span className="chip" data-canon={node.canonStatus}>
-            {CANON_LABELS[node.canonStatus]}
-          </span>
+          <StatusBadge step={node.canonStatus} label={CANON_LABELS[node.canonStatus]} />
         )}
       </p>
 

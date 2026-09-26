@@ -48,8 +48,8 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   `<type>/<description>` branches: Phase 2 Story, Phase 3, and now Phase 4.
   **Phase 023 - Production Hardening / PostgreSQL - remains deferred** and is not started; the
   next numbered phase resumes only when the owner says so.
-- **Design refactor: 001 (audit and direction) done; 002-007 planned, not started.** See Design
-  refactor below.
+- **Design refactor: 001 (audit and direction) and 002 (app shell, shared foundation) done; 003-007 to come.**
+  See Design refactor below.
 - **Entry images** (`feat/entity-images-r2`, merged into `dev`). An entry may carry one picture:
   uploaded through the API, decoded and thumbnailed server-side, stored as two objects in one
   private Cloudflare R2 bucket, and served back only through an authenticated owner-scoped Lorex
@@ -559,15 +559,33 @@ Canon change; the Lore list gains query parameters in 003 and nothing else touch
   `docs/design/LOREX_VISUAL_REFACTOR.md`: problems measured in the live app, principles, tokens with checked contrast,
   components (and those rejected), cards, actions, responsive and accessibility rules, before/after, and the plan.
   Documentation only; no runtime code changed, so no suite was run.
-- **Implementation has not started.** 002 App shell and shared components, 003 Lore browsing, 004 Entity experience,
-  005 Story workspace, 006 Worldbuilding workspaces, 007 Polish - scope, dependencies and exclusions in contract §15.
-- **Owner decisions pending** (contract §17): the Lore type control on a phone (blocks 003), what Overview is for
-  (blocks its part of 002), corner language (blocks 002), create on a phone (blocks 003).
-- `design/` is not a type `branching.md` lists; it was used because the owner named the branch.
+- **002 - App shell and shared foundation** (`refactor/app-shell-shared-components` off `dev` at `0da0faf`, committed,
+  not merged, not pushed). Presentation only: no route, API, schema, backup, search, Canon or auth change.
+  - Tokens: the contract's section 9.3 sheet in `styles.css` - three surfaces rising lighter in both schemes
+    (`--raised` new), `--border-control` (3:1) on every control edge, washes, shadows, 6/10px radii, type and space
+    scales, control heights, motion, layers, `--gutter` per width. Dark primary is `#d6d0c5`, not the ink.
+  - Shell: sidebar grouped by spacing (front page, world, writing, upkeep, settings), a Lucide icon per section,
+    current = accent wash + universe-accent bar + `aria-current`, inside `<nav aria-label="Universe sections">`; 13.5rem
+    below 1280px; the phone sheet reads down two columns, groups whole, 44px rows. The universe name is no longer an
+    `h1`: every screen's title is. Sections live in `src/universes/sections.ts`.
+  - `SkipLink` once above the routes, landing on each layout's `main`. `ActionMenu` (AccountMenu now built on it),
+    `PageHeader` (Stories, Timeline, World Rules, Ideas, Family Tree, Canon, Trash, Types, Settings, Overview),
+    `StatusBadge` (cards, relations, moments, family nodes, stories), `EmptyState` (Stories, World Rules, Trash).
+    Button family and `.iconbutton`; boxed fields; `.segmented` as a track; `.views` shared by entry and story;
+    `.listrow`, `.callout`, `.actionbar`, `.skeleton`, `.cardgrid` defined for 003-006.
+  - Overview is a contents page of doorways, no counts, no feed; "Your lore will appear here." is gone.
+  - Owner decisions (contract section 18): phone type control "Type ▾"; Overview without counts; soft corners;
+    labelled thumb-reachable create. Scratch seed and capture scripts were not committed: a durable visual seed
+    helper was judged not worth its upkeep yet.
+- **Next: 003 Lore browsing** - TypeSwitcher in the URL, EntityCard on StatusBadge and a tile, toolbar, phone
+  "Type ▾" and create. Then 004 Entity, 005 Story, 006 Worldbuilding, 007 Polish (contract section 15).
+- `design/` is not a type `branching.md` lists; 001 used it because the owner named the branch. 002 uses `refactor/`.
 
 ## Baseline
 
-- **999 API integration tests, 171 Playwright tests**, green. Stabilization pass 003's full Playwright run on a fresh
+- **999 API integration tests, 175 Playwright tests**, green. Design refactor 002's full run on a fresh database: **175/175**
+  (171 before, plus `shell.spec.ts`'s four). No backend change, so the API suite and Release build were not rerun.
+  Stabilization pass 003's full Playwright run on a fresh
   database of its own (`LOREX_E2E_DB`), at Playwright's default workers: **171/171, nothing logged about a locked
   database**. No backend change, so the API suite and the Release build were not rerun. Pass 002's runs were 166/166
   twice; a first run, seconds after the dev server was started, lost three tests to fetches that never reached the page,

@@ -6,6 +6,9 @@ import { StoryForm } from '../components/StoryForm'
 import { listStories } from '../stories/api'
 import { sceneCountLabel } from '../stories/format'
 import { STORY_STATUS_LABELS, type StorySummary } from '../stories/types'
+import { EmptyState } from '../components/EmptyState'
+import { PageHeader } from '../components/PageHeader'
+import { StatusBadge } from '../components/StatusBadge'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
 type LoadState =
@@ -43,21 +46,21 @@ export default function StoriesPage() {
 
   return (
     <article className="stories">
-      <header className="chron__head">
-        <div>
-          <h2 className="chron__title">Stories</h2>
-          <p className="chron__lede">Narratives told with this world’s lore, scene by scene.</p>
-        </div>
-        <button
-          className="button button--icon"
-          type="button"
-          onClick={() => setIsCreating(true)}
-          data-testid="new-story"
-        >
-          <ActionIcon icon={Plus} />
-          New story
-        </button>
-      </header>
+      <PageHeader
+        title="Stories"
+        lede="Narratives told with this world’s lore, scene by scene."
+        actions={
+          <button
+            className="button"
+            type="button"
+            onClick={() => setIsCreating(true)}
+            data-testid="new-story"
+          >
+            <ActionIcon icon={Plus} />
+            New story
+          </button>
+        }
+      />
 
       {state.kind === 'loading' ? (
         <p className="notice" role="status">
@@ -94,7 +97,7 @@ export default function StoriesPage() {
                 <bdi>{story.title}</bdi>
               </Link>
               <p className="storyrow__meta">
-                <span className="chip">{STORY_STATUS_LABELS[story.status]}</span>
+                <StatusBadge step={story.status} label={STORY_STATUS_LABELS[story.status]} />
                 <span data-testid="story-scene-count">{sceneCountLabel(story.sceneCount)}</span>
               </p>
               {story.premise ? <p className="storyrow__premise prose">{story.premise}</p> : null}
@@ -104,22 +107,22 @@ export default function StoriesPage() {
       ) : null}
 
       {state.kind === 'ready' && state.stories.length === 0 ? (
-        <div className="empty" data-testid="stories-empty">
-          <p className="empty__line">No stories yet.</p>
-          <p className="empty__hint">
-            A story tells something in this world, scene by scene. It draws on the lore and never
-            changes it.
-          </p>
-          <button
-            className="button button--icon empty__action"
-            type="button"
-            onClick={() => setIsCreating(true)}
-            data-testid="empty-new-story"
-          >
-            <ActionIcon icon={Plus} />
-            New story
-          </button>
-        </div>
+        <EmptyState
+          testId="stories-empty"
+          title="No stories yet."
+          hint="A story tells something in this world, scene by scene. It draws on the lore and never changes it."
+          action={
+            <button
+              className="button"
+              type="button"
+              onClick={() => setIsCreating(true)}
+              data-testid="empty-new-story"
+            >
+              <ActionIcon icon={Plus} />
+              New story
+            </button>
+          }
+        />
       ) : null}
 
       {isCreating ? (

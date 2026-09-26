@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { EntityPortrait } from './EntityPortrait'
 import { NameList } from './NameList'
+import { StatusBadge } from './StatusBadge'
 import { CANON_LABELS, type EntitySummary } from '../lore/types'
 
 /**
@@ -26,9 +27,11 @@ export function EntityCard({ universeId, entity }: { universeId: string; entity:
         <span className="dossier__type">
           <bdi>{entity.entityTypeName}</bdi>
         </span>
-        <span className="dossier__canon" data-canon={entity.canonStatus}>
-          {CANON_LABELS[entity.canonStatus]}
-        </span>
+        <StatusBadge
+          className="dossier__canon"
+          step={entity.canonStatus}
+          label={CANON_LABELS[entity.canonStatus]}
+        />
       </span>
 
       <span className="dossier__title">

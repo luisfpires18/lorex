@@ -212,7 +212,7 @@ export function ChronologySettings({ universeId, chronology, onSaved }: Chronolo
 
   return (
     <section className="settings__section" data-testid="chronology-settings">
-      <h3 className="settings__heading">Chronology</h3>
+      <h2 className="settings__heading">Chronology</h2>
       <p className="settings__note">
         {drafts.length === 0
           ? 'Years here are plain numbers. They count up, and below zero when a story needs them to. Name this world’s eras to write and order its dates by them instead.'

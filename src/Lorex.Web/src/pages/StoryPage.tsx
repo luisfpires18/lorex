@@ -44,6 +44,7 @@ import {
   type Scene,
   type StoryDetail,
 } from '../stories/types'
+import { StatusBadge } from '../components/StatusBadge'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
 type LoadState =
@@ -541,13 +542,15 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
       </nav>
 
       <header className="story__head">
-        <h2 className="story__title" data-testid="story-title">
+        <h1 className="story__title" data-testid="story-title">
           <bdi>{story.title}</bdi>
-        </h2>
+        </h1>
         <p className="story__meta">
-          <span className="chip" data-testid="story-status">
-            {STORY_STATUS_LABELS[story.status]}
-          </span>
+          <StatusBadge
+            step={story.status}
+            label={STORY_STATUS_LABELS[story.status]}
+            testId="story-status"
+          />
           {hasChapters ? (
             <span data-testid="story-chapter-count">{chapterCountLabel(chapters.length)}</span>
           ) : null}
@@ -561,20 +564,16 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
       </header>
 
       <div className="story__bar">
-        <nav className="storyviews" aria-label="Story views" data-testid="story-views">
-          <NavLink to={storyPath} end className="storyviews__link" data-testid="story-view-scenes">
+        <nav className="views" aria-label="Story views" data-testid="story-views">
+          <NavLink to={storyPath} end className="views__link" data-testid="story-view-scenes">
             Scenes
           </NavLink>
-          <NavLink
-            to={`${storyPath}/plot`}
-            className="storyviews__link"
-            data-testid="story-view-plot"
-          >
+          <NavLink to={`${storyPath}/plot`} className="views__link" data-testid="story-view-plot">
             Plot
           </NavLink>
           <NavLink
             to={`${storyPath}/manuscript`}
-            className="storyviews__link"
+            className="views__link"
             data-testid="story-view-manuscript"
           >
             Manuscript
