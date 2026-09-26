@@ -369,6 +369,7 @@ Repository index. Paths and one-line responsibilities only.
 | Path | Responsibility |
 | --- | --- |
 | `architecture/branching.md` | Branch naming and merge rules. |
+| `design/LOREX_VISUAL_REFACTOR.md` | The visual design contract for the refactor (Tasks 002-007): audit findings, principles, tokens, components, cards, actions, responsive and accessibility rules, and the task plan. |
 | `testing/phase2-story-manual-test.md` | The owner's manual Phase 2 Story pass: one writing session from an empty story to a backup, in eighteen steps. |
 | `testing/phase3-lore-article-manual-test.md` | The owner's manual pass over entry articles: writing, two tabs, unsaved text, history, search, Trash, phone, dark and backup, in fourteen steps. |
 | `testing/phase3-ideas-manual-test.md` | The owner's manual pass over Ideas: global and universe ideas, references, two tabs, recovered drafts, two accounts, delete and restore, a deleted universe, backup, phone and dark. |

@@ -48,6 +48,8 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   `<type>/<description>` branches: Phase 2 Story, Phase 3, and now Phase 4.
   **Phase 023 - Production Hardening / PostgreSQL - remains deferred** and is not started; the
   next numbered phase resumes only when the owner says so.
+- **Design refactor: 001 (audit and direction) done; 002-007 planned, not started.** See Design
+  refactor below.
 - **Entry images** (`feat/entity-images-r2`, merged into `dev`). An entry may carry one picture:
   uploaded through the API, decoded and thumbnailed server-side, stored as two objects in one
   private Cloudflare R2 bucket, and served back only through an authenticated owner-scoped Lorex
@@ -546,6 +548,22 @@ sat on the wrong side and "آكرون — 12 / Wright قال: نعم!" threw its
   paragraphs into one, so the first letter decides a mixed excerpt.
 - `text-direction.spec.ts`: five more tests - summary, article written and read, lists and quotes, the manuscript, a
   composed sentence, and prose on a phone - each failing on the code before the fix.
+
+## Design refactor
+
+Owner-sequenced visual redesign in seven tasks. Presentation only throughout: no route, API, schema, backup, search or
+Canon change; the Lore list gains query parameters in 003 and nothing else touches a URL.
+
+- **001 - Audit and direction** (`design/visual-system-audit` off `dev` at `379bd8b`, committed, not merged, not
+  pushed). 31 screens of the running app at 1440, 1024, 820 and 390, light and dark, on a seeded world. The contract is
+  `docs/design/LOREX_VISUAL_REFACTOR.md`: problems measured in the live app, principles, tokens with checked contrast,
+  components (and those rejected), cards, actions, responsive and accessibility rules, before/after, and the plan.
+  Documentation only; no runtime code changed, so no suite was run.
+- **Implementation has not started.** 002 App shell and shared components, 003 Lore browsing, 004 Entity experience,
+  005 Story workspace, 006 Worldbuilding workspaces, 007 Polish - scope, dependencies and exclusions in contract §15.
+- **Owner decisions pending** (contract §17): the Lore type control on a phone (blocks 003), what Overview is for
+  (blocks its part of 002), corner language (blocks 002), create on a phone (blocks 003).
+- `design/` is not a type `branching.md` lists; it was used because the owner named the branch.
 
 ## Baseline
 
