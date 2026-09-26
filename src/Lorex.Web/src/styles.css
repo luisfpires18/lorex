@@ -425,6 +425,12 @@ input[type='radio'] {
   accent-color: var(--accent);
 }
 
+/* A touch shows each control's own pressed state, not the browser's generic flash over it. */
+a,
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* ---------- Buttons ----------
 
    One family, as classes on native `<button>` and `<a>` alike - never a component, so a link that
@@ -2326,21 +2332,554 @@ a.button--danger:visited {
   margin-top: 1.25rem;
 }
 
-/* ---------- Lore browser ---------- */
+/* ---------- Lore browser ----------
 
-.lore__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1.5rem;
-  flex-wrap: wrap;
+   Where the author is comes first and stays small: the type as the page title, the types beside
+   each other as local navigation, one filter field and a status choice in a single row. Then the
+   cards, which are the page. On a phone the types fold into one "Type" button, the filters into
+   one "Filters" button, and "New …" waits at the bottom edge in reach of a thumb. */
+
+.lore .pageheader {
+  margin-bottom: var(--space-4);
 }
 
-.lore__title {
-  font-family: var(--display);
+.lore__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.lore__filtertoggle {
+  display: none;
+}
+
+.lore__filtercount {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.3rem;
+  border-radius: var(--radius-full);
+  background: var(--accent-wash);
+  color: var(--accent);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.lore__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.lore__search {
+  position: relative;
+  flex: 1 1 18rem;
+  max-width: 28rem;
+}
+
+.lore__searchicon {
+  position: absolute;
+  top: 50%;
+  left: 0.75rem;
+  width: 1rem;
+  height: 1rem;
+  color: var(--muted);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.lore__searchinput {
+  padding-left: 2.25rem;
+}
+
+.lore .segmented {
+  align-self: center;
+}
+
+/* The one line of the create label that can grow with an author's type name: cut, whole in the
+   button's accessible name. */
+.lore__createlabel {
+  max-width: 18ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Lore types: the local navigation ----------
+
+   One row. A world with more types than the row has room for scrolls it sideways - on purpose,
+   with the current type kept in view - rather than stacking rows of chips over the cards. Current
+   is the accent wash (a place), never the ink fill (an action). */
+
+.typeswitch {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-top: var(--space-2);
+}
+
+/* A fade at whichever end has more types to scroll to. */
+.typeswitch__row[data-more-after='true'] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
+}
+
+.typeswitch__row[data-more-before='true'] {
+  mask-image: linear-gradient(to left, #000 calc(100% - 2.5rem), transparent);
+}
+
+.typeswitch__row[data-more-before='true'][data-more-after='true'] {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 2.5rem,
+    #000 calc(100% - 2.5rem),
+    transparent
+  );
+}
+
+.typeswitch__row {
+  display: flex;
+  gap: var(--space-1);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  padding: 2px 2px var(--space-2);
+  border-bottom: 1px solid var(--rule);
+}
+
+.typeswitch__link {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 16rem;
+  min-height: var(--control-md);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-size: var(--text-ui);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color var(--duration-1) var(--ease),
+    color var(--duration-1) var(--ease);
+}
+
+.typeswitch__link:hover {
+  background: var(--hover-wash);
+  color: var(--ink);
+}
+
+.typeswitch__link:active {
+  background: var(--press-wash);
+}
+
+.typeswitch__link:focus-visible {
+  outline-offset: -2px;
+}
+
+.typeswitch__link[aria-current='page'] {
+  background: var(--accent-wash);
+  color: var(--ink);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.typeswitch__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.typeswitch__icon,
+.typemenu__icon {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  color: var(--type-ink, var(--muted));
+}
+
+/* A type's own colour is the author's, so it is never used raw: mixed toward the ink so it reads
+   on either paper. */
+.typeswitch__link,
+.typemenu__item,
+.entitycard__type,
+.tile--blank {
+  --type-ink: color-mix(in srgb, var(--type-accent, var(--muted)) 65%, var(--ink));
+}
+
+/* The phone's "Type" button, and the menu it opens: every type, the current one marked. */
+.typemenu {
+  display: none;
+}
+
+.typemenu__trigger {
+  gap: var(--space-2);
+  max-width: 100%;
+}
+
+.typemenu__label {
+  color: var(--muted);
   font-weight: 400;
-  font-size: clamp(1.7rem, 2.6vw, 2.1rem);
-  margin: 0;
+}
+
+.typemenu__current {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.typemenu__chevron {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+}
+
+.actionmenu__panel--start {
+  right: auto;
+  left: 0;
+}
+
+.typemenu__panel {
+  width: min(20rem, calc(100vw - 2 * var(--gutter)));
+  max-height: min(60vh, 28rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.typemenu__item[aria-current='page'] {
+  background: var(--accent-wash);
+  font-weight: 500;
+}
+
+/* ---------- Lore cards ----------
+
+   What the entry looks like, its name, its kind and how settled it is, then two lines of summary.
+   Raised paper you can open; the whole card is one link. No type stripe and no tag chips. */
+
+.lore__grid,
+.lore__skeleton {
+  gap: var(--space-4);
+}
+
+@media (min-width: 1440px) {
+  .lore__grid,
+  .lore__skeleton {
+    gap: var(--space-5);
+  }
+}
+
+.entitycard {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+  height: 100%;
+  padding: var(--space-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+  box-shadow: var(--shadow-1);
+  color: var(--ink);
+  text-decoration: none;
+  transition:
+    border-color var(--duration-1) var(--ease),
+    box-shadow var(--duration-2) var(--ease),
+    transform var(--duration-2) var(--ease);
+}
+
+.entitycard:hover {
+  border-color: var(--rule-strong);
+  box-shadow: var(--shadow-2);
+  transform: translateY(-1px);
+}
+
+.entitycard:active {
+  box-shadow: var(--shadow-1);
+  transform: none;
+  transition-duration: 80ms;
+}
+
+.entitycard:focus-visible {
+  outline-offset: 2px;
+  border-color: var(--rule-strong);
+}
+
+.entitycard__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.entitycard__name {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  font-family: var(--display);
+  font-size: var(--text-item);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.entitycard__aliases {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entitycard__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  margin-top: var(--space-1);
+}
+
+.entitycard__type {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  max-width: 100%;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.entitycard__typename {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entitycard__typeicon {
+  flex: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  color: var(--type-ink);
+}
+
+.entitycard__summary {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  margin-top: var(--space-1);
+  font-size: var(--text-ui);
+  line-height: 1.45;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* Why a search result is here, when the article is where it matched. */
+.entitycard__excerpt {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--space-1);
+}
+
+.entitycard__excerptlabel {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.entitycard__excerpt .entitycard__summary {
+  margin-top: 0;
+}
+
+.entitycard__excerpt mark {
+  padding: 0 0.1em;
+  border-radius: 2px;
+  background: var(--accent-wash);
+  color: var(--ink);
+}
+
+/* ---------- Entity tile ----------
+
+   An entry's square. The thumbnail is the author's own crop; with none, the type's own icon on a
+   tint of the type's colour - plainly a placeholder, not a picture that failed. */
+
+.tile {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  object-fit: cover;
+}
+
+.tile--blank {
+  display: grid;
+  place-items: center;
+  border-color: transparent;
+  background: color-mix(in srgb, var(--type-accent, var(--muted)) 14%, var(--raised));
+}
+
+.tile__icon {
+  width: 45%;
+  height: 45%;
+  color: var(--type-ink);
+}
+
+@media (prefers-color-scheme: dark) {
+  .tile--blank {
+    background: color-mix(in srgb, var(--type-accent, var(--muted)) 22%, var(--raised));
+  }
+
+  .typeswitch__link,
+  .typemenu__item,
+  .entitycard__type,
+  .tile--blank {
+    --type-ink: color-mix(in srgb, var(--type-accent, var(--muted)) 50%, var(--ink));
+  }
+}
+
+/* ---------- Loading ----------
+
+   Six card shapes where the first page is about to be. They appear only if the read takes longer
+   than a moment, so a fast load never flashes them. Static: nothing shimmers. */
+
+.lore__skeleton {
+  animation: skeleton-appear 0s linear 300ms both;
+}
+
+@keyframes skeleton-appear {
+  from {
+    visibility: hidden;
+  }
+
+  to {
+    visibility: visible;
+  }
+}
+
+.skeletoncard {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+}
+
+.skeletoncard__tile {
+  aspect-ratio: 1;
+  border-radius: var(--radius-md);
+}
+
+.skeletoncard__lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-1);
+}
+
+.skeletoncard__line {
+  height: 0.9rem;
+}
+
+.skeletoncard__line--short {
+  width: 55%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entitycard:hover {
+    transform: none;
+  }
+}
+
+/* ---------- Lore on a phone ---------- */
+
+@media (max-width: 640px) {
+  .lore {
+    /* Room under the last card and the pager for the create button at the bottom edge. */
+    padding-bottom: 4.5rem;
+  }
+
+  .lore .pageheader__main {
+    flex-wrap: nowrap;
+  }
+
+  .typeswitch {
+    display: none;
+  }
+
+  .typemenu {
+    display: inline-flex;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .typemenu__trigger {
+    flex: 1 1 auto;
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
+  .typemenu__chevron {
+    margin-left: auto;
+  }
+
+  .lore__filtertoggle {
+    display: inline-flex;
+    flex: none;
+  }
+
+  .lore__filters[data-open='false'] {
+    display: none;
+  }
+
+  .lore__filters {
+    margin-bottom: var(--space-4);
+  }
+
+  .lore__search {
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  /* One labelled "New …" at the bottom edge, clear of the home indicator - the header's own
+     button, moved, so there is never a second one. */
+  .lore__create {
+    position: fixed;
+    right: var(--gutter);
+    bottom: max(var(--space-4), env(safe-area-inset-bottom));
+    z-index: var(--z-sticky);
+    max-width: calc(100vw - 2 * var(--gutter));
+    min-height: var(--control-touch);
+    padding-inline: var(--space-5);
+    box-shadow: var(--shadow-3);
+  }
+
+  .entitycard {
+    grid-template-columns: 4rem minmax(0, 1fr);
+    gap: var(--space-3);
+    padding: var(--space-3);
+  }
+
+  .skeletoncard {
+    grid-template-columns: 4rem minmax(0, 1fr);
+    gap: var(--space-3);
+    padding: var(--space-3);
+  }
+
+  .lore__grid,
+  .lore__skeleton {
+    gap: var(--space-3);
+  }
 }
 
 .controls__filters {
@@ -2351,97 +2890,6 @@ a.button--danger:visited {
 
 .controls__filters .field {
   min-width: 9rem;
-}
-
-/* ---------- Type filter bar ----------
-
-   The Lore browser's types as round-iconed chips on a line of their own under the search,
-   directly above the grid they filter. They flow left to right and wrap onto as many rows as the
-   width needs, with one gap across and down, so every type is on screen at once and nothing
-   scrolls or clips. The chosen chip is inked, the way the committed canon mark is, so it reads in
-   either scheme and without relying on a type's own accent colour. */
-
-.typebar {
-  flex: 1 1 100%;
-  min-width: 0;
-}
-
-.typebar__label {
-  display: block;
-  margin-bottom: 0.45rem;
-}
-
-.typebar__row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.typebar__option {
-  --type-accent: var(--rule-strong);
-
-  flex: none;
-  /* A name longer than the whole row wraps inside its chip rather than pushing the page wider. */
-  max-width: 100%;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0.9rem 0.25rem 0.25rem;
-  border: 1px solid var(--rule);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--muted);
-  font: inherit;
-  font-size: 0.88rem;
-  line-height: 1.2;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    border-color 120ms ease,
-    background-color 120ms ease,
-    color 120ms ease;
-}
-
-.typebar__option:hover {
-  border-color: var(--rule-strong);
-  color: var(--ink);
-}
-
-.typebar__option:focus-visible {
-  outline-offset: 2px;
-}
-
-.typebar__icon {
-  display: inline-grid;
-  place-items: center;
-  flex: none;
-  width: 1.9rem;
-  height: 1.9rem;
-  border-radius: 50%;
-  border: 1.5px solid var(--type-accent);
-  background: var(--paper);
-  color: var(--ink);
-}
-
-.typebar__icon svg {
-  width: 1rem;
-  height: 1rem;
-}
-
-.typebar__name {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.typebar__option[aria-pressed='true'] {
-  border-color: var(--ink);
-  background: var(--ink);
-  color: var(--surface);
-}
-
-.typebar__option[aria-pressed='true'] .typebar__icon {
-  background: var(--surface);
-  color: var(--ink);
 }
 
 .field__input--select {
@@ -2462,58 +2910,8 @@ a.button--danger:visited {
   gap: 0.35rem;
 }
 
-/* ---------- Dossier cards ---------- */
-
-.dossiers {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr));
-}
-
-.dossier {
-  --dossier-accent: var(--rule-strong);
-
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  height: 100%;
-  padding: 1.1rem 1.2rem 1.2rem;
-  border: 1px solid var(--rule);
-  border-top: 3px solid var(--dossier-accent);
-  background: var(--raised);
-  box-shadow: var(--shadow-1);
-  color: inherit;
-  text-decoration: none;
-  transition:
-    border-color var(--duration-1) var(--ease),
-    box-shadow var(--duration-2) var(--ease);
-}
-
-.dossier:hover {
-  border-color: var(--rule-strong);
-  border-top-color: var(--dossier-accent);
-  box-shadow: var(--shadow-2);
-}
-
-.dossier__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  font-size: 0.75rem;
-  color: var(--muted);
-}
-
-.dossier__type {
-  letter-spacing: 0.06em;
-}
-
-/* The portrait slot. Sized in CSS rather than by the image, so a grid of cards keeps its
-   shape whether or not there is a picture in any of them - and does not reflow line by line
-   as the thumbnails arrive. */
+/* The small square portrait still drawn in the family tree and the entry's picture field until
+   Tasks 004 and 006 move them onto the entity tile. Sized in CSS, so nothing reflows as it loads. */
 .portrait {
   flex: 0 0 auto;
   width: 3.25rem;
@@ -2530,45 +2928,11 @@ a.button--danger:visited {
   font-family: var(--display);
   font-size: 1.5rem;
   line-height: 1;
-  color: var(--dossier-accent, var(--muted));
+  color: var(--muted);
   border-style: dashed;
 }
 
-.dossier__title {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.dossier__titletext {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  min-width: 0;
-}
-
-.dossier__name {
-  font-family: var(--display);
-  font-size: 1.2rem;
-  line-height: 1.25;
-}
-
-.dossier__aliases {
-  font-size: 0.82rem;
-  color: var(--muted);
-  font-style: italic;
-}
-
-.dossier__summary {
-  font-size: 0.9rem;
-  color: var(--muted);
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
+/* An entry's tags, on its page and in its history (the Lore card no longer shows them). */
 .dossier__tags {
   margin: 0.5rem 0 0;
   display: flex;
@@ -2581,29 +2945,6 @@ a.button--danger:visited {
   padding: 0.05rem 0.45rem;
   font-size: 0.72rem;
   color: var(--muted);
-}
-
-/* Why a search result is here, when the article is where it matched. Quiet, and bounded by the API. */
-.dossier__excerpt {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  font-size: 0.85rem;
-  line-height: 1.5;
-  color: var(--muted);
-  overflow-wrap: anywhere;
-}
-
-.dossier__excerptlabel {
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.dossier__excerpt mark {
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
-  color: var(--ink);
-  padding: 0 0.1em;
 }
 
 /* ---------- Entry: the lore article ---------- */
@@ -2661,7 +3002,11 @@ a.button--danger:visited {
 .entry__type {
   font-size: 0.8rem;
   letter-spacing: 0.08em;
-  color: var(--entry-accent);
+  text-decoration: none;
+}
+
+.entry__type:hover {
+  text-decoration: underline;
 }
 
 .entry__typepick {
@@ -4347,8 +4692,11 @@ a.button--danger:visited {
    asked for and closes itself again on arrival. Nothing above this width changes. */
 
 @media (max-width: 860px) {
+  /* The bar and the sheet take their own height; only the screen below grows, so a short page
+     never stretches the bar to fill the viewport. */
   .workspace {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto 1fr;
   }
 
   .rail {
@@ -6810,10 +7158,6 @@ a.lorechip--pov:focus-visible .lorechip__name {
   .picker__option {
     min-height: 2.75rem;
     align-items: center;
-  }
-
-  .typebar__option {
-    min-height: 2.75rem;
   }
 
   .iconpicker__swatch {

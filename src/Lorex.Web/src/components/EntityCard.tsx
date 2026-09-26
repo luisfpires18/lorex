@@ -1,87 +1,87 @@
 import { Link } from 'react-router-dom'
-import { EntityPortrait } from './EntityPortrait'
+import { EntityTile } from './EntityTile'
 import { NameList } from './NameList'
 import { StatusBadge } from './StatusBadge'
+import { TypeIcon } from './TypeIcon'
 import { CANON_LABELS, type EntitySummary } from '../lore/types'
 
 /**
- * A dossier card. What it shows depends on what the entity actually has, so a Character
- * with three aliases and a Concept with none do not look like the same row.
+ * A Lore card: what the entry looks like, what it is called, what kind of thing it is and how
+ * settled it is - then, if it has one, two lines of its summary. Nothing else earns the space: tags
+ * stay on the entry, and the card is not a small copy of the entry page.
  *
- * The portrait is the one exception to that rule: every card carries the same slot whether or
- * not there is a picture in it, because a grid that reflowed as thumbnails arrived would be
- * worse than one that never showed them.
+ * The whole card is one link, so there is nothing interactive inside it. Its accessible name is
+ * the entry's name first; the picture beside it is decorative.
  */
 export function EntityCard({ universeId, entity }: { universeId: string; entity: EntitySummary }) {
-  const accent = entity.entityTypeAccentColor ?? undefined
-
   return (
     <Link
-      className="dossier"
+      className="entitycard"
       to={`/app/universes/${universeId}/lore/${entity.id}`}
-      style={accent ? { ['--dossier-accent' as string]: accent } : undefined}
       data-testid="entity-card"
       data-entity-name={entity.name}
     >
-      <span className="dossier__head">
-        <span className="dossier__type">
-          <bdi>{entity.entityTypeName}</bdi>
+      <EntityTile
+        className="entitycard__tile"
+        universeId={universeId}
+        entityId={entity.id}
+        image={entity.image}
+        typeIcon={entity.entityTypeIcon}
+        typeAccent={entity.entityTypeAccentColor}
+      />
+
+      <span className="entitycard__body">
+        <span className="entitycard__name">
+          <bdi>{entity.name}</bdi>
         </span>
-        <StatusBadge
-          className="dossier__canon"
-          step={entity.canonStatus}
-          label={CANON_LABELS[entity.canonStatus]}
-        />
-      </span>
 
-      <span className="dossier__title">
-        <EntityPortrait
-          universeId={universeId}
-          entityId={entity.id}
-          name={entity.name}
-          image={entity.image}
-        />
-
-        <span className="dossier__titletext">
-          <span className="dossier__name">
-            <bdi>{entity.name}</bdi>
+        {entity.aliases.length > 0 ? (
+          <span className="entitycard__aliases">
+            also <NameList names={entity.aliases} />
           </span>
+        ) : null}
 
-          {entity.aliases.length > 0 ? (
-            <span className="dossier__aliases">
-              also <NameList names={entity.aliases} />
+        <span className="entitycard__meta">
+          <span
+            className="entitycard__type"
+            title={entity.entityTypeName}
+            style={
+              entity.entityTypeAccentColor
+                ? { ['--type-accent' as string]: entity.entityTypeAccentColor }
+                : undefined
+            }
+          >
+            <TypeIcon iconKey={entity.entityTypeIcon} className="entitycard__typeicon" />
+            {/* Its own direction on the element that cuts it, so a right-to-left name loses its end, not its start. */}
+            <span className="entitycard__typename" dir="auto">
+              {entity.entityTypeName}
             </span>
-          ) : null}
-        </span>
-      </span>
-
-      {entity.summary ? <span className="dossier__summary prose">{entity.summary}</span> : null}
-
-      {/* Why a search found it, when the article is where: plain runs of text, the matched words marked. */}
-      {entity.articleExcerpt ? (
-        <span className="dossier__excerpt" data-testid="entity-excerpt">
-          <span className="dossier__excerptlabel">In the article</span>
-          <span className="dossier__excerpttext prose">
-            {entity.articleExcerpt.map((part, index) =>
-              part.isMatch ? (
-                <mark key={index}>{part.text}</mark>
-              ) : (
-                <span key={index}>{part.text}</span>
-              ),
-            )}
           </span>
+          <StatusBadge
+            className="entitycard__status"
+            step={entity.canonStatus}
+            label={CANON_LABELS[entity.canonStatus]}
+          />
         </span>
-      ) : null}
 
-      {entity.tags.length > 0 ? (
-        <span className="dossier__tags">
-          {entity.tags.map((tag) => (
-            <span className="chip" key={tag}>
-              {tag}
+        {/* Why a search found it, when the article is where: plain runs of text, the matched words marked. */}
+        {entity.articleExcerpt ? (
+          <span className="entitycard__excerpt" data-testid="entity-excerpt">
+            <span className="entitycard__excerptlabel">In the article</span>
+            <span className="entitycard__summary prose">
+              {entity.articleExcerpt.map((part, index) =>
+                part.isMatch ? (
+                  <mark key={index}>{part.text}</mark>
+                ) : (
+                  <span key={index}>{part.text}</span>
+                ),
+              )}
             </span>
-          ))}
-        </span>
-      ) : null}
+          </span>
+        ) : entity.summary ? (
+          <span className="entitycard__summary prose">{entity.summary}</span>
+        ) : null}
+      </span>
     </Link>
   )
 }

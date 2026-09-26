@@ -1,13 +1,14 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 
 /**
- * The Lore browser's type bar, and the icon an entity type carries.
+ * Lore's types as local navigation, and the icon an entity type carries.
  *
  * What a type may be given, and what the API refuses, is settled by the API tests. What only a
  * browser can show is that an author picks an icon where types are managed and sees it where lore
  * is browsed; that a type nobody gave an icon to gets the neutral shape rather than a guess from its
- * name; that the bar filters exactly as the select it replaced did, search and the Trash included;
- * and that it works from a keyboard and under a thumb.
+ * name; that the chosen type is an address - reloaded, walked back and forward, kept by an opened
+ * entry and by a new one - custom types included; that the filter and status narrow within it; and
+ * that it works from a keyboard, in one row on a desktop and one menu under a thumb.
  *
  * Types are made through the screen, because that is part of what is being proved. Entries are
  * made through the API: they are only the grid the bar filters.
@@ -74,12 +75,12 @@ async function createEntry(
   return ((await response.json()) as { id: string }).id
 }
 
-function typeBar(page: Page) {
-  return page.getByRole('group', { name: 'Type' })
+function typeNav(page: Page) {
+  return page.getByRole('navigation', { name: 'Lore types' })
 }
 
-function chip(page: Page, name: string) {
-  return typeBar(page).getByRole('button', { name, exact: true })
+function typeLink(page: Page, name: string) {
+  return typeNav(page).getByRole('link', { name, exact: true })
 }
 
 function card(page: Page, name: string) {
@@ -90,7 +91,15 @@ function rowIcon(page: Page, typeName: string) {
   return page.getByTestId(`type-icon-${typeName}`).locator('svg')
 }
 
-/** Types beyond the seven starters, so the chips need several rows even on a desktop. */
+function title(page: Page) {
+  return page.getByRole('heading', { level: 1 })
+}
+
+function statusChoice(page: Page, name: string) {
+  return page.getByRole('group', { name: 'Status' }).getByRole('button', { name, exact: true })
+}
+
+/** Types beyond the seven starters, so the row has more than it can show at once. */
 const MANY_TYPES = [
   'Kingdom',
   'Starship',
@@ -107,57 +116,10 @@ function pageOverflow(page: Page) {
   )
 }
 
-/**
- * How the chips sit in the row: how many rows they make, whether any chip reaches outside the row
- * or any label is cut short, whether the row itself has anything to scroll, each chip's height, and
- * the vertical gap between one row and the next.
- */
-function chipLayout(row: Locator) {
-  return row.evaluate((element) => {
-    const bounds = element.getBoundingClientRect()
-    const chips = [...element.querySelectorAll('button')].map((chip) =>
-      chip.getBoundingClientRect(),
-    )
-    const tops = [...new Set(chips.map((chip) => Math.round(chip.top)))].sort((a, b) => a - b)
-
-    return {
-      rows: tops.length,
-      outside: chips.filter(
-        (chip) => chip.left < bounds.left - 0.5 || chip.right > bounds.right + 0.5,
-      ).length,
-      clippedLabels: [...element.querySelectorAll<HTMLElement>('.typebar__name')].filter(
-        (label) => label.scrollWidth > label.clientWidth + 1,
-      ).length,
-      rowOverflows: element.scrollWidth > element.clientWidth + 1,
-      heights: chips.map((chip) => chip.height),
-      rowGaps: tops
-        .slice(1)
-        .map(
-          (top, index) =>
-            top -
-            Math.max(
-              ...chips.filter((chip) => Math.round(chip.top) === tops[index]).map((c) => c.bottom),
-            ),
-        ),
-    }
-  })
-}
-
-/** Every chip inside the row, every label whole, nothing to scroll, and rows close together. */
-async function expectTidyRows(row: Locator) {
-  const layout = await chipLayout(row)
-  expect(layout.outside).toBe(0)
-  expect(layout.clippedLabels).toBe(0)
-  expect(layout.rowOverflows).toBe(false)
-  for (const gap of layout.rowGaps) {
-    expect(gap).toBeGreaterThanOrEqual(4)
-    expect(gap).toBeLessThanOrEqual(12)
-  }
-  return layout
-}
-
-test.describe('the type bar', () => {
-  test('filters by the types a world has, with the icons its author chose', async ({ page }) => {
+test.describe('lore types', () => {
+  test('are places in the address: chosen, reloaded, walked back and forward, and opened into', async ({
+    page,
+  }) => {
     await signUp(page)
     const universeId = await newUniverse(page)
 
@@ -222,17 +184,16 @@ test.describe('the type bar', () => {
       'The Kestrel',
       'Once carried the warden.',
     )
-    await createEntry(page, universeId, ids.get('Kingdom')!, 'Drowned Coast', 'Salt and old roads.')
 
     await page.getByTestId('workspace-lore').click()
     await page.waitForURL(/\/lore$/)
-    await expect(page.getByTestId('entity-card')).toHaveCount(5)
+    await expect(page.getByTestId('entity-card')).toHaveCount(4)
 
-    // ---------- Every type the world has, and nothing else ----------
+    // ---------- Every type the world has, starters and custom, and nothing else ----------
 
-    const labels = await typeBar(page)
-      .getByRole('button')
-      .evaluateAll((buttons) => buttons.map((button) => button.textContent?.trim()))
+    const labels = await typeNav(page)
+      .getByRole('link')
+      .evaluateAll((links) => links.map((link) => link.textContent?.trim()))
     expect(labels).toEqual([
       'All',
       'Character',
@@ -245,89 +206,154 @@ test.describe('the type bar', () => {
       'Starship',
       'Kingdom',
     ])
-
-    await expect(chip(page, 'All')).toHaveAttribute('aria-pressed', 'true')
-    await expect(typeBar(page).locator('[aria-pressed="true"]')).toHaveCount(1)
+    await expect(typeLink(page, 'All')).toHaveAttribute('aria-current', 'page')
+    await expect(typeNav(page).locator('[aria-current="page"]')).toHaveCount(1)
+    await expect(title(page)).toHaveText('Lore')
 
     // The chosen icon, the seeded one, and the fallback - drawn where the lore is browsed.
-    await expect(chip(page, 'Starship').locator('svg')).toHaveAttribute('data-icon', 'ship')
-    await expect(chip(page, 'Location').locator('svg')).toHaveAttribute('data-icon', 'location')
-    await expect(chip(page, 'Kingdom').locator('svg')).toHaveAttribute('data-icon', 'fallback')
+    await expect(typeLink(page, 'Starship').locator('svg')).toHaveAttribute('data-icon', 'ship')
+    await expect(typeLink(page, 'Location').locator('svg')).toHaveAttribute('data-icon', 'location')
+    await expect(typeLink(page, 'Kingdom').locator('svg')).toHaveAttribute('data-icon', 'fallback')
 
-    // ---------- One type ----------
+    // ---------- A type is a place: the address says it ----------
 
-    await chip(page, 'Character').click()
-    await expect(chip(page, 'Character')).toHaveAttribute('aria-pressed', 'true')
-    await expect(chip(page, 'All')).toHaveAttribute('aria-pressed', 'false')
+    await typeLink(page, 'Character').click()
+    await expect(page).toHaveURL(new RegExp(`/lore\\?type=${ids.get('Character')}$`))
+    await expect(typeLink(page, 'Character')).toHaveAttribute('aria-current', 'page')
+    await expect(title(page)).toHaveText('Character')
     await expect(page.getByTestId('entity-card')).toHaveCount(2)
-    await expect(card(page, 'Alenna Vance')).toBeVisible()
     await expect(card(page, 'Tidewatch Keep')).toBeHidden()
 
-    // Chosen is something you can see, not only something a screen reader is told.
+    // Current is drawn, not only announced.
     const background = (name: string) =>
-      chip(page, name).evaluate((element) => getComputedStyle(element).backgroundColor)
+      typeLink(page, name).evaluate((element) => getComputedStyle(element).backgroundColor)
     expect(await background('Character')).not.toEqual(await background('Location'))
 
-    // ---------- Search and type narrow each other, as they always did ----------
+    await typeLink(page, 'Location').click()
+    await expect(title(page)).toHaveText('Location')
+    await expect(card(page, 'Tidewatch Keep')).toBeVisible()
 
-    await page.getByLabel('Search', { exact: true }).fill('warden')
+    // Back returns to Character, Forward to Location, and a reload stays where it is.
+    await page.goBack()
+    await expect(title(page)).toHaveText('Character')
+    await expect(typeLink(page, 'Character')).toHaveAttribute('aria-current', 'page')
+    await expect(page.getByTestId('entity-card')).toHaveCount(2)
+    await page.goForward()
+    await expect(title(page)).toHaveText('Location')
+    await page.reload()
+    await expect(title(page)).toHaveText('Location')
+    await expect(typeLink(page, 'Location')).toHaveAttribute('aria-current', 'page')
+    await expect(card(page, 'Tidewatch Keep')).toBeVisible()
+
+    // ---------- Opening an entry, and coming back to the same type ----------
+
+    await card(page, 'Tidewatch Keep').click()
+    await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
+    await page.goBack()
+    await expect(title(page)).toHaveText('Location')
+    await expect(card(page, 'Tidewatch Keep')).toBeVisible()
+
+    // The entry's type crumb leads back to that type too.
+    await card(page, 'Tidewatch Keep').click()
+    await page.getByTestId('entry-type').click()
+    await expect(page).toHaveURL(new RegExp(`/lore\\?type=${ids.get('Location')}$`))
+
+    // ---------- A custom type works exactly like a starter ----------
+
+    await typeLink(page, 'Starship').click()
+    await expect(title(page)).toHaveText('Starship')
+    await expect(card(page, 'The Kestrel')).toBeVisible()
+    const shipUrl = page.url()
+    await page.goto('/app')
+    await page.goto(shipUrl)
+    await expect(typeLink(page, 'Starship')).toHaveAttribute('aria-current', 'page')
+
+    // ---------- The filter and the status narrow within the type, and keep it ----------
+
+    await typeLink(page, 'Character').click()
+    await expect(title(page)).toHaveText('Character')
+    await page.getByLabel('Filter entries').fill('warden')
     await expect(page.getByTestId('entity-card')).toHaveCount(1)
     await expect(card(page, 'Alenna Vance')).toBeVisible()
 
-    await chip(page, 'Starship').click()
+    // Changing type keeps the filter: Location's warden, not the whole list.
+    await typeLink(page, 'Location').click()
+    await expect(page.getByLabel('Filter entries')).toHaveValue('warden')
     await expect(page.getByTestId('entity-card')).toHaveCount(1)
-    await expect(card(page, 'The Kestrel')).toBeVisible()
+    await expect(card(page, 'Tidewatch Keep')).toBeVisible()
 
-    // Pressing the chosen chip again lets go of it: every type, the search still applied.
-    await chip(page, 'Starship').click()
-    await expect(chip(page, 'All')).toHaveAttribute('aria-pressed', 'true')
-    await expect(page.getByTestId('entity-card')).toHaveCount(3)
+    // Nothing matching says so, and offers to clear the filters - not to write a first entry.
+    await statusChoice(page, 'Canon').click()
+    await expect(statusChoice(page, 'Canon')).toHaveAttribute('aria-pressed', 'true')
+    const empty = page.getByTestId('entity-empty')
+    await expect(empty).toContainText('Nothing matches that.')
+    await empty.getByRole('link', { name: 'Clear filters' }).click()
+    await expect(page.getByLabel('Filter entries')).toHaveValue('')
+    await expect(statusChoice(page, 'Any status')).toHaveAttribute('aria-pressed', 'true')
+    await expect(title(page)).toHaveText('Location')
+    await expect(card(page, 'Tidewatch Keep')).toBeVisible()
 
-    // A type with nothing matching says so, rather than quietly showing everything.
-    await chip(page, 'Kingdom').click()
-    await expect(page.getByTestId('entity-empty')).toBeVisible()
-    await page.getByLabel('Search', { exact: true }).fill('')
-    await expect(page.getByTestId('entity-card')).toHaveCount(1)
-    await expect(card(page, 'Drowned Coast')).toBeVisible()
+    // ---------- An empty type invites its first entry, in that type ----------
+
+    await typeLink(page, 'Kingdom').click()
+    await expect(empty).toContainText('Nothing filed under Kingdom yet.')
+    const create = page.getByTestId('new-entity')
+    await expect(create).toHaveAccessibleName('New Kingdom')
+    await empty.getByRole('link', { name: 'New Kingdom' }).click()
+    await page.waitForURL(new RegExp(`/lore/new\\?type=${ids.get('Kingdom')}$`))
+    await expect(page.getByLabel('Entry type')).toHaveValue(ids.get('Kingdom')!)
+    // Still the author's choice: the type can be changed before the entry exists.
+    await page.getByLabel('Entry type').selectOption({ label: 'Character' })
+    await expect(page.getByLabel('Entry type')).toHaveValue(ids.get('Character')!)
+    await page.goBack()
+
+    // ---------- An id this universe does not have is All ----------
+
+    await page.goto(`/app/universes/${universeId}/lore?type=00000000-0000-0000-0000-000000000000`)
+    await expect(page).toHaveURL(/\/lore$/)
+    await expect(typeLink(page, 'All')).toHaveAttribute('aria-current', 'page')
+    await expect(page.getByTestId('entity-card')).toHaveCount(4)
 
     // ---------- The Trash stays out of it ----------
 
     expect(
       (await page.request.delete(`/api/universes/${universeId}/entities/${brannoch}`)).ok(),
     ).toBeTruthy()
-    await page.reload()
-    await chip(page, 'Character').click()
+    await typeLink(page, 'Character').click()
     await expect(page.getByTestId('entity-card')).toHaveCount(1)
     await expect(card(page, 'Brannoch Hale')).toHaveCount(0)
 
     // ---------- From the keyboard ----------
 
-    // In the tab order right after the status filter.
-    await page.getByLabel('Status').focus()
+    // In the tab order straight after the page's create action.
+    await page.getByTestId('new-entity').focus()
     await page.keyboard.press('Tab')
-    await expect(chip(page, 'All')).toBeFocused()
-
+    await expect(typeLink(page, 'All')).toBeFocused()
     // A visible focus ring, not only a focused element.
     expect(
-      await chip(page, 'All').evaluate((element) => getComputedStyle(element).outlineStyle),
+      await typeLink(page, 'All').evaluate((element) => getComputedStyle(element).outlineStyle),
     ).not.toBe('none')
-
     await page.keyboard.press('ArrowRight')
-    await expect(chip(page, 'Character')).toBeFocused()
+    await expect(typeLink(page, 'Character')).toBeFocused()
     await page.keyboard.press('End')
-    await expect(chip(page, 'Kingdom')).toBeFocused()
-    await page.keyboard.press('Enter')
-    await expect(chip(page, 'Kingdom')).toHaveAttribute('aria-pressed', 'true')
-    await expect(card(page, 'Drowned Coast')).toBeVisible()
-
+    await expect(typeLink(page, 'Kingdom')).toBeFocused()
     await page.keyboard.press('Home')
-    await expect(chip(page, 'All')).toBeFocused()
-    await page.keyboard.press('Space')
-    await expect(chip(page, 'All')).toHaveAttribute('aria-pressed', 'true')
-    await expect(page.getByTestId('entity-card')).toHaveCount(4)
+    await expect(typeLink(page, 'All')).toBeFocused()
+    await page.keyboard.press('ArrowRight')
+    await page.keyboard.press('ArrowRight')
+    await page.keyboard.press('Enter')
+    await expect(title(page)).toHaveText('Location')
+
+    // A card is one link, opened from the keyboard, holding nothing else to press.
+    const keep = card(page, 'Tidewatch Keep')
+    await expect(keep.locator('a, button, input')).toHaveCount(0)
+    await keep.focus()
+    await page.keyboard.press('Enter')
+    await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
+    await expect(page.getByTestId('entry-name')).toHaveText('Tidewatch Keep')
   })
 
-  test('wraps onto more rows as the width runs out, and never spills sideways', async ({
+  test('keep to one row on a desktop, scrolling it - not the page - when a world has many', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 })
@@ -337,32 +363,42 @@ test.describe('the type bar', () => {
     for (const name of MANY_TYPES) await createType(page, universeId, name)
     const ids = await typeIds(page, universeId)
     await createEntry(page, universeId, ids.get('Character')!, 'Alenna Vance', 'Warden.')
-    await createEntry(page, universeId, ids.get('Ritual Circle')!, 'The Tide Vigil', 'At dusk.')
+    await createEntry(
+      page,
+      universeId,
+      ids.get('Rumour of the Tide')!,
+      'The Tide Vigil',
+      'At dusk.',
+    )
 
     await page.getByTestId('workspace-lore').click()
     await page.waitForURL(/\/lore$/)
     await expect(page.getByTestId('entity-card')).toHaveCount(2)
 
-    // All, the seven starters and every added type.
-    const row = page.getByTestId('type-filter')
-    await expect(row.getByRole('button')).toHaveCount(1 + 7 + MANY_TYPES.length)
+    // All, the seven starters and every added type, on one line.
+    const links = typeNav(page).getByRole('link')
+    await expect(links).toHaveCount(1 + 7 + MANY_TYPES.length)
+    const tops = await links.evaluateAll((all) =>
+      all.map((link) => Math.round(link.getBoundingClientRect().top)),
+    )
+    expect(new Set(tops).size).toBe(1)
 
-    // Already more than one row at a desktop width, every chip whole and inside the row.
-    const wide = await expectTidyRows(row)
-    expect(wide.rows).toBeGreaterThan(1)
+    // The row has more than it shows, and scrolls itself; the page does not.
+    const row = page.getByTestId('lore-types')
+    expect(await row.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
     expect(await pageOverflow(page)).toBeLessThanOrEqual(1)
 
-    // Less room: the same chips take more rows, still whole, still nothing to scroll.
-    await page.setViewportSize({ width: 900, height: 900 })
-    await expect.poll(async () => (await chipLayout(row)).rows).toBeGreaterThan(wide.rows)
-    await expectTidyRows(row)
-    expect(await pageOverflow(page)).toBeLessThanOrEqual(1)
-
-    // A chip on a later row filters like any other.
-    await chip(page, 'Ritual Circle').click()
-    await expect(chip(page, 'Ritual Circle')).toHaveAttribute('aria-pressed', 'true')
-    await expect(page.getByTestId('entity-card')).toHaveCount(1)
+    // A type at the far end, chosen by address, is brought into view.
+    await page.goto(`/app/universes/${universeId}/lore?type=${ids.get('Rumour of the Tide')}`)
+    const last = typeLink(page, 'Rumour of the Tide')
+    await expect(last).toHaveAttribute('aria-current', 'page')
     await expect(card(page, 'The Tide Vigil')).toBeVisible()
+    const inView = await last.evaluate((element) => {
+      const box = element.getBoundingClientRect()
+      const bounds = element.parentElement!.getBoundingClientRect()
+      return box.left >= bounds.left - 1 && box.right <= bounds.right + 1
+    })
+    expect(inView).toBe(true)
   })
 
   test('fills the workspace column on every screen, and the Lore grid turns that into columns', async ({
@@ -427,23 +463,20 @@ test.describe('the type bar', () => {
     // More columns rather than wider cards: none is as wide as two of the grid's narrowest.
     const first = (await card(page, 'Alenna Vance').boundingBox())!
     const narrowest = await grid.evaluate(
-      (element) => parseFloat(getComputedStyle(element).fontSize) * 17.5,
+      (element) => parseFloat(getComputedStyle(element).fontSize) * 18,
     )
     expect(first.width).toBeLessThan(narrowest * 2)
 
-    // Heading, search, status, type chips and grid share one content area: the same left edge,
-    // and the chips, the status filter and the cards end at the same right edge.
-    const heading = (await page.getByRole('heading', { name: 'Lore', exact: true }).boundingBox())!
-    const search = (await page.getByLabel('Search', { exact: true }).boundingBox())!
-    const status = (await page.getByLabel('Status').boundingBox())!
-    const chips = (await page.getByTestId('type-filter').boundingBox())!
+    // Heading, types, filter and grid share one content area: the same left edge, and the types'
+    // row and the cards end at the same right edge.
+    const heading = (await title(page).boundingBox())!
+    const filter = (await page.getByLabel('Filter entries').boundingBox())!
+    const types = (await page.getByTestId('lore-types').boundingBox())!
     const cards = (await grid.boundingBox())!
-    for (const left of [heading.x, search.x, chips.x]) {
-      expect(Math.abs(left - cards.x)).toBeLessThanOrEqual(1)
+    for (const left of [heading.x, filter.x, types.x]) {
+      expect(Math.abs(left - cards.x)).toBeLessThanOrEqual(3)
     }
-    for (const right of [chips.x + chips.width, status.x + status.width]) {
-      expect(Math.abs(right - (cards.x + cards.width))).toBeLessThanOrEqual(1)
-    }
+    expect(Math.abs(types.x + types.width - (cards.x + cards.width))).toBeLessThanOrEqual(3)
 
     // The primary action still answers to its name with an icon beside it.
     await expect(page.getByRole('link', { name: 'New entry', exact: true })).toBeVisible()
@@ -476,10 +509,10 @@ test.describe('the type bar', () => {
   })
 })
 
-test.describe('the type bar on a phone', () => {
+test.describe('lore types on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
 
-  test('wraps into rows of thumb-sized chips that fit the screen', async ({ page }) => {
+  test('fold into one labelled Type menu, and the first screen is cards', async ({ page }) => {
     await signUp(page)
     const universeId = await newUniverse(page)
 
@@ -493,32 +526,57 @@ test.describe('the type bar on a phone', () => {
     await page.waitForURL(/\/lore$/)
     await expect(page.getByTestId('entity-card')).toHaveCount(2)
 
-    const row = page.getByTestId('type-filter')
-    await expect(row.getByRole('button')).toHaveCount(1 + 7 + MANY_TYPES.length)
+    // No row of chips: one button that says what it chooses and what is chosen.
+    await expect(typeNav(page)).toBeHidden()
+    const trigger = page.getByTestId('lore-type-menu')
+    await expect(trigger).toHaveAccessibleName('Type: All')
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    expect((await trigger.boundingBox())!.height).toBeGreaterThanOrEqual(44)
 
-    // Several rows, every chip and label whole, and nothing - the row or the page - to scroll.
-    const layout = await expectTidyRows(row)
-    expect(layout.rows).toBeGreaterThan(2)
+    // The first card is on the first screen, well above the fold.
+    const firstCard = (await page.getByTestId('entity-card').first().boundingBox())!
+    expect(firstCard.y).toBeLessThanOrEqual(300)
     expect(await pageOverflow(page)).toBeLessThanOrEqual(1)
 
-    // Every chip is a target a thumb can hit.
-    for (const height of layout.heights) expect(height).toBeGreaterThanOrEqual(44)
+    // Every type is in the menu, the current one marked, and focus lands on it.
+    await trigger.tap()
+    const menu = page.getByTestId('lore-type-menu-panel')
+    await expect(menu.getByRole('link')).toHaveCount(1 + 7 + MANY_TYPES.length)
+    const allItem = menu.getByRole('link', { name: 'All', exact: true })
+    await expect(allItem).toHaveAttribute('aria-current', 'page')
+    await expect(allItem).toBeFocused()
 
-    // A chip on the last rows is chosen with an ordinary tap, and filters.
-    const ritual = chip(page, 'Ritual Circle')
-    await ritual.tap()
-    await expect(ritual).toHaveAttribute('aria-pressed', 'true')
+    // Choosing one closes the menu, goes there, and hands the focus back to the button.
+    await menu.getByRole('link', { name: 'Ritual Circle', exact: true }).tap()
+    await expect(menu).toHaveCount(0)
+    await expect(page).toHaveURL(new RegExp(`/lore\\?type=${ids.get('Ritual Circle')}$`))
+    await expect(trigger).toHaveAccessibleName('Type: Ritual Circle')
+    await expect(trigger).toBeFocused()
     await expect(page.getByTestId('entity-card')).toHaveCount(1)
     await expect(card(page, 'The Tide Vigil')).toBeVisible()
 
-    // Chosen looks chosen.
-    const background = (name: string) =>
-      chip(page, name).evaluate((element) => getComputedStyle(element).backgroundColor)
-    expect(await background('Ritual Circle')).not.toEqual(await background('Character'))
+    // Escape closes it without choosing.
+    await trigger.tap()
+    await page.keyboard.press('Escape')
+    await expect(menu).toHaveCount(0)
+    await expect(trigger).toBeFocused()
 
-    // Tapping it again lets go of it.
-    await ritual.tap()
-    await expect(chip(page, 'All')).toHaveAttribute('aria-pressed', 'true')
-    await expect(page.getByTestId('entity-card')).toHaveCount(2)
+    // Filters fold behind one button that counts what is on.
+    const filters = page.getByTestId('lore-filters-toggle')
+    await expect(page.getByLabel('Filter entries')).toBeHidden()
+    await filters.tap()
+    await expect(filters).toHaveAttribute('aria-expanded', 'true')
+    await page.getByLabel('Filter entries').fill('nothing-like-this')
+    await expect(filters).toContainText('1')
+    await expect(page.getByTestId('entity-empty')).toContainText('Nothing matches that.')
+
+    // One labelled create, at the bottom edge in reach of a thumb, for the type in view.
+    const create = page.getByTestId('new-entity')
+    await expect(create).toHaveAccessibleName('New Ritual Circle')
+    const box = (await create.boundingBox())!
+    expect(box.height).toBeGreaterThanOrEqual(44)
+    expect(box.y + box.height).toBeGreaterThan(844 - 100)
+    expect(box.y + box.height).toBeLessThanOrEqual(844)
+    await expect(page.getByRole('link', { name: 'New Ritual Circle' })).toHaveCount(1)
   })
 })

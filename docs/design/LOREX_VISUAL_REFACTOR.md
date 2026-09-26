@@ -3,7 +3,7 @@
 The implementation contract for Tasks 002-007. Produced by Design Refactor 001 (audit and
 direction) on `design/visual-system-audit`, from `dev` at `379bd8b`, 2026-09-26.
 
-**Implementation: 002 done** (`refactor/app-shell-shared-components`); 003-007 to come. §17's decisions are taken - §18. Nothing here changes routes, APIs, schema, backups, search,
+**Implementation: 002 and 003 done**; 004-007 to come. §17's decisions are taken - §18. Nothing here changes routes, APIs, schema, backups, search,
 permissions, Canon, timeline logic or what a phone can do. The one URL addition anywhere in the
 plan is query parameters on the Lore list (§4.3).
 
@@ -1229,3 +1229,22 @@ type, a header thumbnail beside the entry's picture, drag and drop, a gallery vi
   the phone sheet and the Overview.
 - Every screen's title is its `h1` from 002, including screens whose layout waits for 003-006; their inner headings
   are re-levelled when their task reaches them.
+
+**Clarified by 003's implementation:**
+
+- **The Lore heading names the place.** With a type chosen, the page's `h1` is that type's name under a "Lore"
+  crumb, and the create button reads "New {type}"; with All, the heading is "Lore". §4.3's "the heading stays Lore"
+  gave way to making the current type the loudest thing on the page. The name is the author's, never pluralised.
+- **Types are one row on a desktop**, scrolling sideways (with an edge fade) only when a world has more types than the
+  row has room for, rather than wrapping; the current type is scrolled into view. On a phone, Decision 1's "Type"
+  button opens every type in the shared `ActionMenu`, which opens onto the current item.
+- **Which history entries:** a type or a page is a move (pushed); typing in the filter and the status replace the entry
+  they are on. Choosing a type keeps the filter and status; "Clear filters" keeps the type.
+- **Filters on a phone** fold behind one "Filters" button that counts what is on; the type is never inside it.
+- **Create on a phone** is the header's own button, fixed at the bottom edge above the safe area - one element, so
+  never a second primary.
+- **No-picture tile:** the type's chosen icon (or the neutral fallback) on the type's colour at 14% (22% dark); the
+  initial is gone. Pictures keep the author's square thumbnail at 88px (64px on a phone).
+- **Scroll position on Back** is left to the browser; no restoration was added, so the hash deep links are untouched.
+- **Grid minimum 18rem**, per §6.2, on `.cardgrid`: three columns at 1440, two at 820 and 1024, one on a phone.
+

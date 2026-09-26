@@ -291,22 +291,26 @@ test.describe('text direction', () => {
 
     await page.goto(`/app/universes/${universeId}/lore`)
     const card = page.locator(`[data-testid="entity-card"][data-entity-name="${Text.numbers}"]`)
-    await expectIsolated(card.locator('.dossier__name'), Text.numbers)
-    await expectIsolated(card.locator('.dossier__type'), 'شخصية')
-    await expect(card.locator('.dossier__aliases bdi')).toHaveText(stored.aliases)
-    // The card's own rows are not reversed: the type before the status, the portrait before the name.
+    await expectIsolated(card.locator('.entitycard__name'), Text.numbers)
+    // The type's name is cut with an ellipsis, so the cutting element carries the direction - the
+    // name reads right to left while the line holding its icon and the status does not turn.
+    await expect(card.locator('.entitycard__typename')).toHaveText('شخصية')
+    expect(await computedDirection(card.locator('.entitycard__typename'))).toBe('rtl')
+    expect(await computedDirection(card.locator('.entitycard__meta'))).toBe('ltr')
+    await expect(card.locator('.entitycard__aliases bdi')).toHaveText(stored.aliases)
+    // The card's own rows are not reversed: the type before the status, the picture before the name.
     const [typeBox, statusBox] = await lefts(
-      card.locator('.dossier__type'),
-      card.locator('.dossier__canon'),
+      card.locator('.entitycard__type'),
+      card.locator('.entitycard__status'),
     )
     expect(statusBox).toBeGreaterThan(typeBox)
     const [portraitBox, cardNameBox] = await lefts(
-      card.locator('.portrait'),
-      card.locator('.dossier__name'),
+      card.locator('.tile'),
+      card.locator('.entitycard__name'),
     )
     expect(cardNameBox).toBeGreaterThan(portraitBox)
     await expectIsolated(
-      page.locator('[data-testid="type-filter-option"][data-type-name="شخصية"] .typebar__name'),
+      page.locator('[data-testid="lore-type"][data-type-name="شخصية"] .typeswitch__name'),
       'شخصية',
     )
 
@@ -646,7 +650,7 @@ test.describe('text direction', () => {
       // ---- The lore grid ----
 
       await page.goto(`/app/universes/${universeId}/lore`)
-      await expectIsolated(page.getByTestId('entity-card').locator('.dossier__name'), Text.long)
+      await expectIsolated(page.getByTestId('entity-card').locator('.entitycard__name'), Text.long)
       expect(await scrollsSideways(page)).toBe(false)
     })
   })

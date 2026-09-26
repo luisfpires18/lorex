@@ -48,7 +48,7 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   `<type>/<description>` branches: Phase 2 Story, Phase 3, and now Phase 4.
   **Phase 023 - Production Hardening / PostgreSQL - remains deferred** and is not started; the
   next numbered phase resumes only when the owner says so.
-- **Design refactor: 001 (audit and direction) and 002 (app shell, shared foundation) done; 003-007 to come.**
+- **Design refactor: 001 (audit), 002 (app shell, shared foundation) and 003 (Lore browsing) done; 004-007 to come.**
   See Design refactor below.
 - **Entry images** (`feat/entity-images-r2`, merged into `dev`). An entry may carry one picture:
   uploaded through the API, decoded and thumbnailed server-side, stored as two objects in one
@@ -577,14 +577,27 @@ Canon change; the Lore list gains query parameters in 003 and nothing else touch
   - Owner decisions (contract section 18): phone type control "Type ▾"; Overview without counts; soft corners;
     labelled thumb-reachable create. Scratch seed and capture scripts were not committed: a durable visual seed
     helper was judged not worth its upkeep yet.
-- **Next: 003 Lore browsing** - TypeSwitcher in the URL, EntityCard on StatusBadge and a tile, toolbar, phone
-  "Type ▾" and create. Then 004 Entity, 005 Story, 006 Worldbuilding, 007 Polish (contract section 15).
+- **003 - Lore browsing** (`refactor/lore-browsing` off `dev` at `22e2128`, committed, not merged, not pushed).
+  Presentation and client routing only: no API, schema, backup or search change.
+  - The address holds where Lore is: `lore?type=<id>&status=&q=&page=`. Type and page push, filter and status
+    replace; an unknown type id is All. Back from an entry lands on its type; the entry's type crumb links there;
+    `lore/new?type=<id>` starts a new entry in that type.
+  - `TypeSwitcher` replaces `TypeFilterBar`: links with `aria-current`, one scrolling row from 641px, a labelled
+    "Type" `ActionMenu` on a phone. The `h1` is the type's name under a "Lore" crumb; create reads "New {type}".
+  - `EntityCard` rebuilt on `EntityTile` and `StatusBadge`: 88px square (64 on a phone), the type's icon on its tint
+    when there is no picture, name, aliases, type, status, two lines of summary; no stripe, no tags. Skeletons after
+    300ms, a danger callout with Try again, and two empty states (nothing in this type / nothing matches).
+  - Two search boxes explained: the shell's universe search jumps anywhere; Lore's own field narrows this list. It is
+    now "Filter entries" with a filter icon, in one row with a status `.segmented`; on a phone both fold behind
+    "Filters". Create sits at the bottom edge on a phone. First card: 437 -> 307px at 1440, ~713 -> 260px at 390.
+  - Also fixed: on a phone the sticky bar stretched to fill a short page.
+- **Next: 004 Entity experience.** Then 005 Story, 006 Worldbuilding, 007 Polish (contract section 15).
 - `design/` is not a type `branching.md` lists; 001 used it because the owner named the branch. 002 uses `refactor/`.
 
 ## Baseline
 
-- **999 API integration tests, 175 Playwright tests**, green. Design refactor 002's full run on a fresh database: **175/175**
-  (171 before, plus `shell.spec.ts`'s four). No backend change, so the API suite and Release build were not rerun.
+- **999 API integration tests, 175 Playwright tests**, green. Design refactor 003's full run on a fresh database: **175/175**
+  (`type-filter.spec.ts` rewritten around the type navigation, same count). 002's was 175/175 (171 plus `shell.spec.ts`'s four). No backend change, so the API suite and Release build were not rerun.
   Stabilization pass 003's full Playwright run on a fresh
   database of its own (`LOREX_E2E_DB`), at Playwright's default workers: **171/171, nothing logged about a locked
   database**. No backend change, so the API suite and the Release build were not rerun. Pass 002's runs were 166/166
