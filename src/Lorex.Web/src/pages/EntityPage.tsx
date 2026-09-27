@@ -29,6 +29,7 @@ import type { Chronology } from '../chronology/types'
 import { CanonBlockNotice } from '../components/CanonBlockNotice'
 import { ApiError } from '../lib/api'
 import { formatDate } from '../lib/dates'
+import { useLeaveGuard } from '../lib/leaveGuard'
 import {
   createEntity,
   deleteEntity,
@@ -217,8 +218,7 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
 
   // A new entry's blank draft is derived from the first available type rather than
   // written back into state, so nothing has to re-render to produce it.
-  const draft = useMemo(() => {
-    if (editedDraft) return editedDraft
+  const blankDraft = useMemo((): Draft | null => {
     if (!isNew || types.length === 0) return null
     return {
       entityTypeId: types.find((type) => type.id === startingTypeId)?.id ?? types[0].id,
@@ -229,22 +229,42 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
       tags: [],
       fields: {},
     } satisfies Draft
-  }, [editedDraft, isNew, types, startingTypeId])
+  }, [isNew, types, startingTypeId])
+  const draft = editedDraft ?? blankDraft
 
   const selectedType = useMemo(
     () => types.find((type) => type.id === draft?.entityTypeId) ?? null,
     [types, draft?.entityTypeId],
   )
 
-  // Whether the open form differs from what is stored - said in the form's bar, in words.
-  const isDirty = useMemo(
-    () =>
-      isFormOpen &&
-      !isNew &&
-      detail !== null &&
-      draft !== null &&
-      JSON.stringify(draft) !== JSON.stringify(draftFromDetail(detail)),
-    [isFormOpen, isNew, detail, draft],
+  // Whether the open form differs from what is stored, or for a new entry from the blank form - said in the
+  // form's bar, in words, and asked about before the author leaves it. A change put back is no change. A new
+  // entry's framed picture waits in the form, so it counts; an existing entry's picture is written the moment
+  // it is framed, so there is nothing of it to lose.
+  const isDirty = useMemo(() => {
+    const baseline = isNew ? blankDraft : detail ? draftFromDetail(detail) : null
+    if (!isFormOpen || draft === null || baseline === null) return false
+    if (isNew && pendingImage !== null) return true
+    return comparable(draft, types) !== comparable(baseline, types)
+  }, [isFormOpen, isNew, blankDraft, detail, draft, types, pendingImage])
+
+  /** Lets the form's changes go and closes it: Cancel, or the author choosing to leave. */
+  const discard = useCallback(() => {
+    setDraft(detail ? draftFromDetail(detail) : null)
+    setPendingImage(null)
+    setIsEditing(false)
+    setMessage(null)
+    setFieldErrors({})
+    setBlocked(null)
+  }, [detail])
+
+  useLeaveGuard(
+    !isDirty
+      ? null
+      : isNew
+        ? 'This new entry has not been created. Leave without saving it?'
+        : `“${detail?.name ?? 'This entry'}” has unsaved changes. Leave without saving them?`,
+    discard,
   )
 
   // A link to `#article` - a search result whose words were in the article - lands on it once the entry is on screen:
@@ -832,7 +852,7 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
       {isEditing ? (
         <footer className="entry__actions actionbar">
           <p className="actionbar__status" role="status" data-testid="entry-form-status">
-            {isNew ? 'New entry' : isDirty ? 'Unsaved changes' : 'No changes yet'}
+            {isDirty ? 'Unsaved changes' : isNew ? 'New entry' : 'No changes yet'}
           </p>
           <div className="actionbar__actions">
             {!isNew ? (
@@ -840,12 +860,18 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
                 className="button button--secondary"
                 type="button"
                 onClick={() => {
-                  if (detail) setDraft(draftFromDetail(detail))
-                  setIsEditing(false)
-                  setMessage(null)
-                  setFieldErrors({})
-                  setBlocked(null)
+                  // Cancel is the choice to discard, so it asks once, and only when there is something to lose.
+                  if (
+                    isDirty &&
+                    !window.confirm(
+                      'Close the form without saving your changes? They will be lost.',
+                    )
+                  ) {
+                    return
+                  }
+                  discard()
                 }}
+                data-testid="cancel-entity"
               >
                 <ActionIcon icon={X} />
                 Cancel
@@ -877,6 +903,18 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
       ) : null}
     </article>
   )
+}
+
+/**
+ * A draft as the save would send it, as one string: every field its type defines, an untouched one as its empty
+ * value. So a field typed into and cleared again compares equal to one never touched.
+ */
+function comparable(draft: Draft, types: EntityType[]) {
+  const definitions = types.find((type) => type.id === draft.entityTypeId)?.fields ?? []
+  return JSON.stringify({
+    ...draft,
+    fields: definitions.map((definition) => draft.fields[definition.id] ?? emptyValue(definition)),
+  })
 }
 
 /**
