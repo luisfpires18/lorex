@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ApiError } from '../lib/api'
+import { payloadKey, useDrawerGuard } from '../lib/drawerGuard'
 import { useReturnFocus } from '../lib/returnFocus'
 import { createStory, updateStory } from '../stories/api'
 import {
@@ -14,6 +15,15 @@ interface StoryDraft {
   title: string
   premise: string
   status: StoryStatusValue
+}
+
+/** The draft as the save sends it. */
+function inputOf(draft: StoryDraft) {
+  return {
+    title: draft.title.trim(),
+    premise: draft.premise.trim() === '' ? null : draft.premise.trim(),
+    status: draft.status,
+  }
 }
 
 interface StoryFormProps {
@@ -31,14 +41,25 @@ interface StoryFormProps {
 export function StoryForm({ universeId, story, onClose, onSaved }: StoryFormProps) {
   const dialog = useRef<HTMLDialogElement>(null)
   const title = useRef<HTMLInputElement>(null)
-  const [draft, setDraft] = useState<StoryDraft>(() => ({
+  // What the drawer opened on - the story as stored, or the blank form - which the draft is measured against.
+  const [initial] = useState<StoryDraft>(() => ({
     title: story?.title ?? '',
     premise: story?.premise ?? '',
     status: story?.status ?? StoryStatus.Planning,
   }))
+  const [draft, setDraft] = useState<StoryDraft>(initial)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+
+  const isDirty = payloadKey(inputOf(draft)) !== payloadKey(inputOf(initial))
+  const { close, dialogProps } = useDrawerGuard(
+    isDirty,
+    story
+      ? `“${story.title}” has unsaved changes. Leave without saving them?`
+      : 'This new story has not been created. Leave without saving it?',
+    onClose,
+  )
 
   useReturnFocus()
 
@@ -57,11 +78,7 @@ export function StoryForm({ universeId, story, onClose, onSaved }: StoryFormProp
     setFieldErrors({})
     setIsSaving(true)
 
-    const input = {
-      title: draft.title.trim(),
-      premise: draft.premise.trim() === '' ? null : draft.premise.trim(),
-      status: draft.status,
-    }
+    const input = inputOf(draft)
 
     try {
       const saved = story
@@ -89,14 +106,7 @@ export function StoryForm({ universeId, story, onClose, onSaved }: StoryFormProp
       className="drawer"
       ref={dialog}
       aria-labelledby="story-heading"
-      onCancel={(event) => {
-        event.preventDefault()
-        onClose()
-      }}
-      onClick={(event) => {
-        // Only a click on the backdrop itself lands on the dialog element.
-        if (event.target === dialog.current) onClose()
-      }}
+      {...dialogProps}
       data-testid="story-form"
     >
       <form
@@ -189,7 +199,7 @@ export function StoryForm({ universeId, story, onClose, onSaved }: StoryFormProp
           <button
             className="button button--quiet"
             type="button"
-            onClick={onClose}
+            onClick={close}
             data-testid="cancel-story"
           >
             Cancel
