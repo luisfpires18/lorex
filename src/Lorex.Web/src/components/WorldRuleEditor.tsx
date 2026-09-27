@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Trash2 } from 'lucide-react'
 import { ActionIcon } from './ActionIcon'
+import { ActionMenu } from './ActionMenu'
 import { WorldRuleCheckSection } from './WorldRuleCheckSection'
 import {
   CHECK_ERROR_KEYS,
@@ -377,9 +378,28 @@ export function WorldRuleEditor({
         <Link className="rule__back" to={listPath} data-testid="world-rule-back">
           World Rules
         </Link>
-        <h1 className="rule__heading" id={headingId} data-testid="world-rule-heading">
-          {isNew ? 'New rule' : <bdi>{stored.title}</bdi>}
-        </h1>
+        <div className="doc__titlerow">
+          <h1 className="rule__heading" id={headingId} data-testid="world-rule-heading">
+            {isNew ? 'New rule' : <bdi>{stored.title}</bdi>}
+          </h1>
+          {!isNew ? (
+            <ActionMenu
+              label={`More actions for ${stored.title}`}
+              triggerTestId="world-rule-actions"
+            >
+              <button
+                className="actionmenu__item actionmenu__item--danger"
+                type="button"
+                disabled={isDeleting || isSaving}
+                onClick={() => void remove()}
+                data-testid="world-rule-delete"
+              >
+                <ActionIcon icon={Trash2} />
+                {isDeleting ? 'Moving to the Trash…' : 'Delete rule'}
+              </button>
+            </ActionMenu>
+          ) : null}
+        </div>
         <p className="rule__lede">
           A rule of how this world works, in your own words. Lorex never reads them, and saving
           changes nothing else in the universe; only a timeline check you set below is ever counted.
@@ -527,18 +547,6 @@ export function WorldRuleEditor({
             {status.text}
           </p>
           <div className="rule__actions">
-            {!isNew ? (
-              <button
-                className="button button--quiet button--icon"
-                type="button"
-                disabled={isDeleting || isSaving}
-                onClick={() => void remove()}
-                data-testid="world-rule-delete"
-              >
-                <ActionIcon icon={Trash2} />
-                {isDeleting ? 'Moving to the Trash…' : 'Delete rule'}
-              </button>
-            ) : null}
             <button
               className="button"
               type="submit"

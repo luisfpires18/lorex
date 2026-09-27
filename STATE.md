@@ -629,12 +629,30 @@ Canon change; the Lore list gains query parameters in 003 and nothing else touch
   drawer. Cancel, Escape and the backdrop ask once to discard. Escape is taken on its key press: Chrome refused a second
   prevented `cancel` in a row and closed the dialog under a form still held and guarded. The drawers are modal, so the
   sidebar and views cannot be reached while one is open, and one editor cannot replace another.
-- **Next: 006 Worldbuilding workspaces.** Then 007 Polish (contract section 15).
+- **006 - Worldbuilding workspaces** (`refactor/worldbuilding-workspaces` off `dev` at `4b44269`, committed, not
+  merged, not pushed). Presentation, plus two leave guards: no route, API, schema, backup, chronology, family, Canon or
+  Trash semantics changed.
+  - Timeline: a moment's title opens its drawer; one quiet ⋯ (Edit moment, Delete moment) that no longer hides until
+    hovered; the kind word only where no date line says it; an era named where its years begin; the year never broken
+    on a phone. One word throughout: "New moment", "Create moment", and "moments" on Settings' era counts.
+  - The moment drawer now asks before a draft goes (`useDrawerGuard`); `FamilyLinkForm` asks too, and a tree node or the
+    picker opening another family goes through `confirmLeaving`. The idea and rule editors were already guarded.
+  - Ideas and World Rules: Delete moved from beside Save to a ⋯ beside the title; rows open from anywhere (`.rowlink`).
+  - Family Tree: `EntityTile` thumbnails; the focal status a `StatusBadge`; the relation before the type on a card; the
+    generation names pinned while a wide tree scrolls; on a phone the generations stack with no lines, the focus first,
+    nothing clipped and nothing sideways; the circle a warning callout rather than an error.
+  - Canon's empty state claims only that the checks have nothing open; Trash's lede is two lines and Restore has an icon.
+  - Seen, not changed: Settings' era editor (out of scope) has no leave guard; short right-to-left excerpts sit at the
+    right of a 70ch measure (the shared `.prose` limitation); Trash's type dots are unexplained - 007.
+- **Next: 007 Product-wide polish and consistency** (contract section 15).
 - `design/` is not a type `branching.md` lists; 001 used it because the owner named the branch. 002 uses `refactor/`.
 
 ## Baseline
 
-- **999 API integration tests, 193 Playwright tests**, green. The 005 drawer guards' full runs on fresh databases: 191/193
+- **999 API integration tests, 196 Playwright tests**, green. Design refactor 006's full runs on fresh databases:
+  195/196 (`relationships.spec.ts` timed out at sign-up, `/register` never drew its form), 195/196 (`manuscript.spec.ts`,
+  `net::ERR_CONNECTION_REFUSED` from the Vite server), then **196/196**; both specs 3/3 alone. 193 plus
+  `worldbuilding.spec.ts`'s three. Earlier, the 005 drawer guards' full runs on fresh databases: 191/193
   (a canon test lost to Vite failing a cold dynamic import of `EntityPage.tsx`, a family tree test to a timeout), then
   192/193 (the same canon test, the same import); both pass alone, and canon passes alone on the base too. 188 plus
   `story-drawers.spec.ts`'s five. Design refactor 005's full run on a fresh database:

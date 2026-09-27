@@ -324,6 +324,7 @@ test.describe('world rules', () => {
       question = dialog.message()
       void dialog.accept()
     })
+    await page.getByTestId('world-rule-actions').click()
     await page.getByTestId('world-rule-delete').click()
     await page.waitForURL(`${base}/world-rules`)
     expect(question).toBe(`Move “${name}” to the Trash? You can restore it from the Trash.`)
@@ -445,7 +446,7 @@ test.describe('world rules', () => {
       'world-rule-title',
       'world-rule-description',
       'world-rule-save',
-      'world-rule-delete',
+      'world-rule-actions',
     ]) {
       const box = (await page.getByTestId(id).boundingBox())!
       expect(box.x, id).toBeGreaterThanOrEqual(0)

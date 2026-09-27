@@ -1675,6 +1675,43 @@ a.button--danger:visited {
   background: var(--accent-wash);
 }
 
+/* A row that opens as a whole: its title is the one link, stretched over the row, so the link's name stays the
+   title and nothing else in the row may be a control. The Ideas and World Rules lists. */
+.rowlink {
+  position: relative;
+  padding-inline: var(--space-3);
+  transition: background-color var(--duration-1) var(--ease);
+}
+
+.rowlink:hover {
+  background: var(--hover-wash);
+}
+
+.rowlink:active {
+  background: var(--press-wash);
+}
+
+.rowlink:has(.rowlink__target:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* The lists' own rows are ruled edge to edge; as whole-row links they take the same inset the focus ring needs. */
+.idearow.rowlink,
+.rulerow.rowlink {
+  padding-inline: var(--space-3);
+}
+
+.rowlink__target::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.rowlink__target:focus-visible {
+  outline: none;
+}
+
 /* Sticky status and actions for a document or a drawer: the status on the left, Cancel and Save
    on the right, clear of a phone's home indicator. */
 .actionbar {
@@ -5327,37 +5364,37 @@ html:has(.viewer[open]) {
 
 /* The tools belong to the moment under the cursor, not to every moment at once. They
    stay in the tab order, and focus brings them back into view. */
-.moment__tools {
+/* A moment's facts and its ⋯ on one line; the menu is always there, quiet, never only on hover. */
+.moment__head {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
-  margin-top: 0.7rem;
-  opacity: 0;
-  transition: opacity 120ms ease;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
 
-.moment:hover .moment__tools,
-.moment:focus-within .moment__tools {
-  opacity: 1;
+.moment__head .moment__stamp {
+  margin-bottom: 0;
 }
 
-@media (hover: none) {
-  .moment__tools {
-    opacity: 1;
-  }
+.moment__head .actionmenu {
+  margin-block: calc(-1 * var(--space-1));
 }
 
-.moment__tools .button--quiet {
+/* The title opens the moment: a button that reads as the heading it is. */
+.moment__open {
   padding: 0;
   border: 0;
-  background: transparent;
-  color: var(--muted);
-  font-size: 0.8rem;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  overflow-wrap: anywhere;
+  cursor: pointer;
 }
 
-.moment__tools .button--quiet:hover:not(:disabled) {
-  color: var(--accent);
+.moment__open:hover {
   text-decoration: underline;
+  text-decoration-thickness: 1px;
   text-underline-offset: 0.2em;
 }
 
@@ -6906,6 +6943,12 @@ a.lorechip--pov:focus-visible .lorechip__name {
     margin-top: 0;
   }
 
+  /* Here the year sits in a row beside its era's name, and the name wraps rather than the number. */
+  .chron__yearnum {
+    flex: none;
+    white-space: nowrap;
+  }
+
   .chron__moments {
     grid-column: 1;
   }
@@ -7374,7 +7417,6 @@ a.lorechip--pov:focus-visible .lorechip__name {
    would break the paragraph. */
 
 @media (pointer: coarse) {
-  .moment__tools .button--quiet,
   .version__tools .button--quiet,
   .finding__tools .button--quiet,
   .history__head .button--quiet {
@@ -7482,13 +7524,6 @@ a.lorechip--pov:focus-visible .lorechip__name {
   .picker__chosen .button--quiet {
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
-  }
-
-  /* Revealed on hover for a mouse; a finger has no hover, so they are always there.
-     The existing (hover: none) rule does the same for one of them - this covers the
-     rest of the same pattern. */
-  .moment__tools {
-    opacity: 1;
   }
 }
 
@@ -7616,6 +7651,24 @@ a.idearow__title:focus-visible {
 
 .idearow__restore {
   flex: none;
+}
+
+/* A document's title and its ⋯ - an idea's, a rule's - on one line: what can be done to it beside its name, and
+   never beside Save. */
+.doc__titlerow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.doc__titlerow > h1 {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.doc__titlerow > .actionmenu {
+  margin-top: 0.6rem;
 }
 
 /* One idea. A single readable column, like a settings section: the form is short and the body is a note, not a book. */
@@ -8232,11 +8285,22 @@ a.idearef__name {
    from the cards and drawn behind them, and they are decoration: every connection is also written
    out in words on the card it belongs to, so the tree reads the same without them.
 
-   The diagram scrolls sideways inside its own box on a narrow screen. The page never does. */
+   A wide family scrolls sideways inside its own box, its generation labels pinned at the left so they
+   never scroll out of view. On a phone the generations stack instead - one column, every card whole,
+   no lines - because every connection is already written on its card. The page never scrolls sideways. */
 
 .family__picker {
   max-width: 26rem;
   margin: 1.5rem 0 0.5rem;
+}
+
+.family__loopnote {
+  max-width: 62rem;
+  margin-top: var(--space-4);
+}
+
+.family__loopnote p {
+  margin: 0;
 }
 
 .family__loop {
@@ -8306,6 +8370,9 @@ a.idearef__name {
 }
 
 .familytree__rowlabel {
+  position: sticky;
+  left: 0;
+  width: fit-content;
   margin: 0;
   font-size: 0.7rem;
   font-weight: 600;
@@ -8332,7 +8399,8 @@ a.idearef__name {
   width: 12rem;
   padding: 0.75rem;
   border: 1px solid var(--rule);
-  background: var(--surface);
+  border-radius: var(--radius-md);
+  background: var(--raised);
 }
 
 .familynode--focal {
@@ -8362,13 +8430,17 @@ a.idearef__name {
   text-decoration: underline;
 }
 
-.familynode .portrait {
+.familynode__tile {
+  flex: none;
   width: 2.5rem;
   height: 2.5rem;
-  border-radius: 50%;
+  border-radius: var(--radius-sm);
 }
 
 .familynode__name {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
   font-family: var(--display);
   font-size: 1rem;
   line-height: 1.25;
@@ -8421,7 +8493,8 @@ a.idearef__name {
 }
 
 .familynode__draft {
-  color: var(--danger);
+  color: var(--muted);
+  font-style: italic;
 }
 
 .familynode__open {
@@ -8456,8 +8529,37 @@ a.idearef__name {
   margin: 1.25rem 0;
 }
 
+/* The entry in focus is given the room its name needs. */
+.familynode--focal {
+  width: 15rem;
+}
+
 @media (max-width: 640px) {
+  .familytree__scroll {
+    overflow: visible;
+  }
+
+  .familytree__canvas {
+    min-width: 0;
+    gap: 1.75rem;
+    padding-inline: 0;
+  }
+
+  .familytree__lines {
+    display: none;
+  }
+
+  .familytree__members {
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
   .familynode {
-    width: 10.5rem;
+    width: auto;
+  }
+
+  /* The entry in focus leads its own row, before its siblings. */
+  .familynode--focal {
+    order: -1;
   }
 }

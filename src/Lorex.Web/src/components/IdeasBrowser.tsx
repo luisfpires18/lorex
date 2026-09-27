@@ -340,7 +340,7 @@ export function IdeasBrowser({ universe, basePath }: IdeasBrowserProps) {
         <ul className="idealist" data-testid="idea-list">
           {result.items.map((idea) => (
             <li
-              className="idearow"
+              className={deleted ? 'idearow' : 'idearow rowlink'}
               key={idea.id}
               data-testid="idea-row"
               data-title={idea.title}
@@ -353,7 +353,7 @@ export function IdeasBrowser({ universe, basePath }: IdeasBrowserProps) {
                   </p>
                 ) : (
                   <Link
-                    className="idearow__title"
+                    className="idearow__title rowlink__target"
                     to={`${basePath}/${idea.id}`}
                     data-testid="idea-open"
                   >

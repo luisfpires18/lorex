@@ -60,7 +60,7 @@ function plural(count: number, one: string, many: string) {
 
 function usageOf(era: EraDraft) {
   const parts: string[] = []
-  if (era.momentCount > 0) parts.push(plural(era.momentCount, 'timeline entry', 'timeline entries'))
+  if (era.momentCount > 0) parts.push(plural(era.momentCount, 'moment', 'moments'))
   if (era.yearCount > 0) parts.push(plural(era.yearCount, 'year on an entry', 'years on entries'))
   if (era.sceneCount > 0) parts.push(plural(era.sceneCount, 'scene', 'scenes'))
   return parts.length === 0 ? null : `Dates ${parts.join(' and ')}`
@@ -200,7 +200,7 @@ export function ChronologySettings({ universeId, chronology, onSaved }: Chronolo
 
   const unplacedParts = [
     stored.unplacedMomentCount > 0
-      ? plural(stored.unplacedMomentCount, 'dated timeline entry', 'dated timeline entries')
+      ? plural(stored.unplacedMomentCount, 'dated moment', 'dated moments')
       : null,
     stored.unplacedYearCount > 0
       ? plural(stored.unplacedYearCount, 'birth or death year', 'birth or death years')

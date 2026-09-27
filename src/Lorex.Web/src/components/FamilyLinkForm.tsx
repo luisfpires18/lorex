@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { EntityPicker, type EntityChoice } from './EntityPicker'
 import { ApiError } from '../lib/api'
+import { payloadKey } from '../lib/drawerGuard'
+import { useLeaveGuard } from '../lib/leaveGuard'
 import { createRelationship } from '../relationships/api'
 import { FAMILY_SEMANTIC_WORDS, type RelationshipType } from '../relationships/types'
 import { CANON_LABELS, CANON_ORDER, CanonStatus, type CanonStatusValue } from '../lore/types'
@@ -29,6 +31,21 @@ export function FamilyLinkForm({ universeId, focal, kinds, onSaved, onCancel }: 
   const [isSaving, setIsSaving] = useState(false)
 
   const kind = kinds.find((candidate) => candidate.id === kindId) ?? kinds[0]
+
+  // Unsaved is the connection as it would be written against the one the form opened on - so a choice put back is none.
+  const [initial] = useState(() =>
+    payloadKey({ kindId, focalIsParent, relatedId: null, canonStatus }),
+  )
+  const isDirty =
+    payloadKey({ kindId, focalIsParent, relatedId: related?.id ?? null, canonStatus }) !== initial
+  useLeaveGuard(
+    isDirty ? 'This family connection has not been added. Leave without saving it?' : null,
+  )
+
+  function cancel() {
+    if (isDirty && !window.confirm('Close without saving your changes? They will be lost.')) return
+    onCancel()
+  }
   const parentName = focalIsParent ? focal.name : (related?.name ?? '…')
   const childName = focalIsParent ? (related?.name ?? '…') : focal.name
 
@@ -167,7 +184,7 @@ export function FamilyLinkForm({ universeId, focal, kinds, onSaved, onCancel }: 
         >
           {isSaving ? 'Saving' : 'Add connection'}
         </button>
-        <button className="button button--quiet" type="button" onClick={onCancel}>
+        <button className="button button--quiet" type="button" onClick={cancel}>
           Cancel
         </button>
       </div>

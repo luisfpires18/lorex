@@ -620,6 +620,7 @@ test.describe('world rule checks', () => {
     await page.keyboard.press('Enter')
     await expect(section.locator('.picker__chosenname')).toHaveText('Mirabel')
     await expectInsideScreen(section.locator('.picker__chosen'), 390, 'chosen participant')
+    page.once('dialog', (dialog) => void dialog.accept())
     await drawer.getByTestId('cancel-moment').click()
     await expect(drawer).toHaveCount(0)
 

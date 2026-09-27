@@ -251,7 +251,7 @@ export default function CanonPage() {
           </p>
           {severity === null && status === CanonConflictStatus.Pending ? (
             <button
-              className="button"
+              className="button button--secondary empty__action"
               type="button"
               onClick={() => void evaluate()}
               disabled={isEvaluating}
@@ -297,7 +297,7 @@ function emptyLine(status: CanonConflictStatusValue, severity: CanonSeverityValu
 
   if (status === CanonConflictStatus.Dismissed) return 'Nothing set aside.'
   if (status === CanonConflictStatus.Resolved) return 'Nothing closed yet.'
-  return 'Nothing here contradicts itself.'
+  return 'No open findings.'
 }
 
 function hint(status: CanonConflictStatusValue) {
@@ -309,5 +309,5 @@ function hint(status: CanonConflictStatusValue) {
     return 'A finding closes when evaluation stops seeing it. Nothing has closed yet.'
   }
 
-  return 'Either this world is consistent, or it has not been read since it last changed. Findings are only as fresh as the last evaluation.'
+  return 'The checks have nothing open to report. That is all it means: they look only for the contradictions they know about. Evaluate reads the whole world again.'
 }

@@ -3,7 +3,7 @@
 The implementation contract for Tasks 002-007. Produced by Design Refactor 001 (audit and
 direction) on `design/visual-system-audit`, from `dev` at `379bd8b`, 2026-09-26.
 
-**Implementation: 002, 003, 004 and 005 done**; 006-007 to come. §17's decisions are taken - §18. Nothing here changes routes, APIs, schema, backups, search,
+**Implementation: 002 to 006 done**; 007 to come. §17's decisions are taken - §18. Nothing here changes routes, APIs, schema, backups, search,
 permissions, Canon, timeline logic or what a phone can do. The one URL addition anywhere in the
 plan is query parameters on the Lore list (§4.3).
 
@@ -1153,6 +1153,14 @@ Delete in the header's ⋯. World rules follow the same editor, with the check s
   `family-tree`, `canon`, `trash`, `content-recovery`, `text-direction`.
 - **Excluded:** timeline scale or zoom views, a rule builder, idea statuses, tags or promotion, new
   Canon rules, tree depth control.
+- **As built:** the moment's title opens its drawer and one always-visible ⋯ holds Edit and Delete (no
+  hover-only control remains); the kind word is said but shown only where there is no date line; an
+  era's name is drawn only where its years begin; the phone's year never wraps. Seeded 13 moments fit
+  1,830px at 1440, ~110px each. Participant chips, the Segmented status filter, the title-as-field
+  document editor with a side panel, and Trash tiles were not built: 007, or dropped as not earning their
+  change. The tree stacks by generation below 641px instead of shrinking; Delete is in the editors' ⋯
+  beside the title, the ActionBar unchanged. The moment drawer and the family-connection form gained
+  the leave guard; Settings' era editor did not (out of scope).
 
 ### 007 - Product-wide polish and consistency
 

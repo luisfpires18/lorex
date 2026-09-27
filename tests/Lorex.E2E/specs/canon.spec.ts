@@ -290,7 +290,7 @@ test.describe('canon integrity', () => {
       'aria-pressed',
       'true',
     )
-    await expect(page.getByTestId('canon-empty')).toContainText('Nothing here contradicts itself.')
+    await expect(page.getByTestId('canon-empty')).toContainText('No open findings.')
 
     // Evaluating an empty world says so rather than staying silent.
     await page.getByTestId('empty-evaluate-canon').click()

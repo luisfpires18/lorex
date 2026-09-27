@@ -595,6 +595,7 @@ test.describe('ideas', () => {
       asked = dialog.message()
       void dialog.accept()
     })
+    await page.getByTestId('idea-actions').click()
     await page.getByTestId('idea-delete').click()
     await page.waitForURL(`/app/universes/${world}/ideas`)
     expect(asked).toContain('goes to Recently deleted')

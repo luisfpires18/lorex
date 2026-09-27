@@ -215,6 +215,7 @@ test.describe('chronology', () => {
     await expect(page.getByTestId('moment-form')).toContainText(
       'Choose the era this year is counted in.',
     )
+    page.once('dialog', (dialog) => void dialog.accept())
     await page.getByTestId('cancel-moment').click()
     await expect(page.getByTestId('moment-form')).toHaveCount(0)
 
@@ -223,7 +224,7 @@ test.describe('chronology', () => {
     await page.waitForURL(/\/settings$/)
 
     const before = page.getByTestId('era').nth(0)
-    await expect(before).toContainText('Dates 3 timeline entries')
+    await expect(before).toContainText('Dates 3 moments')
     await expect(before.getByTestId('era-remove')).toBeDisabled()
     await fillEra(page, 0, { name: 'Before the Fall', abbreviation: 'B.F.', position: 'after' })
     await page.getByTestId('save-chronology').click()

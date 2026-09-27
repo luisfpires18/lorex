@@ -6,6 +6,7 @@ import { EntityPicker, type EntityChoice } from '../components/EntityPicker'
 import { FamilyLinkForm } from '../components/FamilyLinkForm'
 import { FamilyTreeView } from '../components/FamilyTreeView'
 import { getFamilyTree } from '../familyTree/api'
+import { confirmLeaving } from '../lib/leaveGuard'
 import { linkSentence } from '../familyTree/reading'
 import type { FamilyTree } from '../familyTree/types'
 import { listRelationshipTypes } from '../relationships/api'
@@ -99,8 +100,11 @@ export default function FamilyTreePage() {
   const isAdding = !!entityId && addingFor === entityId
   const typesPath = `/app/universes/${universe.id}/types`
 
+  /** Another entry's family. A button rather than a link, so it asks the leave question itself: an unsaved connection
+   *  being added here goes with the family it belonged to. */
   function show(choice: EntityChoice | null) {
-    if (choice) navigate(`/app/universes/${universe.id}/family-tree/${choice.id}`)
+    if (!choice || !confirmLeaving()) return
+    navigate(`/app/universes/${universe.id}/family-tree/${choice.id}`)
   }
 
   return (
@@ -174,11 +178,11 @@ export default function FamilyTreePage() {
       {tree && focal ? (
         <>
           {tree.loops.length > 0 ? (
-            <div className="notice notice--error" role="alert" data-testid="family-loop">
+            <div className="callout callout--warning family__loopnote" data-testid="family-loop">
+              <p className="callout__title">These connections go round in a circle</p>
               <p>
-                These connections go round in a circle, so nobody in it can be placed above the
-                others. Nothing has been changed: open the entries and correct or remove one of
-                them.
+                Nobody in it can be placed above the others, so the tree below shows them where it
+                can. Nothing has been changed: open the entries and correct or remove one of them.
               </p>
               <ul className="family__loop">
                 {tree.loops.flatMap((loop) =>
