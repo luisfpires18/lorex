@@ -119,6 +119,7 @@ test.describe('relationships', () => {
     await expect(page.getByTestId('relationship-list').locator('> li')).toHaveCount(1)
 
     // Edit from the inverse side: status, dates and notes all set from here.
+    await page.getByTestId('relationship-actions-Aragorn').click()
     await page.getByTestId('edit-relationship-Aragorn').click()
     await expect(page.getByTestId('relationship-preview')).toContainText('Gondor ruled by Aragorn')
     await page.getByTestId('relation-canon-canon').click()
@@ -141,6 +142,7 @@ test.describe('relationships', () => {
 
     // The dates come back into the form exactly as they were typed, whichever end the
     // author is standing on.
+    await page.getByTestId('relationship-actions-Gondor').click()
     await page.getByTestId('edit-relationship-Gondor').click()
     await expect(page.getByTestId('relation-start')).toHaveValue('2019-05-01')
     await expect(page.getByTestId('relation-end')).toHaveValue('2021-03-04')
@@ -165,6 +167,7 @@ test.describe('relationships', () => {
     // Removing it from the target clears it from both entries: one row, one delete.
     page.on('dialog', (dialog) => dialog.accept())
     await page.goto(entryUrl(universeId, gondor))
+    await page.getByTestId('relationship-actions-Aragorn').click()
     await page.getByTestId('delete-relationship-Aragorn').click()
     await expect(page.getByTestId('relations-empty')).toBeVisible()
 
@@ -197,6 +200,7 @@ test.describe('relationships', () => {
 
     // Editing from the end that was stored as the target must not fall back to some
     // other kind, and must not write a second row.
+    await page.getByTestId('relationship-actions-Rohan').click()
     await page.getByTestId('edit-relationship-Rohan').click()
     await expect(page.getByTestId('relationship-preview')).toContainText('Gondor allied with Rohan')
     await page.getByTestId('relation-notes').fill('Sworn at Cormallen.')
@@ -257,6 +261,7 @@ test.describe('relationships', () => {
     // Clear the link and the kind becomes deletable.
     page.on('dialog', (dialog) => dialog.accept())
     await page.goto(entryUrl(universeId, aragorn))
+    await page.getByTestId('relationship-actions-Gondor').click()
     await page.getByTestId('delete-relationship-Gondor').click()
     await expect(page.getByTestId('relations-empty')).toBeVisible()
 

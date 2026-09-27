@@ -3,7 +3,7 @@
 The implementation contract for Tasks 002-007. Produced by Design Refactor 001 (audit and
 direction) on `design/visual-system-audit`, from `dev` at `379bd8b`, 2026-09-26.
 
-**Implementation: 002 and 003 done**; 004-007 to come. §17's decisions are taken - §18. Nothing here changes routes, APIs, schema, backups, search,
+**Implementation: 002, 003 and 004 done**; 005-007 to come. §17's decisions are taken - §18. Nothing here changes routes, APIs, schema, backups, search,
 permissions, Canon, timeline logic or what a phone can do. The one URL addition anywhere in the
 plan is query parameters on the Lore list (§4.3).
 
@@ -1247,4 +1247,22 @@ type, a header thumbnail beside the entry's picture, drag and drop, a gallery vi
   initial is gone. Pictures keep the author's square thumbnail at 88px (64px on a phone).
 - **Scroll position on Back** is left to the browser; no restoration was added, so the hash deep links are untouched.
 - **Grid minimum 18rem**, per §6.2, on `.cardgrid`: three columns at 1440, two at 820 and 1024, one on a phone.
+
+**Clarified by 004's implementation:**
+
+- **Where the picture goes is read from its own proportions.** The original's stored width and height decide it: taller
+  than wide or near square (ratio under 1.25), it sits beside the article above the facts, as an infobox; clearly wider,
+  it spans the page above the article, bounded to `min(26rem, 52vh)`. Beside the article it is bounded to
+  `min(36rem, 75vh)`, on a phone to `min(22rem, 50vh)`. Only maxima, so nothing is cropped, stretched or enlarged.
+- **The whole picture** opens from an icon button on its corner ("View full image") in `ImageViewer`: a native modal
+  `<dialog>` like the cropper, the original on a dark neutral ground in both schemes, fitted to the window. Transient
+  page state; no route. A focused component, not a modal framework.
+- **The Canon control keeps its place and its one-press change** (the status can already be changed inline, and the
+  Canon gate depends on it), restyled as §14.2 says: a sunken track, the chosen step raised with its glyph.
+- **The entry's form takes the page while it is open**: one column at 46rem - the name and summary in the header, then
+  Picture, Other names and tags, and what the type records - with the article out of view until the form closes, and
+  its bar (state in words, Cancel, Save) sticky at the bottom. The article's own editor still cannot be open beside it.
+- **Relation rows show the related entry's type tile, not its picture**: the relations read carries no image, and
+  adding one is an API change this task does not make. Rows are grouped under their reading; Edit and Remove are in
+  each row's ⋯.
 

@@ -185,8 +185,8 @@ export function EntityImageField({
   }
 
   return (
-    <div className="rail__block imagefield" data-testid="entity-image-field">
-      <h3 className="rail__heading">Image</h3>
+    <div className="imagefield" data-testid="entity-image-field">
+      <h2 className="entryform__heading">Picture</h2>
 
       <div className="imagefield__row">
         {pending && preview ? (
