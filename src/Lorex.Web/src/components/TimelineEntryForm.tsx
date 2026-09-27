@@ -8,6 +8,7 @@ import type { CanonBlockingFinding } from '../canon/types'
 import { namesEras } from '../chronology/format'
 import type { Chronology } from '../chronology/types'
 import { ApiError } from '../lib/api'
+import { payloadKey, useDrawerGuard } from '../lib/drawerGuard'
 import { CANON_LABELS, CANON_ORDER, CanonStatus, type CanonStatusValue } from '../lore/types'
 import { ValidationTermKind } from '../ruleValidation/types'
 import { useValidationTerms } from '../ruleValidation/useValidationTerms'
@@ -157,6 +158,36 @@ interface TimelineEntryFormProps {
  * Validation details sit folded at the foot (ADR 0034): an ordinary moment never needs them, and nothing in them is filled in
  * from the title, the description or who took part.
  */
+/** The draft as the save sends it: a kind carries only its own date parts, and a universe with eras no free label. */
+function inputOf(draft: MomentDraft, reckonsInEras: boolean) {
+  const isDatedKind = draft.dateKind !== DateKind.Unknown
+  const isRangeKind = draft.dateKind === DateKind.Range
+
+  return {
+    title: draft.title.trim(),
+    description: trimmed(draft.description),
+    canonStatus: draft.canonStatus,
+    dateKind: draft.dateKind,
+    startYear: toNumber(draft.startYear),
+    startMonth: toNumber(draft.startMonth),
+    startDay: toNumber(draft.startDay),
+    endYear: toNumber(draft.endYear),
+    endMonth: toNumber(draft.endMonth),
+    endDay: toNumber(draft.endDay),
+    // A universe with eras has no free-text label; one without has no eras to send.
+    eraLabel: reckonsInEras ? null : trimmed(draft.eraLabel),
+    startEraId: reckonsInEras && isDatedKind ? trimmed(draft.startEraId) : null,
+    endEraId: reckonsInEras && isRangeKind ? trimmed(draft.endEraId) : null,
+    entityIds: draft.entities.map((choice) => choice.id),
+    // Always sent whole: all three empty removes the details.
+    validation: {
+      eventKindId: trimmed(draft.eventKindId),
+      methodId: trimmed(draft.methodId),
+      participantEntityId: draft.participant?.id ?? null,
+    },
+  }
+}
+
 export function TimelineEntryForm({
   universeId,
   entry,
@@ -166,7 +197,9 @@ export function TimelineEntryForm({
 }: TimelineEntryFormProps) {
   const dialog = useRef<HTMLDialogElement>(null)
   const title = useRef<HTMLInputElement>(null)
-  const [draft, setDraft] = useState<MomentDraft>(() => (entry ? draftFrom(entry) : EMPTY))
+  // What the drawer opened on - the moment as stored, or the blank form - which the draft is measured against.
+  const [initial] = useState<MomentDraft>(() => (entry ? draftFrom(entry) : EMPTY))
+  const [draft, setDraft] = useState<MomentDraft>(initial)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
   const [blocked, setBlocked] = useState<CanonBlockingFinding[] | null>(null)
@@ -180,6 +213,16 @@ export function TimelineEntryForm({
   } = useValidationTerms(universeId)
 
   const reckonsInEras = namesEras(chronology)
+
+  const isDirty =
+    payloadKey(inputOf(draft, reckonsInEras)) !== payloadKey(inputOf(initial, reckonsInEras))
+  const { close, dialogProps } = useDrawerGuard(
+    isDirty,
+    entry
+      ? `“${entry.title}” has unsaved changes. Leave without saving them?`
+      : 'This new moment has not been added. Leave without saving it?',
+    onClose,
+  )
 
   useEffect(() => {
     // showModal, not the open attribute: it brings the focus trap, the backdrop and
@@ -226,32 +269,7 @@ export function TimelineEntryForm({
     setBlocked(null)
     setIsSaving(true)
 
-    const isDatedKind = draft.dateKind !== DateKind.Unknown
-    const isRangeKind = draft.dateKind === DateKind.Range
-
-    const input = {
-      title: draft.title.trim(),
-      description: trimmed(draft.description),
-      canonStatus: draft.canonStatus,
-      dateKind: draft.dateKind,
-      startYear: toNumber(draft.startYear),
-      startMonth: toNumber(draft.startMonth),
-      startDay: toNumber(draft.startDay),
-      endYear: toNumber(draft.endYear),
-      endMonth: toNumber(draft.endMonth),
-      endDay: toNumber(draft.endDay),
-      // A universe with eras has no free-text label; one without has no eras to send.
-      eraLabel: reckonsInEras ? null : trimmed(draft.eraLabel),
-      startEraId: reckonsInEras && isDatedKind ? trimmed(draft.startEraId) : null,
-      endEraId: reckonsInEras && isRangeKind ? trimmed(draft.endEraId) : null,
-      entityIds: draft.entities.map((choice) => choice.id),
-      // Always sent whole: all three empty removes the details.
-      validation: {
-        eventKindId: trimmed(draft.eventKindId),
-        methodId: trimmed(draft.methodId),
-        participantEntityId: draft.participant?.id ?? null,
-      },
-    }
+    const input = inputOf(draft, reckonsInEras)
 
     try {
       if (entry) {
@@ -331,14 +349,7 @@ export function TimelineEntryForm({
       className="drawer"
       ref={dialog}
       aria-labelledby="moment-heading"
-      onCancel={(event) => {
-        event.preventDefault()
-        onClose()
-      }}
-      onClick={(event) => {
-        // Only a click on the backdrop itself lands on the dialog element.
-        if (event.target === dialog.current) onClose()
-      }}
+      {...dialogProps}
       data-testid="moment-form"
     >
       <form
@@ -351,7 +362,7 @@ export function TimelineEntryForm({
         <header className="drawer__head">
           <p className="drawer__eyebrow">{entry ? 'Editing a moment' : 'A new moment'}</p>
           <h2 className="drawer__title" id="moment-heading">
-            {entry ? entry.title || 'Untitled moment' : 'Add timeline entry'}
+            {entry ? entry.title || 'Untitled moment' : 'New moment'}
           </h2>
         </header>
 
@@ -580,12 +591,12 @@ export function TimelineEntryForm({
 
         <footer className="drawer__actions">
           <button className="button" type="submit" disabled={isSaving} data-testid="save-moment">
-            {isSaving ? 'Saving' : entry ? 'Save moment' : 'Add moment'}
+            {isSaving ? 'Saving' : entry ? 'Save moment' : 'Create moment'}
           </button>
           <button
             className="button button--quiet"
             type="button"
-            onClick={onClose}
+            onClick={close}
             data-testid="cancel-moment"
           >
             Cancel

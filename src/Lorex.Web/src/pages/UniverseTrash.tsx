@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { ArchiveRestore } from 'lucide-react'
 import { Link, useOutletContext } from 'react-router-dom'
+import { ActionIcon } from '../components/ActionIcon'
 import { blockingFindingsOf } from '../canon/blocked'
 import type { CanonBlockingFinding } from '../canon/types'
 import { CanonBlockNotice } from '../components/CanonBlockNotice'
@@ -227,9 +229,7 @@ export default function UniverseTrash() {
           <>
             <p>
               What you removed from your lore, your stories and your world rules. Nothing here has
-              been erased — restoring puts each thing back with everything it held: an entry&rsquo;s
-              article, fields, history and connections; a scene&rsquo;s manuscript and its saved
-              versions; a story&rsquo;s chapters, scenes and plot; a rule&rsquo;s words.
+              been erased: restoring puts each thing back with everything it held.
             </p>
             <p data-testid="trash-ideas-pointer">
               Deleted ideas are not here: they belong to your account, and wait in{' '}
@@ -314,7 +314,7 @@ export default function UniverseTrash() {
                   ) : null}
                 </div>
                 <button
-                  className="button button--quiet"
+                  className="button button--secondary button--icon"
                   type="button"
                   disabled={restoring !== null || waiting !== null}
                   aria-label={`Restore ${kind.toLowerCase()} “${item.name}”`}
@@ -322,6 +322,7 @@ export default function UniverseTrash() {
                   onClick={() => void restore(item)}
                   data-testid={`restore-${item.name}`}
                 >
+                  <ActionIcon icon={ArchiveRestore} />
                   {restoring === item.id ? 'Restoring…' : 'Restore'}
                 </button>
               </li>

@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Trash2, X } from 'lucide-react'
 import { ActionIcon } from './ActionIcon'
+import { ActionMenu } from './ActionMenu'
 import { IdeaReferencePicker } from './IdeaReferencePicker'
 import { Quoted } from './NameList'
 import { RecoveredDraft } from './RecoveredDraft'
@@ -565,9 +566,25 @@ export function IdeaEditor({
         <Link className="idea__back" to={listPath} data-testid="idea-back">
           {listLabel}
         </Link>
-        <h1 className="idea__heading" id={headingId} data-testid="idea-heading">
-          {isNew ? 'New idea' : <bdi>{stored.title}</bdi>}
-        </h1>
+        <div className="doc__titlerow">
+          <h1 className="idea__heading" id={headingId} data-testid="idea-heading">
+            {isNew ? 'New idea' : <bdi>{stored.title}</bdi>}
+          </h1>
+          {!isNew ? (
+            <ActionMenu label={`More actions for ${stored.title}`} triggerTestId="idea-actions">
+              <button
+                className="actionmenu__item actionmenu__item--danger"
+                type="button"
+                disabled={isDeleting || isSaving}
+                onClick={() => void remove()}
+                data-testid="idea-delete"
+              >
+                <ActionIcon icon={Trash2} />
+                {isDeleting ? 'Deleting…' : 'Delete idea'}
+              </button>
+            </ActionMenu>
+          ) : null}
+        </div>
         <p className="idea__lede">
           A possibility, not lore. Nothing saved here changes your world.
           {!isNew && stored.updatedAt ? (
@@ -864,18 +881,6 @@ export function IdeaEditor({
             </p>
           ) : null}
           <div className="idea__actions">
-            {!isNew ? (
-              <button
-                className="button button--quiet button--icon"
-                type="button"
-                disabled={isDeleting || isSaving}
-                onClick={() => void remove()}
-                data-testid="idea-delete"
-              >
-                <ActionIcon icon={Trash2} />
-                {isDeleting ? 'Deleting…' : 'Delete idea'}
-              </button>
-            ) : null}
             <button
               className="button"
               type="submit"

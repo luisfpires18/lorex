@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { EntityPortrait } from './EntityPortrait'
+import { EntityTile } from './EntityTile'
 import { readFamilyTree, type FamilyMember } from '../familyTree/reading'
 import { POSITION_LABELS, type FamilyPosition, type FamilyTree } from '../familyTree/types'
 import { CANON_LABELS, CanonStatus } from '../lore/types'
@@ -40,6 +40,7 @@ const ROWS: { position: FamilyPosition; label: string }[] = [
  */
 export function FamilyTreeView({ universeId, tree, onFocus }: Props) {
   const family = useMemo(() => readFamilyTree(tree), [tree])
+  const scroller = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLDivElement>(null)
   const focalCard = useRef<HTMLLIElement>(null)
   const cards = useRef(new Map<string, HTMLLIElement | null>())
@@ -100,16 +101,21 @@ export function FamilyTreeView({ universeId, tree, onFocus }: Props) {
     }
   }, [measure])
 
-  // A wide family scrolls sideways inside its own box; the entry being looked at starts in view.
+  // A wide family scrolls sideways inside its own box; the entry being looked at starts in view. Only that box
+  // moves - scrolling the card into view would move the page under the reader as well.
   useEffect(() => {
-    focalCard.current?.scrollIntoView({ block: 'nearest', inline: 'center' })
+    const box = scroller.current
+    const card = focalCard.current
+    if (!box || !card || box.scrollWidth <= box.clientWidth) return
+    const offset = card.getBoundingClientRect().left - box.getBoundingClientRect().left
+    box.scrollLeft += offset - (box.clientWidth - card.offsetWidth) / 2
   }, [tree.focalEntityId])
 
   const focal = family.focal
 
   return (
     <div className="familytree" data-testid="family-tree">
-      <div className="familytree__scroll">
+      <div className="familytree__scroll" ref={scroller}>
         <div className="familytree__canvas" ref={canvas}>
           <svg
             className="familytree__lines"
@@ -169,11 +175,13 @@ export function FamilyTreeView({ universeId, tree, onFocus }: Props) {
                       data-focal="true"
                     >
                       <div className="familynode__head">
-                        <EntityPortrait
+                        <EntityTile
                           universeId={universeId}
                           entityId={focal.entityId}
-                          name={focal.name}
                           image={focal.image}
+                          typeIcon={focal.entityTypeIcon}
+                          typeAccent={focal.entityTypeAccentColor}
+                          className="familynode__tile"
                         />
                         <p className="familynode__name">
                           <bdi>{focal.name}</bdi>
@@ -183,9 +191,10 @@ export function FamilyTreeView({ universeId, tree, onFocus }: Props) {
                         <span className="familynode__focusmark">Family shown for this entry</span>
                         <span>{focal.entityTypeName}</span>
                         {focal.canonStatus === CanonStatus.Canon ? null : (
-                          <span className="chip" data-canon={focal.canonStatus}>
-                            {CANON_LABELS[focal.canonStatus]}
-                          </span>
+                          <StatusBadge
+                            step={focal.canonStatus}
+                            label={CANON_LABELS[focal.canonStatus]}
+                          />
                         )}
                       </p>
                       <Link
@@ -263,24 +272,19 @@ function Card({ member, universeId, onFocus, register }: CardProps) {
         onClick={() => onFocus(node.entityId)}
         data-testid={`family-focus-${node.name}`}
       >
-        <EntityPortrait
+        <EntityTile
           universeId={universeId}
           entityId={node.entityId}
-          name={node.name}
           image={node.image}
+          typeIcon={node.entityTypeIcon}
+          typeAccent={node.entityTypeAccentColor}
+          className="familynode__tile"
         />
         <span className="familynode__name">
           <bdi>{node.name}</bdi>
         </span>
         <span className="familynode__action">Show this family</span>
       </button>
-
-      <p className="familynode__kind">
-        <span>{node.entityTypeName}</span>
-        {node.canonStatus === CanonStatus.Canon ? null : (
-          <StatusBadge step={node.canonStatus} label={CANON_LABELS[node.canonStatus]} />
-        )}
-      </p>
 
       <ul className="familynode__roles">
         {relations.flatMap((relation) =>
@@ -297,6 +301,13 @@ function Card({ member, universeId, onFocus, register }: CardProps) {
           )),
         )}
       </ul>
+
+      <p className="familynode__kind">
+        <span>{node.entityTypeName}</span>
+        {node.canonStatus === CanonStatus.Canon ? null : (
+          <StatusBadge step={node.canonStatus} label={CANON_LABELS[node.canonStatus]} />
+        )}
+      </p>
 
       <Link className="familynode__open" to={`/app/universes/${universeId}/lore/${node.entityId}`}>
         Open entry

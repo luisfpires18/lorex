@@ -555,6 +555,7 @@ test.describe('timeline', () => {
 
     // A delete on the first page pulls the thirteenth up rather than leaving a hole.
     page.on('dialog', (dialog) => dialog.accept())
+    await page.getByTestId('moment-actions-Year 3005').click()
     await page.getByTestId('delete-moment-Year 3005').click()
     await expect(moment(page, 'Year 3005')).toHaveCount(0)
     const refilled = await momentOrder(page)
@@ -592,6 +593,7 @@ test.describe('timeline', () => {
     // The page it stood alone on has nothing left to show, so the author is put back on
     // the one before it rather than on an empty stream.
     page.on('dialog', (dialog) => dialog.accept())
+    await page.getByTestId('moment-actions-Year 3013').click()
     await page.getByTestId('delete-moment-Year 3013').click()
 
     await expect(page.getByTestId('chron-empty')).toHaveCount(0)
@@ -616,29 +618,56 @@ test.describe('timeline', () => {
     await page.getByTestId('new-moment').click()
     await expect(page.getByTestId('moment-title')).toBeFocused()
 
-    // Escape gives up on the draft.
+    // Untouched, Escape simply closes it.
+    await page.keyboard.press('Escape')
+    await expect(page.getByTestId('moment-form')).toHaveCount(0)
+
+    // With something written, Escape asks once before giving up on the draft; staying keeps it, and saying
+    // yes leaves nothing behind.
+    const asked: string[] = []
+    const answers: boolean[] = []
+    page.on('dialog', (dialog) => {
+      asked.push(dialog.message())
+      void (answers.shift() ? dialog.accept() : dialog.dismiss())
+    })
+    const discard = 'Close without saving your changes? They will be lost.'
+
+    await page.getByTestId('new-moment').click()
     await page.getByTestId('moment-title').fill('Never written')
+    await page.keyboard.press('Escape')
+    await expect.poll(() => asked).toEqual([discard])
+    await expect(page.getByTestId('moment-title')).toHaveValue('Never written')
+    answers.push(true)
     await page.keyboard.press('Escape')
     await expect(page.getByTestId('moment-form')).toHaveCount(0)
     await expect(page.getByTestId('chron-empty')).toBeVisible()
 
-    // So does a click on the backdrop, and neither leaves anything behind. The drawer is
-    // a panel on the right, so the veil to the left of it is what a click has to land on:
-    // a click inside the dialog's own box would be a click on the panel.
+    // So does a click on the backdrop. The drawer is a panel on the right, so the veil to the left of it is
+    // what a click has to land on: a click inside the dialog's own box would be a click on the panel.
     await page.getByTestId('new-moment').click()
     await page.getByTestId('moment-title').fill('Nor this')
     const panel = (await page.getByTestId('moment-form').boundingBox())!
     expect(panel.x).toBeGreaterThan(20)
+    answers.push(true)
     await page.mouse.click(20, panel.y + panel.height / 2)
     await expect(page.getByTestId('moment-form')).toHaveCount(0)
     await expect(page.getByTestId('chron-empty')).toBeVisible()
+    expect(asked).toHaveLength(3)
 
-    // Cancelling an edit leaves the stored moment exactly as it was.
+    // Cancelling an edit leaves the stored moment exactly as it was; a title typed and put back is no change.
     await addMoment(page, { title: 'Written once', kind: 'exact', startYear: '3018' })
     await page.getByTestId('edit-moment-Written once').click()
-    await page.getByTestId('moment-title').fill('Renamed by accident')
+    await page.getByTestId('moment-title').fill('Renamed')
+    await page.getByTestId('moment-title').fill('Written once')
     await page.getByTestId('cancel-moment').click()
     await expect(page.getByTestId('moment-form')).toHaveCount(0)
+    expect(asked).toHaveLength(3)
+    await page.getByTestId('edit-moment-Written once').click()
+    await page.getByTestId('moment-title').fill('Renamed by accident')
+    answers.push(true)
+    await page.getByTestId('cancel-moment').click()
+    await expect(page.getByTestId('moment-form')).toHaveCount(0)
+    expect(asked).toHaveLength(4)
     await expect(moment(page, 'Written once')).toBeVisible()
     await expect(moment(page, 'Renamed by accident')).toHaveCount(0)
 

@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom'
+import { ActionIcon } from '../components/ActionIcon'
+import { ActionMenu } from '../components/ActionMenu'
+import { EmptyState } from '../components/EmptyState'
 import { EntityPicker, type EntityChoice } from '../components/EntityPicker'
 import { TimelineEntryForm } from '../components/TimelineEntryForm'
 import { findEra, formatChronologyYear, formatSignedYear } from '../chronology/format'
@@ -138,14 +142,52 @@ export default function TimelinePage() {
       <li className="moment" key={entry.id} data-kind={entry.date.kind} data-title={entry.title}>
         <span className="moment__mark" aria-hidden="true" />
 
-        <p className="moment__stamp">
-          {stamp && !restates ? <span className="moment__when">{stamp}</span> : null}
-          <span className="moment__kind">{DATE_KIND_LABELS[entry.date.kind]}</span>
-          <StatusBadge step={entry.canonStatus} label={CANON_LABELS[entry.canonStatus]} />
-        </p>
+        <div className="moment__head">
+          <p className="moment__stamp">
+            {stamp && !restates ? <span className="moment__when">{stamp}</span> : null}
+            {/* The mark's shape and the date line already say exact, approximate ("c.") or a span; the word is said,
+                and shown only where there is no date line to carry it. */}
+            <span className={stamp ? 'moment__kind visually-hidden' : 'moment__kind'}>
+              {DATE_KIND_LABELS[entry.date.kind]}
+            </span>
+            <StatusBadge step={entry.canonStatus} label={CANON_LABELS[entry.canonStatus]} />
+          </p>
+          <ActionMenu
+            label={`More actions for ${entry.title}`}
+            triggerTestId={`moment-actions-${entry.title}`}
+          >
+            <button
+              className="actionmenu__item"
+              type="button"
+              onClick={() => setForm({ mode: 'edit', entry })}
+              data-testid={`menu-edit-moment-${entry.title}`}
+            >
+              <ActionIcon icon={Pencil} />
+              Edit moment
+            </button>
+            <hr className="actionmenu__divider" />
+            <button
+              className="actionmenu__item actionmenu__item--danger"
+              type="button"
+              onClick={() => void remove(entry)}
+              data-testid={`delete-moment-${entry.title}`}
+            >
+              <ActionIcon icon={Trash2} />
+              Delete moment
+            </button>
+          </ActionMenu>
+        </div>
 
+        {/* The title is the way in: it opens the moment's drawer. */}
         <h4 className="moment__title">
-          <bdi>{entry.title}</bdi>
+          <button
+            className="moment__open"
+            type="button"
+            onClick={() => setForm({ mode: 'edit', entry })}
+            data-testid={`edit-moment-${entry.title}`}
+          >
+            <bdi>{entry.title}</bdi>
+          </button>
         </h4>
 
         {entry.description ? <p className="moment__account prose">{entry.description}</p> : null}
@@ -212,25 +254,6 @@ export default function TimelinePage() {
             </span>
           </p>
         ) : null}
-
-        <div className="moment__tools">
-          <button
-            className="button button--quiet"
-            type="button"
-            onClick={() => setForm({ mode: 'edit', entry })}
-            data-testid={`edit-moment-${entry.title}`}
-          >
-            Edit
-          </button>
-          <button
-            className="button button--quiet"
-            type="button"
-            onClick={() => void remove(entry)}
-            data-testid={`delete-moment-${entry.title}`}
-          >
-            Delete
-          </button>
-        </div>
       </li>
     )
   }
@@ -242,12 +265,13 @@ export default function TimelinePage() {
         lede="Everything that has happened here, in the order it happened."
         actions={
           <button
-            className="button"
+            className="button button--icon"
             type="button"
             onClick={() => setForm({ mode: 'new' })}
             data-testid="new-moment"
           >
-            Add timeline entry
+            <ActionIcon icon={Plus} />
+            New moment
           </button>
         }
       />
@@ -321,7 +345,7 @@ export default function TimelinePage() {
 
       {result && result.items.length > 0 ? (
         <div className="chron__stream" data-testid="chron-stream">
-          {groups.map((group) => {
+          {groups.map((group, index) => {
             const heading = formatChronologyYear(chronology, group.year, group.eraId)
 
             // The margin carries the year as the universe writes it, and the era's full name
@@ -331,12 +355,23 @@ export default function TimelinePage() {
             const era = findEra(chronology, group.eraId)
             const margin = era && !era.abbreviation ? formatSignedYear(group.year) : heading
             const aside = era ? era.name : group.eraLabel
+            // The era's name is drawn where its years begin, and only said again after that: the year's own mark
+            // carries it on every other group, and a column of the same long name is noise, not chronology.
+            const previous = groups[index - 1]
+            const repeatsEra =
+              previous !== undefined &&
+              previous.eraId === group.eraId &&
+              previous.eraLabel === group.eraLabel
 
             return (
               <section className="chron__group" key={group.key}>
                 <h3 className="chron__year">
                   <span className="chron__yearnum">{margin}</span>
-                  {aside ? <span className="chron__era">{aside}</span> : null}
+                  {aside ? (
+                    <span className={repeatsEra ? 'chron__era visually-hidden' : 'chron__era'}>
+                      {aside}
+                    </span>
+                  ) : null}
                 </h3>
                 <ul className="chron__moments">
                   {group.entries.map((entry) => moment(entry, heading))}
@@ -383,26 +418,28 @@ export default function TimelinePage() {
       ) : null}
 
       {result && result.items.length === 0 ? (
-        <div className="empty" data-testid="chron-empty">
-          <p className="empty__line">
-            {isFiltered ? 'No moment matches that.' : 'Nothing has happened here yet.'}
-          </p>
-          <p className="empty__hint">
-            {isFiltered
+        <EmptyState
+          testId="chron-empty"
+          title={isFiltered ? 'No moment matches that.' : 'Nothing has happened here yet.'}
+          hint={
+            isFiltered
               ? 'Clear the status or the entry you are following.'
-              : 'A timeline holds the moments of this world in order — a founding, a betrayal, the year someone was born. Give a date you are sure of, one you only half remember, or none at all.'}
-          </p>
-          {!isFiltered ? (
-            <button
-              className="button"
-              type="button"
-              onClick={() => setForm({ mode: 'new' })}
-              data-testid="empty-new-moment"
-            >
-              Add timeline entry
-            </button>
-          ) : null}
-        </div>
+              : 'A timeline holds the moments of this world in order — a founding, a betrayal, the year someone was born. Give a date you are sure of, one you only half remember, or none at all.'
+          }
+          action={
+            isFiltered ? null : (
+              <button
+                className="button button--icon"
+                type="button"
+                onClick={() => setForm({ mode: 'new' })}
+                data-testid="empty-new-moment"
+              >
+                <ActionIcon icon={Plus} />
+                New moment
+              </button>
+            )
+          }
+        />
       ) : null}
 
       {result && result.totalPages > 1 ? (

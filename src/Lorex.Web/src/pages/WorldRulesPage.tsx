@@ -117,13 +117,13 @@ export default function WorldRulesPage() {
         <ul className="rulelist" data-testid="world-rule-list">
           {result.items.map((rule) => (
             <li
-              className="rulerow"
+              className="rulerow rowlink"
               key={rule.id}
               data-testid="world-rule-row"
               data-title={rule.title}
             >
               <Link
-                className="rulerow__title"
+                className="rulerow__title rowlink__target"
                 to={`${basePath}/${rule.id}`}
                 data-testid="world-rule-open"
               >
