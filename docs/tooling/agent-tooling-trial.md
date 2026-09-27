@@ -432,3 +432,9 @@ Graphify - queries that actually earned their place; repository reads avoided; d
 insight a targeted read would have missed; maintenance and noise cost.
 
 No verdict in Phase 012.
+
+## Public portal 008 (2026-09-27)
+
+`rtk proxy` used for every Deploy DEV status check, deliberately and never for a failure: `gh run list --json` and `gh run view --json`,
+whose filtered forms drop the JSON fields (run number, head SHA, job conclusions) needed to verify Deploy DEV #47
+before branching. No diagnostic was missing from a filtered build or test run.

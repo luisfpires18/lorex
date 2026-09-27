@@ -83,8 +83,12 @@ export function useLeaveGuard(message: string | null, onLeave?: () => void) {
         return
       }
 
+      // One question per departure, however many forms on the page hold unsaved work: the newest asks for all of
+      // them, as `confirmLeaving` does, and leaving lets every one of them go.
+      if (standing[standing.length - 1] !== question) return
+
       if (window.confirm(question.message)) {
-        question.leave()
+        for (const each of [...standing]) each.leave()
       } else {
         event.preventDefault()
         event.stopPropagation()

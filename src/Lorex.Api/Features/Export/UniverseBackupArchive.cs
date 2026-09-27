@@ -34,6 +34,10 @@ public static class BackupArchive
     public static string MediaPathFor(Guid entityId, string contentType) =>
         $"media/entities/{entityId:D}/original.{ExtensionFor(contentType)}";
 
+    /// <summary>The original of the universe's artwork, inside the archive (since version 15). One per archive.</summary>
+    public static string ArtworkPathFor(string contentType) =>
+        $"media/universe/artwork/original.{ExtensionFor(contentType)}";
+
     /// <summary>
     /// The file extension for a stored content type. Derived from the type that was decided by
     /// decoding the bytes, never from the object key and never from what the author called the
@@ -53,10 +57,11 @@ public static class BackupArchive
 
 /// <summary>
 /// One image to be written into the archive. The object key is here and only here - it is how
-/// this installation reaches the bytes, and it never reaches the file.
+/// this installation reaches the bytes, and it never reaches the file. <paramref name="EntityId"/> is
+/// the entry the picture belongs to, or null for the universe's own artwork.
 /// </summary>
 public sealed record BackupMediaObject(
-    Guid EntityId,
+    Guid? EntityId,
     string ArchivePath,
     string ObjectKey,
     string ContentType);
@@ -75,10 +80,13 @@ public sealed record UniverseBackupSnapshot(
 /// that quietly left out a picture would break that promise at exactly the moment the promise
 /// mattered - when the file is all that is left.
 /// </summary>
-public sealed class BackupMediaMissingException(Guid entityId)
-    : InvalidOperationException($"The image stored for entry {entityId:D} could not be read.")
+public sealed class BackupMediaMissingException(Guid? entityId)
+    : InvalidOperationException(entityId is { } id
+        ? $"The image stored for entry {id:D} could not be read."
+        : "The universe's artwork could not be read.")
 {
-    public Guid EntityId { get; } = entityId;
+    /// <summary>The entry whose picture is missing, or null when it is the universe's artwork.</summary>
+    public Guid? EntityId { get; } = entityId;
 }
 
 /// <summary>

@@ -471,6 +471,17 @@ internal static partial class RestoreTestClient
             }
         }
 
+        if (version < 15)
+        {
+            // A universe's public details and its artwork arrived in version 15; the artwork's original with them.
+            Drop(payload["universe"], "publicSummary", "category", "genres", "artwork");
+
+            foreach (var path in entries.Keys.Where(path => path.StartsWith("media/universe/", StringComparison.Ordinal)).ToList())
+            {
+                entries.Remove(path);
+            }
+        }
+
         if (version < 14)
         {
             foreach (var type in payload["relationshipTypes"]!.AsArray())
@@ -750,6 +761,12 @@ internal static partial class RestoreTestClient
 
         var universe = payload.Universe;
         lines.Add($"universe description={universe.Description} accent={universe.AccentColor} archived={universe.IsArchived}");
+        lines.Add($"universe public summary={universe.PublicSummary} category={universe.Category} genres=[{string.Join(" | ", universe.Genres ?? [])}]");
+
+        if (universe.Artwork is { } artwork)
+        {
+            lines.Add($"  artwork {artwork.ContentType} {artwork.Width}x{artwork.Height} {artwork.ByteSize} crop={artwork.Crop} file={artwork.FileName} sha={Convert.ToHexString(SHA256.HashData(files[artwork.MediaPath]))}");
+        }
 
         foreach (var era in (payload.ChronologyEras ?? []).OrderBy(era => era.SortOrder))
         {

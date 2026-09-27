@@ -8,6 +8,7 @@ using Lorex.Api.Features.WorldRules;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.RuleValidation;
 using Lorex.Api.Features.Media;
+using Lorex.Api.Features.Publishing;
 using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.Stories;
 using Lorex.Api.Features.Timeline;
@@ -213,7 +214,8 @@ internal sealed partial class UniverseRestore(
         try
         {
             var images = await StoreImagesAsync(backup, opened, ids, universeId, now, attempted, cancellationToken);
-            return await WriteAsync(backup.Payload, ids, universeId, ownerId, name, now, images, cancellationToken);
+            var artwork = await StoreArtworkAsync(backup, opened, universeId, now, attempted, cancellationToken);
+            return await WriteAsync(backup.Payload, ids, universeId, ownerId, name, now, images, artwork, cancellationToken);
         }
         catch
         {
@@ -334,6 +336,63 @@ internal sealed partial class UniverseRestore(
         return new Dictionary<Guid, EntityImage>(rows);
     }
 
+    /// <summary>
+    /// The universe's artwork under the new universe's keys: the original from the archive and the card
+    /// validation already cut from it with the recorded frame. Written with the entries' pictures, before
+    /// the transaction, and swept with them if anything after fails.
+    /// </summary>
+    private async Task<UniverseArtwork?> StoreArtworkAsync(
+        RestorableBackup backup,
+        OpenedBackup opened,
+        Guid universeId,
+        DateTime now,
+        ConcurrentQueue<string> attempted,
+        CancellationToken cancellationToken)
+    {
+        if (backup.Artwork is not { } validated || backup.Payload.Universe.Artwork is not { } artwork)
+        {
+            return null;
+        }
+
+        var original = await opened.ReadMediaAsync(validated.MediaPath, cancellationToken);
+
+        var assetId = Guid.NewGuid();
+        var cardId = Guid.NewGuid();
+        var originalKey = UniverseArtworkKeys.Original(universeId, assetId, validated.Extension);
+        var cardKey = UniverseArtworkKeys.Card(universeId, assetId, cardId);
+
+        attempted.Enqueue(originalKey);
+        attempted.Enqueue(cardKey);
+
+        using var originalBytes = new MemoryStream(original, writable: false);
+        using var cardBytes = new MemoryStream(validated.Thumbnail, writable: false);
+
+        await MediaObjectWrites.PutAllAsync(
+            store,
+            cancellationToken,
+            new PendingMediaObject(originalKey, originalBytes, validated.ContentType),
+            new PendingMediaObject(cardKey, cardBytes, "image/webp"));
+
+        return new UniverseArtwork
+        {
+            UniverseId = universeId,
+            AssetId = assetId,
+            OriginalKey = originalKey,
+            CardId = cardId,
+            CardKey = cardKey,
+            CropX = artwork.Crop.X,
+            CropY = artwork.Crop.Y,
+            CropWidth = artwork.Crop.Width,
+            CropHeight = artwork.Crop.Height,
+            ContentType = validated.ContentType,
+            FileName = FileNameLabel(artwork.FileName),
+            Width = validated.Width,
+            Height = validated.Height,
+            ByteSize = validated.ByteSize,
+            UploadedAt = now,
+        };
+    }
+
     private static string? FileNameLabel(string? fileName)
     {
         if (string.IsNullOrWhiteSpace(fileName))
@@ -355,6 +414,7 @@ internal sealed partial class UniverseRestore(
         string name,
         DateTime now,
         Dictionary<Guid, EntityImage> images,
+        UniverseArtwork? artwork,
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -377,6 +437,13 @@ internal sealed partial class UniverseRestore(
             // The universe is new in this account; everything inside it keeps the moments the backup recorded.
             CreatedAt = now,
             UpdatedAt = now,
+
+            // Its public details as authored - and private, with no address and no publication date, whatever the
+            // universe it was backed up from was. The format cannot say otherwise, and publishing is its new owner's
+            // explicit act (ADR 0036).
+            PublicSummary = string.IsNullOrWhiteSpace(source.PublicSummary) ? null : source.PublicSummary,
+            Category = source.Category,
+            Genres = (source.Genres ?? []).Aggregate(UniverseGenres.None, (all, genre) => all | genre),
         };
 
         var detectChanges = db.ChangeTracker.AutoDetectChangesEnabled;
@@ -385,6 +452,12 @@ internal sealed partial class UniverseRestore(
         try
         {
             db.Universes.Add(universe);
+
+            if (artwork is not null)
+            {
+                db.UniverseArtworks.Add(artwork);
+            }
+
             AddLore(payload, ids, universeId, images);
             AddStories(payload, ids, universeId);
             AddIdeas(payload, ids, universeId, ownerId);

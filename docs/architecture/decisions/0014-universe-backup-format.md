@@ -353,3 +353,12 @@ A file at version 13 or earlier has no `familySemantic`, and every kind in it re
 even when the file carries the member - which Lorex never wrote. No derived relative is in a backup: siblings,
 grandparents and grandchildren are recomputed from the links, and a backup holds only the authored kinds and
 the authored links.
+
+## Amendment: version 15, a universe's public details (2026-09-27)
+
+A universe may be prepared for the public portal (ADR 0036). `payload.universe` gains `publicSummary`, `category` and
+`genres` (by name, fixed order) and `artwork` - the original at `media/universe/artwork/original.{ext}` with its
+16:10 card frame; the card is derived and not carried. Authored, so a version 14 reader would lose them: a bump.
+**Visibility, the public address, the publication date and the author's public name are never in a backup.**
+Publishing is a decision about one universe in one installation; a restore makes a new universe that has never been
+published. A file at version 14 or earlier has none of these members, and they are ignored if one carries them.

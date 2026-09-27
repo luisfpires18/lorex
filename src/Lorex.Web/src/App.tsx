@@ -2,6 +2,7 @@ import { lazy, Suspense, type ReactNode } from 'react'
 import { createBrowserRouter, Navigate, Route, RouterProvider, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthProvider'
 import { RequireAuth, RequireGuest } from './auth/routes'
+import { PublicLayout } from './components/PublicLayout'
 import { SkipLink } from './components/SkipLink'
 import { HistoryLeaveGuard } from './lib/leaveGuard'
 import { ProfileImageProvider } from './profile/ProfileImageProvider'
@@ -22,12 +23,14 @@ import UniverseWorkspace from './pages/UniverseWorkspace'
  */
 const CanonPage = lazy(() => import('./pages/CanonPage'))
 const EntityPage = lazy(() => import('./pages/EntityPage'))
+const ExplorePage = lazy(() => import('./pages/ExplorePage'))
 const FamilyTreePage = lazy(() => import('./pages/FamilyTreePage'))
 const IdeaPage = lazy(() => import('./pages/IdeaPage'))
 const IdeasPage = lazy(() => import('./pages/IdeasPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const LorePage = lazy(() => import('./pages/LorePage'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+const PublicWorldPage = lazy(() => import('./pages/PublicWorldPage'))
 const RegisterPage = lazy(() => import('./pages/RegisterPage'))
 const StoriesPage = lazy(() => import('./pages/StoriesPage'))
 const StoryPage = lazy(() => import('./pages/StoryPage'))
@@ -90,6 +93,13 @@ function Root() {
         <HistoryLeaveGuard />
         <SkipLink />
         <Routes>
+          {/* The public portal: outside both guards, so it answers signed in or out, and outside the
+              workspace, so none of its chrome is mounted. It reads only the anonymous API (ADR 0036). */}
+          <Route element={<PublicLayout />}>
+            <Route path="/explore" element={asScreen('explore', <ExplorePage />)} />
+            <Route path="/worlds/:slug" element={asScreen('world', <PublicWorldPage />)} />
+          </Route>
+
           <Route element={<RequireGuest />}>
             <Route path="/login" element={asScreen('login', <LoginPage />)} />
             <Route path="/register" element={asScreen('register', <RegisterPage />)} />

@@ -59,6 +59,10 @@ namespace Lorex.Api.Data.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("PublicDisplayName")
+                        .HasMaxLength(60)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("TEXT");
 
@@ -943,6 +947,65 @@ namespace Lorex.Api.Data.Migrations
                     b.ToTable("ProfileImages", (string)null);
                 });
 
+            modelBuilder.Entity("Lorex.Api.Features.Publishing.UniverseArtwork", b =>
+                {
+                    b.Property<Guid>("UniverseId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("ByteSize")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("CardId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CardKey")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("CropHeight")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("CropWidth")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("CropX")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("CropY")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("FileName")
+                        .HasMaxLength(255)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Height")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("OriginalKey")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Width")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("UniverseId");
+
+                    b.ToTable("UniverseArtworks", (string)null);
+                });
+
             modelBuilder.Entity("Lorex.Api.Features.Relationships.LoreRelationship", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1590,12 +1653,18 @@ namespace Lorex.Api.Data.Migrations
                         .HasMaxLength(7)
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("Category")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Description")
                         .HasMaxLength(2000)
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("Genres")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsArchived")
                         .HasColumnType("INTEGER");
@@ -1609,13 +1678,32 @@ namespace Lorex.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("PublicSlug")
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PublicSummary")
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("PublishedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Visibility")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("PublicSlug")
+                        .IsUnique();
 
                     b.HasIndex("OwnerId", "Name")
                         .IsUnique();
+
+                    b.HasIndex("Visibility", "PublishedAt");
 
                     b.HasIndex("OwnerId", "IsArchived", "UpdatedAt");
 
@@ -2150,6 +2238,15 @@ namespace Lorex.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Lorex.Api.Features.Publishing.UniverseArtwork", b =>
+                {
+                    b.HasOne("Lorex.Api.Features.Universes.Universe", null)
+                        .WithOne()
+                        .HasForeignKey("Lorex.Api.Features.Publishing.UniverseArtwork", "UniverseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Lorex.Api.Features.Relationships.LoreRelationship", b =>

@@ -1,3 +1,4 @@
+using Lorex.Api.Features.Publishing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -31,5 +32,14 @@ public sealed class UniverseConfiguration : IEntityTypeConfiguration<Universe>
         // One owner cannot hold two universes with the same name, which keeps the list
         // readable without needing a display discriminator.
         builder.HasIndex(universe => new { universe.OwnerId, universe.Name }).IsUnique();
+
+        // Publishing (ADR 0036). A slug is unique across every owner: it is the world's public
+        // address. Nulls - every universe never published - do not collide.
+        builder.Property(universe => universe.PublicSummary).HasMaxLength(PublicationLimits.SummaryMaxLength);
+        builder.Property(universe => universe.PublicSlug).HasMaxLength(PublicationLimits.SlugMaxLength);
+        builder.HasIndex(universe => universe.PublicSlug).IsUnique();
+
+        // The public listing reads public universes, most recently published first.
+        builder.HasIndex(universe => new { universe.Visibility, universe.PublishedAt });
     }
 }

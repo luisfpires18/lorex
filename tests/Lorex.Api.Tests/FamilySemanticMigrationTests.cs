@@ -95,7 +95,10 @@ public sealed class FamilySemanticMigrationTests : IDisposable
             Assert.Contains("InverseName", columns);
             Assert.Empty(await ForeignKeyViolations(db));
             Assert.Equal(triggers, await Triggers(db));
-            Assert.Equal(indexes, await Indexes(db));
+
+            // The walk down also passes back through the publishing migration after this one, which takes its own
+            // indexes with it; every other index is exactly where it was.
+            Assert.Equal(indexes.Where(index => !IsPublishing(index)), await Indexes(db));
 
             Assert.Equal(8, await db.RelationshipTypes.CountAsync());
             Assert.Equal(8, await db.Relationships.CountAsync());
@@ -149,6 +152,11 @@ public sealed class FamilySemanticMigrationTests : IDisposable
     }
 
     // ---------- Reading the file ----------
+
+    private static bool IsPublishing(string index) =>
+        index.StartsWith("IX_Universes_PublicSlug ", StringComparison.Ordinal)
+        || index.StartsWith("IX_Universes_Visibility_PublishedAt ", StringComparison.Ordinal)
+        || index.EndsWith(" on UniverseArtworks", StringComparison.Ordinal);
 
     private LorexDbContext Context() =>
         new(new DbContextOptionsBuilder<LorexDbContext>().UseSqlite($"Data Source={DataSource}").Options);

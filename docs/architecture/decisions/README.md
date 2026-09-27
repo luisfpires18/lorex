@@ -39,8 +39,9 @@ One ADR per durable decision. Rationale lives in the ADR, never here.
 | 0033 | A world rule is a universe's own statement of how its world works, and means nothing to Lorex by itself | [0033-world-rules.md](0033-world-rules.md) |
 | 0034 | A world rule may carry one explicit check, counted against the explicit details of Canon moments | [0034-timeline-rule-validation.md](0034-timeline-rule-validation.md) |
 | 0035 | A relation kind may carry an explicit family meaning, and a family tree derives the rest | [0035-family-trees.md](0035-family-trees.md) |
+| 0036 | A universe is private until its owner publishes its shell, and the portal reads only an allow-list | [0036-universe-publication.md](0036-universe-publication.md) |
 
-All accepted. Next number: `0036`.
+All accepted. Next number: `0037`.
 
 Known limitations are recorded in the ADR that owns them - cross-era ordering on the plain
 reckoning in 0009 and 0011, and years written before a universe named its eras, the listing's
@@ -67,4 +68,5 @@ what a restore does not do - overwrite, merge, account-wide or partial restores,
 one holds, in 0032, and what a world rule deliberately is not - ordered, prioritised, versioned or read for meaning - in 0033, and
 what a rule's check deliberately is not - a second pattern, a builder, a condition tree, a diagnostic finding, a stale-save token for
 moments - and that it is only as complete as the details authors record, in 0034, and the duplicate relationships an older
-database may already hold, which nothing deletes and no unique index refuses, in 0008.
+database may already hold, which nothing deletes and no unique index refuses, in 0008, and what unpublishing cannot
+recall - a copy a visitor already has - and the slug a deleted world frees, in 0036.

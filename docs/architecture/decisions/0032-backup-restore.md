@@ -248,3 +248,10 @@ change: `BackupFormatSupport.MaxVersion` is 14.
   under ids it shares with nothing - pinned by a test that describes every relative of every entry by name on both sides.
 - **Canon.** `CANON-FAMILY-001` is fingerprinted over the links that close a circle, as a set, so `CanonFinding.UnorderedFrom`
   re-applies a dismissal over the restored ids the way a world rule finding's is.
+
+## Amendment: format 15 and publication (2026-09-27)
+
+Importer 1-15. A restored universe is always private, with no address and no publication date, whatever the file
+says - no version of the format can carry visibility (ADR 0036). Its public details are restored as authored, and its
+artwork is validated through the upload gate with the 16:10 card frame, stored under the new universe's keys with the
+card cut again from the recorded frame, and swept with the entries' pictures if the restore fails.

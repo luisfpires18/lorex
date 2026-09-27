@@ -59,11 +59,17 @@ export function ImageCropDialog({
   confirmLabel,
   hint = 'Drag the picture to place the square, or select it and use the arrow keys. The whole picture is kept; the square is what cards show.',
   workingLabel = 'Saving',
+  aspect = 1,
   onConfirm,
   onCancel,
 }: {
   /** An object URL for a file not yet uploaded, or the stored original's own address. */
   source: string
+  /**
+   * The frame's width over its height. 1 is every thumbnail and avatar; a universe's artwork is framed at
+   * 16:10 for its card. The server cuts the same shape and refuses any other.
+   */
+  aspect?: number
   /** Where the square starts. Null starts on the centred square. */
   initialCrop: ImageCrop | null
   title: string
@@ -196,7 +202,7 @@ export function ImageCropDialog({
               zoom={zoom}
               minZoom={MIN_ZOOM}
               maxZoom={MAX_ZOOM}
-              aspect={1}
+              aspect={aspect}
               keyboardStep={KEYBOARD_STEP}
               showGrid={false}
               restrictPosition
@@ -213,7 +219,7 @@ export function ImageCropDialog({
                 role: 'group',
                 // Names the control, not the errand: the dialog's own title and hint already say
                 // whether this square becomes a card's portrait or an avatar.
-                'aria-label': 'Thumbnail square',
+                'aria-label': aspect === 1 ? 'Thumbnail square' : 'Card frame',
                 'aria-describedby': hintId,
               }}
             />
@@ -245,18 +251,32 @@ export function ImageCropDialog({
           </div>
 
           <div className="cropper__previews" aria-hidden="true">
-            <CroppedPicture
-              className="cropper__preview"
-              source={source}
-              crop={crop}
-              testId="image-crop-preview"
-            />
-            <CroppedPicture
-              className="cropper__preview cropper__preview--round"
-              source={source}
-              crop={crop}
-            />
-            <span className="cropper__caption">Thumbnail preview</span>
+            {aspect === 1 ? (
+              <>
+                <CroppedPicture
+                  className="cropper__preview"
+                  source={source}
+                  crop={crop}
+                  testId="image-crop-preview"
+                />
+                <CroppedPicture
+                  className="cropper__preview cropper__preview--round"
+                  source={source}
+                  crop={crop}
+                />
+                <span className="cropper__caption">Thumbnail preview</span>
+              </>
+            ) : (
+              <>
+                <CroppedPicture
+                  className="cropper__preview cropper__preview--wide"
+                  source={source}
+                  crop={crop}
+                  testId="image-crop-preview"
+                />
+                <span className="cropper__caption">Card preview</span>
+              </>
+            )}
           </div>
 
           {stage === null ? null : (

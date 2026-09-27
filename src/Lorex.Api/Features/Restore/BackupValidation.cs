@@ -5,6 +5,7 @@ using Lorex.Api.Features.Export;
 using Lorex.Api.Features.Ideas;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Media;
+using Lorex.Api.Features.Publishing;
 using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.RuleValidation;
 using Lorex.Api.Features.Stories;
@@ -39,7 +40,8 @@ internal sealed record RestorableBackup(
     UniverseBackupPayload Payload,
     IReadOnlyDictionary<Guid, ValidatedImage> Images,
     int RecordCount,
-    BackupPreviewCounts Counts);
+    BackupPreviewCounts Counts,
+    ValidatedImage? Artwork = null);
 
 /// <summary>
 /// Decides whether a parsed backup can be reconstructed, without writing anything anywhere.
@@ -88,6 +90,7 @@ internal static partial class BackupValidation
         }
 
         var images = await CheckImagesAsync(payload, opened, issues, cancellationToken);
+        var artwork = await CheckArtworkAsync(payload.Universe, opened, issues, cancellationToken);
         issues.ThrowIfAny();
 
         return new RestorableBackup(
@@ -96,7 +99,68 @@ internal static partial class BackupValidation
             payload,
             images,
             records,
-            BackupPreviewCounts.Of(payload, images.Count));
+            BackupPreviewCounts.Of(payload, images.Count),
+            artwork);
+    }
+
+    /// <summary>
+    /// The universe's artwork, decoded in full and cut into its card by the same gate an upload goes through,
+    /// with the 16:10 frame the backup recorded - so artwork that would fail the restore fails here.
+    /// </summary>
+    private static async Task<ValidatedImage?> CheckArtworkAsync(
+        BackupUniverse universe,
+        OpenedBackup opened,
+        BackupIssueList issues,
+        CancellationToken cancellationToken)
+    {
+        if (universe.Artwork is not { } artwork)
+        {
+            return null;
+        }
+
+        var bytes = await opened.ReadMediaAsync(artwork.MediaPath, cancellationToken);
+        var crop = new ImageCrop(artwork.Crop.X, artwork.Crop.Y, artwork.Crop.Width, artwork.Crop.Height);
+
+        using var stream = new MemoryStream(bytes, writable: false);
+        PreparedImage? prepared;
+        ImageRejection? rejection;
+
+        try
+        {
+            (prepared, rejection) = await ImagePreparation.PrepareAsync(stream, bytes.Length, crop, ImageFrame.Card, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            (prepared, rejection) = (null, new ImageRejection(ImagePreparation.FileField, "That image could not be read."));
+        }
+
+        if (prepared is null)
+        {
+            issues.Add(BackupIssueCodes.InvalidImage, $"The universe's artwork could not be used: {rejection!.Message}");
+            return null;
+        }
+
+        if (!string.Equals(prepared.ContentType, artwork.ContentType, StringComparison.Ordinal))
+        {
+            issues.Add(BackupIssueCodes.InvalidImage, "The universe's artwork is not the kind of image the backup says it is.");
+            return null;
+        }
+
+        if (bytes.Length != artwork.ByteSize)
+        {
+            issues.Add(BackupIssueCodes.InvalidImage, "The universe's artwork is not the size the backup says it is.");
+            return null;
+        }
+
+        return new ValidatedImage(
+            universe.Id,
+            artwork.MediaPath,
+            prepared.ContentType,
+            prepared.Extension,
+            prepared.Width,
+            prepared.Height,
+            bytes.Length,
+            prepared.Thumbnail);
     }
 
     // ---------- Pictures ----------
@@ -326,6 +390,82 @@ internal static partial class BackupValidation
             Text(universe.Name, UniverseConfiguration.NameMaxLength, "The universe's name", required: true);
             Text(universe.Description, UniverseConfiguration.DescriptionMaxLength, "The universe's description");
             Accent(universe.AccentColor, "The universe's colour");
+
+            // Its public details (version 15). Only their shape: nothing here decides anything is public.
+            Text(universe.PublicSummary, PublicationLimits.SummaryMaxLength, "The universe's public summary");
+
+            if (universe.Category is { } category)
+            {
+                Defined(category, "The universe's category");
+            }
+
+            if (universe.Genres is { } genres)
+            {
+                if (genres.Any(genre => !PublicationRules.IsOneGenre(genre)))
+                {
+                    Add(BackupIssueCodes.InvalidValue, "The universe's genres include one Lorex does not know.");
+                }
+                else if (genres.Distinct().Count() != genres.Count)
+                {
+                    Add(BackupIssueCodes.InvalidValue, "The universe names one genre twice.");
+                }
+                else if (genres.Count > PublicationLimits.MaxGenres)
+                {
+                    Add(BackupIssueCodes.InvalidValue, $"The universe names {genres.Count} genres. A universe can have at most {PublicationLimits.MaxGenres}.");
+                }
+            }
+
+            if (universe.Artwork is { } artwork)
+            {
+                CheckArtwork(artwork);
+            }
+        }
+
+        private void CheckArtwork(BackupUniverseArtwork artwork)
+        {
+            if (artwork.ContentType is not ("image/jpeg" or "image/png" or "image/webp"))
+            {
+                Add(BackupIssueCodes.InvalidImage, "The universe's artwork is a picture of a kind Lorex does not store.");
+                return;
+            }
+
+            // As for an entry's picture: the path must be exactly the one Lorex would have built.
+            var expected = BackupArchive.ArtworkPathFor(artwork.ContentType);
+
+            if (!string.Equals(artwork.MediaPath, expected, StringComparison.Ordinal))
+            {
+                Add(BackupIssueCodes.InvalidImage, "The universe's artwork is named at a place Lorex would not have put it.");
+                return;
+            }
+
+            _referencedMedia.Add(expected);
+
+            if (opened.MediaLength(expected) is not { } length)
+            {
+                Add(BackupIssueCodes.MissingMedia, "The universe's artwork is missing from the archive.");
+                return;
+            }
+
+            if (length != artwork.ByteSize || artwork.ByteSize <= 0 || artwork.ByteSize > BackupRestoreLimits.MaxMediaBytes)
+            {
+                Add(BackupIssueCodes.InvalidImage, "The universe's artwork is not the size the backup says it is.");
+            }
+
+            if (artwork.Width <= 0 || artwork.Height <= 0 || artwork.Width > ImagePreparation.MaxSide || artwork.Height > ImagePreparation.MaxSide)
+            {
+                Add(BackupIssueCodes.InvalidImage, "The universe's artwork has dimensions Lorex does not accept.");
+            }
+
+            Text(artwork.FileName, StoredImageLimits.FileNameMaxLength, "The file name of the universe's artwork");
+
+            if (artwork.Crop is null)
+            {
+                Missing("the framing of the universe's artwork");
+            }
+            else if (ImagePreparation.CheckCrop(new ImageCrop(artwork.Crop.X, artwork.Crop.Y, artwork.Crop.Width, artwork.Crop.Height), ImageFrame.Card) is { } badCrop)
+            {
+                Add(BackupIssueCodes.InvalidImage, $"The card framing of the universe's artwork cannot be used: {badCrop}");
+            }
         }
 
         // ---------- Eras ----------
@@ -1252,7 +1392,7 @@ internal static partial class BackupValidation
             {
                 if (!_referencedMedia.Contains(path))
                 {
-                    Add(BackupIssueCodes.UnexpectedEntry, "The archive holds a file the backup does not name. Lorex writes only backup.json and the entries' pictures.");
+                    Add(BackupIssueCodes.UnexpectedEntry, "The archive holds a file the backup does not name. Lorex writes only backup.json and the pictures it names.");
                     return;
                 }
             }

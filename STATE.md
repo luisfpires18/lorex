@@ -48,9 +48,11 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   `<type>/<description>` branches: Phase 2 Story, Phase 3, and now Phase 4.
   **Phase 023 - Production Hardening / PostgreSQL - remains deferred** and is not started; the
   next numbered phase resumes only when the owner says so.
-- **Design refactor 001-007 done** (007 committed on `refactor/product-wide-polish`, not merged). The contract is now an
-  as-built reference.
-  See Design refactor below.
+- **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
+  The contract is now an as-built reference. See Design refactor below.
+- **Public portal phase begun.** Roadmap: **008** publication foundation (current), **009** Explore Worlds portal,
+  **010** content publishing controls, **011** public universe experience, **012** portal polish, SEO, performance and
+  safety. See Public portal below and `docs/public-portal/PUBLIC_PORTAL.md`.
 - **Entry images** (`feat/entity-images-r2`, merged into `dev`). An entry may carry one picture:
   uploaded through the API, decoded and thumbnailed server-side, stored as two objects in one
   private Cloudflare R2 bucket, and served back only through an authenticated owner-scoped Lorex
@@ -665,9 +667,38 @@ Canon change; the Lore list gains query parameters in 003 and nothing else touch
 - **The original design refactor 001-007 is complete.**
 - `design/` is not a type `branching.md` lists; 001 used it because the owner named the branch. 002 uses `refactor/`.
 
+## Public portal
+
+A public, read-only discovery experience beside the workspace, in the same application. ADR 0036 is authoritative;
+`docs/public-portal/PUBLIC_PORTAL.md` is the working reference.
+
+- **008 - Publication foundation** (`feat/public-portal-foundation` off `dev` at `a87b7da`, committed, not merged, not
+  pushed).
+  - Every universe private by default - the migration `AddUniversePublication` publishes nothing and copies nothing.
+    `POST .../publish` refuses until summary, category, a genre, artwork and the owner's public name exist, mints the
+    slug once and sets `publishedAt` once; `.../unpublish` is immediate. While public nothing required can be removed.
+  - Public details: a public summary (never the description), one category (8), one to three genres (12, flags).
+    Author: `PublicDisplayName` on the account, set on the Profile, read live.
+  - Artwork: `UniverseArtworks`, original plus a 16:10 card (960 wide) cut by the shared upload gate; only the card is
+    public, only while public, `no-cache` + ETag.
+  - Anonymous API `/api/public/universes` (list, `/{slug}`, card): one predicate, an eight-member allow-list, private
+    and missing alike 404. Nothing inside a universe is readable.
+  - Web: Settings' Public portal section (guarded details form, artwork, checklist, inline confirmations); public name
+    on the Profile; `/explore` and `/worlds/:slug` under `PublicLayout`, outside the guards and the workspace chrome;
+    "Explore worlds" in the universes header. The leave guard now asks one question when several forms are dirty.
+  - Backup format **15**: public details and artwork, never visibility, slug, date or author. Restores are private.
+  - `explore-worlds-background.png` stays untracked at the repository root for Task 009.
+  - Minor 007 polish (drawer button order, repeated Moment label, Settings danger styling, 200% zoom, loading/error
+    states) is held for 012.
+
 ## Baseline
 
-- **999 API integration tests, 200 Playwright tests**, green. Design refactor 007's full run on a fresh database:
+- **1053 API integration tests, 204 Playwright tests** (Public portal 008: +54 API, +4 Playwright). API suite 1053/1053
+  twice. Playwright for 008 never got one clean full pass: the machine's C: drive reached **0 bytes free** mid-validation
+  (outside the repository), so SQLite hit `disk I/O error`, `npx` hit `ENOSPC` and workers died of OOM as the page file
+  could not grow. With the database, TEMP and npm cache moved to D:, a fresh-database full run passed 198/204 (six story
+  specs lost to worker aborts) and every spec that failed in any run passed together, 76/76, at two workers. Free C:
+  before the next full run. Design refactor 007's full run on a fresh database:
   **200/200** first time (196 plus `polish.spec.ts`'s four). 006's runs lost one test each to known infrastructure (a
   `/register` timeout, Vite `ERR_CONNECTION_REFUSED`) before 196/196; 005's drawer guards lost two to Vite cold dynamic
   imports before passing. No backend change since, so the API suite and Release build were not rerun.
@@ -695,7 +726,9 @@ Canon change; the Lore list gains query parameters in 003 and nothing else touch
     fails as a failure instead of telling the author a free name is taken.
 - Under a full parallel Playwright run, `auth.spec.ts` "rejects a wrong password" intermittently
   times out (it navigates to `/login` without awaiting sign-out).
-- 31 migrations, latest `AddRelationshipFamilySemantics` - one additive column on `RelationshipTypes`, defaulting to no family
+- 32 migrations, latest `AddUniversePublication` - additive: six columns on `Universes` (`Visibility` default Private),
+  `AspNetUsers.PublicDisplayName`, `UniverseArtworks`, two indexes; the rollback uses native `DROP COLUMN`.
+  `UniversePublicationMigrationTests` walks it on a file. Before it, `AddRelationshipFamilySemantics` - one additive column on `RelationshipTypes`, defaulting to no family
   meaning; the rollback uses SQLite's native `DROP COLUMN` so nothing that points at the table is rebuilt under it.
   `FamilySemanticMigrationTests` walks it down and up on a file over kinds called parent, mother and father, and reads every
   trigger and index back. Before it, `AddRuleValidation` - additive: `ValidationTerms`, `WorldRuleValidations`,
