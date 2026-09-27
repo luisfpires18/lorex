@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { clickSignOut } from './support/account'
 import { entryText } from './support/zip'
+import { chooseFromMenu } from './support/rowMenu'
 
 /**
  * Content recovery, end to end (ADR 0029): the three ways Lorex gives writing back, kept apart.
@@ -591,7 +592,7 @@ test.describe('content recovery', () => {
       confirmation = dialog.message()
       void dialog.accept()
     })
-    await scene(page, 'The Council').getByTestId('scene-delete').click()
+    await chooseFromMenu(scene(page, 'The Council'), 'scene-delete')
     await expect(scene(page, 'The Council')).toHaveCount(0)
     expect(confirmation).toContain('to the Trash')
     expect(confirmation).toContain('restore it from the Trash')
@@ -633,7 +634,7 @@ test.describe('content recovery', () => {
       confirmation = dialog.message()
       void dialog.accept()
     })
-    await page.getByTestId('delete-story').click()
+    await chooseFromMenu(page, 'delete-story')
     await page.waitForURL(/\/stories$/)
     expect(confirmation).toContain('to the Trash')
     await expect(

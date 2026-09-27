@@ -114,9 +114,9 @@ export function ManuscriptPanel({
 
   return (
     <section className="manuscript" aria-labelledby="manuscript-heading" data-testid="manuscript">
-      <h3 className="visually-hidden" id="manuscript-heading">
+      <h2 className="visually-hidden" id="manuscript-heading">
         Manuscript
-      </h3>
+      </h2>
 
       <div className="manuscript__layout">
         <nav className="msoutline" aria-label="Scenes to write" data-testid="manuscript-outline">

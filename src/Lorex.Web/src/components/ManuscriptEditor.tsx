@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { History, LocateFixed, Pencil } from 'lucide-react'
+import { History, Info, LocateFixed, Pencil } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ActionIcon } from './ActionIcon'
+import { ActionMenu } from './ActionMenu'
 import { ManuscriptHistory } from './ManuscriptHistory'
 import { RecoveredDraft } from './RecoveredDraft'
 import { SceneBeats, SceneLore, SceneStamp } from './SceneContext'
@@ -49,9 +50,11 @@ interface ManuscriptEditorProps {
  * One scene's prose, and nothing but: a plain text box that keeps every line break, blank line and character exactly as
  * typed. No formatting, no Markdown and no reading of the text - a name written here links to nothing.
  *
- * Above it, read-only, the scene's planning as the Scenes view draws it - when and through whose eyes, its lore and its
- * beats, each a link to where it is edited - with Edit scene, which opens the scene's own drawer in place, Show in
- * Scenes, which leads back to the scene's place in the story's structure, and the manuscript's own history.
+ * Above it, where the scene is told, its title, and the manuscript's own history - the one tool beside the title, because
+ * recovering a version is part of writing. Edit scene, which opens the scene's own drawer in place, and Show in Scenes,
+ * which leads back to the scene's place in the story's structure, are in the scene's ⋯ menu. Under the title, read-only,
+ * the scene's planning as the Scenes view draws it - when and through whose eyes, its lore and its beats, each a link to
+ * where it is edited - folded behind Details on a phone, where every line above the prose is a line of prose gone.
  *
  * Mounted once per scene - the panel keys it by the scene's id - so opening another scene starts from nothing and never
  * shows the last scene's prose under the new title while the new one loads.
@@ -81,6 +84,7 @@ export function ManuscriptEditor({
   const tooLongId = useId()
   const recoveryId = useId()
   const historyId = useId()
+  const contextId = useId()
 
   const { user } = useAuth()
   const { found, keep, forget, discard, settle, failed } = useLocalDraft(
@@ -95,6 +99,8 @@ export function ManuscriptEditor({
   const [failure, setFailure] = useState<string | null>(null)
   const [conflict, setConflict] = useState<{ updatedAt: string | null } | null>(null)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+  // On a phone the scene's planning folds behind Details, so the prose starts on the first screen. Wider, it is always shown.
+  const [isContextOpen, setIsContextOpen] = useState(false)
   const [historyKey, setHistoryKey] = useState(0)
   const [announcement, setAnnouncement] = useState('')
   const inFlight = useRef(false)
@@ -281,12 +287,75 @@ export function ManuscriptEditor({
           {where.container ? <>{where.container} · </> : null}
           <span className="manuscript__position">{where.position}</span>
         </p>
-        <h4 className="manuscript__title" id={titleId} data-testid="manuscript-scene-title">
-          <bdi>{scene.title}</bdi>
-        </h4>
+
+        <div className="manuscript__titlerow">
+          <h3 className="manuscript__title" id={titleId} data-testid="manuscript-scene-title">
+            <bdi>{scene.title}</bdi>
+          </h3>
+
+          <div className="manuscript__tools rowtools">
+            {hasContext ? (
+              <button
+                className="button button--text button--icon manuscript__detailstoggle"
+                type="button"
+                aria-expanded={isContextOpen}
+                aria-controls={contextId}
+                onClick={() => setIsContextOpen((open) => !open)}
+                title="Scene details"
+                data-testid="manuscript-details-toggle"
+              >
+                <ActionIcon icon={Info} />
+                <span className="visually-hidden">Scene details</span>
+              </button>
+            ) : null}
+            {stored.updatedAt !== null || isHistoryOpen ? (
+              <button
+                className="button button--text button--icon"
+                type="button"
+                aria-expanded={isHistoryOpen}
+                aria-controls={historyId}
+                aria-describedby={titleId}
+                onClick={() => setIsHistoryOpen((open) => !open)}
+                data-testid="manuscript-history-toggle"
+              >
+                <ActionIcon icon={History} />
+                <span className="manuscript__toolname">Manuscript history</span>
+                <span className="manuscript__toolshort" aria-hidden="true">
+                  History
+                </span>
+              </button>
+            ) : null}
+            <ActionMenu
+              label={`More actions for ${scene.title}`}
+              triggerTestId="manuscript-scene-actions"
+            >
+              <button
+                className="actionmenu__item"
+                type="button"
+                onClick={() => onEditScene(scene)}
+                data-testid="manuscript-edit-scene"
+              >
+                <ActionIcon icon={Pencil} />
+                Edit scene
+              </button>
+              <Link
+                className="actionmenu__item"
+                to={`/app/universes/${universeId}/stories/${storyId}#scene-${scene.id}`}
+                data-testid="manuscript-show-scene"
+              >
+                <ActionIcon icon={LocateFixed} />
+                Show in Scenes
+              </Link>
+            </ActionMenu>
+          </div>
+        </div>
 
         {hasContext ? (
-          <div className="manuscript__context">
+          <div
+            className="manuscript__context"
+            id={contextId}
+            data-open={isContextOpen ? 'true' : 'false'}
+          >
             <SceneStamp
               universeId={universeId}
               chronology={chronology}
@@ -302,45 +371,6 @@ export function ManuscriptEditor({
             />
           </div>
         ) : null}
-
-        <div className="storytools manuscript__tools">
-          <button
-            className="button button--quiet button--icon"
-            type="button"
-            onClick={() => onEditScene(scene)}
-            aria-describedby={titleId}
-            data-testid="manuscript-edit-scene"
-          >
-            <ActionIcon icon={Pencil} />
-            Edit scene
-          </button>
-          <Link
-            className="button button--quiet button--icon"
-            to={`/app/universes/${universeId}/stories/${storyId}#scene-${scene.id}`}
-            aria-describedby={titleId}
-            data-testid="manuscript-show-scene"
-          >
-            <ActionIcon icon={LocateFixed} />
-            Show in Scenes
-          </Link>
-          {stored.updatedAt !== null || isHistoryOpen ? (
-            <button
-              className="button button--quiet button--icon"
-              type="button"
-              aria-expanded={isHistoryOpen}
-              aria-controls={historyId}
-              aria-describedby={titleId}
-              onClick={() => setIsHistoryOpen((open) => !open)}
-              data-testid="manuscript-history-toggle"
-            >
-              <ActionIcon icon={History} />
-              <span className="manuscript__toolname">Manuscript history</span>
-              <span className="manuscript__toolshort" aria-hidden="true">
-                History
-              </span>
-            </button>
-          ) : null}
-        </div>
       </header>
 
       {isHistoryOpen ? (

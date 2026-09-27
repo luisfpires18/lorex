@@ -1,4 +1,5 @@
 import { expect, test, type Dialog, type Page } from '@playwright/test'
+import { chooseFromMenu, openMenuFor } from './support/rowMenu'
 
 /**
  * A story's manuscript, end to end: the prose an author writes, scene by scene, on the story's Manuscript view. Each
@@ -289,7 +290,7 @@ test.describe('manuscript', () => {
     await page.getByTestId('story-view-scenes').click()
     await page.waitForURL(new RegExp(`/stories/${storyId}$`))
     await structural(page, `/scenes/${council}/position`, async () => {
-      await scene(page, 'The Council').getByTestId('scene-move-to').click()
+      await openMenuFor(scene(page, 'The Council'), 'scene-move-to-option')
       await scene(page, 'The Council')
         .locator('[data-testid="scene-move-to-option"][data-target="Chapter 2 — Ashes"]')
         .click()
@@ -309,7 +310,7 @@ test.describe('manuscript', () => {
     // Reordered inside its chapter: still the same prose.
     await page.goto(storyUrl)
     await structural(page, '/scenes/order', () =>
-      scene(page, 'The Council').getByTestId('scene-move-up').click(),
+      chooseFromMenu(scene(page, 'The Council'), 'scene-move-up'),
     )
     await expect(page.getByTestId('story-announcer')).toHaveText(
       '“The Council” is now scene 1 of 2 in Chapter 2 — Ashes.',
@@ -322,7 +323,7 @@ test.describe('manuscript', () => {
     // Arrival is deleted: The Gates goes to Unchaptered with every word it had.
     await page.goto(storyUrl)
     page.once('dialog', (dialog) => void dialog.accept())
-    await chapter(page, 'Arrival').getByTestId('chapter-delete').click()
+    await chooseFromMenu(chapter(page, 'Arrival'), 'chapter-delete')
     await expect(page.getByTestId('chapter')).toHaveCount(1)
 
     await page.goto(`${storyUrl}/manuscript/${gates}`)
@@ -338,7 +339,7 @@ test.describe('manuscript', () => {
     // The Gates is deleted, and its prose with it. Its old address opens nothing.
     await page.goto(storyUrl)
     page.once('dialog', (dialog) => void dialog.accept())
-    await scene(page, 'The Gates').getByTestId('scene-delete').click()
+    await chooseFromMenu(scene(page, 'The Gates'), 'scene-delete')
     await expect(scene(page, 'The Gates')).toHaveCount(0)
 
     await page.goto(`${storyUrl}/manuscript/${gates}`)
@@ -565,7 +566,7 @@ test.describe('manuscript', () => {
     // The scene's planning is edited in its own form, and a draft beside it is left exactly as it was.
     const editor = page.getByTestId('manuscript-editor')
     await editor.fill('A draft written while the planning changes.')
-    await page.getByTestId('manuscript-edit-scene').click()
+    await chooseFromMenu(page, 'manuscript-edit-scene')
     const form = page.getByTestId('scene-form')
     await expect(form).toBeVisible()
     await page.getByTestId('scene-title-input').fill('The Council of Nine')
@@ -586,6 +587,88 @@ test.describe('manuscript', () => {
     await saveWith(page, () => page.getByTestId('manuscript-save').click())
     await beatChip.click()
     await page.waitForURL(/\/plot#beat-[0-9a-f-]+$/)
+  })
+
+  test('a writer reaches the prose, saves, opens its history and writes on from the keyboard alone', async ({
+    page,
+  }) => {
+    await signUp(page)
+    const universeId = await newUniverse(page, unique('Keys to Write '))
+    const storyId = await seedStory(page, universeId, 'Written by keys')
+    const first = await seedScene(page, universeId, storyId, 'First')
+    await writeManuscript(page, universeId, storyId, first, 'One.')
+
+    await page.goto(`/app/universes/${universeId}/stories/${storyId}`)
+    await page.getByTestId('story-view-manuscript').focus()
+    await page.keyboard.press('Enter')
+    await page.waitForURL(new RegExp(`/manuscript/${first}$`))
+
+    const editor = page.getByTestId('manuscript-editor')
+    await expect(editor).toHaveValue('One.')
+
+    /** Presses a key until the focus lands on `testId`, and says how many presses that took. */
+    async function tabTo(testId: string, key = 'Tab', limit = 12) {
+      for (let presses = 1; presses <= limit; presses++) {
+        await page.keyboard.press(key)
+        const at = await page.evaluate(() => document.activeElement?.getAttribute('data-testid'))
+        if (at === testId) return presses
+      }
+      throw new Error(`${testId} was not reached in ${limit} presses of ${key}`)
+    }
+
+    // From the views, the prose is a few presses away: past the outline and the scene's tools, nothing else.
+    await tabTo('manuscript-editor')
+    await page.keyboard.press('End')
+    await page.keyboard.type(' Two.')
+    await expect(page.getByTestId('manuscript-status')).toHaveText('Unsaved changes')
+    await saveWith(page, () => page.keyboard.press('Control+s'))
+    await expect(editor).toBeFocused()
+
+    // History is just above the prose: opened, a version read, and back to writing.
+    await tabTo('manuscript-history-toggle', 'Shift+Tab', 4)
+    await page.keyboard.press('Enter')
+    const list = page.getByTestId('manuscript-history-list')
+    await expect(list.getByTestId('manuscript-version-view')).toHaveCount(2)
+    await tabTo('manuscript-version-view')
+    await page.keyboard.press('Enter')
+    await expect(page.getByTestId('manuscript-version-snapshot')).toBeVisible()
+
+    await tabTo('manuscript-editor')
+    await page.keyboard.press('End')
+    await page.keyboard.type(' Three.')
+    await saveWith(page, () => page.keyboard.press('Control+s'))
+    expect((await readManuscript(page, universeId, storyId, first)).content).toBe(
+      'One. Two. Three.',
+    )
+  })
+
+  test("on a phone the scene's planning waits behind Details, and on a desktop it is always shown", async ({
+    page,
+  }) => {
+    await signUp(page)
+    const universeId = await newUniverse(page, unique('Folded Planning '))
+    const arlen = await seedEntity(page, universeId, 'Arlen')
+    const storyId = await seedStory(page, universeId, 'Planned')
+    const first = await seedScene(page, universeId, storyId, 'First', null, arlen)
+    const url = `/app/universes/${universeId}/stories/${storyId}/manuscript/${first}`
+
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto(url)
+    const details = page.getByTestId('manuscript-details-toggle')
+    await expect(details).toHaveAccessibleName('Scene details')
+    await expect(details).toHaveAttribute('aria-expanded', 'false')
+    await expect(page.getByTestId('manuscript-pov')).toBeHidden()
+    expect(await scrollsSideways(page)).toBe(false)
+
+    await details.click()
+    await expect(details).toHaveAttribute('aria-expanded', 'true')
+    await expect(page.getByTestId('manuscript-pov')).toContainText('Arlen')
+    await details.click()
+    await expect(page.getByTestId('manuscript-pov')).toBeHidden()
+
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await expect(details).toBeHidden()
+    await expect(page.getByTestId('manuscript-pov')).toContainText('Arlen')
   })
 
   test('the manuscript keeps a writing measure from a phone to a wide desktop, light and dark', async ({
@@ -655,7 +738,8 @@ test.describe('manuscript', () => {
 
       for (const control of [
         'story-view-manuscript',
-        'manuscript-edit-scene',
+        'manuscript-scene-actions',
+        'manuscript-history-toggle',
         'manuscript-where',
       ]) {
         const box = await page.getByTestId(control).boundingBox()

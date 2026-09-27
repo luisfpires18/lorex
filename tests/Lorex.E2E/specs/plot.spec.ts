@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { chooseFromMenu, openMenuFor } from './support/rowMenu'
 
 /**
  * A story's plot, end to end: arcs, the beats in each, and what they point at. Each test registers its own account
@@ -312,7 +313,7 @@ test.describe('plot', () => {
     await saveAndAnnounce(
       page,
       '/plot-arcs/order',
-      () => arc(page, "Mira's Betrayal").getByTestId('plot-arc-move-up').click(),
+      () => chooseFromMenu(arc(page, "Mira's Betrayal"), 'plot-arc-move-up'),
       "“Mira's Betrayal” is now arc 1 of 2.",
     )
     await expect
@@ -336,7 +337,7 @@ test.describe('plot', () => {
     await saveAndAnnounce(
       page,
       '/beats/order',
-      () => beat(page, 'Learns of the conspiracy').getByTestId('plot-beat-move-up').click(),
+      () => chooseFromMenu(beat(page, 'Learns of the conspiracy'), 'plot-beat-move-up'),
       '“Learns of the conspiracy” is now beat 1 of 3 in Arc 2 — Fall of the King.',
     )
 
@@ -386,7 +387,7 @@ test.describe('plot', () => {
       page,
       '/position',
       async () => {
-        await scene(page, 'The Council').getByTestId('scene-move-to').click()
+        await openMenuFor(scene(page, 'The Council'), 'scene-move-to-option')
         await scene(page, 'The Council')
           .locator('[data-testid="scene-move-to-option"][data-target="Chapter 2 — Arrival"]')
           .click()
@@ -428,7 +429,7 @@ test.describe('plot', () => {
       confirmation = dialog.message()
       void dialog.accept()
     })
-    await beat(page, 'Learns of the conspiracy').getByTestId('plot-beat-delete').click()
+    await chooseFromMenu(beat(page, 'Learns of the conspiracy'), 'plot-beat-delete')
     await expect
       .poll(() => plotStructure(page))
       .toEqual([
@@ -453,7 +454,7 @@ test.describe('plot', () => {
       confirmation = dialog.message()
       void dialog.accept()
     })
-    await arc(page, "Mira's Betrayal").getByTestId('plot-arc-delete').click()
+    await chooseFromMenu(arc(page, "Mira's Betrayal"), 'plot-arc-delete')
     await expect
       .poll(() => plotStructure(page))
       .toEqual(['Arc 1 — Fall of the King | Capital is breached | Accepts exile'])
@@ -528,10 +529,11 @@ test.describe('plot', () => {
       .poll(() => plotStructure(page))
       .toEqual(['Arc 1 — A | a1 | a2 | a3', 'Arc 2 — B', 'Arc 3 — C'])
 
-    // A tool is named by its label and described by the arc's heading.
-    const up = arc(page, 'C').getByRole('button', { name: 'Move up' })
-    await expect(up).toHaveAccessibleDescription('Arc 3 — C')
-    await up.focus()
+    // An arc's menu is named with the arc's heading; its moves are in it, after Edit arc.
+    await arc(page, 'C').getByRole('button', { name: 'More actions for Arc 3 — C' }).focus()
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('ArrowDown')
+    await expect.poll(() => focused(page)).toMatchObject({ control: 'plot-arc-move-up', arc: 'C' })
 
     await saveAndAnnounce(
       page,
@@ -539,24 +541,31 @@ test.describe('plot', () => {
       () => page.keyboard.press('Enter'),
       '“C” is now arc 2 of 3.',
     )
-    await expect.poll(() => focused(page)).toMatchObject({ control: 'plot-arc-move-up', arc: 'C' })
+    // The focus follows the arc, back on its menu.
+    await expect.poll(() => focused(page)).toMatchObject({ control: 'plot-arc-actions', arc: 'C' })
 
-    // At the top, "Move up" can go no further, so the focus lands on "Move down" rather than nowhere.
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('ArrowDown')
     await saveAndAnnounce(
       page,
       '/plot-arcs/order',
       () => page.keyboard.press('Enter'),
       '“C” is now arc 1 of 3.',
     )
-    await expect(arc(page, 'C').getByTestId('plot-arc-move-up')).toBeDisabled()
+    await expect.poll(() => focused(page)).toMatchObject({ control: 'plot-arc-actions', arc: 'C' })
+
+    // At the top, "Move up" is not offered.
+    await page.keyboard.press('Enter')
+    await expect(arc(page, 'C').getByTestId('plot-arc-move-up')).toHaveCount(0)
+    await expect(arc(page, 'C').getByTestId('plot-arc-move-down')).toBeVisible()
+    await page.keyboard.press('Escape')
+
+    // A beat's move stays inside its arc; its menu is named with the beat.
+    await beat(page, 'a3').getByRole('button', { name: 'More actions for a3' }).focus()
+    await page.keyboard.press('Enter')
     await expect
       .poll(() => focused(page))
-      .toMatchObject({ control: 'plot-arc-move-down', arc: 'C' })
-
-    // A beat's move stays inside its arc, described by the beat it moves.
-    const beatUp = beat(page, 'a3').getByRole('button', { name: 'Move up' })
-    await expect(beatUp).toHaveAccessibleDescription(/a3/)
-    await beatUp.focus()
+      .toMatchObject({ control: 'plot-beat-move-up', beat: 'a3' })
 
     await saveAndAnnounce(
       page,
@@ -566,18 +575,24 @@ test.describe('plot', () => {
     )
     await expect
       .poll(() => focused(page))
-      .toMatchObject({ control: 'plot-beat-move-up', beat: 'a3' })
+      .toMatchObject({ control: 'plot-beat-actions', beat: 'a3' })
 
+    await page.keyboard.press('Space')
+    await expect
+      .poll(() => focused(page))
+      .toMatchObject({ control: 'plot-beat-move-up', beat: 'a3' })
     await saveAndAnnounce(
       page,
       '/beats/order',
       () => page.keyboard.press('Space'),
       '“a3” is now beat 1 of 3 in Arc 2 — A.',
     )
-    await expect(beat(page, 'a3').getByTestId('plot-beat-move-up')).toBeDisabled()
+    await page.keyboard.press('Enter')
+    await expect(beat(page, 'a3').getByTestId('plot-beat-move-up')).toHaveCount(0)
     await expect
       .poll(() => focused(page))
       .toMatchObject({ control: 'plot-beat-move-down', beat: 'a3' })
+    await page.keyboard.press('Escape')
 
     // C went to the top past A, so A is second now, and B last; only A's beats moved inside it.
     const moved = ['Arc 1 — C', 'Arc 2 — A | a3 | a1 | a2', 'Arc 3 — B']
@@ -671,20 +686,17 @@ test.describe('plot', () => {
       }
 
       const first = page.getByTestId('plot-arc').first()
-      for (const control of [
-        'plot-arc-heading',
-        'plot-arc-move-down',
-        'plot-arc-new-beat',
-        'plot-arc-edit',
-        'plot-arc-delete',
-      ]) {
+      // An arc shows Add beat and its menu; Edit, moves and Delete wait inside it.
+      await expect(first.getByTestId('plot-arc-delete')).toHaveCount(0)
+      for (const control of ['plot-arc-heading', 'plot-arc-new-beat', 'plot-arc-actions']) {
         const box = await first.getByTestId(control).boundingBox()
         expect(box, `${control} at ${width}px`).not.toBeNull()
         expect(box!.x + box!.width, `${control} at ${width}px`).toBeLessThanOrEqual(edge)
       }
 
       const firstBeat = page.getByTestId('plot-beat').first()
-      for (const control of ['plot-beat-move-down', 'plot-beat-edit', 'plot-beat-delete']) {
+      await expect(firstBeat.getByTestId('plot-beat-delete')).toHaveCount(0)
+      for (const control of ['plot-beat-edit', 'plot-beat-actions']) {
         const box = await firstBeat.getByTestId(control).boundingBox()
         expect(box, `${control} at ${width}px`).not.toBeNull()
         expect(box!.x + box!.width, `${control} at ${width}px`).toBeLessThanOrEqual(edge)

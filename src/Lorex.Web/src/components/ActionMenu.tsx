@@ -140,7 +140,6 @@ export function ActionMenu({
         ref={button}
         aria-label={label}
         title={trigger ? undefined : label}
-        aria-haspopup="true"
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((wasOpen) => !wasOpen)}

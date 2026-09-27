@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { openAccountMenu } from './support/account'
+import { chooseFromMenu, openMenuFor } from './support/rowMenu'
 
 /**
  * The Story workspace as one product rather than three screens: Scenes, Plot and Manuscript under one header, reached
@@ -244,14 +245,15 @@ test.describe('story workspace', () => {
     await expect(page.getByTestId('scenes-empty')).toHaveCount(0)
     await expect(page.getByTestId('scene')).toHaveCount(1)
 
-    // The story's own edit is the story's, and its drawer hands the focus back to it.
-    const editStory = page.getByRole('button', { name: 'Edit story' })
-    await editStory.click()
+    // The story's own edit is in the story's menu, and its drawer hands the focus back to that menu.
+    const storyMenu = page.getByTestId('story-actions')
+    await expect(storyMenu).toHaveAccessibleName(/^Story actions for /)
+    await chooseFromMenu(page, 'edit-story')
     await page.getByTestId('story-status-drafting').click()
     await page.getByTestId('save-story').click()
     await expect(page.getByTestId('story-form')).toHaveCount(0)
     await expect(page.getByTestId('story-status')).toHaveText('Drafting')
-    await expect(editStory).toBeFocused()
+    await expect(storyMenu).toBeFocused()
   })
 
   test('a writer moves between a scene, its prose, its plot and its lore, and no unsaved word is dropped on the way', async ({
@@ -303,7 +305,7 @@ test.describe('story workspace', () => {
       asked = dialog.message()
       void dialog.dismiss()
     })
-    await page.getByTestId('manuscript-show-scene').click()
+    await chooseFromMenu(page, 'manuscript-show-scene')
     await expect.poll(() => asked).toContain('“The Council” has unsaved changes')
     await expect(page).toHaveURL(new RegExp(`/manuscript/${council}$`))
     await expect(editor).toHaveValue('The hall had emptied.')
@@ -331,7 +333,7 @@ test.describe('story workspace', () => {
     await expect(page.getByTestId('manuscript-status')).toHaveText('Saved')
 
     // Saved, it simply goes - and lands on the scene: scrolled to, focused and marked for a moment.
-    await page.getByTestId('manuscript-show-scene').click()
+    await chooseFromMenu(page, 'manuscript-show-scene')
     await page.waitForURL(atCouncil)
     const councilCard = scene(page, 'The Council')
     await expect(councilCard).toHaveAttribute('data-arrived', 'true')
@@ -354,17 +356,19 @@ test.describe('story workspace', () => {
     await expect(scene(page, 'The Council')).toBeInViewport()
     await expect(scene(page, 'The Council')).toBeFocused()
 
-    // Every tool says whose it is, and a drawer hands the focus back to the tool that opened it.
-    const editScene = scene(page, 'The Council').getByTestId('scene-edit')
-    await expect(editScene).toHaveAccessibleName('Edit scene')
-    await expect(scene(page, 'The Council').getByTestId('scene-delete')).toHaveAccessibleName(
-      'Delete scene',
-    )
-    await editScene.click()
+    // Every menu says whose it is, Delete comes last in it, and a drawer hands the focus back to the menu that opened it.
+    const sceneMenu = scene(page, 'The Council').getByTestId('scene-actions')
+    await expect(sceneMenu).toHaveAccessibleName('More actions for The Council')
+    await openMenuFor(scene(page, 'The Council'), 'scene-edit')
+    const items = scene(page, 'The Council').locator('.actionmenu__item')
+    await expect(items.first()).toHaveAccessibleName('Edit scene')
+    await expect(items.last()).toHaveAccessibleName('Delete scene')
+    await expect(items.last()).toHaveAttribute('data-testid', 'scene-delete')
+    await scene(page, 'The Council').getByTestId('scene-edit').click()
     await expect(page.getByTestId('scene-form')).toBeVisible()
     await page.getByTestId('cancel-scene').click()
     await expect(page.getByTestId('scene-form')).toHaveCount(0)
-    await expect(editScene).toBeFocused()
+    await expect(sceneMenu).toBeFocused()
 
     // The lore the prose is about is a link from the manuscript; with the words saved it simply goes there.
     await scene(page, 'The Council').getByTestId('scene-write').click()
@@ -445,10 +449,9 @@ test.describe('story workspace', () => {
       const firstChapter = (await page.getByTestId('chapter').first().boundingBox())!
       expect(firstChapter.y, `first chapter at ${width}px`).toBeLessThan(height)
 
-      // One bar: the three views and the story's two tools, each named, none off the screen. On a phone the tools are
-      // their icons, and still the same controls by name.
+      // One bar: the three views and the story's menu, none off the screen and all on one line.
       const manuscriptView = (await page.getByTestId('story-view-manuscript').boundingBox())!
-      for (const name of ['Edit story', 'Delete story']) {
+      for (const name of ['Story actions for']) {
         const tool = page.getByRole('button', { name })
         await expect(tool, `${name} at ${width}px`).toBeVisible()
         const box = (await tool.boundingBox())!
@@ -475,24 +478,28 @@ test.describe('story workspace', () => {
       await expect(editor).not.toHaveValue('')
       expect(await scrollsSideways(page), `manuscript at ${width}px`).toBe(false)
 
-      // The scene's three tools keep to one line, each under its whole name: a second row of them is prose pushed off
-      // a phone's first screen.
-      const editScene = (await page.getByTestId('manuscript-edit-scene').boundingBox())!
-      for (const [testId, name] of [
-        ['manuscript-show-scene', 'Show in Scenes'],
-        ['manuscript-history-toggle', 'Manuscript history'],
-      ] as const) {
-        const tool = page.getByTestId(testId)
-        await expect(tool, `${name} at ${width}px`).toHaveAccessibleName(name)
-        const box = (await tool.boundingBox())!
-        expect(box.x + box.width, `${name} at ${width}px`).toBeLessThanOrEqual(edge)
-        expect(box.y, `${name} shares Edit scene's line at ${width}px`).toBeLessThan(
-          editScene.y + editScene.height,
-        )
-      }
+      // The scene's tools keep to one line, each under its whole name - History, then the menu holding Edit scene and
+      // Show in Scenes: a second row of them is prose pushed off a phone's first screen.
+      const history = page.getByTestId('manuscript-history-toggle')
+      await expect(history).toHaveAccessibleName('Manuscript history')
+      const menu = (await page.getByTestId('manuscript-scene-actions').boundingBox())!
+      const historyBox = (await history.boundingBox())!
+      expect(menu.x + menu.width, `scene menu at ${width}px`).toBeLessThanOrEqual(edge)
+      expect(historyBox.y, `history shares the menu's line at ${width}px`).toBeLessThan(
+        menu.y + menu.height,
+      )
+      await openMenuFor(page, 'manuscript-edit-scene')
+      await expect(page.getByTestId('manuscript-edit-scene')).toHaveAccessibleName('Edit scene')
+      await expect(page.getByTestId('manuscript-show-scene')).toHaveAccessibleName('Show in Scenes')
+      await page.keyboard.press('Escape')
 
+      // The writing dominates: even under a long chapter and a long scene title, a real stretch of prose is on the first
+      // screen between the top of the sheet and the bar holding Save - measured, not an exact height, because fonts
+      // differ between machines. (Design refactor 001 measured about 210px of it on a 390px phone.)
       const editorBox = (await editor.boundingBox())!
-      expect(editorBox.y, `prose at ${width}px`).toBeLessThanOrEqual(height - 200)
+      await editor.focus()
+      const save = (await page.getByTestId('manuscript-save').boundingBox())!
+      expect(save.y - editorBox.y, `first-screen prose at ${width}px`).toBeGreaterThanOrEqual(300)
 
       if (colorScheme === 'dark') {
         const ground = await page.evaluate(() => getComputedStyle(document.body).backgroundColor)

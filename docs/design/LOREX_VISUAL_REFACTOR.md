@@ -3,7 +3,7 @@
 The implementation contract for Tasks 002-007. Produced by Design Refactor 001 (audit and
 direction) on `design/visual-system-audit`, from `dev` at `379bd8b`, 2026-09-26.
 
-**Implementation: 002, 003 and 004 done**; 005-007 to come. §17's decisions are taken - §18. Nothing here changes routes, APIs, schema, backups, search,
+**Implementation: 002, 003, 004 and 005 done**; 006-007 to come. §17's decisions are taken - §18. Nothing here changes routes, APIs, schema, backups, search,
 permissions, Canon, timeline logic or what a phone can do. The one URL addition anywhere in the
 plan is query parameters on the Lore list (§4.3).
 
@@ -997,6 +997,22 @@ a phone; a disabled Save is a grey slab.
 **Acceptance:** at most 35 buttons in `main` on the Scenes view of the seeded story (from 59; the
 chip links are content and stay); the manuscript text box at ≤300px on 1440×900 and ≤360px on
 390×844; the first scene still on the first phone screen.
+
+**As built in 005** (clarifications of the above, measured on an 8-scene, 3-chapter, 4-arc seed):
+
+- Buttons in `main`: Scenes 59 → 17, Plot 47 → 22. The text box starts at y≈317 (1440×900) and
+  y≈351 (390×844); about 433px of prose above Save on the phone, from about 247 on the same seed.
+- **↑ ↓ moved into ⋯**, which 005's brief allowed: every row is one direct verb (Write, Add scene,
+  Add beat, Edit beat) and ⋯. A move that cannot be made is left out, not disabled; after a move the
+  focus returns to the row's ⋯, wherever the row now is. "Move to…" is one "Move to Chapter N — …"
+  item per other chapter, in a wider panel.
+- **Edit story is in ⋯ with Delete story**, not beside it: the three views and one menu hold one line
+  at 360px without icon-only story tools. The premise opens the Scenes view, under the views.
+- The Manuscript header is one line - "Stories / Title" - over the views; the scene's History sits
+  beside its title, and Edit scene and Show in Scenes are in its ⋯. Below 641px (not 1100) the
+  planning folds behind an icon button named "Scene details".
+- Not done, left for 007: the context line without POINT OF VIEW / LORE / PLOT labels, the raised
+  editor page, and the five story drawers and history rows on tokens.
 
 ### 14.4 Timeline
 

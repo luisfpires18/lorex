@@ -9,9 +9,12 @@ import {
   useParams,
 } from 'react-router-dom'
 import { ActionIcon } from '../components/ActionIcon'
+import { ActionMenu } from '../components/ActionMenu'
 import { ChapterForm } from '../components/ChapterForm'
 import { ChapterSection } from '../components/ChapterSection'
+import { EmptyState } from '../components/EmptyState'
 import { ManuscriptPanel } from '../components/ManuscriptPanel'
+import { PageHeader } from '../components/PageHeader'
 import { PlotPanel } from '../components/PlotPanel'
 import { SceneCard, type MoveTarget } from '../components/SceneCard'
 import { SceneForm } from '../components/SceneForm'
@@ -59,8 +62,8 @@ type SceneFormState =
 type ChapterFormState =
   { mode: 'closed' } | { mode: 'new' } | { mode: 'edit'; chapter: Chapter; index: number }
 
-/** The control that should hold the focus once a move has redrawn the page, and the one to use if it is disabled. */
-type FocusRequest = { key: string; fallback: string | null }
+/** Where the focus goes back to once a scene has moved: its ⋯ menu, wherever the scene now is. */
+const sceneMenu = (sceneId: string) => `#scene-${sceneId} [data-testid="scene-actions"]`
 
 /** How long a scene or beat reached by a link stays marked, so the eye can pick it out from its neighbours. */
 const ARRIVAL_MS = 2400
@@ -130,8 +133,7 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
   const message = raised?.at === location.pathname ? raised.text : null
 
   const isMoving = useRef(false)
-  const controls = useRef(new Map<string, HTMLButtonElement>())
-  const pendingFocus = useRef<FocusRequest | null>(null)
+  const pendingFocus = useRef<string | null>(null)
 
   useEffect(() => {
     if (!storyId) return
@@ -163,16 +165,13 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
     }
   }, [universe.id, storyId, reloads])
 
-  // Whatever has just moved keeps the focus on its own control, wherever the page put it. When a move
-  // reached an end the control that made it is disabled, so the focus goes to the other one.
+  // Whatever has just moved keeps the focus on its own ⋯ menu, wherever the page put it: the move was made from that
+  // menu, and moving the row in the page can take the focus off it.
   useEffect(() => {
-    const request = pendingFocus.current
-    if (!request || state.kind !== 'ready') return
+    const selector = pendingFocus.current
+    if (!selector || state.kind !== 'ready') return
     pendingFocus.current = null
-
-    const first = controls.current.get(request.key)
-    const second = request.fallback ? controls.current.get(request.fallback) : undefined
-    ;(first && !first.disabled ? first : second)?.focus()
+    document.querySelector<HTMLElement>(selector)?.focus()
   }, [state])
 
   // A link to one scene or one beat - a beat's scene, a scene's beat, or the manuscript's way back to its scene - lands
@@ -195,11 +194,6 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
       target.removeAttribute('data-arrived')
     }
   }, [isReady, view, location.hash, location.key])
-
-  const controlRef = useCallback((key: string, element: HTMLButtonElement | null) => {
-    if (element) controls.current.set(key, element)
-    else controls.current.delete(key)
-  }, [])
 
   const reload = useCallback(() => setReloads((count) => count + 1), [])
 
@@ -315,13 +309,9 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
     const [moved] = next.splice(from, 1)
     next.splice(to, 0, moved)
 
-    const direction = by < 0 ? 'up' : 'down'
     isMoving.current = true
     setMessage(null)
-    pendingFocus.current = {
-      key: `${scene.id}:${direction}`,
-      fallback: `${scene.id}:${by < 0 ? 'down' : 'up'}`,
-    }
+    pendingFocus.current = sceneMenu(scene.id)
     showContainer(
       scene.chapterId,
       next.map((candidate, index) => ({ ...candidate, sortOrder: index })),
@@ -356,7 +346,7 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
 
     try {
       const saved = await moveScene(universe.id, story.id, scene.id, chapterId)
-      pendingFocus.current = { key: `${scene.id}:to`, fallback: `${scene.id}:up` }
+      pendingFocus.current = sceneMenu(scene.id)
       showStory(saved)
 
       const count = scenesIn(saved.scenes, chapterId).length
@@ -365,7 +355,7 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
       )
     } catch (error: unknown) {
       setMessage(error instanceof ApiError ? error.message : 'That scene could not be moved.')
-      controls.current.get(`${scene.id}:to`)?.focus()
+      document.querySelector<HTMLElement>(sceneMenu(scene.id))?.focus()
     } finally {
       isMoving.current = false
     }
@@ -385,10 +375,7 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
 
     isMoving.current = true
     setMessage(null)
-    pendingFocus.current = {
-      key: `chapter:${chapter.id}:${by < 0 ? 'up' : 'down'}`,
-      fallback: `chapter:${chapter.id}:${by < 0 ? 'down' : 'up'}`,
-    }
+    pendingFocus.current = `#chapter-${chapter.id} [data-testid="chapter-actions"]`
     showChapters(next.map((candidate, index) => ({ ...candidate, sortOrder: index })))
 
     try {
@@ -490,7 +477,7 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
     }
   }
 
-  function sceneCards(container: Scene[], titleLevel: 4 | 5) {
+  function sceneCards(container: Scene[], titleLevel: 3 | 4) {
     return container.map((scene, index) => (
       <SceneCard
         key={scene.id}
@@ -506,7 +493,6 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
         onMoveTo={(target, chapterId) => void moveTo(target, chapterId)}
         onEdit={(target) => setSceneForm({ mode: 'edit', scene: target })}
         onDelete={(target) => void removeScene(target)}
-        controlRef={controlRef}
       />
     ))
   }
@@ -525,7 +511,7 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
 
   const newChapter = (
     <button
-      className="button button--quiet button--icon"
+      className="button button--secondary button--icon"
       type="button"
       onClick={() => setChapterForm({ mode: 'new' })}
       data-testid="new-chapter"
@@ -536,71 +522,76 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
   )
 
   return (
-    <article className="story" data-testid="story-page">
-      <nav className="entry__crumbs story__crumbs" aria-label="Breadcrumb">
-        <Link to={`/app/universes/${universe.id}/stories`}>Stories</Link>
-      </nav>
+    <article className={`story story--${view}`} data-testid="story-page">
+      <PageHeader
+        crumb={
+          <nav className="story__crumbs" aria-label="Breadcrumb">
+            <Link to={`/app/universes/${universe.id}/stories`}>Stories</Link>
+          </nav>
+        }
+        title={<bdi>{story.title}</bdi>}
+        titleTestId="story-title"
+        lede={
+          // Writing needs the height more than the facts: the Manuscript view keeps the title and the views only.
+          view === 'manuscript' ? null : (
+            <p className="story__meta">
+              <StatusBadge
+                step={story.status}
+                label={STORY_STATUS_LABELS[story.status]}
+                testId="story-status"
+              />
+              {hasChapters ? (
+                <span data-testid="story-chapter-count">{chapterCountLabel(chapters.length)}</span>
+              ) : null}
+              <span>{sceneCountLabel(scenes.length)}</span>
+            </p>
+          )
+        }
+      >
+        <div className="story__bar">
+          <nav className="views story__views" aria-label="Story views" data-testid="story-views">
+            <NavLink to={storyPath} end className="views__link" data-testid="story-view-scenes">
+              Scenes
+            </NavLink>
+            <NavLink to={`${storyPath}/plot`} className="views__link" data-testid="story-view-plot">
+              Plot
+            </NavLink>
+            <NavLink
+              to={`${storyPath}/manuscript`}
+              className="views__link"
+              data-testid="story-view-manuscript"
+            >
+              Manuscript
+            </NavLink>
+          </nav>
 
-      <header className="story__head">
-        <h1 className="story__title" data-testid="story-title">
-          <bdi>{story.title}</bdi>
-        </h1>
-        <p className="story__meta">
-          <StatusBadge
-            step={story.status}
-            label={STORY_STATUS_LABELS[story.status]}
-            testId="story-status"
-          />
-          {hasChapters ? (
-            <span data-testid="story-chapter-count">{chapterCountLabel(chapters.length)}</span>
-          ) : null}
-          <span>{sceneCountLabel(scenes.length)}</span>
-        </p>
-        {view === 'scenes' && story.premise ? (
-          <p className="story__premise prose" data-testid="story-premise">
-            {story.premise}
-          </p>
-        ) : null}
-      </header>
-
-      <div className="story__bar">
-        <nav className="views" aria-label="Story views" data-testid="story-views">
-          <NavLink to={storyPath} end className="views__link" data-testid="story-view-scenes">
-            Scenes
-          </NavLink>
-          <NavLink to={`${storyPath}/plot`} className="views__link" data-testid="story-view-plot">
-            Plot
-          </NavLink>
-          <NavLink
-            to={`${storyPath}/manuscript`}
-            className="views__link"
-            data-testid="story-view-manuscript"
+          <ActionMenu
+            className="story__menu"
+            label={`Story actions for ${story.title}`}
+            triggerTestId="story-actions"
           >
-            Manuscript
-          </NavLink>
-        </nav>
-
-        <div className="storytools story__actions">
-          <button
-            className="button button--quiet button--icon"
-            type="button"
-            onClick={() => setIsEditingStory(true)}
-            data-testid="edit-story"
-          >
-            <ActionIcon icon={Pencil} />
-            <span className="story__actionlabel">Edit story</span>
-          </button>
-          <button
-            className="button button--quiet button--icon"
-            type="button"
-            onClick={() => void removeStory()}
-            data-testid="delete-story"
-          >
-            <ActionIcon icon={Trash} />
-            <span className="story__actionlabel">Delete story</span>
-          </button>
+            <button
+              className="actionmenu__item"
+              type="button"
+              onClick={() => setIsEditingStory(true)}
+              data-testid="edit-story"
+            >
+              <ActionIcon icon={Pencil} />
+              Edit story
+            </button>
+            <hr className="actionmenu__divider" />
+            <button
+              className="actionmenu__item actionmenu__item--danger"
+              type="button"
+              onClick={() => void removeStory()}
+              data-testid="delete-story"
+            >
+              <ActionIcon icon={Trash} />
+              Delete story
+            </button>
+          </ActionMenu>
         </div>
-      </div>
+      </PageHeader>
 
       {stale ? (
         <div className="notice notice--error story__stale" role="alert" data-testid="story-stale">
@@ -631,9 +622,15 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
         />
       ) : (
         <section className="story__scenes" aria-labelledby="story-scenes-heading">
-          <h3 className="visually-hidden" id="story-scenes-heading">
+          <h2 className="visually-hidden" id="story-scenes-heading">
             Scenes
-          </h3>
+          </h2>
+
+          {story.premise ? (
+            <p className="story__premise prose" data-testid="story-premise">
+              {story.premise}
+            </p>
+          ) : null}
 
           {isEmpty ? null : (
             <div className="story__toolbar">
@@ -644,7 +641,7 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
               </p>
               <div className="story__toolbaractions">
                 {newChapter}
-                {newScene}
+                <span className="story__create">{newScene}</span>
               </div>
             </div>
           )}
@@ -656,23 +653,22 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
           ) : null}
 
           {isEmpty ? (
-            <div className="empty" data-testid="scenes-empty">
-              <p className="empty__line">No scenes yet.</p>
-              <p className="empty__hint">
-                Start with a scene: plot beats point at scenes, and the manuscript is written one
-                scene at a time. Scenes are told in the order you set, whenever in the world each
-                happens, and can be grouped into chapters whenever you like, or never.
-              </p>
-              <div className="empty__actions">
-                {newScene}
-                {newChapter}
-              </div>
-            </div>
+            <EmptyState
+              testId="scenes-empty"
+              title="No scenes yet."
+              hint="Start with a scene: plot beats point at scenes, and the manuscript is written one scene at a time. Scenes are told in the order you set, whenever in the world each happens, and can be grouped into chapters whenever you like, or never."
+              action={
+                <>
+                  {newScene}
+                  {newChapter}
+                </>
+              }
+            />
           ) : null}
 
           {!hasChapters && scenes.length > 0 ? (
             <ol className="scenes" data-testid="scene-list">
-              {sceneCards(scenes, 4)}
+              {sceneCards(scenes, 3)}
             </ol>
           ) : null}
 
@@ -683,15 +679,15 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
               data-testid="unchaptered"
             >
               <header className="storygroup__head">
-                <h4 className="storygroup__title" id="unchaptered-heading">
+                <h3 className="storygroup__title" id="unchaptered-heading">
                   {UNCHAPTERED}
-                </h4>
+                </h3>
                 <p className="storygroup__hint">
                   {sceneCountLabel(unchaptered.length)} not in a chapter yet.
                 </p>
               </header>
               <ol className="scenes" data-testid="unchaptered-scenes">
-                {sceneCards(unchaptered, 5)}
+                {sceneCards(unchaptered, 4)}
               </ol>
             </section>
           ) : null}
@@ -711,10 +707,9 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
                   setChapterForm({ mode: 'edit', chapter: target, index: at })
                 }
                 onDelete={(target, at) => void removeChapter(target, at)}
-                controlRef={controlRef}
               >
                 <ol className="scenes" data-testid="chapter-scenes">
-                  {sceneCards(inside, 5)}
+                  {sceneCards(inside, 4)}
                 </ol>
               </ChapterSection>
             )

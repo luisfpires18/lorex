@@ -418,7 +418,7 @@ test.describe('text direction', () => {
 
     await expectLorexStaysLeftToRight(page, [
       page.getByTestId('story-views'),
-      page.locator('.story__actions'),
+      page.locator('.story__bar'),
       sceneCard.locator('.scene__tools'),
     ])
 
@@ -644,11 +644,12 @@ test.describe('text direction', () => {
         page.getByTestId('story-view-manuscript'),
       )
       expect(isIncreasing([scenes, plot, manuscript])).toBe(true)
-      const [editStory, deleteStory] = await lefts(
-        page.getByTestId('edit-story'),
-        page.getByTestId('delete-story'),
+      // The story's menu ends the bar, after the views, however the title runs.
+      const [lastView, storyMenu] = await lefts(
+        page.getByTestId('story-view-manuscript'),
+        page.getByTestId('story-actions'),
       )
-      expect(deleteStory).toBeGreaterThan(editStory)
+      expect(storyMenu).toBeGreaterThan(lastView)
       expect(await scrollsSideways(page)).toBe(false)
 
       // ---- The lore grid ----

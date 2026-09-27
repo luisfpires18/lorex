@@ -1,7 +1,8 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useId } from 'react'
 import { ArrowDown, ArrowRightLeft, ArrowUp, PenLine, Pencil, Trash } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ActionIcon } from './ActionIcon'
+import { ActionMenu } from './ActionMenu'
 import { ContainerName } from './ContainerName'
 import { SceneBeats, SceneLore, SceneStamp } from './SceneContext'
 import type { Chronology } from '../chronology/types'
@@ -16,113 +17,6 @@ export interface MoveTarget {
   chapter: { index: number; title: string } | null
 }
 
-/**
- * "Move to…": where else this scene could be told, one press each.
- *
- * A disclosure of plain buttons, like the account menu, rather than a select that acts on change - a
- * closed select changes value on every arrow key in some browsers, which would move the scene before
- * the author had finished choosing. Escape closes and hands focus back; a press outside closes; opening
- * moves focus to the first choice.
- */
-function MoveToMenu({
-  scene,
-  describedBy,
-  targets,
-  onChoose,
-  controlRef,
-}: {
-  scene: Scene
-  describedBy: string
-  targets: MoveTarget[]
-  onChoose: (chapterId: string | null) => void
-  controlRef: (key: string, element: HTMLButtonElement | null) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const panelId = useId()
-  const root = useRef<HTMLDivElement>(null)
-  const trigger = useRef<HTMLButtonElement | null>(null)
-  const firstChoice = useRef<HTMLButtonElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'Escape') return
-      event.stopPropagation()
-      setOpen(false)
-      trigger.current?.focus()
-    }
-
-    function onPointerDown(event: PointerEvent) {
-      if (!root.current?.contains(event.target as Node)) setOpen(false)
-    }
-
-    document.addEventListener('pointerdown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown)
-
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [open])
-
-  useEffect(() => {
-    if (open) firstChoice.current?.focus()
-  }, [open])
-
-  return (
-    <div className="movemenu" ref={root}>
-      <button
-        ref={(element) => {
-          trigger.current = element
-          controlRef(`${scene.id}:to`, element)
-        }}
-        className="button button--quiet button--icon"
-        type="button"
-        aria-expanded={open}
-        aria-controls={open ? panelId : undefined}
-        aria-describedby={describedBy}
-        onClick={() => setOpen((wasOpen) => !wasOpen)}
-        data-testid="scene-move-to"
-      >
-        <ActionIcon icon={ArrowRightLeft} />
-        Move to…
-      </button>
-
-      {open ? (
-        <div className="movemenu__panel" id={panelId} data-testid="scene-move-to-panel">
-          <p className="movemenu__label" id={`${panelId}-label`}>
-            Move “<bdi>{scene.title}</bdi>” to
-          </p>
-          <ul className="movemenu__list" aria-labelledby={`${panelId}-label`}>
-            {targets.map((target, index) => (
-              <li key={target.chapterId ?? 'unchaptered'}>
-                <button
-                  ref={index === 0 ? firstChoice : undefined}
-                  className="movemenu__item"
-                  type="button"
-                  onClick={() => {
-                    setOpen(false)
-                    onChoose(target.chapterId)
-                  }}
-                  data-testid="scene-move-to-option"
-                  data-target={
-                    target.chapter
-                      ? chapterLabel(target.chapter.index, target.chapter.title)
-                      : UNCHAPTERED
-                  }
-                >
-                  <ContainerName chapter={target.chapter} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
 interface SceneCardProps {
   universeId: string
   chronology: Chronology
@@ -131,8 +25,8 @@ interface SceneCardProps {
   index: number
   /** How many scenes its container holds. */
   count: number
-  /** 5 under a chapter or Unchaptered heading, 4 in a story with no chapters. */
-  titleLevel: 4 | 5
+  /** 4 under a chapter or Unchaptered heading, 3 in a story with no chapters. */
+  titleLevel: 3 | 4
   /** Every other container the scene could move to. Empty in a story with no chapters. */
   moveTargets: MoveTarget[]
   /** The plot beats that point at this scene, arc by arc. Shown only: a scene holds no beat. */
@@ -141,22 +35,21 @@ interface SceneCardProps {
   onMoveTo: (scene: Scene, chapterId: string | null) => void
   onEdit: (scene: Scene) => void
   onDelete: (scene: Scene) => void
-  /** Hands the move controls to the page, so focus can follow a scene to its new place. */
-  controlRef: (key: string, element: HTMLButtonElement | null) => void
 }
 
 /**
  * One scene in its container's list: number, where it happens, whose eyes, what happens, what lore it
- * draws on, which plot beats point at it, and the tools. Notes stay in the form - the list is for scanning.
+ * draws on, which plot beats point at it - and then two controls, so the scene outweighs its tools.
  *
  * The lore and plot rows are read-only. The beats own those links, so each one is a way to the beat on the
  * story's Plot view rather than something edited here.
  *
- * Write opens this scene on the Manuscript view - the one editor, at the scene's own address - so a writer
- * never has to find the scene again in the outline. Reordering is plain buttons rather than a drag gesture, so
- * it works from a keyboard, a screen reader and a phone alike. Move up and Move down stay inside the scene's
- * chapter; Move to… takes it to another chapter or to Unchaptered, last there. Each tool's visible label is its
- * accessible name, and the scene's title describes it, so "Move up" is announced with the scene it moves.
+ * Write is the one direct action: it opens this scene on the Manuscript view - the one editor, at the scene's
+ * own address - so a writer never has to find the scene again in the outline. Everything else is in the
+ * scene's ⋯ menu: Edit scene, Move up and Move down inside its chapter, one "Move to" item per other chapter
+ * (or Unchaptered, last there), and Delete scene last, after a divider. Reordering stays plain buttons rather
+ * than a drag gesture, so it works from a keyboard, a screen reader and a phone alike; a move that cannot be
+ * made at this end of the list is not offered. The menu's name carries the scene's title.
  *
  * The row takes the focus - but is never in the tab order - so a link that lands on the scene can put a keyboard
  * and a screen reader there too.
@@ -174,10 +67,9 @@ export function SceneCard({
   onMoveTo,
   onEdit,
   onDelete,
-  controlRef,
 }: SceneCardProps) {
   const titleId = useId()
-  const Title = titleLevel === 5 ? 'h5' : 'h4'
+  const Title = titleLevel === 4 ? 'h4' : 'h3'
 
   return (
     <li
@@ -203,71 +95,84 @@ export function SceneCard({
 
         <SceneLore universeId={universeId} scene={scene} testId="scene" />
         <SceneBeats universeId={universeId} storyId={scene.storyId} beats={beats} testId="scene" />
+      </div>
 
-        <div className="scene__tools storytools">
-          <Link
-            className="button button--quiet button--icon"
-            to={`/app/universes/${universeId}/stories/${scene.storyId}/manuscript/${scene.id}`}
-            aria-describedby={titleId}
-            data-testid="scene-write"
-          >
-            <ActionIcon icon={PenLine} />
-            Write
-          </Link>
+      <div className="scene__tools rowtools">
+        <Link
+          className="button button--text button--icon"
+          to={`/app/universes/${universeId}/stories/${scene.storyId}/manuscript/${scene.id}`}
+          aria-describedby={titleId}
+          data-testid="scene-write"
+        >
+          <ActionIcon icon={PenLine} />
+          Write
+        </Link>
+        <ActionMenu
+          label={`More actions for ${scene.title}`}
+          triggerTestId="scene-actions"
+          panelClassName="actionmenu__panel--wide"
+        >
           <button
-            ref={(element) => controlRef(`${scene.id}:up`, element)}
-            className="button button--quiet button--icon"
-            type="button"
-            disabled={index === 0}
-            onClick={() => onMove(scene, -1)}
-            aria-describedby={titleId}
-            data-testid="scene-move-up"
-          >
-            <ActionIcon icon={ArrowUp} />
-            Move up
-          </button>
-          <button
-            ref={(element) => controlRef(`${scene.id}:down`, element)}
-            className="button button--quiet button--icon"
-            type="button"
-            disabled={index === count - 1}
-            onClick={() => onMove(scene, 1)}
-            aria-describedby={titleId}
-            data-testid="scene-move-down"
-          >
-            <ActionIcon icon={ArrowDown} />
-            Move down
-          </button>
-          {moveTargets.length > 0 ? (
-            <MoveToMenu
-              scene={scene}
-              describedBy={titleId}
-              targets={moveTargets}
-              onChoose={(chapterId) => onMoveTo(scene, chapterId)}
-              controlRef={controlRef}
-            />
-          ) : null}
-          <button
-            className="button button--quiet button--icon"
+            className="actionmenu__item"
             type="button"
             onClick={() => onEdit(scene)}
-            aria-describedby={titleId}
             data-testid="scene-edit"
           >
             <ActionIcon icon={Pencil} />
             Edit scene
           </button>
+          {index > 0 ? (
+            <button
+              className="actionmenu__item"
+              type="button"
+              onClick={() => onMove(scene, -1)}
+              data-testid="scene-move-up"
+            >
+              <ActionIcon icon={ArrowUp} />
+              Move up
+            </button>
+          ) : null}
+          {index < count - 1 ? (
+            <button
+              className="actionmenu__item"
+              type="button"
+              onClick={() => onMove(scene, 1)}
+              data-testid="scene-move-down"
+            >
+              <ActionIcon icon={ArrowDown} />
+              Move down
+            </button>
+          ) : null}
+          {moveTargets.map((target) => (
+            <button
+              key={target.chapterId ?? 'unchaptered'}
+              className="actionmenu__item"
+              type="button"
+              onClick={() => onMoveTo(scene, target.chapterId)}
+              data-testid="scene-move-to-option"
+              data-target={
+                target.chapter
+                  ? chapterLabel(target.chapter.index, target.chapter.title)
+                  : UNCHAPTERED
+              }
+            >
+              <ActionIcon icon={ArrowRightLeft} />
+              <span className="actionmenu__text">
+                Move to <ContainerName chapter={target.chapter} />
+              </span>
+            </button>
+          ))}
+          <hr className="actionmenu__divider" />
           <button
-            className="button button--quiet button--icon"
+            className="actionmenu__item actionmenu__item--danger"
             type="button"
             onClick={() => onDelete(scene)}
-            aria-describedby={titleId}
             data-testid="scene-delete"
           >
             <ActionIcon icon={Trash} />
             Delete scene
           </button>
-        </div>
+        </ActionMenu>
       </div>
     </li>
   )

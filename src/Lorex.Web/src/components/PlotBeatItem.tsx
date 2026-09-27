@@ -2,6 +2,7 @@ import { useId } from 'react'
 import { ArrowDown, ArrowUp, Pencil, Trash } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ActionIcon } from './ActionIcon'
+import { ActionMenu } from './ActionMenu'
 import { LoreReference } from './LoreReference'
 import { containerNumber } from '../stories/format'
 import type { Chapter, PlotBeat, Scene } from '../stories/types'
@@ -20,13 +21,12 @@ interface PlotBeatItemProps {
   onMove: (beat: PlotBeat, by: -1 | 1) => void
   onEdit: (beat: PlotBeat) => void
   onDelete: (beat: PlotBeat) => void
-  /** Hands the move controls to the panel, so focus can follow a beat to its new place. */
-  controlRef: (key: string, element: HTMLButtonElement | null) => void
 }
 
 /**
- * One beat in its arc: its number, what develops, the scenes it plays out in and the lore it concerns, and the tools.
- * Notes stay in the form.
+ * One beat in its arc: its number, what develops, the scenes it plays out in and the lore it concerns. Notes stay in
+ * the form. Edit is the one direct action - Edit beat; the moves that can be made from here
+ * and Delete beat, last, are in its ⋯ menu.
  *
  * Each scene is named from the story as it is now - its title, and its chapter when the story has chapters - and
  * links to that scene on the story's Scenes view; each entry links to its own page. The beat stores only ids, so a
@@ -45,7 +45,6 @@ export function PlotBeatItem({
   onMove,
   onEdit,
   onDelete,
-  controlRef,
 }: PlotBeatItemProps) {
   const titleId = useId()
   const scenesLabelId = useId()
@@ -67,10 +66,10 @@ export function PlotBeatItem({
       </span>
 
       <div className="beat__body">
-        <h5 className="beat__title" id={titleId}>
+        <h4 className="beat__title" id={titleId}>
           <span className="visually-hidden">Beat {index + 1}: </span>
           <bdi>{beat.title}</bdi>
-        </h5>
+        </h4>
 
         {beat.description ? <p className="beat__description prose">{beat.description}</p> : null}
 
@@ -121,53 +120,53 @@ export function PlotBeatItem({
             </ul>
           </div>
         ) : null}
+      </div>
 
-        <div className="beat__tools storytools">
+      <div className="beat__tools rowtools">
+        <button
+          className="button button--text button--icon"
+          type="button"
+          onClick={() => onEdit(beat)}
+          aria-describedby={titleId}
+          data-testid="plot-beat-edit"
+        >
+          <ActionIcon icon={Pencil} />
+          Edit beat
+        </button>
+        <ActionMenu label={`More actions for ${beat.title}`} triggerTestId="plot-beat-actions">
+          {index > 0 ? (
+            <button
+              className="actionmenu__item"
+              type="button"
+              onClick={() => onMove(beat, -1)}
+              data-testid="plot-beat-move-up"
+            >
+              <ActionIcon icon={ArrowUp} />
+              Move up
+            </button>
+          ) : null}
+          {index < count - 1 ? (
+            <button
+              className="actionmenu__item"
+              type="button"
+              onClick={() => onMove(beat, 1)}
+              data-testid="plot-beat-move-down"
+            >
+              <ActionIcon icon={ArrowDown} />
+              Move down
+            </button>
+          ) : null}
+          {count > 1 ? <hr className="actionmenu__divider" /> : null}
           <button
-            ref={(element) => controlRef(`beat:${beat.id}:up`, element)}
-            className="button button--quiet button--icon"
-            type="button"
-            disabled={index === 0}
-            onClick={() => onMove(beat, -1)}
-            aria-describedby={titleId}
-            data-testid="plot-beat-move-up"
-          >
-            <ActionIcon icon={ArrowUp} />
-            Move up
-          </button>
-          <button
-            ref={(element) => controlRef(`beat:${beat.id}:down`, element)}
-            className="button button--quiet button--icon"
-            type="button"
-            disabled={index === count - 1}
-            onClick={() => onMove(beat, 1)}
-            aria-describedby={titleId}
-            data-testid="plot-beat-move-down"
-          >
-            <ActionIcon icon={ArrowDown} />
-            Move down
-          </button>
-          <button
-            className="button button--quiet button--icon"
-            type="button"
-            onClick={() => onEdit(beat)}
-            aria-describedby={titleId}
-            data-testid="plot-beat-edit"
-          >
-            <ActionIcon icon={Pencil} />
-            Edit beat
-          </button>
-          <button
-            className="button button--quiet button--icon"
+            className="actionmenu__item actionmenu__item--danger"
             type="button"
             onClick={() => onDelete(beat)}
-            aria-describedby={titleId}
             data-testid="plot-beat-delete"
           >
             <ActionIcon icon={Trash} />
             Delete beat
           </button>
-        </div>
+        </ActionMenu>
       </div>
     </li>
   )
