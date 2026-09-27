@@ -133,12 +133,12 @@ export function IdeaReferencePicker({
             <span className="field__label" id={kindsId}>
               What to reference
             </span>
-            <div className="kinds" role="group" aria-labelledby={kindsId}>
+            <div className="segmented" role="group" aria-labelledby={kindsId}>
               {IDEA_REFERENCE_KINDS.map((option) => (
                 <button
                   key={option}
                   type="button"
-                  className="kinds__step"
+                  className="segmented__option"
                   aria-pressed={kind === option}
                   onClick={() => setKind(option)}
                   data-testid={`idea-picker-kind-${IDEA_REFERENCE_KIND_LABELS[option].toLowerCase()}`}
@@ -213,7 +213,7 @@ export function IdeaReferencePicker({
 
         <footer className="drawer__actions">
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             onClick={onClose}
             data-testid="idea-picker-close"

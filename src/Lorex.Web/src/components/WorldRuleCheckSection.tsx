@@ -95,7 +95,11 @@ export function WorldRuleCheckSection({
           {failed ? (
             <p className="form__message rule__checkwide" role="alert">
               The event kinds and methods could not be read.{' '}
-              <button className="button button--quiet" type="button" onClick={reload}>
+              <button
+                className="button button--secondary button--sm"
+                type="button"
+                onClick={reload}
+              >
                 Try again
               </button>
             </p>

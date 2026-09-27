@@ -240,7 +240,7 @@ export default function UniverseTypes() {
                 {type.entityCount === 1 ? '1 entry' : `${type.entityCount} entries`}
               </span>
               <button
-                className="button button--quiet"
+                className="button button--secondary button--sm"
                 type="button"
                 aria-expanded={iconTypeId === type.id}
                 onClick={() => setIconTypeId(iconTypeId === type.id ? null : type.id)}
@@ -249,7 +249,7 @@ export default function UniverseTypes() {
                 Icon
               </button>
               <button
-                className="button button--quiet"
+                className="button button--secondary button--sm"
                 type="button"
                 onClick={() => setOpenTypeId(openTypeId === type.id ? null : type.id)}
                 data-testid={`fields-${type.name}`}
@@ -258,7 +258,7 @@ export default function UniverseTypes() {
               </button>
               {type.entityCount === 0 ? (
                 <button
-                  className="button button--quiet"
+                  className="button button--secondary button--sm"
                   type="button"
                   onClick={() => removeType(type.id)}
                 >

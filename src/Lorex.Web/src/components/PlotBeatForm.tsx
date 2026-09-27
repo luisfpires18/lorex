@@ -295,7 +295,7 @@ export function PlotBeatForm({
             {isSaving ? 'Saving' : beat ? 'Save beat' : 'Add beat'}
           </button>
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             onClick={close}
             data-testid="cancel-plot-beat"

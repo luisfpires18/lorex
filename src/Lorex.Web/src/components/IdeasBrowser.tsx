@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { Plus } from 'lucide-react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { EmptyState } from './EmptyState'
 import { ActionIcon } from './ActionIcon'
 import { PageHeader } from './PageHeader'
 import { Quoted } from './NameList'
@@ -240,7 +241,7 @@ export function IdeasBrowser({ universe, basePath }: IdeasBrowserProps) {
       <div className="controls ideas__controls">
         <div className="controls__search">
           <label className="field__label" htmlFor={searchId}>
-            Filter
+            Filter ideas
           </label>
           <input
             id={searchId}
@@ -324,7 +325,7 @@ export function IdeasBrowser({ universe, basePath }: IdeasBrowserProps) {
         <div className="notice notice--error" role="alert" data-testid="ideas-load-error">
           <p>{state.message}</p>
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             onClick={() => {
               setState({ kind: 'loading' })
@@ -405,7 +406,7 @@ export function IdeasBrowser({ universe, basePath }: IdeasBrowserProps) {
               </div>
               {deleted ? (
                 <button
-                  className="button button--quiet idearow__restore"
+                  className="button button--secondary idearow__restore"
                   type="button"
                   disabled={restoring !== null}
                   onClick={() => void restore(idea)}
@@ -421,41 +422,37 @@ export function IdeasBrowser({ universe, basePath }: IdeasBrowserProps) {
       ) : null}
 
       {result && result.items.length === 0 ? (
-        <div className="empty" data-testid="ideas-empty">
-          {deleted ? (
-            <>
-              <p className="empty__line">Nothing recently deleted.</p>
-              <p className="empty__hint">A deleted idea waits here, whole, until you restore it.</p>
-            </>
-          ) : isFiltered ? (
-            <>
-              <p className="empty__line">No ideas match.</p>
-              <p className="empty__hint">Try other words, or show all ideas.</p>
-            </>
-          ) : (
-            <>
-              <p className="empty__line">No ideas yet.</p>
-              <p className="empty__hint">
-                “Maybe this city floats.” “What if Mira betrays Arlen?” Keep possibilities here,
-                apart from what is true in your world.
-              </p>
-              <Link
-                className="button button--icon empty__action"
-                to={`${basePath}/new`}
-                data-testid="empty-new-idea"
-              >
+        deleted ? (
+          <EmptyState
+            testId="ideas-empty"
+            title="Nothing recently deleted."
+            hint="A deleted idea waits here, whole, until you restore it."
+          />
+        ) : isFiltered ? (
+          <EmptyState
+            testId="ideas-empty"
+            title="No ideas match."
+            hint="Try other words, or show all ideas."
+          />
+        ) : (
+          <EmptyState
+            testId="ideas-empty"
+            title="No ideas yet."
+            hint="“Maybe this city floats.” “What if Mira betrays Arlen?” Keep possibilities here, apart from what is true in your world."
+            action={
+              <Link className="button" to={`${basePath}/new`} data-testid="empty-new-idea">
                 <ActionIcon icon={Plus} />
                 New idea
               </Link>
-            </>
-          )}
-        </div>
+            }
+          />
+        )
       ) : null}
 
       {result && result.totalPages > 1 ? (
         <nav className="pager" aria-label="Pagination">
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             disabled={result.page <= 1}
             onClick={() => update({ page: String(result.page - 1) })}
@@ -466,7 +463,7 @@ export function IdeasBrowser({ universe, basePath }: IdeasBrowserProps) {
             Page {result.page} of {result.totalPages}
           </span>
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             disabled={result.page >= result.totalPages}
             onClick={() => update({ page: String(result.page + 1) })}

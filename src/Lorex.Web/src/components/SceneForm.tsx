@@ -370,7 +370,7 @@ export function SceneForm({
 
             {hasPoint ? (
               <button
-                className="button button--quiet scenechron__clear"
+                className="button button--secondary button--sm scenechron__clear"
                 type="button"
                 onClick={() => edit({ point: EMPTY_POINT })}
                 data-testid="scene-chronology-clear"
@@ -397,7 +397,7 @@ export function SceneForm({
             {isSaving ? 'Saving' : scene ? 'Save scene' : 'Add scene'}
           </button>
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             onClick={close}
             data-testid="cancel-scene"

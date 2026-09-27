@@ -13,6 +13,7 @@ import { listRelationshipTypes } from '../relationships/api'
 import { FamilySemantic, type RelationshipType } from '../relationships/types'
 import { PageHeader } from '../components/PageHeader'
 import type { WorkspaceContext } from './UniverseWorkspace'
+import { EmptyState } from '../components/EmptyState'
 
 /**
  * Every answered state carries the entry it is about, so a tree, a refusal or a failure that belongs to the
@@ -134,13 +135,16 @@ export default function FamilyTreePage() {
       ) : null}
 
       {view.kind === 'idle' ? (
-        <div className="empty" data-testid="family-empty">
-          <p className="empty__line">Choose an entry to see its family.</p>
-          <p className="empty__hint">
-            Any entry can have one: Lorex never decides which of them are people. Record a
-            connection of a kind that means “parent”, and the tree grows from it.
-          </p>
-        </div>
+        <EmptyState
+          testId="family-empty"
+          title="Choose an entry to see its family."
+          hint={
+            <>
+              Any entry can have one: Lorex never decides which of them are people. Record a
+              connection of a kind that means “parent”, and the tree grows from it.
+            </>
+          }
+        />
       ) : null}
 
       {view.kind === 'loading' ? (
@@ -150,20 +154,23 @@ export default function FamilyTreePage() {
       ) : null}
 
       {view.kind === 'missing' ? (
-        <div className="empty" data-testid="family-missing">
-          <p className="empty__line">That entry is not here.</p>
-          <p className="empty__hint">
-            It may have been moved to the Trash, deleted, or it belongs to another universe.{' '}
-            <Link to={`/app/universes/${universe.id}/lore`}>Back to Lore</Link>
-          </p>
-        </div>
+        <EmptyState
+          testId="family-missing"
+          title="That entry is not here."
+          hint={
+            <>
+              It may have been moved to the Trash, deleted, or it belongs to another universe.{' '}
+              <Link to={`/app/universes/${universe.id}/lore`}>Back to Lore</Link>
+            </>
+          }
+        />
       ) : null}
 
       {view.kind === 'error' ? (
         <div className="notice notice--error" role="alert" data-testid="family-error">
           <p>{view.message}</p>
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             onClick={() => {
               setState({ kind: 'loading' })
@@ -225,7 +232,7 @@ export default function FamilyTreePage() {
               />
             ) : (
               <button
-                className="button button--quiet button--icon"
+                className="button button--secondary"
                 type="button"
                 onClick={() => setAddingFor(entityId ?? null)}
                 data-testid="add-family-link"

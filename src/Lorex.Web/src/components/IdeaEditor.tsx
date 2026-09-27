@@ -30,6 +30,7 @@ import { formatDateTime } from '../lib/dates'
 import { useLeaveGuard } from '../lib/leaveGuard'
 import { useLocalDraft } from '../lib/useLocalDraft'
 import type { UniverseSummary } from '../universes/types'
+import { EmptyState } from './EmptyState'
 
 type LoadState =
   | { kind: 'loading' }
@@ -508,28 +509,36 @@ export function IdeaEditor({
 
   if (load.kind === 'missing') {
     return (
-      <div className="empty" data-testid="idea-missing">
-        <p className="empty__line">This idea is not here.</p>
-        <p className="empty__hint">
-          It may have been deleted, or it belongs to someone else. Deleted ideas wait in{' '}
-          <Link to={`${listPath}?view=deleted`}>Recently deleted</Link>.
-        </p>
-      </div>
+      <EmptyState
+        testId="idea-missing"
+        title="This idea is not here."
+        hint={
+          <>
+            It may have been deleted, or it belongs to someone else. Deleted ideas wait in{' '}
+            <Link to={`${listPath}?view=deleted`}>Recently deleted</Link>.
+          </>
+        }
+      />
     )
   }
 
   if (load.kind === 'elsewhere') {
     return (
-      <div className="empty" data-testid="idea-not-in-universe">
-        <p className="empty__line">
-          This idea is not in <Quoted text={contextUniverse?.name ?? ''} />.
-        </p>
-        <p className="empty__hint">
-          It belongs to another universe, or to none, so it does not open here.{' '}
-          <Link to={`/app/ideas/${ideaId}`}>Open it in all ideas</Link>, or go back to{' '}
-          <Link to={listPath}>{listLabel}</Link>.
-        </p>
-      </div>
+      <EmptyState
+        testId="idea-not-in-universe"
+        title={
+          <>
+            This idea is not in <Quoted text={contextUniverse?.name ?? ''} />.
+          </>
+        }
+        hint={
+          <>
+            It belongs to another universe, or to none, so it does not open here.{' '}
+            <Link to={`/app/ideas/${ideaId}`}>Open it in all ideas</Link>, or go back to{' '}
+            <Link to={listPath}>{listLabel}</Link>.
+          </>
+        }
+      />
     )
   }
 
@@ -537,7 +546,7 @@ export function IdeaEditor({
     return (
       <div className="notice notice--error" role="alert" data-testid="idea-load-error">
         <p>{load.message}</p>
-        <button className="button button--quiet" type="button" onClick={reread}>
+        <button className="button button--secondary" type="button" onClick={reread}>
           Try again
         </button>
       </div>
@@ -646,7 +655,7 @@ export function IdeaEditor({
           </p>
           <div className="manuscript__conflictactions">
             <button
-              className="button button--quiet"
+              className="button button--secondary"
               type="button"
               disabled={isSaving}
               onClick={() => void save(conflict.updatedAt)}
@@ -655,7 +664,7 @@ export function IdeaEditor({
               Save mine over it
             </button>
             <button
-              className="button button--quiet"
+              className="button button--secondary"
               type="button"
               disabled={isSaving}
               onClick={loadSavedVersion}
@@ -688,7 +697,7 @@ export function IdeaEditor({
           <input
             id={titleId}
             ref={titleInput}
-            className="field__input idea__title"
+            className="field__input field__input--title"
             type="text"
             dir="auto"
             value={draft.title}
@@ -780,9 +789,9 @@ export function IdeaEditor({
           aria-labelledby={referencesId}
           data-testid="idea-references"
         >
-          <h3 className="idea__subheading" id={referencesId}>
+          <h2 className="idea__subheading" id={referencesId}>
             References
-          </h3>
+          </h2>
           <p className="field__hint">
             Optional. Point at lore or story content this idea is about. A reference changes nothing
             in what it points at.
@@ -831,7 +840,7 @@ export function IdeaEditor({
                       ) : null}
                     </span>
                     <button
-                      className="button button--quiet button--icon idearef__remove"
+                      className="button button--secondary button--sm idearef__remove"
                       type="button"
                       disabled={isHeld}
                       onClick={() => removeReference(reference)}
@@ -849,7 +858,7 @@ export function IdeaEditor({
 
           <button
             ref={addButton}
-            className="button button--quiet button--icon"
+            className="button button--secondary"
             type="button"
             disabled={draft.universeId === null || isHeld}
             onClick={() => setIsPicking(true)}

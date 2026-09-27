@@ -6,6 +6,7 @@ import type { Chronology } from '../chronology/types'
 import { UNCHAPTERED } from '../stories/format'
 import { beatsByScene, readingOrder, scenesIn } from '../stories/structure'
 import type { Chapter, PlotArc, Scene, StoryDetail } from '../stories/types'
+import { EmptyState } from './EmptyState'
 
 interface ManuscriptPanelProps {
   universeId: string
@@ -67,16 +68,19 @@ export function ManuscriptPanel({
 
   if (scenes.length === 0) {
     return (
-      <div className="empty" data-testid="manuscript-empty">
-        <p className="empty__line">No scenes yet.</p>
-        <p className="empty__hint">
-          A manuscript is written scene by scene.{' '}
-          <Link to={storyPath} data-testid="manuscript-empty-scenes">
-            Add a scene on the Scenes view
-          </Link>{' '}
-          to start writing.
-        </p>
-      </div>
+      <EmptyState
+        testId="manuscript-empty"
+        title="No scenes yet."
+        hint={
+          <>
+            A manuscript is written scene by scene.{' '}
+            <Link to={storyPath} data-testid="manuscript-empty-scenes">
+              Add a scene on the Scenes view
+            </Link>{' '}
+            to start writing.
+          </>
+        }
+      />
     )
   }
 
@@ -201,10 +205,11 @@ export function ManuscriptPanel({
               onEditScene={onEditScene}
             />
           ) : (
-            <div className="empty" data-testid="manuscript-scene-missing">
-              <p className="empty__line">That scene is not in this story.</p>
-              <p className="empty__hint">It may have been deleted. Choose a scene from the list.</p>
-            </div>
+            <EmptyState
+              testId="manuscript-scene-missing"
+              title="That scene is not in this story."
+              hint="It may have been deleted. Choose a scene from the list."
+            />
           )}
         </div>
       </div>

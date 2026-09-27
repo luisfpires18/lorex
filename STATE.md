@@ -48,7 +48,8 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   `<type>/<description>` branches: Phase 2 Story, Phase 3, and now Phase 4.
   **Phase 023 - Production Hardening / PostgreSQL - remains deferred** and is not started; the
   next numbered phase resumes only when the owner says so.
-- **Design refactor: 001 (audit), 002 (app shell), 003 (Lore browsing) and 004 (entity experience) done; 005-007 to come.**
+- **Design refactor 001-007 done** (007 committed on `refactor/product-wide-polish`, not merged). The contract is now an
+  as-built reference.
   See Design refactor below.
 - **Entry images** (`feat/entity-images-r2`, merged into `dev`). An entry may carry one picture:
   uploaded through the API, decoded and thumbnailed server-side, stored as two objects in one
@@ -644,35 +645,34 @@ Canon change; the Lore list gains query parameters in 003 and nothing else touch
   - Canon's empty state claims only that the checks have nothing open; Trash's lede is two lines and Restore has an icon.
   - Seen, not changed: Settings' era editor (out of scope) has no leave guard; short right-to-left excerpts sit at the
     right of a 70ch measure (the shared `.prose` limitation); Trash's type dots are unexplained - 007.
-- **Next: 007 Product-wide polish and consistency** (contract section 15).
+- **007 - Product-wide polish and consistency** (`refactor/product-wide-polish` off `dev` at `9237246`, committed, not
+  merged, not pushed). Presentation, plus three leave guards: no route, API, schema, backup, search or Canon change.
+  - Guards: Settings' era editor, a universe's details (Settings and New universe) and the relation form now call the
+    existing `useLeaveGuard` (Cancel/Discard ask once, put-back reads clean, a failed save keeps draft and question).
+    Settings no longer opens with the focus in the universe's name. No known silent authored-draft loss remains.
+  - Buttons: `.button--quiet` retired - 77 callers to `.button--secondary`, row tools to `--secondary`/`--text` with
+    `.button--sm`; every button is 44px under a finger; dead `button--icon` class dropped. `.kinds` (ink-filled
+    squares) replaced by `.segmented`.
+  - Shared language: scene lore, beats and the timeline cast share one `.lorechip` (type icon in the type's ink); a
+    scene's point of view is an `EntityTile`, and `EntityPortrait` is deleted. Trash rows show a type or kind tile
+    (decorative) with the kind as a word in the facts; the unexplained dots are gone. Every left-stripe message panel
+    (form errors, conflicts, recovery, cautions, Canon refusal, rule check, Canon's rule note) is the callout shape.
+    Uppercase letter-spaced labels and chrome italics retired (search panel and picker group headings kept). Idea and
+    rule titles are `.field__input--title`. Drawers on tokens. Twelve inline empty/not-found blocks now `EmptyState`.
+  - Headings: Timeline, Family Tree, Types and Canon no longer skip from h1 to h3.
+  - Right-to-left: `.prose` is `width: fit-content`, so a short RTL summary sits under its title, not mid-page.
+  - `styles.css` 8,565 -> 8,402 lines; the contract is closed as built (section 19).
+- **The original design refactor 001-007 is complete.**
 - `design/` is not a type `branching.md` lists; 001 used it because the owner named the branch. 002 uses `refactor/`.
 
 ## Baseline
 
-- **999 API integration tests, 196 Playwright tests**, green. Design refactor 006's full runs on fresh databases:
-  195/196 (`relationships.spec.ts` timed out at sign-up, `/register` never drew its form), 195/196 (`manuscript.spec.ts`,
-  `net::ERR_CONNECTION_REFUSED` from the Vite server), then **196/196**; both specs 3/3 alone. 193 plus
-  `worldbuilding.spec.ts`'s three. Earlier, the 005 drawer guards' full runs on fresh databases: 191/193
-  (a canon test lost to Vite failing a cold dynamic import of `EntityPage.tsx`, a family tree test to a timeout), then
-  192/193 (the same canon test, the same import); both pass alone, and canon passes alone on the base too. 188 plus
-  `story-drawers.spec.ts`'s five. Design refactor 005's full run on a fresh database:
-  **188/188** first time (185 plus three: the keyboard path through the manuscript, Scene details on a phone, a story
-  row opened anywhere on it). The 004 entry-form guard's full run on a fresh database:
-  **185/185** (179 plus six guard tests; a first run lost one canon test to Vite failing a cold dynamic import, green
-  alone and on the rerun). Design refactor 004's full run on a fresh database: **179/179**
-  (175 plus `entity-page.spec.ts`'s four). 003's was 175/175
-  (`type-filter.spec.ts` rewritten around the type navigation, same count). 002's was 175/175 (171 plus `shell.spec.ts`'s four). No backend change, so the API suite and Release build were not rerun.
-  Stabilization pass 003's full Playwright run on a fresh
-  database of its own (`LOREX_E2E_DB`), at Playwright's default workers: **171/171, nothing logged about a locked
-  database**. No backend change, so the API suite and the Release build were not rerun. Pass 002's runs were 166/166
-  twice; a first run, seconds after the dev server was started, lost three tests to fetches that never reached the page,
-  no lock logged, all three green alone. Pass 001 ran both green, and its full Playwright run was 161/161.
-  Before those, the Family Trees full run on the dev database: 151/155 -
-  canon, content-recovery, pwa and type-filter, none of which touches a family tree; all four passed on a serial rerun, which
-  itself lost one canon test at sign-up, and canon passed 6/6 alone. Two genuine failures were found and fixed first: the restore
-  screen's preview still expected "Version 13", and the "newer Lorex" file it refuses was written at version 14, which the format
-  bump made real. Every earlier phase's run has the same shape - a rotating one to four specs lost in parallel, each green alone,
-  the known contention below rather than the feature. No frontend unit runner exists; the web checks are `typecheck`, `lint`,
+- **999 API integration tests, 200 Playwright tests**, green. Design refactor 007's full run on a fresh database:
+  **200/200** first time (196 plus `polish.spec.ts`'s four). 006's runs lost one test each to known infrastructure (a
+  `/register` timeout, Vite `ERR_CONNECTION_REFUSED`) before 196/196; 005's drawer guards lost two to Vite cold dynamic
+  imports before passing. No backend change since, so the API suite and Release build were not rerun.
+  Earlier phases' runs had the same shape: a rotating one to four specs lost in parallel, each green alone - the
+  contention below, not the feature. No frontend unit runner exists; the web checks are `typecheck`, `lint`,
   `format:check` and `build`. The E2E
   project has no format script of its own - its specs are held to the `src/Lorex.Web` Prettier settings, and
   Prettier has to be pointed at that config explicitly. CI runs all of it.

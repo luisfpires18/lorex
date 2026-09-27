@@ -15,6 +15,7 @@ import { getSceneManuscript, MANUSCRIPT_CHANGED, saveSceneManuscript } from '../
 import { sceneWhen } from '../stories/format'
 import type { SceneBeatReference } from '../stories/structure'
 import { MANUSCRIPT_MAX_LENGTH, type Scene } from '../stories/types'
+import { EmptyState } from './EmptyState'
 
 type LoadState =
   { kind: 'loading' } | { kind: 'ready' } | { kind: 'missing' } | { kind: 'error'; message: string }
@@ -296,7 +297,7 @@ export function ManuscriptEditor({
           <div className="manuscript__tools rowtools">
             {hasContext ? (
               <button
-                className="button button--text button--icon manuscript__detailstoggle"
+                className="button button--text manuscript__detailstoggle"
                 type="button"
                 aria-expanded={isContextOpen}
                 aria-controls={contextId}
@@ -310,7 +311,7 @@ export function ManuscriptEditor({
             ) : null}
             {stored.updatedAt !== null || isHistoryOpen ? (
               <button
-                className="button button--text button--icon"
+                className="button button--text"
                 type="button"
                 aria-expanded={isHistoryOpen}
                 aria-controls={historyId}
@@ -406,17 +407,18 @@ export function ManuscriptEditor({
       ) : null}
 
       {load.kind === 'missing' ? (
-        <div className="empty" data-testid="manuscript-missing">
-          <p className="empty__line">This scene is not here.</p>
-          <p className="empty__hint">It may have been moved to the Trash.</p>
-        </div>
+        <EmptyState
+          testId="manuscript-missing"
+          title="This scene is not here."
+          hint="It may have been moved to the Trash."
+        />
       ) : null}
 
       {load.kind === 'error' ? (
         <div className="notice notice--error" role="alert" data-testid="manuscript-load-error">
           <p>{load.message}</p>
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             onClick={reread}
             data-testid="manuscript-retry"
@@ -463,7 +465,7 @@ export function ManuscriptEditor({
               </p>
               <div className="manuscript__conflictactions">
                 <button
-                  className="button button--quiet"
+                  className="button button--secondary"
                   type="button"
                   disabled={isSaving}
                   onClick={() => void save(conflict.updatedAt)}
@@ -472,7 +474,7 @@ export function ManuscriptEditor({
                   Save mine over it
                 </button>
                 <button
-                  className="button button--quiet"
+                  className="button button--secondary"
                   type="button"
                   disabled={isSaving}
                   onClick={loadSavedVersion}

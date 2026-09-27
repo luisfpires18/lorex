@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 
 /**
- * The icon inside a `button--icon`, beside the label that names the action.
+ * The icon inside a `.button`, beside the label that names the action.
  *
  * Always decorative: the label is what is read out and what a test or a screen reader finds, so the
  * icon is hidden from assistive technology and never focusable. One size, one stroke, and the

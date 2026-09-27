@@ -50,6 +50,7 @@ import {
   type FieldValueInput,
 } from '../lore/types'
 import type { WorkspaceContext } from './UniverseWorkspace'
+import { EmptyState } from '../components/EmptyState'
 
 interface Draft {
   entityTypeId: string
@@ -441,13 +442,16 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
   // ordinary thing to hit, because a link to an entry since moved to the Trash answers 404.
   if (status === 'missing') {
     return (
-      <div className="empty" data-testid="entity-missing">
-        <p className="empty__line">That entry is not here.</p>
-        <p className="empty__hint">
-          It may be in the <Link to={`/app/universes/${universe.id}/trash`}>Trash</Link>, where it
-          can be restored. <Link to={`/app/universes/${universe.id}/lore`}>Back to the lore</Link>
-        </p>
-      </div>
+      <EmptyState
+        testId="entity-missing"
+        title="That entry is not here."
+        hint={
+          <>
+            It may be in the <Link to={`/app/universes/${universe.id}/trash`}>Trash</Link>, where it
+            can be restored. <Link to={`/app/universes/${universe.id}/lore`}>Back to the lore</Link>
+          </>
+        }
+      />
     )
   }
 

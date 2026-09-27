@@ -365,7 +365,7 @@ export function EntityArticleSection({
         {isReady && !isEditing && hasArticle ? (
           <button
             ref={startButton}
-            className="button button--quiet button--icon"
+            className="button button--secondary"
             type="button"
             onClick={() => startEditing()}
             disabled={!canStart}
@@ -401,7 +401,7 @@ export function EntityArticleSection({
         <div className="notice notice--error" role="alert" data-testid="article-load-error">
           <p>The article could not be opened.</p>
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             onClick={reread}
             data-testid="article-retry"
@@ -440,7 +440,7 @@ export function EntityArticleSection({
             </p>
             <button
               ref={startButton}
-              className="button button--icon"
+              className="button"
               type="button"
               onClick={() => startEditing()}
               disabled={!canStart}
@@ -464,7 +464,7 @@ export function EntityArticleSection({
               </p>
               <div className="article__conflictactions">
                 <button
-                  className="button button--quiet"
+                  className="button button--secondary"
                   type="button"
                   disabled={isSaving}
                   onClick={() => void save(conflict.updatedAt)}
@@ -473,7 +473,7 @@ export function EntityArticleSection({
                   Save mine over it
                 </button>
                 <button
-                  className="button button--quiet"
+                  className="button button--secondary"
                   type="button"
                   disabled={isSaving}
                   onClick={loadSavedVersion}
@@ -533,7 +533,7 @@ export function EntityArticleSection({
             ) : null}
             <div className="article__actions">
               <button
-                className="button button--quiet button--icon"
+                className="button button--secondary"
                 type="button"
                 onClick={finishEditing}
                 disabled={isSaving}
@@ -543,7 +543,7 @@ export function EntityArticleSection({
                 Done
               </button>
               <button
-                className="button button--icon"
+                className="button"
                 type="button"
                 disabled={!isDirty || isSaving || isTooLong}
                 onClick={() => void save(stored.updatedAt)}
@@ -706,7 +706,7 @@ function ArticleHistory({
   return (
     <div className="article__history">
       <button
-        className="button button--quiet button--icon article__historytoggle"
+        className="button button--secondary article__historytoggle"
         type="button"
         aria-expanded={isOpen}
         aria-controls={bodyId}
@@ -755,7 +755,7 @@ function ArticleHistory({
 
                   <div className="version__tools">
                     <button
-                      className="button button--quiet"
+                      className="button button--text button--sm"
                       type="button"
                       aria-expanded={viewing?.id === revision.id}
                       onClick={() => void view(revision.id)}
@@ -765,7 +765,7 @@ function ArticleHistory({
                     </button>
                     {index > 0 ? (
                       <button
-                        className="button button--quiet"
+                        className="button button--text button--sm"
                         type="button"
                         disabled={busyId !== null}
                         onClick={() => void restore(revision)}

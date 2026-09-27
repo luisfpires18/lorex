@@ -171,12 +171,12 @@ export function StoryForm({ universeId, story, onClose, onSaved }: StoryFormProp
             <span className="field__label" id="story-status-label">
               Status
             </span>
-            <div className="kinds" role="group" aria-labelledby="story-status-label">
+            <div className="segmented" role="group" aria-labelledby="story-status-label">
               {STORY_STATUS_ORDER.map((option) => (
                 <button
                   key={option}
                   type="button"
-                  className="kinds__step"
+                  className="segmented__option"
                   aria-pressed={draft.status === option}
                   onClick={() => edit({ status: option })}
                   data-testid={`story-status-${STORY_STATUS_LABELS[option].toLowerCase()}`}
@@ -197,7 +197,7 @@ export function StoryForm({ universeId, story, onClose, onSaved }: StoryFormProp
             {isSaving ? 'Saving' : story ? 'Save story' : 'Create story'}
           </button>
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             onClick={close}
             data-testid="cancel-story"

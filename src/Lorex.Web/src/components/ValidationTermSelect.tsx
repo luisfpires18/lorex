@@ -165,7 +165,7 @@ export function ValidationTermSelect({
         {!isAdding ? (
           <button
             ref={newButton}
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             onClick={open}
             data-testid={`${testId}-new`}
@@ -205,7 +205,7 @@ export function ValidationTermSelect({
             >
               {isCreating ? 'Adding…' : `Add ${word}`}
             </button>
-            <button className="button button--quiet" type="button" onClick={cancel}>
+            <button className="button button--secondary" type="button" onClick={cancel}>
               Cancel
             </button>
           </div>

@@ -91,7 +91,7 @@ export function RecoveredDraft({
 
       <div className="recovery__actions">
         <button
-          className="button button--quiet"
+          className="button button--secondary"
           type="button"
           onClick={onRecover}
           aria-describedby={bodyId}
@@ -100,7 +100,7 @@ export function RecoveredDraft({
           Recover draft
         </button>
         <button
-          className="button button--quiet"
+          className="button button--secondary"
           type="button"
           onClick={discard}
           aria-describedby={bodyId}
@@ -109,7 +109,7 @@ export function RecoveredDraft({
           Discard draft
         </button>
         <button
-          className="button button--quiet"
+          className="button button--secondary"
           type="button"
           aria-expanded={isShowing}
           aria-controls={previewId}

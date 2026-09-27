@@ -13,6 +13,7 @@ import {
   type EraLabelPositionValue,
 } from '../chronology/types'
 import { ApiError } from '../lib/api'
+import { useLeaveGuard } from '../lib/leaveGuard'
 
 /** One era as it is being edited. Text stays text until it is sent; counts ride along for display. */
 interface EraDraft {
@@ -112,6 +113,8 @@ export function ChronologySettings({ universeId, chronology, onSaved }: Chronolo
   }, [universeId, onSaved])
 
   const dirty = JSON.stringify(inputOf(drafts)) !== JSON.stringify(inputOf(draftsFrom(stored)))
+  // Eras put back as they were read clean; a failed save leaves the draft, and the question, standing.
+  useLeaveGuard(dirty ? 'The chronology has unsaved changes. Leave without saving them?' : null)
 
   function change(next: EraDraft[]) {
     touched.current = true
@@ -149,6 +152,7 @@ export function ChronologySettings({ universeId, chronology, onSaved }: Chronolo
   }
 
   function discard() {
+    if (!window.confirm('Discard your changes to the chronology? They will be lost.')) return
     touched.current = false
     setDrafts(draftsFrom(stored))
     setFieldErrors({})
@@ -220,7 +224,7 @@ export function ChronologySettings({ universeId, chronology, onSaved }: Chronolo
       </p>
 
       {drafts.length > 0 && unplacedTotal > 0 ? (
-        <p className="settings__caution" data-testid="chronology-unplaced">
+        <p className="callout callout--warning settings__caution" data-testid="chronology-unplaced">
           {storedNamesEras
             ? `${unplacedParts.join(' and ')} ${unplacedTotal === 1 ? 'was' : 'were'} written before these eras and ${unplacedTotal === 1 ? 'has' : 'have'} none yet. Until each is given one, it sits apart on the timeline and Canon Integrity does not compare it.`
             : `Once saved, ${unplacedParts.join(' and ')} written as plain years will each need an era. Until then they sit apart on the timeline and Canon Integrity does not compare them.`}
@@ -322,7 +326,7 @@ export function ChronologySettings({ universeId, chronology, onSaved }: Chronolo
                   </p>
                   <div className="era__tools">
                     <button
-                      className="button button--quiet"
+                      className="button button--secondary button--sm"
                       type="button"
                       onClick={() => move(index, -1)}
                       disabled={index === 0}
@@ -332,7 +336,7 @@ export function ChronologySettings({ universeId, chronology, onSaved }: Chronolo
                       Earlier
                     </button>
                     <button
-                      className="button button--quiet"
+                      className="button button--secondary button--sm"
                       type="button"
                       onClick={() => move(index, 1)}
                       disabled={index === drafts.length - 1}
@@ -342,7 +346,7 @@ export function ChronologySettings({ universeId, chronology, onSaved }: Chronolo
                       Later
                     </button>
                     <button
-                      className="button button--quiet"
+                      className="button button--secondary button--sm"
                       type="button"
                       onClick={() => change(drafts.filter((_, position) => position !== index))}
                       disabled={inUse}
@@ -365,7 +369,12 @@ export function ChronologySettings({ universeId, chronology, onSaved }: Chronolo
       {fieldErrors.eras ? <p className="field__error">{fieldErrors.eras}</p> : null}
 
       <div className="form__actions">
-        <button className="button button--quiet" type="button" onClick={add} data-testid="add-era">
+        <button
+          className="button button--secondary"
+          type="button"
+          onClick={add}
+          data-testid="add-era"
+        >
           Add era
         </button>
       </div>
@@ -408,7 +417,7 @@ export function ChronologySettings({ universeId, chronology, onSaved }: Chronolo
           {saving ? 'Saving' : 'Save chronology'}
         </button>
         {dirty ? (
-          <button className="button button--quiet" type="button" onClick={discard}>
+          <button className="button button--secondary" type="button" onClick={discard}>
             Discard changes
           </button>
         ) : null}

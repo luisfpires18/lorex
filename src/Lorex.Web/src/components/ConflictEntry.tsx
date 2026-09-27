@@ -44,9 +44,7 @@ export function ConflictEntry({ universeId, conflict, isBusy, onDismiss, onReope
 
       <div className="finding__body">
         <p className="finding__stamp">
-          <span className="chip" data-conflict={conflict.status}>
-            {CONFLICT_STATUS_LABELS[conflict.status]}
-          </span>
+          <span className="finding__status">{CONFLICT_STATUS_LABELS[conflict.status]}</span>
           <span className="finding__when">
             {isResolved && conflict.resolvedAt
               ? `Resolved ${formatDate(conflict.resolvedAt)}`
@@ -75,7 +73,7 @@ export function ConflictEntry({ universeId, conflict, isBusy, onDismiss, onReope
             </p>
           ) : (
             <button
-              className="button button--quiet"
+              className="button button--secondary button--sm"
               type="button"
               disabled={isBusy}
               onClick={isDismissed ? onReopen : onDismiss}

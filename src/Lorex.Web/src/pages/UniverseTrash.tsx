@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { ArchiveRestore } from 'lucide-react'
+import {
+  ArchiveRestore,
+  BookOpen,
+  CircleDot,
+  Feather,
+  FileText,
+  Scale,
+  Spline,
+  type LucideIcon,
+} from 'lucide-react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { ActionIcon } from '../components/ActionIcon'
 import { blockingFindingsOf } from '../canon/blocked'
@@ -14,9 +23,11 @@ import {
   TrashBlock,
   TrashKind,
   type TrashItem,
+  type TrashKindValue,
   type TrashPage,
 } from '../trash/types'
 import { EmptyState } from '../components/EmptyState'
+import { EntityTile } from '../components/EntityTile'
 import { PageHeader } from '../components/PageHeader'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
@@ -268,7 +279,7 @@ export default function UniverseTrash() {
       {state.kind === 'error' ? (
         <div className="notice notice--error" role="alert">
           <p>{state.message}</p>
-          <button className="button button--quiet" type="button" onClick={() => load()}>
+          <button className="button button--secondary" type="button" onClick={() => load()}>
             Try again
           </button>
         </div>
@@ -288,24 +299,29 @@ export default function UniverseTrash() {
                 data-testid={`trash-row-${item.name}`}
                 data-kind={kind}
               >
-                <span
-                  className="trash__dot"
-                  aria-hidden="true"
-                  style={
-                    item.entityTypeAccentColor
-                      ? { background: item.entityTypeAccentColor }
-                      : undefined
-                  }
-                />
+                {/* What it is, at a glance: an entry's type tile, or the icon of the story part or rule. The kind is
+                    said in words beside the name, so the tile is decorative. */}
+                {item.kind === TrashKind.Entry ? (
+                  <EntityTile
+                    className="trash__tile"
+                    universeId={universe.id}
+                    entityId={item.id}
+                    image={null}
+                    typeIcon={item.entityTypeIcon}
+                    typeAccent={item.entityTypeAccentColor}
+                  />
+                ) : (
+                  <KindTile kind={item.kind} />
+                )}
                 <div className="trash__what">
                   <p className="trash__name">
-                    <span className="trash__kind" data-testid="trash-kind">
-                      {kind}
-                    </span>
                     <bdi>{item.name}</bdi>
                   </p>
                   <p className="trash__meta">
-                    {whereItWas(item)} · removed {formatDateTime(item.trashedAt)}
+                    <span className="trash__kind" data-testid="trash-kind">
+                      {kind}
+                    </span>{' '}
+                    · {whereItWas(item)} · removed {formatDateTime(item.trashedAt)}
                   </p>
                   {waiting ? (
                     <p className="trash__waiting" id={waitingId} data-testid="trash-waiting">
@@ -314,7 +330,7 @@ export default function UniverseTrash() {
                   ) : null}
                 </div>
                 <button
-                  className="button button--secondary button--icon"
+                  className="button button--secondary"
                   type="button"
                   disabled={restoring !== null || waiting !== null}
                   aria-label={`Restore ${kind.toLowerCase()} “${item.name}”`}
@@ -342,7 +358,7 @@ export default function UniverseTrash() {
       {result && result.totalPages > 1 ? (
         <nav className="pager" aria-label="Pagination">
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             disabled={result.page <= 1}
             onClick={() => setPage((current) => current - 1)}
@@ -353,7 +369,7 @@ export default function UniverseTrash() {
             Page {result.page} of {result.totalPages}
           </span>
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             disabled={result.page >= result.totalPages}
             onClick={() => setPage((current) => current + 1)}
@@ -363,5 +379,25 @@ export default function UniverseTrash() {
         </nav>
       ) : null}
     </article>
+  )
+}
+
+const KIND_ICONS: Record<TrashKindValue, LucideIcon> = {
+  [TrashKind.Entry]: FileText,
+  [TrashKind.Story]: Feather,
+  [TrashKind.Chapter]: BookOpen,
+  [TrashKind.Scene]: FileText,
+  [TrashKind.PlotArc]: Spline,
+  [TrashKind.PlotBeat]: CircleDot,
+  [TrashKind.WorldRule]: Scale,
+}
+
+/** A story part's or a rule's square: its kind's icon on the sunken paper, the shape an entry's tile has. */
+function KindTile({ kind }: { kind: TrashKindValue }) {
+  const Icon = KIND_ICONS[kind]
+  return (
+    <span className="tile tile--blank trash__tile" aria-hidden="true">
+      <Icon className="tile__icon" />
+    </span>
   )
 }

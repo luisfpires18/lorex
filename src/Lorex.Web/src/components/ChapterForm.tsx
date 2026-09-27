@@ -205,7 +205,7 @@ export function ChapterForm({
             {isSaving ? 'Saving' : chapter ? 'Save chapter' : 'Add chapter'}
           </button>
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             onClick={close}
             data-testid="cancel-chapter"

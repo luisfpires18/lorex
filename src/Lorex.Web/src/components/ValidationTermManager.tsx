@@ -140,9 +140,9 @@ export function ValidationTermManager({ universeId }: { universeId: string }) {
   return (
     <section className="reltypes terms" aria-labelledby={headingId} data-testid="validation-terms">
       <div className="relations__head">
-        <h3 className="settings__heading" id={headingId}>
+        <h2 className="settings__heading" id={headingId}>
           Event kinds and methods
-        </h3>
+        </h2>
       </div>
 
       <p className="settings__note">
@@ -169,9 +169,9 @@ export function ValidationTermManager({ universeId }: { universeId: string }) {
 
             return (
               <div className="terms__group" key={kind}>
-                <h4 className="terms__kind" id={groupId}>
+                <h3 className="terms__kind" id={groupId}>
                   {TERM_KIND_PLURALS[kind]}
-                </h4>
+                </h3>
                 {group.length === 0 ? (
                   <p className="relations__quiet">None yet.</p>
                 ) : (
@@ -216,7 +216,7 @@ export function ValidationTermManager({ universeId }: { universeId: string }) {
                                 Save name
                               </button>
                               <button
-                                className="button button--quiet"
+                                className="button button--secondary button--sm"
                                 type="button"
                                 onClick={() => setRenaming(null)}
                               >
@@ -242,7 +242,7 @@ export function ValidationTermManager({ universeId }: { universeId: string }) {
                             </span>
                             <span className="types__count">{usage(term)}</span>
                             <button
-                              className="button button--quiet"
+                              className="button button--secondary button--sm"
                               type="button"
                               aria-label={`Rename ${term.name}`}
                               onClick={() =>
@@ -254,7 +254,7 @@ export function ValidationTermManager({ universeId }: { universeId: string }) {
                             </button>
                             {term.ruleCount === 0 && term.momentCount === 0 ? (
                               <button
-                                className="button button--quiet"
+                                className="button button--secondary button--sm"
                                 type="button"
                                 aria-label={`Delete ${term.name}`}
                                 disabled={busyId === term.id}

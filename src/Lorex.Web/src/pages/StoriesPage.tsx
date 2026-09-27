@@ -72,7 +72,7 @@ export default function StoriesPage() {
         <div className="notice notice--error" role="alert" data-testid="stories-load-error">
           <p>The stories could not be read.</p>
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             onClick={() => {
               setState({ kind: 'loading' })

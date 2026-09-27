@@ -65,7 +65,7 @@ export function PlotArcSection({
 
         <div className="plotarc__tools rowtools">
           <button
-            className="button button--text button--icon"
+            className="button button--text"
             type="button"
             onClick={() => onAddBeat(arc)}
             aria-describedby={headingId}

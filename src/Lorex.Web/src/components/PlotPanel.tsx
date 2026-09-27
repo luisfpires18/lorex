@@ -190,7 +190,7 @@ export function PlotPanel({
 
   const newArc = (
     <button
-      className="button button--icon"
+      className="button"
       type="button"
       onClick={() => setArcForm({ mode: 'new' })}
       data-testid="new-plot-arc"

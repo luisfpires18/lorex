@@ -144,7 +144,7 @@ export function ProfileAvatar({ name }: { name: string }) {
         />
 
         <label
-          className="button button--quiet button--icon avatar__pick"
+          className="button button--secondary avatar__pick"
           htmlFor="profile-photo-input"
           data-testid="profile-photo-pick"
         >
@@ -155,7 +155,7 @@ export function ProfileAvatar({ name }: { name: string }) {
         {image ? (
           <>
             <button
-              className="button button--quiet button--icon"
+              className="button button--secondary"
               type="button"
               disabled={busy}
               onClick={reframe}
@@ -165,7 +165,7 @@ export function ProfileAvatar({ name }: { name: string }) {
               Edit photo
             </button>
             <button
-              className="button button--quiet button--icon"
+              className="button button--secondary"
               type="button"
               disabled={busy}
               onClick={() => void remove()}

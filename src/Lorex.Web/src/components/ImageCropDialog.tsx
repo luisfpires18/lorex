@@ -298,7 +298,7 @@ export function ImageCropDialog({
 
         <footer className="cropper__actions">
           <button
-            className="button button--icon"
+            className="button"
             type="button"
             disabled={!crop || saving}
             onClick={() => void confirm()}
@@ -308,7 +308,7 @@ export function ImageCropDialog({
             {savingLabel ?? confirmLabel}
           </button>
           <button
-            className="button button--quiet button--icon"
+            className="button button--secondary"
             type="button"
             disabled={saving}
             onClick={cancel}

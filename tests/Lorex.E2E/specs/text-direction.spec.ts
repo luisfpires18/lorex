@@ -502,7 +502,7 @@ test.describe('text direction', () => {
     await expectIsolated(page.getByTestId('overview-name'), universeName)
     await expectLorexStaysLeftToRight(page, [page.locator('.sidebar__nav'), page.locator('.rail')])
 
-    // ---- The Trash: Lorex's word for the kind first, then the name, isolated ----
+    // ---- The Trash: the name, isolated, over Lorex's word for the kind - both where a row's text starts ----
 
     await page.goto(`${base}/trash`)
     const trashed = page.getByTestId(`trash-row-${Text.brackets}`)
@@ -511,7 +511,7 @@ test.describe('text direction', () => {
       trashed.getByTestId('trash-kind'),
       trashed.locator('.trash__name bdi'),
     )
-    expect(trashedLeft).toBeGreaterThan(kindLeft)
+    expect(Math.abs(trashedLeft - kindLeft)).toBeLessThan(2)
     await expect(
       trashed.getByRole('button', { name: `Restore entry “${Text.brackets}”` }),
     ).toBeVisible()
@@ -523,9 +523,12 @@ test.describe('text direction', () => {
     await expectIsolated(moment.locator('.moment__title'), `معركة ${Text.numbers}`)
     const player = moment.locator('.moment__player')
     await expectIsolated(player, Text.rtlThenLatin)
-    // The dot is before the name, as it is for every name: the row is not reversed.
-    const [dotLeft, playerLeft] = await lefts(player.locator('.moment__dot'), player.locator('bdi'))
-    expect(playerLeft).toBeGreaterThan(dotLeft)
+    // The type's icon is before the name, as it is for every name: the chip is not reversed.
+    const [castIconLeft, playerLeft] = await lefts(
+      player.locator('.lorechip__icon'),
+      player.locator('bdi'),
+    )
+    expect(playerLeft).toBeGreaterThan(castIconLeft)
 
     // ---- Types: an entry type, a relation kind and an event kind, each beside its row's start ----
 
@@ -774,6 +777,31 @@ function sideOf(element: Locator, text: string) {
   }, text)
 }
 
+/**
+ * Whether the written `text` ends at the right of `element`'s content box: where a right-to-left paragraph is aligned.
+ * A block of prose is only as wide as its longest line, so the line that sets that width also starts at the left; this
+ * asks only what a right-to-left paragraph must always do.
+ */
+function endsAtRight(element: Locator, text: string) {
+  return element.evaluate((node, wanted) => {
+    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT)
+    for (let current = walker.nextNode(); current; current = walker.nextNode()) {
+      const at = (current.textContent ?? '').indexOf(wanted)
+      if (at < 0) continue
+      const range = document.createRange()
+      range.setStart(current, at)
+      range.setEnd(current, at + wanted.length)
+      const style = getComputedStyle(node as Element)
+      const right =
+        (node as Element).getBoundingClientRect().right -
+        parseFloat(style.paddingRight) -
+        parseFloat(style.borderRightWidth)
+      return Math.abs(right - range.getBoundingClientRect().right) < 2
+    }
+    throw new Error(`"${wanted}" is not on the page`)
+  }, text)
+}
+
 test.describe('authored prose direction', () => {
   test.use({ viewport: { width: 1440, height: 900 } })
 
@@ -808,7 +836,11 @@ test.describe('authored prose direction', () => {
       '12',
       'آكرون',
     ])
-    expect(await sideOf(summary, Prose.mixed)).toBe('right')
+    expect(await endsAtRight(summary, Prose.mixed)).toBe(true)
+    // A short right-to-left summary sits where any summary sits - under the name, at the start of the column - not at
+    // the far edge of its measure in the middle of the page.
+    const [nameLeft, summaryLeft] = await lefts(page.getByRole('heading', { level: 1 }), summary)
+    expect(Math.abs(summaryLeft - nameLeft)).toBeLessThan(2)
     await expectLorexStaysLeftToRight(page, [
       page.locator('.entry__kind'),
       page.getByRole('group', { name: 'Canon status' }),
@@ -1106,7 +1138,7 @@ test.describe('authored prose direction', () => {
       const shown = page.getByTestId('story-premise')
       await expect(shown).toHaveText(premise)
       expect(await sideOf(shown, Prose.english)).toBe('left')
-      expect(await sideOf(shown, Prose.year)).toBe('right')
+      expect(await endsAtRight(shown, Prose.year)).toBe(true)
       expect(await sideOf(shown, Prose.after)).toBe('left')
 
       const summary = page.locator('.scene__summary')

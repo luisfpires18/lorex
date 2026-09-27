@@ -99,7 +99,7 @@ export function SceneCard({
 
       <div className="scene__tools rowtools">
         <Link
-          className="button button--text button--icon"
+          className="button button--text"
           to={`/app/universes/${universeId}/stories/${scene.storyId}/manuscript/${scene.id}`}
           aria-describedby={titleId}
           data-testid="scene-write"

@@ -279,7 +279,7 @@ export function UniverseSearch({ universeId }: { universeId: string }) {
         {status === 'error' ? (
           <div className="unisearch__note unisearch__failure" data-testid="universe-search-error">
             <p>The search could not be reached.</p>
-            <button className="button button--quiet" type="button" onClick={retry}>
+            <button className="button button--secondary" type="button" onClick={retry}>
               Try again
             </button>
           </div>

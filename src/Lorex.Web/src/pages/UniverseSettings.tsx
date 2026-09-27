@@ -114,7 +114,7 @@ export default function UniverseSettings() {
           </Link>
         </p>
         <button
-          className="button button--quiet"
+          className="button button--secondary"
           type="button"
           onClick={exportBackup}
           disabled={exporting}
@@ -142,7 +142,7 @@ export default function UniverseSettings() {
             : 'Archiving keeps everything and takes the universe out of your active list.'}
         </p>
         <button
-          className="button button--quiet"
+          className="button button--secondary"
           type="button"
           onClick={toggleArchived}
           disabled={busy}
@@ -178,7 +178,7 @@ export default function UniverseSettings() {
                   Delete permanently
                 </button>
                 <button
-                  className="button button--quiet"
+                  className="button button--secondary"
                   type="button"
                   onClick={() => setConfirmingDelete(false)}
                 >
@@ -188,7 +188,7 @@ export default function UniverseSettings() {
             </div>
           ) : (
             <button
-              className="button button--quiet"
+              className="button button--secondary"
               type="button"
               onClick={() => setConfirmingDelete(true)}
             >

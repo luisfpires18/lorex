@@ -9,6 +9,7 @@ import type { Chronology } from '../chronology/types'
 import { getUniverse } from '../universes/api'
 import { SECTION_GROUPS } from '../universes/sections'
 import type { UniverseDetail } from '../universes/types'
+import { EmptyState } from '../components/EmptyState'
 
 const SECTIONS = SECTION_GROUPS.flat()
 
@@ -116,13 +117,16 @@ export default function UniverseWorkspace() {
 
   if (state.kind === 'missing') {
     return (
-      <div className="empty" data-testid="universe-missing">
-        <p className="empty__line">That universe is not here.</p>
-        <p className="empty__hint">
-          It may have been deleted, or it belongs to someone else.{' '}
-          <Link to="/app">Back to your universes</Link>
-        </p>
-      </div>
+      <EmptyState
+        testId="universe-missing"
+        title="That universe is not here."
+        hint={
+          <>
+            It may have been deleted, or it belongs to someone else.{' '}
+            <Link to="/app">Back to your universes</Link>
+          </>
+        }
+      />
     )
   }
 
@@ -130,7 +134,7 @@ export default function UniverseWorkspace() {
     return (
       <div className="notice notice--error" role="alert">
         <p>{state.message}</p>
-        <button className="button button--quiet" type="button" onClick={() => refresh()}>
+        <button className="button button--secondary" type="button" onClick={() => refresh()}>
           Try again
         </button>
       </div>
