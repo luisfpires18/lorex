@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { EntityMultiPicker, type EntityChoice } from './EntityPicker'
 import { SceneReferencePicker } from './SceneReferencePicker'
 import { ApiError } from '../lib/api'
+import { payloadKey, useDrawerGuard } from '../lib/drawerGuard'
 import { useReturnFocus } from '../lib/returnFocus'
 import { createPlotBeat, updatePlotBeat } from '../stories/api'
 import { arcLabel } from '../stories/format'
@@ -68,7 +69,9 @@ export function PlotBeatForm({
 }: PlotBeatFormProps) {
   const dialog = useRef<HTMLDialogElement>(null)
   const title = useRef<HTMLInputElement>(null)
-  const [draft, setDraft] = useState<PlotBeatDraft>(() => {
+  // What the drawer opened on - the beat as stored, or the blank form in its arc - which the draft is measured against.
+  // Its arc, scenes and lore all count; the order they were picked in does not.
+  const [initial] = useState<PlotBeatDraft>(() => {
     const present = new Set(scenes.map((scene) => scene.id))
     return {
       title: beat?.title ?? '',
@@ -80,9 +83,19 @@ export function PlotBeatForm({
       entities: (beat?.entities ?? []).map(choiceOf),
     }
   })
+  const [draft, setDraft] = useState<PlotBeatDraft>(initial)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+
+  const isDirty = payloadKey(comparableOf(draft)) !== payloadKey(comparableOf(initial))
+  const { close, dialogProps } = useDrawerGuard(
+    isDirty,
+    beat
+      ? `“${beat.title}” has unsaved changes. Leave without saving them?`
+      : 'This new beat has not been created. Leave without saving it?',
+    onClose,
+  )
 
   useReturnFocus()
 
@@ -90,6 +103,23 @@ export function PlotBeatForm({
     dialog.current?.showModal()
     title.current?.focus()
   }, [])
+
+  /** The draft as the save sends it. A new beat's arc is in its address rather than its body. */
+  function inputOf(from: PlotBeatDraft) {
+    return {
+      title: from.title.trim(),
+      description: trimmed(from.description),
+      notes: trimmed(from.notes),
+      sceneIds: from.sceneIds,
+      entityIds: from.entities.map((choice) => choice.id),
+      plotArcId: beat ? from.arcId : null,
+    }
+  }
+
+  /** What would be saved, arc included either way. */
+  function comparableOf(from: PlotBeatDraft) {
+    return { ...inputOf(from), arcId: from.arcId }
+  }
 
   function edit(change: Partial<PlotBeatDraft>) {
     setDraft((current) => ({ ...current, ...change }))
@@ -100,14 +130,7 @@ export function PlotBeatForm({
     setFieldErrors({})
     setIsSaving(true)
 
-    const input = {
-      title: draft.title.trim(),
-      description: trimmed(draft.description),
-      notes: trimmed(draft.notes),
-      sceneIds: draft.sceneIds,
-      entityIds: draft.entities.map((choice) => choice.id),
-      plotArcId: beat ? draft.arcId : null,
-    }
+    const input = inputOf(draft)
 
     try {
       const saved = beat
@@ -135,13 +158,7 @@ export function PlotBeatForm({
       className="drawer"
       ref={dialog}
       aria-labelledby="plot-beat-heading"
-      onCancel={(event) => {
-        event.preventDefault()
-        onClose()
-      }}
-      onClick={(event) => {
-        if (event.target === dialog.current) onClose()
-      }}
+      {...dialogProps}
       data-testid="plot-beat-form"
     >
       <form
@@ -280,7 +297,7 @@ export function PlotBeatForm({
           <button
             className="button button--quiet"
             type="button"
-            onClick={onClose}
+            onClick={close}
             data-testid="cancel-plot-beat"
           >
             Cancel

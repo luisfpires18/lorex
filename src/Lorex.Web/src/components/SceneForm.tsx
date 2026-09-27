@@ -8,6 +8,7 @@ import { EntityMultiPicker, EntityPicker, type EntityChoice } from './EntityPick
 import { namesEras } from '../chronology/format'
 import type { Chronology, ChronologyValue } from '../chronology/types'
 import { ApiError } from '../lib/api'
+import { payloadKey, useDrawerGuard } from '../lib/drawerGuard'
 import { useReturnFocus } from '../lib/returnFocus'
 import { createScene, updateScene } from '../stories/api'
 import { chapterLabel, UNCHAPTERED } from '../stories/format'
@@ -97,6 +98,19 @@ function chronologyOf(point: ChronologyPointDraft, reckonsInEras: boolean): Chro
   }
 }
 
+/** The draft as the save sends it: every reference as its id, nothing typed in the date as no date at all. */
+function inputOf(draft: SceneDraft, reckonsInEras: boolean) {
+  return {
+    title: draft.title.trim(),
+    summary: trimmed(draft.summary),
+    notes: trimmed(draft.notes),
+    povEntityId: draft.pov?.id ?? null,
+    chronology: chronologyOf(draft.point, reckonsInEras),
+    entityIds: draft.entities.map((choice) => choice.id),
+    chapterId: draft.chapterId === '' ? null : draft.chapterId,
+  }
+}
+
 interface SceneFormProps {
   universeId: string
   storyId: string
@@ -132,7 +146,10 @@ export function SceneForm({
 }: SceneFormProps) {
   const dialog = useRef<HTMLDialogElement>(null)
   const title = useRef<HTMLInputElement>(null)
-  const [draft, setDraft] = useState<SceneDraft>(() => draftFrom(scene, chapterId))
+  // What the drawer opened on - the scene as stored, or the blank form in its chapter - which the draft is measured
+  // against. Its chapter, point of view, date and lore all count; the order the lore was picked in does not.
+  const [initial] = useState<SceneDraft>(() => draftFrom(scene, chapterId))
+  const [draft, setDraft] = useState<SceneDraft>(initial)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -142,6 +159,16 @@ export function SceneForm({
 
   // A plain year written before the universe named its eras has no era to show in the picker.
   const unreckoned = reckonsInEras && scene?.chronology != null && scene.chronology.eraId === null
+
+  const isDirty =
+    payloadKey(inputOf(draft, reckonsInEras)) !== payloadKey(inputOf(initial, reckonsInEras))
+  const { close, dialogProps } = useDrawerGuard(
+    isDirty,
+    scene
+      ? `“${scene.title}” has unsaved changes. Leave without saving them?`
+      : 'This new scene has not been created. Leave without saving it?',
+    onClose,
+  )
 
   useReturnFocus()
 
@@ -163,15 +190,7 @@ export function SceneForm({
     setFieldErrors({})
     setIsSaving(true)
 
-    const input = {
-      title: draft.title.trim(),
-      summary: trimmed(draft.summary),
-      notes: trimmed(draft.notes),
-      povEntityId: draft.pov?.id ?? null,
-      chronology: chronologyOf(draft.point, reckonsInEras),
-      entityIds: draft.entities.map((choice) => choice.id),
-      chapterId: draft.chapterId === '' ? null : draft.chapterId,
-    }
+    const input = inputOf(draft, reckonsInEras)
 
     try {
       const saved = scene
@@ -199,13 +218,7 @@ export function SceneForm({
       className="drawer"
       ref={dialog}
       aria-labelledby="scene-heading"
-      onCancel={(event) => {
-        event.preventDefault()
-        onClose()
-      }}
-      onClick={(event) => {
-        if (event.target === dialog.current) onClose()
-      }}
+      {...dialogProps}
       data-testid="scene-form"
     >
       <form
@@ -386,7 +399,7 @@ export function SceneForm({
           <button
             className="button button--quiet"
             type="button"
-            onClick={onClose}
+            onClick={close}
             data-testid="cancel-scene"
           >
             Cancel

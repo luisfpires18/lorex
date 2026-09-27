@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ApiError } from '../lib/api'
+import { payloadKey, useDrawerGuard } from '../lib/drawerGuard'
 import { useReturnFocus } from '../lib/returnFocus'
 import { createChapter, updateChapter } from '../stories/api'
 import type { Chapter } from '../stories/types'
@@ -26,6 +27,15 @@ function trimmed(value: string) {
   return text === '' ? null : text
 }
 
+/** The draft as the save sends it. */
+function inputOf(draft: ChapterDraft) {
+  return {
+    title: draft.title.trim(),
+    summary: trimmed(draft.summary),
+    notes: trimmed(draft.notes),
+  }
+}
+
 /**
  * A chapter's title, summary and notes, in the drawer every Lorex form uses. Plain text only: a chapter
  * is structure, so it has no prose, no date, no point of view and no canon of its own.
@@ -43,14 +53,25 @@ export function ChapterForm({
 }: ChapterFormProps) {
   const dialog = useRef<HTMLDialogElement>(null)
   const title = useRef<HTMLInputElement>(null)
-  const [draft, setDraft] = useState<ChapterDraft>(() => ({
+  // What the drawer opened on - the chapter as stored, or the blank form - which the draft is measured against.
+  const [initial] = useState<ChapterDraft>(() => ({
     title: chapter?.title ?? '',
     summary: chapter?.summary ?? '',
     notes: chapter?.notes ?? '',
   }))
+  const [draft, setDraft] = useState<ChapterDraft>(initial)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+
+  const isDirty = payloadKey(inputOf(draft)) !== payloadKey(inputOf(initial))
+  const { close, dialogProps } = useDrawerGuard(
+    isDirty,
+    chapter
+      ? `“${chapter.title}” has unsaved changes. Leave without saving them?`
+      : 'This new chapter has not been created. Leave without saving it?',
+    onClose,
+  )
 
   useReturnFocus()
 
@@ -68,11 +89,7 @@ export function ChapterForm({
     setFieldErrors({})
     setIsSaving(true)
 
-    const input = {
-      title: draft.title.trim(),
-      summary: trimmed(draft.summary),
-      notes: trimmed(draft.notes),
-    }
+    const input = inputOf(draft)
 
     try {
       const saved = chapter
@@ -100,13 +117,7 @@ export function ChapterForm({
       className="drawer"
       ref={dialog}
       aria-labelledby="chapter-heading"
-      onCancel={(event) => {
-        event.preventDefault()
-        onClose()
-      }}
-      onClick={(event) => {
-        if (event.target === dialog.current) onClose()
-      }}
+      {...dialogProps}
       data-testid="chapter-form"
     >
       <form
@@ -196,7 +207,7 @@ export function ChapterForm({
           <button
             className="button button--quiet"
             type="button"
-            onClick={onClose}
+            onClick={close}
             data-testid="cancel-chapter"
           >
             Cancel

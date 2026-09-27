@@ -622,12 +622,22 @@ Canon change; the Lore list gains query parameters in 003 and nothing else touch
   - Seen, not changed: the five story drawers (story, chapter, scene, arc, beat) have no leave guard; adding one is
     five forms and their tests, so it is a follow-up. Short right-to-left `.prose` paragraphs sit at the right of a
     62ch measure rather than of the column - the shared prose rule, not the story's.
+- **005 follow-up - story drawer leave guards** (`fix/story-drawer-unsaved-guards` off `dev` at `a8156bd`, committed, not
+  merged, not pushed). The story, chapter, scene, arc and beat drawers call the existing `useLeaveGuard` through
+  `lib/drawerGuard.ts` - `leaveGuard.ts` untouched. Dirty is the save payload against the one the drawer opened on (id
+  lists as sets), so a change put back is clean. Back, Forward, reload and close ask while dirty; leaving closes the
+  drawer. Cancel, Escape and the backdrop ask once to discard. Escape is taken on its key press: Chrome refused a second
+  prevented `cancel` in a row and closed the dialog under a form still held and guarded. The drawers are modal, so the
+  sidebar and views cannot be reached while one is open, and one editor cannot replace another.
 - **Next: 006 Worldbuilding workspaces.** Then 007 Polish (contract section 15).
 - `design/` is not a type `branching.md` lists; 001 used it because the owner named the branch. 002 uses `refactor/`.
 
 ## Baseline
 
-- **999 API integration tests, 188 Playwright tests**, green. Design refactor 005's full run on a fresh database:
+- **999 API integration tests, 193 Playwright tests**, green. The 005 drawer guards' full runs on fresh databases: 191/193
+  (a canon test lost to Vite failing a cold dynamic import of `EntityPage.tsx`, a family tree test to a timeout), then
+  192/193 (the same canon test, the same import); both pass alone, and canon passes alone on the base too. 188 plus
+  `story-drawers.spec.ts`'s five. Design refactor 005's full run on a fresh database:
   **188/188** first time (185 plus three: the keyboard path through the manuscript, Scene details on a phone, a story
   row opened anywhere on it). The 004 entry-form guard's full run on a fresh database:
   **185/185** (179 plus six guard tests; a first run lost one canon test to Vite failing a cold dynamic import, green

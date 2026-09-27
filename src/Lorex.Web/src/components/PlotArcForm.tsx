@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ApiError } from '../lib/api'
+import { payloadKey, useDrawerGuard } from '../lib/drawerGuard'
 import { useReturnFocus } from '../lib/returnFocus'
 import { createPlotArc, updatePlotArc } from '../stories/api'
 import type { PlotArc } from '../stories/types'
@@ -26,6 +27,15 @@ function trimmed(value: string) {
   return text === '' ? null : text
 }
 
+/** The draft as the save sends it. */
+function inputOf(draft: PlotArcDraft) {
+  return {
+    title: draft.title.trim(),
+    description: trimmed(draft.description),
+    notes: trimmed(draft.notes),
+  }
+}
+
 /**
  * An arc's title, description and notes, in the drawer every Lorex form uses. Plain text only: an arc is a thread
  * the author means to follow, so it has no date, no chapter, no status and no canon of its own, and Lorex reads
@@ -43,14 +53,25 @@ export function PlotArcForm({
 }: PlotArcFormProps) {
   const dialog = useRef<HTMLDialogElement>(null)
   const title = useRef<HTMLInputElement>(null)
-  const [draft, setDraft] = useState<PlotArcDraft>(() => ({
+  // What the drawer opened on - the arc as stored, or the blank form - which the draft is measured against.
+  const [initial] = useState<PlotArcDraft>(() => ({
     title: arc?.title ?? '',
     description: arc?.description ?? '',
     notes: arc?.notes ?? '',
   }))
+  const [draft, setDraft] = useState<PlotArcDraft>(initial)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+
+  const isDirty = payloadKey(inputOf(draft)) !== payloadKey(inputOf(initial))
+  const { close, dialogProps } = useDrawerGuard(
+    isDirty,
+    arc
+      ? `“${arc.title}” has unsaved changes. Leave without saving them?`
+      : 'This new arc has not been created. Leave without saving it?',
+    onClose,
+  )
 
   useReturnFocus()
 
@@ -68,11 +89,7 @@ export function PlotArcForm({
     setFieldErrors({})
     setIsSaving(true)
 
-    const input = {
-      title: draft.title.trim(),
-      description: trimmed(draft.description),
-      notes: trimmed(draft.notes),
-    }
+    const input = inputOf(draft)
 
     try {
       const saved = arc
@@ -100,13 +117,7 @@ export function PlotArcForm({
       className="drawer"
       ref={dialog}
       aria-labelledby="plot-arc-heading"
-      onCancel={(event) => {
-        event.preventDefault()
-        onClose()
-      }}
-      onClick={(event) => {
-        if (event.target === dialog.current) onClose()
-      }}
+      {...dialogProps}
       data-testid="plot-arc-form"
     >
       <form
@@ -196,7 +207,7 @@ export function PlotArcForm({
           <button
             className="button button--quiet"
             type="button"
-            onClick={onClose}
+            onClick={close}
             data-testid="cancel-plot-arc"
           >
             Cancel
