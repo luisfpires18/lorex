@@ -602,12 +602,20 @@ Canon change; the Lore list gains query parameters in 003 and nothing else touch
     their reading with type tiles, Edit and Remove in each row's ⋯. History without italics, dates in the margin.
   - The form takes the page: sections, and a sticky bar that says whether anything changed, Cancel before Save.
   - Seen, not changed: the entry form has no leave guard of its own - the article editor does, and it still holds.
+- **004 follow-up - entry form leave guard** (`fix/entity-edit-unsaved-guard` off `dev` at `e26fe86`, committed, not
+  merged, not pushed). The entry form, new and edit, now calls the existing `useLeaveGuard` - no new mechanism, `leaveGuard.ts`
+  untouched - so links, Sign out, search results, Back/Forward (`HistoryLeaveGuard`) and reload/close ask while it is
+  dirty. Dirty is the form against what is stored (a new entry: against the blank form), compared as the save would send
+  it, so a change put back reads clean; a new entry's accepted picture counts, an existing entry's is already written.
+  Leaving discards and closes the form; Cancel asks once, only when dirty. Six tests in `entity-page.spec.ts`.
 - **Next: 005 Story workspace.** Then 006 Worldbuilding, 007 Polish (contract section 15).
 - `design/` is not a type `branching.md` lists; 001 used it because the owner named the branch. 002 uses `refactor/`.
 
 ## Baseline
 
-- **999 API integration tests, 179 Playwright tests**, green. Design refactor 004's full run on a fresh database: **179/179**
+- **999 API integration tests, 185 Playwright tests**, green. The 004 entry-form guard's full run on a fresh database:
+  **185/185** (179 plus six guard tests; a first run lost one canon test to Vite failing a cold dynamic import, green
+  alone and on the rerun). Design refactor 004's full run on a fresh database: **179/179**
   (175 plus `entity-page.spec.ts`'s four). 003's was 175/175
   (`type-filter.spec.ts` rewritten around the type navigation, same count). 002's was 175/175 (171 plus `shell.spec.ts`'s four). No backend change, so the API suite and Release build were not rerun.
   Stabilization pass 003's full Playwright run on a fresh

@@ -130,6 +130,7 @@ test.describe('an entry page', () => {
     const save = page.getByTestId('save-entity')
     const cancel = page.getByRole('button', { name: 'Cancel' })
     expect((await cancel.boundingBox())!.x).toBeLessThan((await save.boundingBox())!.x)
+    page.once('dialog', (dialog) => void dialog.accept())
     await cancel.click()
     await expect(page.getByTestId('entry-summary')).toHaveText('Keeper of the tide ledger.')
   })
@@ -195,6 +196,235 @@ test.describe('an entry page', () => {
     await page.goto(`/app/universes/${world.universeId}/lore`)
     const card = page.locator('[data-testid="entity-card"][data-entity-name="Maren Ashvale"]')
     await expect(card.getByTestId('entity-portrait')).toHaveAttribute('src', /\/thumbnail\//)
+  })
+
+  test.describe('with unsaved changes in the form', () => {
+    /** Every question the page asks, answered as the step says - stay unless told to leave. */
+    function answering(page: Page) {
+      const questions: string[] = []
+      const state = { answer: 'stay' as 'stay' | 'leave', questions }
+      page.on('dialog', (dialog) => {
+        questions.push(dialog.message())
+        void (state.answer === 'leave' ? dialog.accept() : dialog.dismiss())
+      })
+      return state
+    }
+
+    const sidebarLink = (page: Page, name: string) =>
+      page.getByRole('navigation', { name: 'Universe sections' }).getByRole('link', { name })
+
+    test('a link out asks once; staying keeps the edit, leaving lets it go', async ({ page }) => {
+      await signUp(page)
+      const world = await seedWorld(page)
+      const id = await world.entry('Tovin Marsh')
+      await page.goto(entryUrl(world.universeId, id))
+      const asked = answering(page)
+
+      await page.getByTestId('edit-entity').click()
+      const status = page.getByTestId('entry-form-status')
+      await expect(status).toHaveText('No changes yet')
+      await page.getByLabel('Summary').fill('Ferryman of the salt road.')
+      await expect(status).toHaveText('Unsaved changes')
+
+      // Stay: still on the form, the edit intact.
+      await sidebarLink(page, 'Timeline').click()
+      await expect.poll(() => asked.questions.length).toBe(1)
+      expect(asked.questions[0]).toContain('“Tovin Marsh” has unsaved changes')
+      await expect(page).toHaveURL(entryUrl(world.universeId, id))
+      await expect(page.getByLabel('Summary')).toHaveValue('Ferryman of the salt road.')
+
+      // Leave: asked once more, and the destination opens.
+      asked.answer = 'leave'
+      await sidebarLink(page, 'Timeline').click()
+      await page.waitForURL(`/app/universes/${world.universeId}/timeline`)
+      expect(asked.questions).toHaveLength(2)
+
+      // Nothing was saved.
+      await page.goto(entryUrl(world.universeId, id))
+      await expect(page.getByTestId('entry-summary')).toHaveText('Keeper of the tide ledger.')
+    })
+
+    test('the browser Back button asks, and stays or leaves once', async ({ page }) => {
+      await signUp(page)
+      const world = await seedWorld(page)
+      const id = await world.entry('Wren Allard')
+      const loreUrl = `/app/universes/${world.universeId}/lore`
+      await page.goto(loreUrl)
+      await page.locator('[data-testid="entity-card"][data-entity-name="Wren Allard"]').click()
+      await page.waitForURL(entryUrl(world.universeId, id))
+      const asked = answering(page)
+
+      await page.getByTestId('edit-entity').click()
+      await page.getByLabel('Summary').fill('Cartographer of the fens.')
+
+      await page.goBack()
+      await expect.poll(() => asked.questions.length).toBe(1)
+      await expect(page).toHaveURL(entryUrl(world.universeId, id))
+      await expect(page.getByLabel('Summary')).toHaveValue('Cartographer of the fens.')
+      await expect(page.getByTestId('entry-form-status')).toHaveText('Unsaved changes')
+
+      asked.answer = 'leave'
+      await page.goBack()
+      await page.waitForURL(loreUrl)
+      await expect(page.getByTestId('entity-grid')).toBeVisible()
+      expect(asked.questions).toHaveLength(2)
+
+      // Forward returns to the entry, not to a form nobody chose to keep, and nothing asks.
+      await page.goForward()
+      await page.waitForURL(entryUrl(world.universeId, id))
+      await expect(page.getByTestId('entry-summary')).toHaveText('Keeper of the tide ledger.')
+      await expect(page.getByTestId('entry-form')).toHaveCount(0)
+      expect(asked.questions).toHaveLength(2)
+    })
+
+    test('Cancel asks once only when there is something to lose', async ({ page }) => {
+      await signUp(page)
+      const world = await seedWorld(page)
+      const id = await world.entry('Ossery Vane')
+      await page.goto(entryUrl(world.universeId, id))
+      const asked = answering(page)
+      const status = page.getByTestId('entry-form-status')
+      const cancel = page.getByTestId('cancel-entity')
+
+      // Clean: Cancel simply closes.
+      await page.getByTestId('edit-entity').click()
+      await cancel.click()
+      await expect(page.getByTestId('entry-form')).toHaveCount(0)
+      expect(asked.questions).toHaveLength(0)
+
+      // Dirty: stay keeps the change.
+      await page.getByTestId('edit-entity').click()
+      await page.getByLabel('Summary').fill('Lampwright.')
+      await cancel.click()
+      await expect.poll(() => asked.questions.length).toBe(1)
+      await expect(status).toHaveText('Unsaved changes')
+      await expect(page.getByLabel('Summary')).toHaveValue('Lampwright.')
+
+      // Discard: one question, and the entry as stored. Nothing asks on the way out after.
+      asked.answer = 'leave'
+      await cancel.click()
+      await expect(page.getByTestId('entry-summary')).toHaveText('Keeper of the tide ledger.')
+      expect(asked.questions).toHaveLength(2)
+      await sidebarLink(page, 'Timeline').click()
+      await page.waitForURL(`/app/universes/${world.universeId}/timeline`)
+      expect(asked.questions).toHaveLength(2)
+    })
+
+    test('a change put back is no change, and a saved form leaves freely', async ({ page }) => {
+      await signUp(page)
+      const world = await seedWorld(page)
+      const id = await world.entry('Hesper Coyle')
+      await page.goto(entryUrl(world.universeId, id))
+      const asked = answering(page)
+      const status = page.getByTestId('entry-form-status')
+
+      // Reverting: every kind of change back to what is stored reads clean again.
+      await page.getByTestId('edit-entity').click()
+      const summary = page.getByLabel('Summary')
+      await summary.fill('Something else.')
+      await expect(status).toHaveText('Unsaved changes')
+      await summary.fill('Keeper of the tide ledger.')
+      await expect(status).toHaveText('No changes yet')
+
+      await page.getByLabel('Aliases').fill('The Ledger')
+      await page.getByLabel('Aliases').press('Enter')
+      await expect(status).toHaveText('Unsaved changes')
+      await page.getByRole('button', { name: /Remove The Ledger/ }).click()
+      await expect(status).toHaveText('No changes yet')
+
+      await page.getByTestId('canon-draft').click()
+      await expect(status).toHaveText('Unsaved changes')
+      await page.getByTestId('canon-canon').click()
+      await expect(status).toHaveText('No changes yet')
+
+      // A change of type is a change.
+      const typePick = page.getByLabel('Entry type')
+      const original = await typePick.inputValue()
+      await typePick.selectOption({ label: 'Location' })
+      await expect(status).toHaveText('Unsaved changes')
+      await typePick.selectOption(original)
+      await expect(status).toHaveText('No changes yet')
+
+      // A save that succeeds clears it, and nothing asks after.
+      await summary.fill('Harbourmaster.')
+      await expect(status).toHaveText('Unsaved changes')
+      await page.getByTestId('save-entity').click()
+      await expect(page.getByTestId('entry-summary')).toHaveText('Harbourmaster.')
+      await sidebarLink(page, 'Timeline').click()
+      await page.waitForURL(`/app/universes/${world.universeId}/timeline`)
+      expect(asked.questions).toHaveLength(0)
+    })
+
+    test('a save that fails stays dirty and still asks', async ({ page }) => {
+      await signUp(page)
+      const world = await seedWorld(page)
+      const id = await world.entry('Corvin Pell')
+      await page.goto(entryUrl(world.universeId, id))
+      const asked = answering(page)
+
+      await page.getByTestId('edit-entity').click()
+      await page.getByLabel('Name').fill('')
+      await page.getByTestId('save-entity').click()
+      await expect(page.getByTestId('entry-error')).toBeVisible()
+      await expect(page.getByTestId('entry-form-status')).toHaveText('Unsaved changes')
+
+      await sidebarLink(page, 'Timeline').click()
+      await expect.poll(() => asked.questions.length).toBe(1)
+      await expect(page).toHaveURL(entryUrl(world.universeId, id))
+    })
+
+    test('a new entry is protected once written in, its framed picture included', async ({
+      page,
+    }) => {
+      await signUp(page)
+      const world = await seedWorld(page)
+      await page.goto(`/app/universes/${world.universeId}/lore/new`)
+      const asked = answering(page)
+      const status = page.getByTestId('entry-form-status')
+
+      // Blank: leaving asks nothing.
+      await expect(status).toHaveText('New entry')
+      await sidebarLink(page, 'Timeline').click()
+      await page.waitForURL(`/app/universes/${world.universeId}/timeline`)
+      expect(asked.questions).toHaveLength(0)
+
+      // A name is worth asking about.
+      await page.goto(`/app/universes/${world.universeId}/lore/new`)
+      await page.getByLabel('Name').fill('Isolde Brack')
+      await expect(status).toHaveText('Unsaved changes')
+      await sidebarLink(page, 'Timeline').click()
+      await expect.poll(() => asked.questions.length).toBe(1)
+      expect(asked.questions[0]).toContain('new entry has not been created')
+      await expect(page.getByLabel('Name')).toHaveValue('Isolde Brack')
+
+      // So is a picture framed and accepted - but not the cropper opened and closed. Typing an address
+      // leaves the page itself, so the browser asks too.
+      asked.answer = 'leave'
+      await page.goto(`/app/universes/${world.universeId}/lore/new`)
+      expect(asked.questions).toHaveLength(2)
+      asked.answer = 'stay'
+      const file = {
+        name: 'portrait.png',
+        mimeType: 'image/png',
+        buffer: png(300, 300, (x, y) => [40 + (x % 80), 90, 120 + (y % 60)]),
+      }
+      const crop = page.getByTestId('image-crop-dialog')
+      await page.getByTestId('entity-image-input').setInputFiles(file)
+      await expect(crop).toBeVisible()
+      await page.getByTestId('image-crop-cancel').click()
+      await expect(crop).toHaveCount(0)
+      await expect(status).toHaveText('New entry')
+
+      await page.getByTestId('entity-image-input').setInputFiles(file)
+      await expect(crop.getByTestId('image-crop-confirm')).toBeEnabled()
+      await crop.getByTestId('image-crop-confirm').click()
+      await expect(status).toHaveText('Unsaved changes')
+
+      // Reload and close are the browser's own question, only while there is something to lose.
+      const prompt = page.waitForEvent('dialog')
+      await page.close({ runBeforeUnload: true })
+      expect((await prompt).type()).toBe('beforeunload')
+    })
   })
 
   test.describe('on a phone', () => {
