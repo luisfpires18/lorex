@@ -101,7 +101,7 @@ export default function WorldRulesPage() {
         <div className="notice notice--error" role="alert" data-testid="world-rules-load-error">
           <p>{state.message}</p>
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             onClick={() => {
               setState({ kind: 'loading' })
@@ -177,7 +177,7 @@ export default function WorldRulesPage() {
       {result && result.totalPages > 1 ? (
         <nav className="pager" aria-label="Pagination">
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             disabled={result.page <= 1}
             onClick={() => goToPage(result.page - 1)}
@@ -188,7 +188,7 @@ export default function WorldRulesPage() {
             Page {result.page} of {result.totalPages}
           </span>
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             disabled={result.page >= result.totalPages}
             onClick={() => goToPage(result.page + 1)}

@@ -152,7 +152,7 @@ export function FamilyTreeView({ universeId, tree, onFocus }: Props) {
                 aria-label={row.label}
                 data-row={row.position}
               >
-                <h3 className="familytree__rowlabel">{row.label}</h3>
+                <h2 className="familytree__rowlabel">{row.label}</h2>
                 <ul className="familytree__members">
                   {before.map((member) => (
                     <Card

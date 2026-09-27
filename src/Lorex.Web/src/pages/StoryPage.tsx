@@ -216,13 +216,16 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
 
   if (state.kind === 'missing') {
     return (
-      <div className="empty" data-testid="story-missing">
-        <p className="empty__line">That story is not here.</p>
-        <p className="empty__hint">
-          It may have been deleted.{' '}
-          <Link to={`/app/universes/${universe.id}/stories`}>Back to the stories</Link>
-        </p>
-      </div>
+      <EmptyState
+        testId="story-missing"
+        title="That story is not here."
+        hint={
+          <>
+            It may have been deleted.{' '}
+            <Link to={`/app/universes/${universe.id}/stories`}>Back to the stories</Link>
+          </>
+        }
+      />
     )
   }
 
@@ -230,7 +233,7 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
     return (
       <div className="notice notice--error" role="alert" data-testid="story-load-error">
         <p>This story could not be opened.</p>
-        <button className="button button--quiet" type="button" onClick={retry}>
+        <button className="button button--secondary" type="button" onClick={retry}>
           Try again
         </button>
       </div>
@@ -499,7 +502,7 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
 
   const newScene = (
     <button
-      className="button button--icon"
+      className="button"
       type="button"
       onClick={() => setSceneForm({ mode: 'new', chapterId: null })}
       data-testid="new-scene"
@@ -511,7 +514,7 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
 
   const newChapter = (
     <button
-      className="button button--secondary button--icon"
+      className="button button--secondary"
       type="button"
       onClick={() => setChapterForm({ mode: 'new' })}
       data-testid="new-chapter"
@@ -596,7 +599,7 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
       {stale ? (
         <div className="notice notice--error story__stale" role="alert" data-testid="story-stale">
           <p>The story could not be read again, so what is shown may be out of date.</p>
-          <button className="button button--quiet" type="button" onClick={reload}>
+          <button className="button button--secondary" type="button" onClick={reload}>
             Try again
           </button>
         </div>

@@ -124,7 +124,7 @@ export function PlotBeatItem({
 
       <div className="beat__tools rowtools">
         <button
-          className="button button--text button--icon"
+          className="button button--text"
           type="button"
           onClick={() => onEdit(beat)}
           aria-describedby={titleId}

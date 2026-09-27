@@ -21,6 +21,7 @@ import type {
 } from '../canon/types'
 import { ConflictEntry } from '../components/ConflictEntry'
 import { ApiError } from '../lib/api'
+import { EmptyState } from '../components/EmptyState'
 import { PageHeader } from '../components/PageHeader'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
@@ -142,7 +143,7 @@ export default function CanonPage() {
         }
       />
 
-      <p className="integrity__law">
+      <p className="callout integrity__law">
         Only a <strong>High</strong> finding refuses a save, and only the save that would create
         one. A world already carrying one stays editable everywhere else. Medium and Low are
         reported and never block.
@@ -220,10 +221,14 @@ export default function CanonPage() {
       {state.kind === 'error' ? (
         <div className="notice notice--error" role="alert">
           <p>{state.message}</p>
-          <button className="button button--quiet" type="button" onClick={reload}>
+          <button className="button button--secondary" type="button" onClick={reload}>
             Try again
           </button>
         </div>
+      ) : null}
+
+      {result && result.items.length > 0 ? (
+        <h2 className="visually-hidden">{CONFLICT_STATUS_LABELS[status]} findings</h2>
       ) : null}
 
       {result && result.items.length > 0 ? (
@@ -242,31 +247,34 @@ export default function CanonPage() {
       ) : null}
 
       {result && result.items.length === 0 ? (
-        <div className="empty" data-testid="canon-empty">
-          <p className="empty__line">{emptyLine(status, severity)}</p>
-          <p className="empty__hint">
-            {severity !== null
+        <EmptyState
+          testId="canon-empty"
+          title={emptyLine(status, severity)}
+          hint={
+            severity !== null
               ? 'Another severity may have something. Clear the filter to see them all.'
-              : hint(status)}
-          </p>
-          {severity === null && status === CanonConflictStatus.Pending ? (
-            <button
-              className="button button--secondary empty__action"
-              type="button"
-              onClick={() => void evaluate()}
-              disabled={isEvaluating}
-              data-testid="empty-evaluate-canon"
-            >
-              {isEvaluating ? 'Evaluating…' : 'Evaluate'}
-            </button>
-          ) : null}
-        </div>
+              : hint(status)
+          }
+          action={
+            severity === null && status === CanonConflictStatus.Pending ? (
+              <button
+                className="button button--secondary"
+                type="button"
+                onClick={() => void evaluate()}
+                disabled={isEvaluating}
+                data-testid="empty-evaluate-canon"
+              >
+                {isEvaluating ? 'Evaluating…' : 'Evaluate'}
+              </button>
+            ) : undefined
+          }
+        />
       ) : null}
 
       {result && result.totalPages > 1 ? (
         <nav className="pager" aria-label="Pagination">
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             disabled={result.page <= 1}
             onClick={() => setPage((current) => current - 1)}
@@ -277,7 +285,7 @@ export default function CanonPage() {
             Page {result.page} of {result.totalPages}
           </span>
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             disabled={result.page >= result.totalPages}
             onClick={() => setPage((current) => current + 1)}

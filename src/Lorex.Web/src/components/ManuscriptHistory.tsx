@@ -227,7 +227,7 @@ export function ManuscriptHistory({
 
                 <div className="version__tools">
                   <button
-                    className="button button--quiet"
+                    className="button button--text button--sm"
                     type="button"
                     aria-expanded={isViewing}
                     aria-controls={snapshotId}
@@ -239,7 +239,7 @@ export function ManuscriptHistory({
                   </button>
                   {index > 0 ? (
                     <button
-                      className="button button--quiet"
+                      className="button button--text button--sm"
                       type="button"
                       disabled={blocked !== null}
                       aria-describedby={blocked ? blockedId : undefined}

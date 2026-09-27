@@ -205,7 +205,7 @@ export function PlotArcForm({
             {isSaving ? 'Saving' : arc ? 'Save arc' : 'Add arc'}
           </button>
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             onClick={close}
             data-testid="cancel-plot-arc"

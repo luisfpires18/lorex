@@ -191,20 +191,20 @@ export function EntityImageField({
       <div className="imagefield__row">
         {pending && preview ? (
           <CroppedPicture
-            className="portrait"
+            className="imagefield__preview"
             source={preview}
             crop={pending.crop}
             testId="entity-image-preview"
           />
         ) : image && entityId ? (
           <img
-            className="portrait"
+            className="imagefield__preview"
             src={entityImageUrl(universeId, entityId, image, 'thumbnail')}
             alt=""
             data-testid="entity-image-preview"
           />
         ) : (
-          <span className="portrait portrait--blank" aria-hidden="true">
+          <span className="imagefield__preview imagefield__preview--blank" aria-hidden="true">
             —
           </span>
         )}
@@ -223,7 +223,7 @@ export function EntityImageField({
             data-testid="entity-image-input"
           />
 
-          <label className="button button--quiet button--icon imagefield__pick" htmlFor={inputId}>
+          <label className="button button--secondary imagefield__pick" htmlFor={inputId}>
             <ActionIcon icon={hasPicture ? ImageUp : ImagePlus} />
             {hasPicture ? 'Replace' : 'Add image'}
           </label>
@@ -231,7 +231,7 @@ export function EntityImageField({
           {hasPicture ? (
             <>
               <button
-                className="button button--quiet button--icon"
+                className="button button--secondary"
                 type="button"
                 disabled={busyOrDisabled}
                 onClick={reframe}
@@ -241,7 +241,7 @@ export function EntityImageField({
                 Edit thumbnail
               </button>
               <button
-                className="button button--quiet button--icon"
+                className="button button--secondary"
                 type="button"
                 disabled={busyOrDisabled}
                 onClick={() => void remove()}

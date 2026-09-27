@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { EntityPicker } from './EntityPicker'
 import { ApiError } from '../lib/api'
+import { payloadKey } from '../lib/drawerGuard'
+import { useLeaveGuard } from '../lib/leaveGuard'
 import { formatSpan, fromDateInput, toDateInput } from '../lib/dates'
 import {
   createRelationship,
@@ -38,6 +40,13 @@ interface RelationshipSectionProps {
   universeId: string
   entityId: string
   entityName: string
+}
+
+const DISCARD = 'Close without saving your changes? They will be lost.'
+
+/** A draft as it would be saved, for telling whether anything changed since the form opened. */
+function draftKey(draft: RelationDraft) {
+  return payloadKey({ ...draft, related: draft.related?.id ?? null, notes: draft.notes.trim() })
 }
 
 function choiceKey(typeId: string, useInverse: boolean) {
@@ -91,6 +100,10 @@ export function RelationshipSection({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [opened, setOpened] = useState<string | null>(null)
+
+  const isDirty = draft !== null && draftKey(draft) !== opened
+  useLeaveGuard(isDirty ? 'This relation has unsaved changes. Leave without saving it?' : null)
 
   const load = useCallback(
     (signal?: AbortSignal) =>
@@ -125,13 +138,23 @@ export function RelationshipSection({
     setFieldErrors({})
   }
 
+  /** Cancel, or opening another relation over this one: asks once, only when there is something to lose. */
+  function mayDiscard() {
+    return !isDirty || window.confirm(DISCARD)
+  }
+
+  function begin(next: RelationDraft) {
+    setDraft(next)
+    setOpened(draftKey(next))
+  }
+
   function openAdd() {
-    if (types.length === 0) return
+    if (types.length === 0 || !mayDiscard()) return
     setMessage(null)
     setFieldErrors({})
     setEditingId(null)
     setIsAdding(true)
-    setDraft({
+    begin({
       typeId: types[0].id,
       useInverse: false,
       related: null,
@@ -143,11 +166,12 @@ export function RelationshipSection({
   }
 
   function openEdit(view: RelationshipView) {
+    if (!mayDiscard()) return
     setMessage(null)
     setFieldErrors({})
     setIsAdding(false)
     setEditingId(view.id)
-    setDraft(draftFromView(view))
+    begin(draftFromView(view))
   }
 
   async function save() {
@@ -348,7 +372,13 @@ export function RelationshipSection({
         >
           {isSaving ? 'Saving' : editingId ? 'Save relation' : 'Add relation'}
         </button>
-        <button className="button button--quiet" type="button" onClick={close}>
+        <button
+          className="button button--secondary"
+          type="button"
+          onClick={() => {
+            if (mayDiscard()) close()
+          }}
+        >
           Cancel
         </button>
       </div>

@@ -73,13 +73,13 @@ test.describe('universes', () => {
     // Search finds the renamed universe.
     await page.getByRole('link', { name: 'All universes' }).click()
     await page.waitForURL('/app')
-    await page.getByLabel('Search').fill('Redrawn')
+    await page.getByLabel('Filter universes').fill('Redrawn')
     await expect(card(page, renamed)).toBeVisible()
 
     // A search that matches nothing shows the empty state rather than the whole list.
-    await page.getByLabel('Search').fill('nothing-matches-this')
+    await page.getByLabel('Filter universes').fill('nothing-matches-this')
     await expect(page.getByTestId('universe-empty')).toBeVisible()
-    await page.getByLabel('Search').fill('')
+    await page.getByLabel('Filter universes').fill('')
     await expect(card(page, renamed)).toBeVisible()
 
     // Archive it, and it leaves the active list.

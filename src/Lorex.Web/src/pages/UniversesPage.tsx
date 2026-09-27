@@ -9,6 +9,7 @@ import { UniverseForm } from '../components/UniverseForm'
 import { Wordmark } from '../components/Wordmark'
 import { createUniverse, listUniverses } from '../universes/api'
 import type { UniversePage } from '../universes/types'
+import { EmptyState } from '../components/EmptyState'
 
 type LoadState =
   { kind: 'loading' } | { kind: 'ready'; page: UniversePage } | { kind: 'error'; message: string }
@@ -99,7 +100,7 @@ export default function UniversesPage() {
               New universe
             </button>
             <button
-              className="button button--quiet"
+              className="button button--secondary"
               type="button"
               aria-expanded={isRestoring}
               onClick={() => setRestoring(true)}
@@ -135,7 +136,7 @@ export default function UniversesPage() {
         <div className="controls">
           <div className="controls__search">
             <label className="field__label" htmlFor="universe-search">
-              Search
+              Filter universes
             </label>
             <input
               id="universe-search"
@@ -178,7 +179,7 @@ export default function UniversesPage() {
           <div className="notice notice--error" role="alert">
             <p>{state.message}</p>
             <button
-              className="button button--quiet"
+              className="button button--secondary"
               type="button"
               onClick={() => setReloadKey((current) => current + 1)}
             >
@@ -198,22 +199,23 @@ export default function UniversesPage() {
         ) : null}
 
         {result && result.items.length === 0 ? (
-          <div className="empty" data-testid="universe-empty">
-            <p className="empty__line">
-              {isFiltered ? 'Nothing here by that name.' : 'No universes yet.'}
-            </p>
-            <p className="empty__hint">
-              {isFiltered
-                ? 'Try a different word, or clear the search.'
-                : 'Start one, and everything you invent will hang off it.'}
-            </p>
-          </div>
+          <EmptyState
+            testId="universe-empty"
+            title={<>{isFiltered ? 'Nothing here by that name.' : 'No universes yet.'}</>}
+            hint={
+              <>
+                {isFiltered
+                  ? 'Try a different word, or clear the search.'
+                  : 'Start one, and everything you invent will hang off it.'}
+              </>
+            }
+          />
         ) : null}
 
         {result && result.totalPages > 1 ? (
           <nav className="pager" aria-label="Pagination">
             <button
-              className="button button--quiet"
+              className="button button--secondary"
               type="button"
               disabled={result.page <= 1}
               onClick={() => setPage((current) => current - 1)}
@@ -224,7 +226,7 @@ export default function UniversesPage() {
               Page {result.page} of {result.totalPages}
             </span>
             <button
-              className="button button--quiet"
+              className="button button--secondary"
               type="button"
               disabled={result.page >= result.totalPages}
               onClick={() => setPage((current) => current + 1)}

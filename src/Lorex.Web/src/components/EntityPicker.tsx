@@ -202,7 +202,7 @@ export function EntityPicker({
             <bdi>{value.name}</bdi>
           </span>
           <button
-            className="button button--quiet"
+            className="button button--secondary button--sm"
             type="button"
             onClick={() => {
               focusInput.current = true

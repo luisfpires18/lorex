@@ -3,7 +3,7 @@
 The implementation contract for Tasks 002-007. Produced by Design Refactor 001 (audit and
 direction) on `design/visual-system-audit`, from `dev` at `379bd8b`, 2026-09-26.
 
-**Implementation: 002 to 006 done**; 007 to come. §17's decisions are taken - §18. Nothing here changes routes, APIs, schema, backups, search,
+**Implementation: 002 to 007 done - the refactor is closed; §19 is the as-built record.** §17's decisions are taken - §18. Nothing here changes routes, APIs, schema, backups, search,
 permissions, Canon, timeline logic or what a phone can do. The one URL addition anywhere in the
 plan is query parameters on the Lore list (§4.3).
 
@@ -11,7 +11,7 @@ Contents: §0 method and standing decisions · §1 current problems · §2 princ
 direction · §4 navigation · §5 components · §6 cards · §7 buttons and actions · §8 type and
 spacing · §9 surfaces and tokens · §10 states · §11 responsive · §12 light and dark ·
 §13 accessibility · §14 before and after · §15 implementation plan · §16 risks · §17 owner
-decisions.
+decisions · §18 decisions taken · §19 as built.
 
 ---
 
@@ -1289,4 +1289,72 @@ type, a header thumbnail beside the entry's picture, drag and drop, a gallery vi
 - **Relation rows show the related entry's type tile, not its picture**: the relations read carries no image, and
   adding one is an API change this task does not make. Rows are grouped under their reading; Edit and Remove are in
   each row's ⋯.
+
+---
+
+## 19. As built - the close of 001-007
+
+Task 007 (`refactor/product-wide-polish`) closed the refactor. This section says what the running app now is against
+this contract, where it departs on purpose, and what is left for later. Where §1-§17 and this section disagree, this
+section describes the product.
+
+### 19.1 Achieved
+
+- **One button family.** Primary, secondary, text, danger, icon; `.button--sm` for a row's own tools. `.button--quiet`
+  is gone (§7.1's alias), and every button is at least 44px under a finger - the old exemption for quiet buttons too.
+- **One message shape.** Errors, cautions, conflicts, recovery offers, Canon refusals, a rule's check and Canon's
+  rule note are the tinted callout (§9.4), toned danger, warning or accent. No side stripe remains on a message; the
+  sidebar's "you are here" bar is the one deliberate stripe.
+- **One reference chip.** A scene's lore, a beat's, and a moment's cast are the same `.lorechip`: the type's icon in the
+  type's ink, the name isolated. A point of view is an `EntityTile`; `EntityPortrait` and every round or initial
+  stand-in are gone (§6.4: circles are for people who use Lorex).
+- **Typography (§8.2).** Lorex's own labels are sentence case; the letter-spaced capitals survive only as group
+  headings in the search panel and the scene picker. Italic is authored emphasis only. Document titles in the idea and
+  rule editors are `.field__input--title` - the display face at the section size, still a boxed field.
+- **Headings.** One `h1` per screen and no skipped level on any primary route, checked at five widths.
+- **Empty and missing states** are all `EmptyState`; a filtered list and an empty one say different things.
+- **Pressed choices** are all `.segmented` (the ink-filled `.kinds` squares are gone).
+- **Right-to-left prose.** `.prose` is as wide as its longest line (`width: fit-content`), so a short RTL summary sits
+  under its title where any summary sits; wrapped RTL prose still aligns right within its measure (§13.9).
+- **Unsaved work.** Every first-party authored draft asks before it is lost: entry, article, manuscript, idea, rule,
+  the five story drawers, the moment drawer, the family connection, and - from 007 - the era editor, a universe's
+  details and the relation form. Immediate writes, filters and confirmations do not ask.
+- **Responsive.** No primary route scrolls sideways at 1440, 1024, 820, 390 or 360, in either scheme; the family tree
+  scrolls inside itself on purpose. The phone's create buttons leave the last row clear of them.
+- **CSS.** `styles.css` ends smaller than 002 began (8,565 lines at 007's start, 8,402 after), with no unreferenced class.
+
+### 19.2 Changed from the proposal
+
+- **Title-as-field** (§14.5) is the restrained version: the `h1` still names the document and the title field stays
+  boxed, in the display face at section size. Dropping the box or the heading would have cost either the obvious edit
+  affordance or the page's `h1`.
+- **Trash** has tiles (type tile for an entry, a kind icon for a story part or rule), not thumbnails: the Trash read
+  carries no picture and adding one is an API change. The kind word moved from a boxed capital badge before the name to
+  the head of the row's facts.
+- **Scene context** keeps short sentence-case labels (Point of view, Lore, Plot) rather than icons alone (§7.5): the
+  labels are the lists' accessible names, and quiet sentence case removed the weight the capitals had.
+- **The universes list's filter** is "Filter universes", and Ideas' "Filter ideas", beside Lore's "Filter entries":
+  local filters say what they filter; only the universe bar says Search.
+
+### 19.3 Intentionally different
+
+Consistency is shared interaction and visual language, not one layout. The family tree keeps its topology and its own
+scroll; the timeline its spine and margin years; the manuscript its uninterrupted serif page; Lore its card grid;
+the entry its article and infobox; ideas and rules their document editors; the drawers their workflow order (the
+primary first, Cancel after), which differs from the entry form's ActionBar.
+
+### 19.4 Not done, and why
+
+- **The universe search panel grouped by kind**, Universes' new-universe form in a drawer, and the Settings danger
+  section as a Callout (§15, 007 scope): the panel already groups its results; moving the form to a drawer is a
+  workflow change; the danger section keeps its danger-coloured heading and Lorex's danger button only on the final
+  confirmation.
+- **A full token sweep** ("no raw sizes left"): rejected as churn. Screens touched from 002 to 007 are on the scale;
+  untouched per-screen rules keep some raw rem values that render identically.
+- **200% zoom** was not re-measured in 007.
+
+### 19.5 Beyond the refactor
+
+Future product work - a public portal, publishing, templates, collections, saved views, maps, autosave, bulk actions,
+AI - starts from this system and is not part of it.
 

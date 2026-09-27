@@ -1,6 +1,8 @@
 import { useId, useState, type FormEvent } from 'react'
 import { Field } from './Field'
 import { ApiError } from '../lib/api'
+import { payloadKey } from '../lib/drawerGuard'
+import { useLeaveGuard } from '../lib/leaveGuard'
 import type { UniverseInput } from '../universes/types'
 
 /** A short, deliberately unfussy palette. Worlds get an identity, not a colour picker. */
@@ -12,6 +14,15 @@ const ACCENTS = [
   { value: '#b3922f', label: 'Brass' },
   { value: '#3c4a57', label: 'Slate' },
 ]
+
+/** The universe as a save sends it. */
+function inputOf(name: string, description: string, accentColor: string): UniverseInput {
+  return {
+    name: name.trim(),
+    description: description.trim() || null,
+    accentColor: accentColor || null,
+  }
+}
 
 interface UniverseFormProps {
   initial?: UniverseInput
@@ -38,6 +49,27 @@ export function UniverseForm({
   const [message, setMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const [isSaved, setIsSaved] = useState(false)
+
+  // Unsaved is the universe as it would be sent against the one the form opened on, so a change put back is none. Not
+  // once it is sent: a new universe opens as it is created, and the page it leaves can stay on screen until the next
+  // one has loaded. A save that fails asks again.
+  const [opened] = useState(() => payloadKey(inputOf(name, description, accentColor)))
+  const isDirty =
+    !isSubmitting && !isSaved && payloadKey(inputOf(name, description, accentColor)) !== opened
+  useLeaveGuard(
+    isDirty
+      ? initial
+        ? `“${initial.name}” has unsaved changes. Leave without saving them?`
+        : 'This universe has not been created. Leave without saving it?'
+      : null,
+  )
+
+  function cancel() {
+    if (isDirty && !window.confirm('Close without saving your changes? They will be lost.')) return
+    onCancel?.()
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setMessage(null)
@@ -45,11 +77,8 @@ export function UniverseForm({
     setIsSubmitting(true)
 
     try {
-      await onSubmit({
-        name: name.trim(),
-        description: description.trim() ? description.trim() : null,
-        accentColor: accentColor || null,
-      })
+      await onSubmit(inputOf(name, description, accentColor))
+      setIsSaved(true)
       onDone?.()
     } catch (error: unknown) {
       if (error instanceof ApiError) {
@@ -76,7 +105,8 @@ export function UniverseForm({
       <Field
         label="Name"
         name="name"
-        autoFocus
+        // Opening a new universe starts at its name; Settings opens on the page, not in a field.
+        autoFocus={!initial}
         required
         maxLength={120}
         dir="auto"
@@ -142,7 +172,7 @@ export function UniverseForm({
           {isSubmitting ? busyLabel : submitLabel}
         </button>
         {onCancel ? (
-          <button className="button button--quiet" type="button" onClick={onCancel}>
+          <button className="button button--secondary" type="button" onClick={cancel}>
             Cancel
           </button>
         ) : null}

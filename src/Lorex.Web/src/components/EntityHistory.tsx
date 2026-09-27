@@ -220,7 +220,7 @@ export function EntityHistory({
 
               <div className="version__tools">
                 <button
-                  className="button button--quiet"
+                  className="button button--text button--sm"
                   type="button"
                   aria-expanded={openId === revision.id}
                   onClick={() => void open(revision.id)}
@@ -230,7 +230,7 @@ export function EntityHistory({
                 </button>
                 {index > 0 ? (
                   <button
-                    className="button button--quiet"
+                    className="button button--text button--sm"
                     type="button"
                     disabled={busyId !== null}
                     onClick={() => void restore(revision)}

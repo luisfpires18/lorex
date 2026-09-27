@@ -29,6 +29,7 @@ import {
   WORLD_RULE_TITLE_MAX_LENGTH,
   type WorldRuleDetail,
 } from '../worldRules/types'
+import { EmptyState } from './EmptyState'
 
 type LoadState =
   { kind: 'loading' } | { kind: 'ready' } | { kind: 'missing' } | { kind: 'error'; message: string }
@@ -337,14 +338,17 @@ export function WorldRuleEditor({
 
   if (load.kind === 'missing') {
     return (
-      <div className="empty" data-testid="world-rule-missing">
-        <p className="empty__line">This rule is not here.</p>
-        <p className="empty__hint">
-          It may be in the Trash, or it is not a rule of this universe.{' '}
-          <Link to={trashPath}>Open the Trash</Link>, or go back to{' '}
-          <Link to={listPath}>World Rules</Link>.
-        </p>
-      </div>
+      <EmptyState
+        testId="world-rule-missing"
+        title="This rule is not here."
+        hint={
+          <>
+            It may be in the Trash, or it is not a rule of this universe.{' '}
+            <Link to={trashPath}>Open the Trash</Link>, or go back to{' '}
+            <Link to={listPath}>World Rules</Link>.
+          </>
+        }
+      />
     )
   }
 
@@ -352,7 +356,7 @@ export function WorldRuleEditor({
     return (
       <div className="notice notice--error" role="alert" data-testid="world-rule-load-error">
         <p>{load.message}</p>
-        <button className="button button--quiet" type="button" onClick={reread}>
+        <button className="button button--secondary" type="button" onClick={reread}>
           Try again
         </button>
       </div>
@@ -421,7 +425,7 @@ export function WorldRuleEditor({
           </p>
           <div className="manuscript__conflictactions">
             <button
-              className="button button--quiet"
+              className="button button--secondary"
               type="button"
               disabled={isSaving}
               onClick={() => void save(conflict.updatedAt)}
@@ -430,7 +434,7 @@ export function WorldRuleEditor({
               Save mine over it
             </button>
             <button
-              className="button button--quiet"
+              className="button button--secondary"
               type="button"
               disabled={isSaving}
               onClick={loadSavedVersion}
@@ -463,7 +467,7 @@ export function WorldRuleEditor({
           <input
             id={titleId}
             ref={titleInput}
-            className="field__input rule__title"
+            className="field__input field__input--title"
             type="text"
             dir="auto"
             value={draft.title}

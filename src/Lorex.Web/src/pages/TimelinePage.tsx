@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom'
 import { ActionIcon } from '../components/ActionIcon'
@@ -14,6 +14,7 @@ import { formatTimelineDate, groupTimeline } from '../timeline/format'
 import { DATE_KIND_LABELS, type TimelineEntry, type TimelineEntryPage } from '../timeline/types'
 import { PageHeader } from '../components/PageHeader'
 import { StatusBadge } from '../components/StatusBadge'
+import { TypeIcon } from '../components/TypeIcon'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
 type LoadState =
@@ -179,7 +180,7 @@ export default function TimelinePage() {
         </div>
 
         {/* The title is the way in: it opens the moment's drawer. */}
-        <h4 className="moment__title">
+        <h3 className="moment__title">
           <button
             className="moment__open"
             type="button"
@@ -188,24 +189,17 @@ export default function TimelinePage() {
           >
             <bdi>{entry.title}</bdi>
           </button>
-        </h4>
+        </h3>
 
         {entry.description ? <p className="moment__account prose">{entry.description}</p> : null}
 
         {entry.entities.length > 0 ? (
           <ul className="moment__cast">
             {entry.entities.map((link) => {
-              const dot = (
-                <span
-                  className="moment__dot"
-                  aria-hidden="true"
-                  style={
-                    link.entityTypeAccentColor
-                      ? { background: link.entityTypeAccentColor }
-                      : undefined
-                  }
-                />
-              )
+              const accent = link.entityTypeAccentColor
+                ? ({ '--type-accent': link.entityTypeAccentColor } as CSSProperties)
+                : undefined
+              const icon = <TypeIcon iconKey={link.entityTypeIcon} className="lorechip__icon" />
 
               // A participant in the Trash is still stored on this moment and comes back
               // with it, so it is named rather than dropped - but it has no page to open
@@ -213,18 +207,24 @@ export default function TimelinePage() {
               return (
                 <li key={link.entityId}>
                   {link.isTrashed ? (
-                    <span className="moment__player moment__player--trashed">
-                      {dot}
-                      <bdi>{link.name}</bdi> (in Trash)
+                    <span className="lorechip lorechip--trashed moment__player" style={accent}>
+                      {icon}
+                      <span className="lorechip__name">
+                        <bdi>{link.name}</bdi>
+                      </span>{' '}
+                      <span className="lorechip__note">(in Trash)</span>
                     </span>
                   ) : (
                     <Link
-                      className="moment__player"
+                      className="lorechip moment__player"
+                      style={accent}
                       to={`/app/universes/${universe.id}/lore/${link.entityId}`}
                       title={link.entityTypeName}
                     >
-                      {dot}
-                      <bdi>{link.name}</bdi>
+                      {icon}
+                      <span className="lorechip__name">
+                        <bdi>{link.name}</bdi>
+                      </span>
                     </Link>
                   )}
                 </li>
@@ -265,7 +265,7 @@ export default function TimelinePage() {
         lede="Everything that has happened here, in the order it happened."
         actions={
           <button
-            className="button button--icon"
+            className="button"
             type="button"
             onClick={() => setForm({ mode: 'new' })}
             data-testid="new-moment"
@@ -365,14 +365,14 @@ export default function TimelinePage() {
 
             return (
               <section className="chron__group" key={group.key}>
-                <h3 className="chron__year">
+                <h2 className="chron__year">
                   <span className="chron__yearnum">{margin}</span>
                   {aside ? (
                     <span className={repeatsEra ? 'chron__era visually-hidden' : 'chron__era'}>
                       {aside}
                     </span>
                   ) : null}
-                </h3>
+                </h2>
                 <ul className="chron__moments">
                   {group.entries.map((entry) => moment(entry, heading))}
                 </ul>
@@ -382,10 +382,10 @@ export default function TimelinePage() {
 
           {unreckoned.length > 0 ? (
             <section className="chron__group chron__group--unplaced" data-testid="chron-unreckoned">
-              <h3 className="chron__year">
+              <h2 className="chron__year">
                 <span className="chron__yearnum chron__yearnum--none">?</span>
                 <span className="chron__era">No era yet</span>
-              </h3>
+              </h2>
               <div>
                 <p className="chron__aside">
                   Dated before this universe named its eras. Edit each one to choose the era its
@@ -400,10 +400,10 @@ export default function TimelinePage() {
 
           {unplaced.length > 0 ? (
             <section className="chron__group chron__group--unplaced">
-              <h3 className="chron__year">
+              <h2 className="chron__year">
                 <span className="chron__yearnum chron__yearnum--none">?</span>
                 <span className="chron__era">Unplaced</span>
-              </h3>
+              </h2>
               <div>
                 <p className="chron__aside">
                   In the story, not yet in time. These sit apart rather than pretending to a year.
@@ -429,7 +429,7 @@ export default function TimelinePage() {
           action={
             isFiltered ? null : (
               <button
-                className="button button--icon"
+                className="button"
                 type="button"
                 onClick={() => setForm({ mode: 'new' })}
                 data-testid="empty-new-moment"
@@ -445,7 +445,7 @@ export default function TimelinePage() {
       {result && result.totalPages > 1 ? (
         <nav className="pager" aria-label="Pagination">
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             disabled={result.page <= 1}
             onClick={() => setPage((current) => current - 1)}
@@ -456,7 +456,7 @@ export default function TimelinePage() {
             Page {result.page} of {result.totalPages}
           </span>
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             disabled={result.page >= result.totalPages}
             onClick={() => setPage((current) => current + 1)}

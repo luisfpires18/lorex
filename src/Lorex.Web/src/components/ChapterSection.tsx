@@ -67,7 +67,7 @@ export function ChapterSection({
 
         <div className="chapter__tools rowtools">
           <button
-            className="button button--text button--icon"
+            className="button button--text"
             type="button"
             onClick={() => onAddScene(chapter)}
             aria-describedby={headingId}

@@ -416,7 +416,7 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
         >
           {isSaving ? 'Saving' : editingId ? 'Save kind' : 'Add kind'}
         </button>
-        <button className="button button--quiet" type="button" onClick={close}>
+        <button className="button button--secondary" type="button" onClick={close}>
           Cancel
         </button>
       </div>
@@ -434,12 +434,12 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
   return (
     <section className="reltypes" aria-labelledby="reltypes-heading">
       <div className="relations__head">
-        <h3 className="settings__heading" id="reltypes-heading">
+        <h2 className="settings__heading" id="reltypes-heading">
           Relation kinds
-        </h3>
+        </h2>
         {!isAdding && !editingId ? (
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             onClick={() => {
               setMessage(null)
@@ -498,7 +498,7 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
                       : `${type.relationshipCount} relations`}
                   </span>
                   <button
-                    className="button button--quiet"
+                    className="button button--secondary button--sm"
                     type="button"
                     onClick={() => {
                       setMessage(null)
@@ -513,7 +513,7 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
                   </button>
                   {type.relationshipCount === 0 ? (
                     <button
-                      className="button button--quiet"
+                      className="button button--secondary button--sm"
                       type="button"
                       onClick={() => remove(type)}
                       data-testid={`delete-reltype-${type.name}`}

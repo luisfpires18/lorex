@@ -434,12 +434,12 @@ export function TimelineEntryForm({
 
           <div className="field">
             <span className="field__label">When</span>
-            <div className="kinds" role="group" aria-label="How the date is known">
+            <div className="segmented" role="group" aria-label="How the date is known">
               {DATE_KIND_ORDER.map((option) => (
                 <button
                   key={option}
                   type="button"
-                  className="kinds__step"
+                  className="segmented__option"
                   aria-pressed={draft.dateKind === option}
                   onClick={() => chooseKind(option)}
                   data-testid={`moment-kind-${DATE_KIND_LABELS[option].toLowerCase()}`}
@@ -535,7 +535,11 @@ export function TimelineEntryForm({
               {termsFailed ? (
                 <p className="form__message" role="alert">
                   The event kinds and methods could not be read.{' '}
-                  <button className="button button--quiet" type="button" onClick={reloadTerms}>
+                  <button
+                    className="button button--secondary button--sm"
+                    type="button"
+                    onClick={reloadTerms}
+                  >
                     Try again
                   </button>
                 </p>
@@ -594,7 +598,7 @@ export function TimelineEntryForm({
             {isSaving ? 'Saving' : entry ? 'Save moment' : 'Create moment'}
           </button>
           <button
-            className="button button--quiet"
+            className="button button--secondary"
             type="button"
             onClick={close}
             data-testid="cancel-moment"

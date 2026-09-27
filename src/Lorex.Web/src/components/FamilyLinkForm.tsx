@@ -184,7 +184,7 @@ export function FamilyLinkForm({ universeId, focal, kinds, onSaved, onCancel }: 
         >
           {isSaving ? 'Saving' : 'Add connection'}
         </button>
-        <button className="button button--quiet" type="button" onClick={cancel}>
+        <button className="button button--secondary" type="button" onClick={cancel}>
           Cancel
         </button>
       </div>

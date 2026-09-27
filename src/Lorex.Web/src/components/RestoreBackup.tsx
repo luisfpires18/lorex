@@ -271,7 +271,7 @@ export function RestoreBackup({ onCancel, onRestored }: RestoreBackupProps) {
               {stage.kind === 'checking' ? 'Checking' : 'Check backup'}
             </button>
             <button
-              className="button button--quiet"
+              className="button button--secondary"
               type="button"
               onClick={() => (stage.kind === 'checking' ? upload.current?.abort() : onCancel())}
             >
@@ -305,14 +305,14 @@ export function RestoreBackup({ onCancel, onRestored }: RestoreBackupProps) {
           <p className="restore__note">No universe was created.</p>
           <div className="form__actions">
             <button
-              className="button button--quiet"
+              className="button button--secondary"
               type="button"
               onClick={chooseAnother}
               data-testid="restore-choose-another"
             >
               Choose another file
             </button>
-            <button className="button button--quiet" type="button" onClick={onCancel}>
+            <button className="button button--secondary" type="button" onClick={onCancel}>
               Close
             </button>
           </div>
@@ -397,7 +397,7 @@ export function RestoreBackup({ onCancel, onRestored }: RestoreBackupProps) {
               {stage.kind === 'restoring' ? 'Restoring' : 'Restore as a new universe'}
             </button>
             <button
-              className="button button--quiet"
+              className="button button--secondary"
               type="button"
               disabled={stage.kind === 'restoring'}
               onClick={chooseAnother}
