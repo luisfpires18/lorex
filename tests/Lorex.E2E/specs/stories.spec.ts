@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { chooseFromMenu, openMenuFor } from './support/rowMenu'
 
 /**
  * Stories, their chapters and their scenes, end to end. Each test registers its own account and builds
@@ -272,7 +273,7 @@ async function moveSceneTo(page: Page, title: string, target: string, announceme
     page,
     '/position',
     async () => {
-      await scene(page, title).getByTestId('scene-move-to').click()
+      await openMenuFor(scene(page, title), 'scene-move-to-option')
       await scene(page, title)
         .locator(`[data-testid="scene-move-to-option"][data-target="${target}"]`)
         .click()
@@ -349,7 +350,9 @@ test.describe('stories', () => {
 
     // A story with no chapters is one plain list: no Unchaptered heading, no chapter to move to.
     await expect(page.getByTestId('unchaptered')).toHaveCount(0)
-    await expect(page.getByTestId('scene-move-to')).toHaveCount(0)
+    await openMenuFor(scene(page, 'Aftermath'), 'scene-edit')
+    await expect(scene(page, 'Aftermath').getByTestId('scene-move-to-option')).toHaveCount(0)
+    await page.keyboard.press('Escape')
 
     // Every date is written by the universe's chronology, and none of them moved anything.
     await expect(scene(page, 'Aftermath').getByTestId('scene-when')).toHaveText('AF 30')
@@ -367,12 +370,12 @@ test.describe('stories', () => {
     // Childhood moves to the front of the telling, and stays there.
     await moveAndSave(
       page,
-      () => scene(page, 'Childhood').getByTestId('scene-move-up').click(),
+      () => chooseFromMenu(scene(page, 'Childhood'), 'scene-move-up'),
       '“Childhood” is now scene 2 of 3.',
     )
     await moveAndSave(
       page,
-      () => scene(page, 'Childhood').getByTestId('scene-move-up').click(),
+      () => chooseFromMenu(scene(page, 'Childhood'), 'scene-move-up'),
       '“Childhood” is now scene 1 of 3.',
     )
     await expect.poll(() => sceneOrder(page)).toEqual(['Childhood', 'Aftermath', 'The Battle'])
@@ -395,7 +398,7 @@ test.describe('stories', () => {
 
     // Edited in place: still the second scene told.
     await page.goto(storyUrl)
-    await scene(page, 'Aftermath').getByTestId('scene-edit').click()
+    await chooseFromMenu(scene(page, 'Aftermath'), 'scene-edit')
     await page.getByTestId('scene-title-input').fill('Aftermath at the Gate')
     await page.getByTestId('scene-notes-input').fill('Open on the silence.')
     await page.getByTestId('save-scene').click()
@@ -406,7 +409,7 @@ test.describe('stories', () => {
 
     // Deleted: the rest keep their order, and the entry it linked is still in the world.
     page.once('dialog', (dialog) => void dialog.accept())
-    await scene(page, 'The Battle').getByTestId('scene-delete').click()
+    await chooseFromMenu(scene(page, 'The Battle'), 'scene-delete')
     await expect.poll(() => sceneOrder(page)).toEqual(['Childhood', 'Aftermath at the Gate'])
 
     await page.getByTestId('workspace-stories').click()
@@ -495,7 +498,7 @@ test.describe('stories', () => {
     await saveAndAnnounce(
       page,
       '/chapters/order',
-      () => chapter(page, 'Ashes').getByTestId('chapter-move-up').click(),
+      () => chooseFromMenu(chapter(page, 'Ashes'), 'chapter-move-up'),
       '“Ashes” is now chapter 1 of 2.',
     )
     await expect
@@ -515,12 +518,12 @@ test.describe('stories', () => {
     )
     await moveAndSave(
       page,
-      () => scene(page, 'Embers').getByTestId('scene-move-up').click(),
+      () => chooseFromMenu(scene(page, 'Embers'), 'scene-move-up'),
       '“Embers” is now scene 1 of 2 in Chapter 1 — Ashes.',
     )
 
     // And from the scene's own form: another chapter puts it last there.
-    await scene(page, 'Loose thread').getByTestId('scene-edit').click()
+    await chooseFromMenu(scene(page, 'Loose thread'), 'scene-edit')
     await page.getByTestId('scene-chapter-select').selectOption({ label: 'Chapter 2 — Arrival' })
     await page.getByTestId('save-scene').click()
     await expect(page.getByTestId('scene-form')).toHaveCount(0)
@@ -541,7 +544,7 @@ test.describe('stories', () => {
       confirmation = dialog.message()
       void dialog.accept()
     })
-    await chapter(page, 'Arrival').getByTestId('chapter-delete').click()
+    await chooseFromMenu(chapter(page, 'Arrival'), 'chapter-delete')
     await expect
       .poll(() => structure(page))
       .toEqual([
@@ -578,6 +581,35 @@ test.describe('stories', () => {
     await expect(row.getByTestId('story-scene-count')).toHaveText('4 scenes')
   })
 
+  test('a story is a row to open: the whole row leads in, named by its title, and Back returns to the list', async ({
+    page,
+  }) => {
+    await signUp(page)
+    const universeId = await newUniverse(page, unique('Rows '))
+    const created = await page.request.post(`/api/universes/${universeId}/stories`, {
+      data: { title: 'ظل المنارة 7', premise: 'A keeper waits for a ship.', status: 1 },
+    })
+    expect(created.status()).toBe(201)
+    const storyId = (await created.json()).id as string
+
+    await page.goto(`/app/universes/${universeId}/stories`)
+    const row = page.getByTestId('story-row')
+    // One link per row, named by the title alone - the status and the premise are read around it.
+    await expect(row.getByRole('link')).toHaveCount(1)
+    await expect(row.getByRole('link')).toHaveAccessibleName('ظل المنارة 7')
+
+    // A press anywhere on the row - here, near its far corner, well away from the title - opens the story.
+    const box = (await row.boundingBox())!
+    await row.click({ position: { x: box.width - 12, y: box.height - 12 } })
+    await page.waitForURL(new RegExp(`/stories/${storyId}$`))
+    await expect(page.getByTestId('story-title')).toHaveText('ظل المنارة 7')
+    await expect(page.getByTestId('story-view-scenes')).toHaveAttribute('aria-current', 'page')
+
+    await page.goBack()
+    await page.waitForURL(/\/stories$/)
+    await expect(page.getByTestId('story-row')).toHaveCount(1)
+  })
+
   test('scenes are reordered from the keyboard alone, and the focus follows the scene', async ({
     page,
   }) => {
@@ -592,21 +624,31 @@ test.describe('stories', () => {
     await page.goto(`/app/universes/${universeId}/stories/${storyId}`)
     await expect.poll(() => sceneOrder(page)).toEqual(['A', 'B', 'C'])
 
-    // The control's name is its label, and the scene it moves describes it.
-    const up = scene(page, 'C').getByRole('button', { name: 'Move up' })
-    await expect(up).toHaveAccessibleDescription(/C/)
-    await up.focus()
+    // The scene's menu is named with the scene; the moves are in it, and only the ones that can be made.
+    const menu = scene(page, 'C').getByRole('button', { name: 'More actions for C' })
+    await menu.focus()
+    await page.keyboard.press('Enter')
+    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-edit', scene: 'C' })
+    await expect(scene(page, 'C').getByTestId('scene-move-down')).toHaveCount(0)
+    await page.keyboard.press('ArrowDown')
+    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-move-up', scene: 'C' })
 
     await moveAndSave(page, () => page.keyboard.press('Enter'), '“C” is now scene 2 of 3.')
     await expect.poll(() => sceneOrder(page)).toEqual(['A', 'C', 'B'])
-    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-move-up', scene: 'C' })
+    // The focus follows the scene: back on its menu, wherever the scene now is.
+    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-actions', scene: 'C' })
 
-    // At the top, "Move up" can go no further, so the focus lands on "Move down" rather than nowhere.
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('ArrowDown')
     await moveAndSave(page, () => page.keyboard.press('Enter'), '“C” is now scene 1 of 3.')
     await expect.poll(() => sceneOrder(page)).toEqual(['C', 'A', 'B'])
-    await expect(scene(page, 'C').getByTestId('scene-move-up')).toBeDisabled()
-    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-move-down', scene: 'C' })
+    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-actions', scene: 'C' })
 
+    // At the top, "Move up" is not offered: the move after Edit scene is "Move down".
+    await page.keyboard.press('Enter')
+    await expect(scene(page, 'C').getByTestId('scene-move-up')).toHaveCount(0)
+    await page.keyboard.press('ArrowDown')
+    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-move-down', scene: 'C' })
     await moveAndSave(page, () => page.keyboard.press('Space'), '“C” is now scene 2 of 3.')
     await expect.poll(() => sceneOrder(page)).toEqual(['A', 'C', 'B'])
 
@@ -630,10 +672,16 @@ test.describe('stories', () => {
       .poll(() => structure(page))
       .toEqual(['Chapter 1 — One | a | b', 'Chapter 2 — Two | c', 'Chapter 3 — Three'])
 
-    // A chapter's tool is named by its label and described by the chapter's heading.
-    const up = chapter(page, 'Three').getByRole('button', { name: 'Move up' })
-    await expect(up).toHaveAccessibleDescription('Chapter 3 — Three')
-    await up.focus()
+    // A chapter's menu is named with the chapter's heading.
+    const menu = chapter(page, 'Three').getByRole('button', {
+      name: 'More actions for Chapter 3 — Three',
+    })
+    await menu.focus()
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('ArrowDown')
+    await expect
+      .poll(() => focused(page))
+      .toMatchObject({ control: 'chapter-move-up', chapter: 'Three' })
 
     await saveAndAnnounce(
       page,
@@ -643,54 +691,66 @@ test.describe('stories', () => {
     )
     await expect
       .poll(() => focused(page))
-      .toMatchObject({ control: 'chapter-move-up', chapter: 'Three' })
+      .toMatchObject({ control: 'chapter-actions', chapter: 'Three' })
 
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('ArrowDown')
     await saveAndAnnounce(
       page,
       '/chapters/order',
       () => page.keyboard.press('Enter'),
       '“Three” is now chapter 1 of 3.',
     )
-    await expect(chapter(page, 'Three').getByTestId('chapter-move-up')).toBeDisabled()
     await expect
       .poll(() => focused(page))
-      .toMatchObject({ control: 'chapter-move-down', chapter: 'Three' })
+      .toMatchObject({ control: 'chapter-actions', chapter: 'Three' })
+    await page.keyboard.press('Enter')
+    await expect(chapter(page, 'Three').getByTestId('chapter-move-up')).toHaveCount(0)
+    await page.keyboard.press('Escape')
+    await expect
+      .poll(() => focused(page))
+      .toMatchObject({ control: 'chapter-actions', chapter: 'Three' })
 
-    // Inside a chapter, a scene's move stays inside it. At the chapter's top the focus lands on
-    // "Move down", as it does in a story with no chapters.
-    await scene(page, 'b').getByTestId('scene-move-up').focus()
+    // Inside a chapter, a scene's move stays inside it.
+    await scene(page, 'b').getByTestId('scene-actions').focus()
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('ArrowDown')
+    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-move-up', scene: 'b' })
     await moveAndSave(
       page,
       () => page.keyboard.press('Enter'),
       '“b” is now scene 1 of 2 in Chapter 2 — One.',
     )
-    await expect(scene(page, 'b').getByTestId('scene-move-up')).toBeDisabled()
-    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-move-down', scene: 'b' })
+    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-actions', scene: 'b' })
 
-    // "Move to…" opens onto its choices, Escape puts the focus back, and a choice moves the scene.
-    const moveTo = scene(page, 'c').getByTestId('scene-move-to')
-    await expect(moveTo).toHaveAccessibleName('Move to…')
-    await moveTo.focus()
-    await page.keyboard.press('Enter')
-    await expect(scene(page, 'c').getByTestId('scene-move-to-panel')).toBeVisible()
-    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-move-to-option' })
-    await page.keyboard.press('Escape')
-    await expect(scene(page, 'c').getByTestId('scene-move-to-panel')).toHaveCount(0)
-    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-move-to', scene: 'c' })
-
+    // Every other chapter is a "Move to" choice in the scene's menu. Escape puts the focus back on the menu, and a
+    // choice moves the scene, the focus following it to its new chapter.
+    const cMenu = scene(page, 'c').getByTestId('scene-actions')
+    await cMenu.focus()
     await page.keyboard.press('Enter')
     const options = scene(page, 'c').getByTestId('scene-move-to-option')
-    await expect(options).toHaveText(['Unchaptered', 'Chapter 1 — Three', 'Chapter 2 — One'])
-    await page.keyboard.press('Tab')
-    await page.keyboard.press('Tab')
-    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-move-to-option' })
+    await expect(options).toHaveText([
+      'Move to Unchaptered',
+      'Move to Chapter 1 — Three',
+      'Move to Chapter 2 — One',
+    ])
+    await page.keyboard.press('Escape')
+    await expect(options).toHaveCount(0)
+    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-actions', scene: 'c' })
+
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('End')
+    await page.keyboard.press('ArrowUp')
+    await expect
+      .poll(() => page.evaluate(() => document.activeElement?.textContent))
+      .toBe('Move to Chapter 2 — One')
     await saveAndAnnounce(
       page,
       '/position',
       () => page.keyboard.press('Enter'),
       '“c” moved to Chapter 2 — One, scene 3 of 3.',
     )
-    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-move-to', scene: 'c' })
+    await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-actions', scene: 'c' })
 
     const moved = ['Chapter 1 — Three', 'Chapter 2 — One | b | a | c', 'Chapter 3 — Two']
     await expect.poll(() => structure(page)).toEqual(moved)
@@ -725,7 +785,7 @@ test.describe('stories', () => {
     ).toBeVisible()
 
     // Saving the scene keeps what it holds.
-    await council.getByTestId('scene-edit').click()
+    await chooseFromMenu(council, 'scene-edit')
     await page.getByTestId('scene-title-input').fill('The Council, again')
     await page.getByTestId('save-scene').click()
     await expect(page.getByTestId('scene-form')).toHaveCount(0)
@@ -807,9 +867,12 @@ test.describe('stories', () => {
         expect(ground, `dark ground at ${width}px`).toBe('rgb(21, 22, 23)')
       }
 
-      // Every reorder control and every linked entry is on screen, not pushed off its edge.
+      // A scene shows Write and its menu, not a row of tools: the rest waits in the menu. Both, and every linked
+      // entry, are on screen rather than pushed off its edge.
       const first = page.getByTestId('scene').first()
-      for (const control of ['scene-move-down', 'scene-move-to', 'scene-edit', 'scene-delete']) {
+      await expect(first.getByTestId('scene-delete')).toHaveCount(0)
+      await expect(first.getByTestId('scene-edit')).toHaveCount(0)
+      for (const control of ['scene-write', 'scene-actions']) {
         const box = await first.getByTestId(control).boundingBox()
         expect(box, `${control} at ${width}px`).not.toBeNull()
         expect(box!.x + box!.width, `${control} at ${width}px`).toBeLessThanOrEqual(edge)
@@ -819,24 +882,18 @@ test.describe('stories', () => {
         expect(box!.x + box!.width, `lore chip at ${width}px`).toBeLessThanOrEqual(edge)
       }
 
-      // A chapter's heading and every one of its tools fit too.
+      // A chapter's heading, Add scene and its menu fit too.
       const heading = page.getByTestId('chapter').first()
-      for (const control of [
-        'chapter-heading',
-        'chapter-move-down',
-        'chapter-new-scene',
-        'chapter-edit',
-        'chapter-delete',
-      ]) {
+      for (const control of ['chapter-heading', 'chapter-new-scene', 'chapter-actions']) {
         const box = await heading.getByTestId(control).boundingBox()
         expect(box, `${control} at ${width}px`).not.toBeNull()
         expect(box!.x + box!.width, `${control} at ${width}px`).toBeLessThanOrEqual(edge)
       }
 
-      // "Move to…" opens inside the screen, wherever its button wrapped to.
+      // A scene's menu, with its "Move to" choices, opens inside the screen.
       const second = scene(page, 'Second')
-      await second.getByTestId('scene-move-to').click()
-      const panel = second.getByTestId('scene-move-to-panel')
+      await openMenuFor(second, 'scene-move-to-option')
+      const panel = second.locator('.actionmenu__panel')
       await expect(panel).toBeVisible()
       const panelBox = await panel.boundingBox()
       expect(panelBox!.x, `move menu at ${width}px`).toBeGreaterThanOrEqual(-1)
@@ -846,7 +903,7 @@ test.describe('stories', () => {
       await expect(panel).toHaveCount(0)
 
       // The drawers keep a form's measure on a wide screen and fold their rows on a narrow one.
-      await first.getByTestId('scene-edit').click()
+      await chooseFromMenu(first, 'scene-edit')
       const form = page.getByTestId('scene-form')
       await expect(form).toBeVisible()
       const formBox = await form.boundingBox()
@@ -879,7 +936,7 @@ test.describe('stories', () => {
       await page.getByTestId('cancel-scene').click()
       await expect(form).toHaveCount(0)
 
-      await heading.getByTestId('chapter-edit').click()
+      await chooseFromMenu(heading, 'chapter-edit')
       const chapterForm = page.getByTestId('chapter-form')
       await expect(chapterForm).toBeVisible()
       const chapterFormBox = await chapterForm.boundingBox()

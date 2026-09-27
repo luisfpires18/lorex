@@ -608,12 +608,28 @@ Canon change; the Lore list gains query parameters in 003 and nothing else touch
   dirty. Dirty is the form against what is stored (a new entry: against the blank form), compared as the save would send
   it, so a change put back reads clean; a new entry's accepted picture counts, an existing entry's is already written.
   Leaving discards and closes the form; Cancel asks once, only when dirty. Six tests in `entity-page.spec.ts`.
-- **Next: 005 Story workspace.** Then 006 Worldbuilding, 007 Polish (contract section 15).
+- **005 - Story workspace** (`refactor/story-workspace` off `dev` at `18cd48b`, committed, not merged, not pushed).
+  Presentation only: no route, API, schema, backup, Story, Plot or manuscript semantics changed.
+  - Every row is one direct verb and ⋯: a scene Write, a chapter Add scene, an arc Add beat, a beat Edit beat; edits,
+    moves (only those possible), Move to each chapter and Delete last live in the row's `ActionMenu`, and the focus
+    returns to it after a move. Scenes view 59 -> 17 buttons, Plot 47 -> 22.
+  - Header on `PageHeader`: the title is the `h1`, the facts its lede, the views and one story ⋯ (Edit, Delete) on one
+    line; headings run h1 story, h2 view, h3 chapter or arc, h4 scene or beat. The Stories list opens from anywhere on a row.
+  - Manuscript: a one-line header, History beside the scene title, Edit scene and Show in Scenes in ⋯, the planning
+    behind "Scene details" on a phone. Prose above Save at 390x844: about 247 -> 433px.
+  - Creating sits at the thumb on a phone (New scene, New arc), as Lore's does. `ActionMenu` no longer claims
+    `aria-haspopup`: it is a disclosure.
+  - Seen, not changed: the five story drawers (story, chapter, scene, arc, beat) have no leave guard; adding one is
+    five forms and their tests, so it is a follow-up. Short right-to-left `.prose` paragraphs sit at the right of a
+    62ch measure rather than of the column - the shared prose rule, not the story's.
+- **Next: 006 Worldbuilding workspaces.** Then 007 Polish (contract section 15).
 - `design/` is not a type `branching.md` lists; 001 used it because the owner named the branch. 002 uses `refactor/`.
 
 ## Baseline
 
-- **999 API integration tests, 185 Playwright tests**, green. The 004 entry-form guard's full run on a fresh database:
+- **999 API integration tests, 188 Playwright tests**, green. Design refactor 005's full run on a fresh database:
+  **188/188** first time (185 plus three: the keyboard path through the manuscript, Scene details on a phone, a story
+  row opened anywhere on it). The 004 entry-form guard's full run on a fresh database:
   **185/185** (179 plus six guard tests; a first run lost one canon test to Vite failing a cold dynamic import, green
   alone and on the rerun). Design refactor 004's full run on a fresh database: **179/179**
   (175 plus `entity-page.spec.ts`'s four). 003's was 175/175

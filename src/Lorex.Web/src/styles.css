@@ -5540,27 +5540,49 @@ html:has(.viewer[open]) {
   border-top: 1px solid var(--rule);
 }
 
+/* A story is a work, so its title leads in the display face and the facts follow it quietly. The whole row opens
+   the story: the title is the one link, and its box is stretched over the row, so the link's name stays the title. */
 .storyrow {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.3rem 1.5rem;
   align-items: baseline;
-  padding: 1.1rem 0;
+  padding: var(--space-5) var(--space-3);
   border-bottom: 1px solid var(--rule);
+  transition: background-color var(--duration-1) var(--ease);
+}
+
+.storyrow:hover {
+  background: var(--hover-wash);
+}
+
+.storyrow:active {
+  background: var(--press-wash);
+}
+
+.storyrow:has(.storyrow__title:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
 }
 
 .storyrow__title {
   font-family: var(--display);
-  font-size: clamp(1.1rem, 1.7vw, 1.3rem);
+  font-size: clamp(1.15rem, 1.8vw, 1.4rem);
+  line-height: 1.3;
   color: var(--ink);
   text-decoration: none;
   overflow-wrap: anywhere;
 }
 
-.storyrow__title:hover,
+.storyrow__title::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
 .storyrow__title:focus-visible {
-  color: var(--accent);
-  text-decoration: underline;
+  outline: none;
 }
 
 .storyrow__meta {
@@ -5593,27 +5615,60 @@ html:has(.viewer[open]) {
  * author and the scenes, the plot or the prose: the title, one line of facts, the premise on Scenes alone, and then one
  * bar holding the views and the story's own tools, drawn on the rule the current view underlines.
  */
-.story__crumbs {
-  margin-bottom: 1rem;
+.story .pageheader {
+  margin-bottom: 0;
 }
 
-.story__title {
-  margin: 0;
-  font-family: var(--display);
-  font-weight: 400;
-  font-size: clamp(1.35rem, 1rem + 1.6vw, 2.1rem);
-  line-height: 1.2;
-  overflow-wrap: anywhere;
+.story__crumbs a {
+  color: var(--muted);
 }
 
+/* The views and the story's one menu, on the rule the current view underlines. The views never wrap: three fit a
+   360px phone, and the menu keeps to the end of the same line. */
 .story__bar {
   display: flex;
-  flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 0 1.5rem;
-  margin-top: 1rem;
+  gap: 0 var(--space-4);
   border-bottom: 1px solid var(--rule);
+}
+
+.story__views {
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.story__menu {
+  align-self: center;
+}
+
+/* While writing, the header steps back to one line - "Stories / The title" - over the views, with no line of facts. */
+.story--manuscript .pageheader {
+  flex-flow: row wrap;
+  align-items: baseline;
+  column-gap: var(--space-2);
+}
+
+.story--manuscript .pageheader__crumb {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.story--manuscript .pageheader__crumb::after {
+  content: '/';
+}
+
+.story--manuscript .pageheader__main {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.story--manuscript .pageheader__slot {
+  flex: 1 1 100%;
+}
+
+.story--manuscript .pageheader__title {
+  font-size: var(--text-item);
 }
 
 .story__stale {
@@ -5692,7 +5747,7 @@ html:has(.viewer[open]) {
 }
 
 .story__premise {
-  margin: 0.75rem 0 0;
+  margin: var(--space-5) 0 0;
   max-width: 62ch;
   line-height: 1.65;
   white-space: pre-line;
@@ -5707,7 +5762,7 @@ html:has(.viewer[open]) {
 
 .scene {
   display: grid;
-  grid-template-columns: 2.5rem minmax(0, 1fr);
+  grid-template-columns: 2.5rem minmax(0, 1fr) auto;
   column-gap: 1rem;
   padding: 1.1rem 0;
   border-top: 1px solid var(--rule);
@@ -5728,6 +5783,11 @@ html:has(.viewer[open]) {
 
 .scene__body {
   min-width: 0;
+}
+
+.scene__tools,
+.beat__tools {
+  align-self: start;
 }
 
 .scene__stamp {
@@ -5858,46 +5918,41 @@ a.lorechip--pov:focus-visible .lorechip__name {
   font-size: 0.85rem;
 }
 
-/* The quiet row of tools under a scene or a chapter heading. */
-.storytools {
+/* A row's tools: its one direct action as a text button, then its ⋯ menu. Trailing, so the menu's panel opens back
+   toward the page from the row's end. */
+.rowtools {
   display: flex;
-  flex-wrap: wrap;
+  flex: none;
   align-items: center;
-  gap: 0.35rem 1.1rem;
-  margin-top: 0.75rem;
+  justify-content: flex-end;
+  gap: var(--space-1);
 }
 
-.storytools .button--quiet {
-  padding: 0.15rem 0;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  font-size: 0.8rem;
+.rowtools .button--text {
+  min-height: var(--control-sm);
+  padding-block: 0;
+  font-size: var(--text-sm);
 }
 
-.storytools .button--quiet:hover:not(:disabled) {
-  color: var(--accent);
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-}
-
-.storytools .button--quiet:disabled {
-  opacity: 0.35;
-}
-
-/* A touch screen gets targets a thumb can hit, not the pointer's hairline links. */
 @media (pointer: coarse) {
-  .storytools .button--quiet {
-    min-height: 2.75rem;
-    padding: 0 0.2rem;
+  .rowtools .button--text {
+    min-height: var(--control-touch);
+  }
+
+  .rowtools .iconbutton {
+    width: var(--control-touch);
+    height: var(--control-touch);
   }
 }
 
-.story__sceneactions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.6rem;
+/* "Move to Chapter 2 — …": the chapter's title may be long, and wraps inside the menu item - in a panel wide enough
+   that a long title takes two lines, not six. */
+.actionmenu__text {
+  min-width: 0;
+}
+
+.actionmenu__panel--wide {
+  width: min(22rem, calc(100vw - 2 * var(--gutter)));
 }
 
 /*
@@ -5908,9 +5963,26 @@ a.lorechip--pov:focus-visible .lorechip__name {
   margin-top: 2.5rem;
 }
 
+.chapter__head,
+.plotarc__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: var(--space-4);
+}
+
 .chapter__head {
   padding-top: 1rem;
   border-top: 2px solid var(--rule-strong);
+}
+
+.chapter__heading {
+  min-width: 0;
+}
+
+.chapter__summary,
+.plotarc__description {
+  grid-column: 1 / -1;
 }
 
 .chapter__title {
@@ -5985,76 +6057,6 @@ a.lorechip--pov:focus-visible .lorechip__name {
   color: var(--muted);
 }
 
-/*
- * "Move to…". The panel hangs from the scene's body rather than from the button, so however far along
- * a wrapped row of tools the button sits, the panel starts at the scene's own left edge and never runs
- * off a phone's screen.
- */
-.scene__body {
-  position: relative;
-}
-
-.movemenu {
-  display: inline-flex;
-}
-
-.movemenu__panel {
-  position: absolute;
-  z-index: 20;
-  top: calc(100% + 0.35rem);
-  left: 0;
-  width: min(22rem, 100%);
-  padding: 0.35rem;
-  border: 1px solid var(--rule);
-  border-radius: 3px;
-  background: var(--raised);
-  color: var(--ink);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
-}
-
-.movemenu__label {
-  margin: 0;
-  padding: 0.35rem 0.65rem 0.25rem;
-  font-size: 0.64rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--muted);
-  overflow-wrap: anywhere;
-}
-
-.movemenu__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.movemenu__item {
-  display: block;
-  width: 100%;
-  padding: 0.5rem 0.65rem;
-  border: 0;
-  border-radius: 2px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.9rem;
-  text-align: left;
-  overflow-wrap: anywhere;
-  cursor: pointer;
-}
-
-.movemenu__item:hover,
-.movemenu__item:focus-visible {
-  background: var(--paper);
-  color: var(--accent);
-}
-
-@media (pointer: coarse) {
-  .movemenu__item {
-    min-height: 2.75rem;
-  }
-}
-
 .scenechron {
   margin: 0;
   padding: 0;
@@ -6066,14 +6068,6 @@ a.lorechip--pov:focus-visible .lorechip__name {
   margin-top: 0.75rem;
 }
 
-/* The story's own Edit and Delete: story tools like any other row of them, at the end of the bar. On a phone they are
-   their icons alone - the label is still each one's name - so the three views and both tools keep to one line. */
-.story__actions {
-  align-self: stretch;
-  margin-top: 0;
-  padding-bottom: 2px;
-}
-
 /* Where the manuscript's outline folds into a disclosure, it sits directly under the story's bar, which already draws the
    rule above it. */
 @media (max-width: 1100px) {
@@ -6083,35 +6077,6 @@ a.lorechip--pov:focus-visible .lorechip__name {
 
   .story .msoutline {
     border-top: 0;
-  }
-}
-
-/* A link among the quiet tools - Write, Show in Scenes - reads exactly like the buttons beside it. */
-.storytools a.button--quiet {
-  text-decoration: none;
-}
-
-@media (max-width: 640px) {
-  .story__actionlabel {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    padding: 0;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-    border: 0;
-  }
-
-  .story__actions {
-    column-gap: 0.9rem;
-  }
-}
-
-@media (max-width: 640px) and (pointer: coarse) {
-  .story__actions .button--quiet {
-    min-width: 2.75rem;
   }
 }
 
@@ -6226,7 +6191,7 @@ a.lorechip--pov:focus-visible .lorechip__name {
 
 .beat {
   display: grid;
-  grid-template-columns: 2rem minmax(0, 1fr);
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
   column-gap: 0.9rem;
   padding: 0.85rem 0;
   border-top: 1px solid var(--rule);
@@ -6254,9 +6219,9 @@ a.lorechip--pov:focus-visible .lorechip__name {
 
 .beat__title {
   margin: 0;
-  font-family: var(--ui);
-  font-weight: 500;
-  font-size: 1rem;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: var(--text-item);
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
@@ -6320,10 +6285,6 @@ a.lorechip--pov:focus-visible .lorechip__name {
 
 .plotchip__arrow {
   color: var(--rule-strong);
-}
-
-.beat__tools {
-  margin-top: 0.55rem;
 }
 
 /* The scene picker: chosen scenes, a filter, and the story's scenes by chapter in a scrolling list. */
@@ -6434,12 +6395,8 @@ a.lorechip--pov:focus-visible .lorechip__name {
 
 /* On a phone the story's header and each view's tools give their height back to the work beneath them. */
 @media (max-width: 640px) {
-  .story__crumbs {
-    margin-bottom: 0.6rem;
-  }
-
-  .story__bar {
-    margin-top: 0.75rem;
+  .story .pageheader {
+    gap: var(--space-1);
   }
 
   .story__toolbar {
@@ -6449,7 +6406,7 @@ a.lorechip--pov:focus-visible .lorechip__name {
   }
 
   .manuscript {
-    margin-top: 1rem;
+    margin-top: 0;
   }
 }
 
@@ -6553,8 +6510,23 @@ a.lorechip--pov:focus-visible .lorechip__name {
   white-space: nowrap;
 }
 
+/* The title and the scene's tools share a line: History, then ⋯ with Edit scene and Show in Scenes. */
+.manuscript__titlerow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  margin-top: 0.2rem;
+}
+
+.manuscript__detailstoggle {
+  display: none;
+}
+
 .manuscript__title {
-  margin: 0.2rem 0 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
   font-family: var(--display);
   font-weight: 400;
   font-size: clamp(1.35rem, 2.2vw, 1.7rem);
@@ -6568,10 +6540,6 @@ a.lorechip--pov:focus-visible .lorechip__name {
 
 .manuscript__context .scene__stamp {
   margin: 0;
-}
-
-.manuscript__tools {
-  margin-top: 0.5rem;
 }
 
 /* A tool's shorter label, drawn only where the whole one would push the row onto a second line. */
@@ -6802,10 +6770,60 @@ a.lorechip--pov:focus-visible .lorechip__name {
     display: inline;
   }
 
+  /* Every line above the prose is a line of prose gone. The tools move up beside where the scene is told, the title
+     takes the whole width under them, and the scene's planning waits behind Details. */
+  .manuscript__head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--space-2);
+  }
+
+  .manuscript__titlerow {
+    display: contents;
+  }
+
+  .manuscript__where {
+    grid-column: 1 / -1;
+  }
+
+  .manuscript__tools {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .manuscript__title {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .manuscript__context {
+    grid-column: 1 / -1;
+  }
+
+  .manuscript__context[data-open='false'] {
+    display: none;
+  }
+
+  .manuscript__detailstoggle {
+    display: inline-flex;
+  }
+
+  .manuscript__detailstoggle[aria-expanded='true'] {
+    background: var(--press-wash);
+    color: var(--ink);
+  }
+
   .manuscript__text {
-    height: clamp(18rem, calc(100dvh - 12rem), 60rem);
+    height: clamp(18rem, calc(100dvh - 9rem), 60rem);
+    margin-top: var(--space-3);
     padding: 0.9rem 1rem;
     font-size: 1.0625rem;
+  }
+
+  .manuscript__bar {
+    padding-block: var(--space-2);
+    padding-bottom: max(var(--space-2), env(safe-area-inset-bottom));
   }
 }
 
@@ -6821,6 +6839,45 @@ a.lorechip--pov:focus-visible .lorechip__name {
   .scene {
     grid-template-columns: 1.6rem minmax(0, 1fr);
     column-gap: 0.6rem;
+  }
+
+  /* A phone keeps the column for the scene: its two controls sit under it, at the end. */
+  .scene__tools,
+  .beat__tools {
+    grid-column: 2;
+  }
+
+  .chapter__head,
+  .plotarc__head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* The heading and its summary read as one unit; the tools follow them. */
+  .chapter__summary,
+  .plotarc__description {
+    grid-row: 2;
+  }
+
+  .chapter__tools,
+  .plotarc__tools {
+    grid-row: 3;
+    margin-top: var(--space-1);
+  }
+
+  /* The view's one creating action sits at the thumb, labelled, as Lore's does. */
+  .story__create .button {
+    position: fixed;
+    right: var(--gutter);
+    bottom: max(var(--space-4), env(safe-area-inset-bottom));
+    z-index: var(--z-sticky);
+    min-height: var(--control-touch);
+    padding-inline: var(--space-5);
+    box-shadow: var(--shadow-3);
+  }
+
+  .story__scenes,
+  .plot {
+    padding-bottom: 5rem;
   }
 
   .scene__number {

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ActionIcon } from './ActionIcon'
+import { EmptyState } from './EmptyState'
 import { PlotArcForm } from './PlotArcForm'
 import { PlotArcSection } from './PlotArcSection'
 import { PlotBeatForm } from './PlotBeatForm'
@@ -16,9 +17,6 @@ type ArcFormState =
 
 type BeatFormState =
   { mode: 'closed' } | { mode: 'new'; arcId: string } | { mode: 'edit'; beat: PlotBeat }
-
-/** The control that should hold the focus once a move has redrawn the plot, and the one to use if it is disabled. */
-type FocusRequest = { key: string; fallback: string | null }
 
 interface PlotPanelProps {
   universeId: string
@@ -58,25 +56,16 @@ export function PlotPanel({
   const [message, setMessage] = useState<string | null>(null)
 
   const isMoving = useRef(false)
-  const controls = useRef(new Map<string, HTMLButtonElement>())
-  const pendingFocus = useRef<FocusRequest | null>(null)
+  // The ⋯ menu of whatever has just moved, found again once the plot is redrawn: the move was made from that menu, and
+  // moving the row in the page can take the focus off it.
+  const pendingFocus = useRef<string | null>(null)
 
-  // Whatever has just moved keeps the focus on its own control. When a move reached an end the control that made it
-  // is disabled, so the focus goes to the other one.
   useEffect(() => {
-    const request = pendingFocus.current
-    if (!request) return
+    const selector = pendingFocus.current
+    if (!selector) return
     pendingFocus.current = null
-
-    const first = controls.current.get(request.key)
-    const second = request.fallback ? controls.current.get(request.fallback) : undefined
-    ;(first && !first.disabled ? first : second)?.focus()
+    document.querySelector<HTMLElement>(selector)?.focus()
   }, [arcs])
-
-  const controlRef = useCallback((key: string, element: HTMLButtonElement | null) => {
-    if (element) controls.current.set(key, element)
-    else controls.current.delete(key)
-  }, [])
 
   /** Moves one arc one place, at once on screen, and puts it back if refused. */
   async function moveArc(arc: PlotArc, by: -1 | 1) {
@@ -93,10 +82,7 @@ export function PlotPanel({
     const previous = arcs
     isMoving.current = true
     setMessage(null)
-    pendingFocus.current = {
-      key: `arc:${arc.id}:${by < 0 ? 'up' : 'down'}`,
-      fallback: `arc:${arc.id}:${by < 0 ? 'down' : 'up'}`,
-    }
+    pendingFocus.current = `#arc-${arc.id} [data-testid="plot-arc-actions"]`
     onArcsChange(next.map((candidate, index) => ({ ...candidate, sortOrder: index })))
 
     try {
@@ -134,10 +120,7 @@ export function PlotPanel({
 
     isMoving.current = true
     setMessage(null)
-    pendingFocus.current = {
-      key: `beat:${beat.id}:${by < 0 ? 'up' : 'down'}`,
-      fallback: `beat:${beat.id}:${by < 0 ? 'down' : 'up'}`,
-    }
+    pendingFocus.current = `#beat-${beat.id} [data-testid="plot-beat-actions"]`
     onArcsChange(withBeats(next.map((candidate, index) => ({ ...candidate, sortOrder: index }))))
 
     try {
@@ -219,9 +202,9 @@ export function PlotPanel({
 
   return (
     <section className="plot" aria-labelledby="story-plot-heading" data-testid="plot">
-      <h3 className="visually-hidden" id="story-plot-heading">
+      <h2 className="visually-hidden" id="story-plot-heading">
         Plot
-      </h3>
+      </h2>
 
       {arcs.length > 0 ? (
         <div className="story__toolbar">
@@ -229,7 +212,9 @@ export function PlotPanel({
             Arcs in the order you plan them, and the beats in each. Neither follows the order scenes
             are told in or when they happen.
           </p>
-          <div className="story__toolbaractions">{newArc}</div>
+          <div className="story__toolbaractions">
+            <span className="story__create">{newArc}</span>
+          </div>
         </div>
       ) : null}
 
@@ -240,27 +225,30 @@ export function PlotPanel({
       ) : null}
 
       {arcs.length === 0 ? (
-        <div className="empty" data-testid="plot-empty">
-          <p className="empty__line">No arcs yet.</p>
-          <p className="empty__hint">
-            An arc is a thread you follow through the story; its beats are the steps, and each can
-            point at the scenes it plays out in.
-            {story.scenes.length === 0 ? (
-              <>
-                {' '}
-                Most stories start with a scene —{' '}
-                <Link
-                  to={`/app/universes/${universeId}/stories/${story.id}`}
-                  data-testid="plot-empty-scenes"
-                >
-                  add one on the Scenes view
-                </Link>
-                . A beat needs none.
-              </>
-            ) : null}
-          </p>
-          <div className="empty__actions">{newArc}</div>
-        </div>
+        <EmptyState
+          testId="plot-empty"
+          title="No arcs yet."
+          hint={
+            <>
+              An arc is a thread you follow through the story; its beats are the steps, and each can
+              point at the scenes it plays out in.
+              {story.scenes.length === 0 ? (
+                <>
+                  {' '}
+                  Most stories start with a scene —{' '}
+                  <Link
+                    to={`/app/universes/${universeId}/stories/${story.id}`}
+                    data-testid="plot-empty-scenes"
+                  >
+                    add one on the Scenes view
+                  </Link>
+                  . A beat needs none.
+                </>
+              ) : null}
+            </>
+          }
+          action={newArc}
+        />
       ) : null}
 
       {arcs.map((arc, arcIndex) => (
@@ -273,7 +261,6 @@ export function PlotPanel({
           onAddBeat={(target) => setBeatForm({ mode: 'new', arcId: target.id })}
           onEdit={(target, at) => setArcForm({ mode: 'edit', arc: target, index: at })}
           onDelete={(target, at) => void removeArc(target, at)}
-          controlRef={controlRef}
         >
           <ol className="beats" data-testid="plot-arc-beats">
             {arc.beats.map((beat, beatIndex) => (
@@ -289,7 +276,6 @@ export function PlotPanel({
                 onMove={(target, by) => void moveBeat(arc, arcIndex, target, by)}
                 onEdit={(target) => setBeatForm({ mode: 'edit', beat: target })}
                 onDelete={(target) => void removeBeat(target)}
-                controlRef={controlRef}
               />
             ))}
           </ol>
