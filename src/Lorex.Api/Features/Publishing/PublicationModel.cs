@@ -17,6 +17,37 @@ public enum UniverseVisibility
 }
 
 /// <summary>
+/// Whether one lore entry or one story is selected for the public portal (ADR 0036, Task 010). Set only by that
+/// item's publish and unpublish routes - never by a save, a restore or a migration.
+///
+/// Its own type rather than <see cref="UniverseVisibility"/>, because it promises less: <c>Public</c> here is the
+/// author's selection, and it is read only while the universe holding the item is public too. A private universe
+/// overrides it, and it is kept while the universe is private, so republishing the universe brings back exactly the
+/// items that were selected. Nothing inherits it in either direction.
+/// </summary>
+public enum ContentVisibility
+{
+    /// <summary>Every entry and story starts here, and every one written before Task 010 is here.</summary>
+    Private = 0,
+
+    /// <summary>Selected by its owner: listed publicly while its universe is public and it is not in the Trash.</summary>
+    Public = 1,
+}
+
+/// <summary>
+/// What a lore entry and a story share for publishing, so one transition serves both: the author's selection, the
+/// address minted the first time, and when that was. Never bound from a request.
+/// </summary>
+public interface IPublishable
+{
+    ContentVisibility Visibility { get; set; }
+
+    string? PublicSlug { get; set; }
+
+    DateTime? PublishedAt { get; set; }
+}
+
+/// <summary>
 /// What kind of creative property a universe belongs to: one per universe, chosen by its author and never
 /// inferred. Numbered from 1, so no unset value can read as a category; null is none chosen.
 /// </summary>

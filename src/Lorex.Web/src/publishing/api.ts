@@ -1,7 +1,13 @@
 import { apiFetch } from '../lib/api'
 import type { ImageCrop } from '../lib/imageCrop'
 import { apiUpload, type UploadProgress } from '../lib/upload'
-import type { PublicationDetails, PublicationState, UniverseArtworkRef } from './types'
+import type {
+  ContentKind,
+  ContentPublicationState,
+  PublicationDetails,
+  PublicationState,
+  UniverseArtworkRef,
+} from './types'
 
 const base = (universeId: string) => `/api/universes/${universeId}`
 
@@ -66,4 +72,33 @@ export function setArtworkCard(universeId: string, assetId: string, crop: ImageC
 
 export function removeArtwork(universeId: string) {
   return apiFetch<void>(`${base(universeId)}/artwork`, { method: 'DELETE' })
+}
+
+/** The owner's routes for one entry's or story's publication: read, and the two transitions. */
+function contentBase(universeId: string, kind: ContentKind, id: string) {
+  return `${base(universeId)}/${kind === 'entry' ? 'entities' : 'stories'}/${id}`
+}
+
+export function getContentPublication(
+  universeId: string,
+  kind: ContentKind,
+  id: string,
+  signal?: AbortSignal,
+) {
+  return apiFetch<ContentPublicationState>(`${contentBase(universeId, kind, id)}/publication`, {
+    signal,
+  })
+}
+
+/** Selects the item. Its universe's visibility is its own and is never changed by this. */
+export function publishContent(universeId: string, kind: ContentKind, id: string) {
+  return apiFetch<ContentPublicationState>(`${contentBase(universeId, kind, id)}/publish`, {
+    method: 'POST',
+  })
+}
+
+export function unpublishContent(universeId: string, kind: ContentKind, id: string) {
+  return apiFetch<ContentPublicationState>(`${contentBase(universeId, kind, id)}/unpublish`, {
+    method: 'POST',
+  })
 }

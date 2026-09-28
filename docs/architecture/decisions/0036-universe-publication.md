@@ -81,3 +81,41 @@ Public portal section in Settings; the public page does not yet know its viewer 
 - No preview route yet: the planned owner preview (Task 011) renders the same allow-list from saved details through an
   authenticated owner-scoped route, never anonymously.
 - An archived universe stays public; archive is the owner's list, not visibility.
+
+## Amendment (2026-09-28, Task 010) - entries and stories are published one by one, and the universe overrides them
+
+The same principle, one level down: nothing inside a universe is public because the universe is.
+
+- **Explicit at every level.** `Entities` and `Stories` gain `Visibility` (`ContentVisibility`: `Private` 0, `Public` 1),
+  `PublicSlug` and `PublishedAt`. Its own enum rather than `UniverseVisibility`, because it promises less: an item's
+  `Public` is its author's selection, read only while the universe is public too. The migration
+  `AddContentPublication` defaults every existing entry and story to `Private`, with no address or date - a universe
+  already public comes out of it with nothing inside it published.
+- **Effective visibility is both levels, in one place.** `PublicationRules.PublicLore` and `PublicStories` hold the
+  universe predicate inside them, plus the item's selection, address and date and `DeletedAt IS NULL`. No caller can
+  ask for an item without its universe. Private universe + public item, public universe + private item, and anything
+  in the Trash are all simply not public.
+- **The selection outlives the universe's state.** Making a universe private hides every selected item at the next
+  read and clears nothing; publishing it again brings back exactly those. An owner may select items while the
+  universe is still private. Trash hides an item whatever its selection; a restore brings it back selected, so it is
+  public again only if it and its universe still are.
+- **Transitions, not fields.** `POST .../entities/{id}/publish|unpublish` and `.../stories/{id}/publish|unpublish`,
+  owner-scoped, idempotent, no body; `GET .../publication` reads the selection, address, date and whether the universe
+  is public. No entry or story save binds any of the three. Publishing requires nothing beyond what the item always
+  has - a name or title. It mints the address once and sets the date once, in one `IMMEDIATE` transaction, and does not
+  touch `UpdatedAt`, history or the search index: a selection is not an edit.
+- **Addresses per universe and kind.** The one generator (`PublicSlugs`): the same ASCII stem and `-n` suffixes as a
+  universe's, falling back to `entry` or `story`; unique among one universe's entries (or stories) by index
+  `(UniverseId, PublicSlug)`, so an entry and a story may share one. A trashed item keeps its address. Renames and
+  unpublishing never change it. That index is also what the public listings read.
+- **Two allow-lists, two listings, one picture.** `GET /api/public/universes/{slug}/lore` -> `PublicLoreEntry` (`slug`,
+  `name`, `summary`, `typeName`, `thumbnailUrl`, `publishedAt`); `.../stories` -> `PublicStory` (`slug`, `title`,
+  `publishedAt`). Both paged 24 (max 48), ordered by name or title (`NOCASE`) then address, 404 for a universe that is not
+  public. The entry's summary is its authored lead ("what this is") and is listed; the story's premise is planning text
+  and is not. No article, fields, aliases, tags, Canon status, relationships, history, chapters, scenes, manuscript,
+  plot or notes. `.../lore/{loreSlug}/thumbnail/{thumbnailId}` serves the entry's current square thumbnail - never the
+  original - through the same predicate, the thumbnail id as ETag, checked after visibility, `no-cache`.
+- **Backups never carry it.** Format 15 is unchanged: no visibility, address or date for an entry or story. A restore -
+  of any version, or of a forged file claiming otherwise - has every item private.
+- Relationships, family trees, timeline, world rules, ideas and Canon stay private; no public detail route for an entry
+  or a story exists yet. Task 011 builds reading on these contracts with its own detail DTOs.

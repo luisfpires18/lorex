@@ -29,7 +29,7 @@ public enum StoryStatus
 /// <c>docs/architecture/decisions/0024-story-scene-foundation.md</c> and
 /// <c>docs/architecture/decisions/0029-content-recovery.md</c>.
 /// </summary>
-public sealed class Story
+public sealed class Story : Publishing.IPublishable
 {
     public Guid Id { get; set; }
 
@@ -54,6 +54,20 @@ public sealed class Story
     /// prose and plot are left exactly as they were, unreachable while it is there and back with it on restore.
     /// </summary>
     public DateTime? DeletedAt { get; set; }
+
+    /// <summary>
+    /// Whether the author selected this story for the public portal - the story, never a chapter, scene, beat or note
+    /// on its own. Read only together with its universe's visibility and <see cref="DeletedAt"/> -
+    /// <see cref="Publishing.PublicationRules.PublicStories"/> - and changed only by the story's publish and unpublish
+    /// routes (ADR 0036).
+    /// </summary>
+    public Publishing.ContentVisibility Visibility { get; set; }
+
+    /// <summary>The story's public address inside its universe, minted at first publication and never changed after.</summary>
+    public string? PublicSlug { get; set; }
+
+    /// <summary>When the story was first published. Republishing keeps it.</summary>
+    public DateTime? PublishedAt { get; set; }
 
     public ICollection<Chapter> Chapters { get; } = [];
 

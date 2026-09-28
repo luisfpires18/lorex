@@ -11,6 +11,7 @@ import {
 import { Check, Maximize2, Network, Pencil, Trash, X } from 'lucide-react'
 import { ActionIcon } from '../components/ActionIcon'
 import { ActionMenu } from '../components/ActionMenu'
+import { ContentPublication } from '../components/ContentPublication'
 import { EntityArticleSection } from '../components/EntityArticle'
 import { EntityHistory } from '../components/EntityHistory'
 import { EntityImageField, type PendingImage } from '../components/EntityImageField'
@@ -627,6 +628,16 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
 
           {isWritingArticle ? null : (
             <div className="entry__tools">
+              {/* Whether the entry is public, said in a word, and the way to change it - before Edit, because it is
+                  state the author should see on arrival, not a tool buried in the menu. */}
+              <ContentPublication
+                key={entityId}
+                universeId={universe.id}
+                kind="entry"
+                id={entityId!}
+                name={detail?.name ?? ''}
+                placement="bar"
+              />
               <button
                 className="button button--secondary"
                 type="button"

@@ -13,8 +13,10 @@ namespace Lorex.Api.Features.Publishing;
 
 /// <summary>
 /// The public portal's API: anonymous, read-only, and the only routes in Lorex that answer without a
-/// session (ADR 0036). Three reads - the listing, one universe by its address, and its card picture -
-/// and nothing else. No route here writes, and no authenticated route is reachable through here.
+/// session (ADR 0036). Three reads of universes - the listing, one universe by its address, and its card
+/// picture - and, in <see cref="PublicContentEndpoints"/> on the same group, the published entries and
+/// stories inside one and an entry's thumbnail. No route here writes, and no authenticated route is
+/// reachable through here.
 ///
 /// <para><b>One query decides.</b> Every route starts from <see cref="PublicationRules.Public"/>, so a
 /// private universe - or one that does not exist, or one some future bug left public but incomplete -
@@ -24,13 +26,14 @@ namespace Lorex.Api.Features.Publishing;
 /// and asking again is what a private universe's picture answers with a 404.</para>
 ///
 /// <para><b>An allow-list, projected.</b> Each response is built member by member from the columns
-/// <see cref="PublicUniverse"/> names. No entity is serialised, and nothing inside the universe -
-/// lore, stories, timeline, ideas, rules, relationships, Canon, the Trash - is read at all.</para>
+/// <see cref="PublicUniverse"/> names. No entity is serialised, and nothing inside the universe is read
+/// here - only the entries and stories their author selected are, by their own routes and their own
+/// allow-lists.</para>
 /// </summary>
 public static partial class PublicUniverseEndpoints
 {
-    private const int DefaultPageSize = 24;
-    private const int MaxPageSize = 48;
+    internal const int DefaultPageSize = 24;
+    internal const int MaxPageSize = 48;
     private const int SearchMaxLength = 100;
 
     /// <summary>
@@ -62,6 +65,7 @@ public static partial class PublicUniverseEndpoints
         group.MapGet("/", ListAsync).WithName("ListPublicUniverses");
         group.MapGet("/{slug}", GetAsync).WithName("GetPublicUniverse");
         group.MapGet("/{slug}/artwork/card/{cardId:guid}", ReadCardAsync).WithName("ReadPublicUniverseCard");
+        group.MapPublicContentEndpoints();
 
         return endpoints;
     }
@@ -226,7 +230,25 @@ public static partial class PublicUniverseEndpoints
             return Results.NotFound();
         }
 
-        var tag = new EntityTagHeaderValue($"\"{cardId:N}\"");
+        return await ServeWebpAsync(cardKey, cardId, context, store, loggerFactory, cancellationToken);
+    }
+
+    /// <summary>
+    /// A public picture the caller has already found through the public predicate: <paramref name="version"/> - an id
+    /// that names these bytes and never others - is the entity tag, so a browser holding the current picture is told
+    /// 304 without the store being asked for anything. Only ever reached after the visibility check, never before it,
+    /// so a revalidation of a picture that stopped being public is a 404 rather than a 304. Always WebP: only cut
+    /// derivatives are public, and every one is WebP.
+    /// </summary>
+    internal static async Task<IResult> ServeWebpAsync(
+        string key,
+        Guid version,
+        HttpContext context,
+        IMediaObjectStore store,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        var tag = new EntityTagHeaderValue($"\"{version:N}\"");
         context.Response.Headers.ETag = tag.ToString();
 
         if (context.Request.GetTypedHeaders().IfNoneMatch is { Count: > 0 } asked
@@ -238,7 +260,7 @@ public static partial class PublicUniverseEndpoints
         StoredMediaObject? stored;
         try
         {
-            stored = await store.GetAsync(cardKey, cancellationToken);
+            stored = await store.GetAsync(key, cancellationToken);
         }
         catch (MediaStorageException exception)
         {
@@ -296,11 +318,11 @@ public static partial class PublicUniverseEndpoints
 
     /// <summary>Only what <see cref="PublicSlugs"/> can mint; anything else is not an address and costs no query.</summary>
     [GeneratedRegex("^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$")]
-    private static partial Regex SlugShape();
+    internal static partial Regex SlugShape();
 
     [GeneratedRegex("(?<=[a-z])([A-Z])")]
     private static partial Regex KeyBreak();
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Image storage failed while serving a public card.")]
+    [LoggerMessage(Level = LogLevel.Error, Message = "Image storage failed while serving a public picture.")]
     private static partial void LogStorageFailure(ILogger logger, Exception exception);
 }

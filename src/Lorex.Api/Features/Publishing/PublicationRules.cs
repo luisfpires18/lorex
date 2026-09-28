@@ -1,11 +1,14 @@
 using Lorex.Api.Data;
+using Lorex.Api.Features.Lore;
+using Lorex.Api.Features.Stories;
 using Lorex.Api.Features.Universes;
 
 namespace Lorex.Api.Features.Publishing;
 
 /// <summary>
-/// What a universe needs before it may be public, and the one query that decides what the public
-/// portal may read. Both live here so they cannot disagree.
+/// What a universe needs before it may be public, and the queries that decide what the public
+/// portal may read - the universe predicate, and the entry and story predicates built on it. All
+/// live here so they cannot disagree.
 /// </summary>
 internal static class PublicationRules
 {
@@ -78,6 +81,33 @@ internal static class PublicationRules
                 && universe.Genres != UniverseGenres.None
                 && universe.Owner!.PublicDisplayName != null
                 && db.UniverseArtworks.Any(artwork => artwork.UniverseId == universe.Id));
+
+    /// <summary>
+    /// Every lore entry the public portal may read, and nothing else: selected by its author, not in the Trash, with
+    /// the address and date publishing gives it - and inside a universe <see cref="Public"/> answers. The parent is
+    /// part of the predicate rather than a step a caller remembers, so a private universe overrides every entry in
+    /// it and no route can ask for one without the other.
+    /// </summary>
+    public static IQueryable<LoreEntity> PublicLore(LorexDbContext db)
+    {
+        var universes = Public(db);
+        return db.Entities.Where(entity => entity.Visibility == ContentVisibility.Public
+            && entity.DeletedAt == null
+            && entity.PublicSlug != null
+            && entity.PublishedAt != null
+            && universes.Any(universe => universe.Id == entity.UniverseId));
+    }
+
+    /// <summary>Every story the public portal may read: the same two levels as <see cref="PublicLore"/>.</summary>
+    public static IQueryable<Story> PublicStories(LorexDbContext db)
+    {
+        var universes = Public(db);
+        return db.Stories.Where(story => story.Visibility == ContentVisibility.Public
+            && story.DeletedAt == null
+            && story.PublicSlug != null
+            && story.PublishedAt != null
+            && universes.Any(universe => universe.Id == story.UniverseId));
+    }
 
     /// <summary>Every genre in <paramref name="genres"/>, in the one order they are always listed in.</summary>
     public static IReadOnlyList<UniverseGenres> List(UniverseGenres genres) =>

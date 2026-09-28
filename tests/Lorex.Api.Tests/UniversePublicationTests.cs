@@ -214,10 +214,18 @@ public sealed class UniversePublicationTests(LorexApiFactory factory) : IClassFi
         Assert.DoesNotContain("book three", shell, StringComparison.Ordinal);
 
         // There is no public route beneath it for anything else.
-        foreach (var route in new[] { "entities", "stories", "timeline", "lore", "artwork/original" })
+        foreach (var route in new[] { "entities", "timeline", "relationships", "family-tree", "canon-conflicts", "artwork/original" })
         {
             var response = await anonymous.GetAsync($"{PublicRoute}/hollowmere-inside/{route}");
             Assert.True(response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed, $"{route} answered {(int)response.StatusCode}");
+        }
+
+        // Its published lore and stories are listed there (Task 010) - and publishing the universe published neither.
+        foreach (var route in new[] { "lore", "stories" })
+        {
+            var listing = await anonymous.GetStringAsync($"{PublicRoute}/hollowmere-inside/{route}");
+            Assert.Contains("\"totalCount\":0", listing, StringComparison.Ordinal);
+            Assert.DoesNotContain("Secret heir", listing, StringComparison.Ordinal);
         }
     }
 

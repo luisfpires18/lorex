@@ -1,31 +1,36 @@
 using System.Globalization;
 using System.Text;
-using Lorex.Api.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace Lorex.Api.Features.Publishing;
 
 /// <summary>
-/// A public universe's address, <c>/worlds/{slug}</c>: minted once, from the name, the first time it
-/// is published, and never changed after (ADR 0036).
+/// A public address: a universe's, <c>/worlds/{slug}</c>, and - inside it - a lore entry's or a story's. Minted
+/// once, from the name or title, the first time it is published, and never changed after - not by a rename, not
+/// by unpublishing (ADR 0036). One generator for all three, so they cannot drift apart.
 ///
 /// <para><b>ASCII only.</b> Letters and digits a-z, 0-9 and single hyphens. Accents fold away
 /// ("Ilúvatar" is <c>iluvatar</c>, "Straße" <c>strasse</c>) and every other character is a word
-/// break. A name with nothing left - Arabic, Hebrew, Chinese, punctuation - takes <c>world</c>. A
+/// break. A name with nothing left - Arabic, Hebrew, Chinese, punctuation - takes the kind's fallback:
+/// <c>world</c>, <c>entry</c> or <c>story</c>. A
 /// Unicode address was the alternative and was refused: mixed-direction text and look-alike
 /// letters are how an address is made to read as another one. The name itself is never changed
 /// for the address; it is shown exactly as written.</para>
 ///
-/// <para><b>Unique across Lorex, and deterministic.</b> The first world to take a stem has it; the
-/// next gets <c>-2</c>, then <c>-3</c>, whatever is free at the moment it is published. No account,
-/// id or clock is in it.</para>
+/// <para><b>Unique in its namespace, and deterministic.</b> A universe's across Lorex; an entry's among its
+/// universe's entries, a story's among its universe's stories - an entry and a story may share one, since they
+/// live under different route segments. The first to take a stem has it; the next gets <c>-2</c>, then
+/// <c>-3</c>, whatever is free at the moment it is published - an item in the Trash keeps its address, so it is
+/// still taken. No account, id or clock is in it.</para>
 /// </summary>
 internal static class PublicSlugs
 {
     /// <summary>Room for a collision suffix inside <see cref="PublicationLimits.SlugMaxLength"/>.</summary>
     private const int StemMaxLength = 60;
 
-    private const string Fallback = "world";
+    public const string UniverseFallback = "world";
+    public const string LoreFallback = "entry";
+    public const string StoryFallback = "story";
 
     /// <summary>
     /// The Latin letters of Latin-1 and Latin Extended-A, folded to plain ones. A table rather than
@@ -41,7 +46,7 @@ internal static class PublicSlugs
         ("ss", "ß"), ("ae", "æ"), ("oe", "œ"), ("th", "þ"), ("ij", "ĳ"));
 
     /// <summary>The address a name would have if nothing else had taken it.</summary>
-    public static string Stem(string name)
+    public static string Stem(string name, string fallback = UniverseFallback)
     {
         var slug = new StringBuilder(StemMaxLength);
 
@@ -79,7 +84,7 @@ internal static class PublicSlugs
             stem = (lastBreak >= StemMaxLength / 2 ? stem[..lastBreak] : stem).TrimEnd('-');
         }
 
-        return stem.Length > 0 ? stem : Fallback;
+        return stem.Length > 0 ? stem : fallback;
     }
 
     private static Dictionary<char, string> Fold(params (string Plain, string Letters)[] groups) =>
@@ -87,22 +92,26 @@ internal static class PublicSlugs
             .ToDictionary(pair => pair.letter, pair => pair.Plain);
 
     /// <summary>
-    /// The first free address for <paramref name="name"/>. Called inside the publishing transaction,
-    /// which holds SQLite's one writer, so nothing can take the answer before it is written; the
-    /// unique index is the guarantee either way.
+    /// The first free address for <paramref name="name"/> among <paramref name="taken"/> - every address already held
+    /// in the namespace. Called inside the publishing transaction, which holds SQLite's one writer, so nothing can take
+    /// the answer before it is written; the unique index is the guarantee either way.
     /// </summary>
-    public static async Task<string> ChooseAsync(LorexDbContext db, string name, CancellationToken cancellationToken)
+    public static async Task<string> ChooseAsync(
+        IQueryable<string?> taken,
+        string name,
+        string fallback,
+        CancellationToken cancellationToken)
     {
-        var stem = Stem(name);
+        var stem = Stem(name, fallback);
         var numbered = stem + "-";
 
-        var taken = (await db.Universes.AsNoTracking()
-                .Where(universe => universe.PublicSlug == stem || universe.PublicSlug!.StartsWith(numbered))
-                .Select(universe => universe.PublicSlug!)
+        var held = (await taken
+                .Where(slug => slug == stem || slug!.StartsWith(numbered))
+                .Select(slug => slug!)
                 .ToListAsync(cancellationToken))
             .ToHashSet(StringComparer.Ordinal);
 
-        if (!taken.Contains(stem))
+        if (!held.Contains(stem))
         {
             return stem;
         }
@@ -110,7 +119,7 @@ internal static class PublicSlugs
         for (var suffix = 2; ; suffix++)
         {
             var candidate = $"{stem}-{suffix.ToString(CultureInfo.InvariantCulture)}";
-            if (!taken.Contains(candidate))
+            if (!held.Contains(candidate))
             {
                 return candidate;
             }

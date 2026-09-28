@@ -10,6 +10,7 @@ import {
 } from 'react-router-dom'
 import { ActionIcon } from '../components/ActionIcon'
 import { ActionMenu } from '../components/ActionMenu'
+import { ContentPublication } from '../components/ContentPublication'
 import { ChapterForm } from '../components/ChapterForm'
 import { ChapterSection } from '../components/ChapterSection'
 import { EmptyState } from '../components/EmptyState'
@@ -537,7 +538,9 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
         lede={
           // Writing needs the height more than the facts: the Manuscript view keeps the title and the views only.
           view === 'manuscript' ? null : (
-            <p className="story__meta">
+            // A div, because the publication control's panel is not phrasing content. The story's publication sits
+            // with its other facts: the bar under the title is full at 360px, and this line has room.
+            <div className="story__meta">
               <StatusBadge
                 step={story.status}
                 label={STORY_STATUS_LABELS[story.status]}
@@ -547,7 +550,15 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
                 <span data-testid="story-chapter-count">{chapterCountLabel(chapters.length)}</span>
               ) : null}
               <span>{sceneCountLabel(scenes.length)}</span>
-            </p>
+              <ContentPublication
+                key={story.id}
+                universeId={universe.id}
+                kind="story"
+                id={story.id}
+                name={story.title}
+                placement="line"
+              />
+            </div>
           )
         }
       >

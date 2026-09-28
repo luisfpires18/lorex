@@ -1,0 +1,161 @@
+using System.Security.Claims;
+using Lorex.Api.Data;
+using Lorex.Api.Features.Lore;
+using Lorex.Api.Features.Stories;
+using Lorex.Api.Features.Universes;
+using Microsoft.EntityFrameworkCore;
+
+namespace Lorex.Api.Features.Publishing;
+
+/// <summary>
+/// An owner selecting one lore entry or one story for the public portal, and taking it back (ADR 0036, Task 010).
+///
+/// <para><b>Explicit at every level.</b> Publishing a universe publishes none of its entries or stories, and
+/// publishing an entry or a story publishes nothing of its universe. An item is read publicly only while both are
+/// public - <see cref="PublicationRules.PublicLore"/> and <see cref="PublicationRules.PublicStories"/> - so an owner
+/// may select items while the universe is still private, and making the universe private hides every one of them
+/// without clearing what was selected.</para>
+///
+/// <para><b>Owner-scoped like every route under a universe.</b> Ownership first, then the item by its id and that
+/// universe together, live only: another account's item, one from another universe and one in the Trash all answer
+/// 404. The item in the Trash keeps its selection and its address; restoring it lets it be read again if it and its
+/// universe are still public.</para>
+///
+/// <para><b>Transitions, not fields.</b> POST with no body, like a universe's publish. No entry or story save binds
+/// the visibility, the address or the date. Publishing mints the address the first time - from the name or title,
+/// unique among the universe's items of that kind - and sets the first publication date once; both are kept by
+/// unpublishing and by renames. Nothing here touches <c>UpdatedAt</c>, the history or the search index: a selection
+/// is not an edit, so it neither reorders a list nor makes an open editor's save stale.</para>
+/// </summary>
+public static class ContentPublicationEndpoints
+{
+    public static IEndpointRouteBuilder MapContentPublicationEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var entries = endpoints.MapGroup("/api/universes/{universeId:guid}/entities/{entityId:guid}")
+            .WithTags("Publishing")
+            .RequireAuthorization();
+
+        entries.MapGet("/publication", GetEntryAsync).WithName("GetEntityPublication");
+        entries.MapPost("/publish", PublishEntryAsync).WithName("PublishEntity");
+        entries.MapPost("/unpublish", UnpublishEntryAsync).WithName("UnpublishEntity");
+
+        var stories = endpoints.MapGroup("/api/universes/{universeId:guid}/stories/{storyId:guid}")
+            .WithTags("Publishing")
+            .RequireAuthorization();
+
+        stories.MapGet("/publication", GetStoryAsync).WithName("GetStoryPublication");
+        stories.MapPost("/publish", PublishStoryAsync).WithName("PublishStory");
+        stories.MapPost("/unpublish", UnpublishStoryAsync).WithName("UnpublishStory");
+
+        return endpoints;
+    }
+
+    // ---------- Lore entries ----------
+
+    private static Task<IResult> GetEntryAsync(
+        Guid universeId, Guid entityId, ClaimsPrincipal principal, LorexDbContext db, CancellationToken cancellationToken) =>
+        TransitionAsync(db, universeId, principal, () => LiveEntry(db, universeId, entityId, cancellationToken), to: null, mint: null, cancellationToken);
+
+    private static Task<IResult> PublishEntryAsync(
+        Guid universeId, Guid entityId, ClaimsPrincipal principal, LorexDbContext db, CancellationToken cancellationToken) =>
+        TransitionAsync(
+            db,
+            universeId,
+            principal,
+            () => LiveEntry(db, universeId, entityId, cancellationToken),
+            ContentVisibility.Public,
+            entry => PublicSlugs.ChooseAsync(
+                db.Entities.AsNoTracking().Where(candidate => candidate.UniverseId == universeId).Select(candidate => candidate.PublicSlug),
+                entry.Name,
+                PublicSlugs.LoreFallback,
+                cancellationToken),
+            cancellationToken);
+
+    private static Task<IResult> UnpublishEntryAsync(
+        Guid universeId, Guid entityId, ClaimsPrincipal principal, LorexDbContext db, CancellationToken cancellationToken) =>
+        TransitionAsync(db, universeId, principal, () => LiveEntry(db, universeId, entityId, cancellationToken), ContentVisibility.Private, mint: null, cancellationToken);
+
+    private static Task<LoreEntity?> LiveEntry(LorexDbContext db, Guid universeId, Guid entityId, CancellationToken cancellationToken) =>
+        db.Entities.FirstOrDefaultAsync(
+            entity => entity.Id == entityId && entity.UniverseId == universeId && entity.DeletedAt == null,
+            cancellationToken);
+
+    // ---------- Stories ----------
+
+    private static Task<IResult> GetStoryAsync(
+        Guid universeId, Guid storyId, ClaimsPrincipal principal, LorexDbContext db, CancellationToken cancellationToken) =>
+        TransitionAsync(db, universeId, principal, () => StoryEndpoints.FindAsync(db, universeId, storyId, cancellationToken), to: null, mint: null, cancellationToken);
+
+    private static Task<IResult> PublishStoryAsync(
+        Guid universeId, Guid storyId, ClaimsPrincipal principal, LorexDbContext db, CancellationToken cancellationToken) =>
+        TransitionAsync(
+            db,
+            universeId,
+            principal,
+            () => StoryEndpoints.FindAsync(db, universeId, storyId, cancellationToken),
+            ContentVisibility.Public,
+            story => PublicSlugs.ChooseAsync(
+                db.Stories.AsNoTracking().Where(candidate => candidate.UniverseId == universeId).Select(candidate => candidate.PublicSlug),
+                story.Title,
+                PublicSlugs.StoryFallback,
+                cancellationToken),
+            cancellationToken);
+
+    private static Task<IResult> UnpublishStoryAsync(
+        Guid universeId, Guid storyId, ClaimsPrincipal principal, LorexDbContext db, CancellationToken cancellationToken) =>
+        TransitionAsync(db, universeId, principal, () => StoryEndpoints.FindAsync(db, universeId, storyId, cancellationToken), ContentVisibility.Private, mint: null, cancellationToken);
+
+    // ---------- Shared ----------
+
+    /// <summary>
+    /// Reads the item's publication, or moves it to <paramref name="to"/> first when that is given. Idempotent: an
+    /// item already there is left alone. For a move, the ownership check, the read, the address and the write share
+    /// one transaction, which Microsoft.Data.Sqlite begins <c>IMMEDIATE</c>, so two publishes cannot both see an address
+    /// as free - and a failed write leaves nothing half-published, because the address, the date and the visibility
+    /// are one row saved once.
+    /// </summary>
+    private static async Task<IResult> TransitionAsync<T>(
+        LorexDbContext db,
+        Guid universeId,
+        ClaimsPrincipal principal,
+        Func<Task<T?>> find,
+        ContentVisibility? to,
+        Func<T, Task<string>>? mint,
+        CancellationToken cancellationToken)
+        where T : class, IPublishable
+    {
+        // A read takes no write lock: SQLite has one writer, and a GET should not queue behind it.
+        await using var transaction = to is null ? null : await db.Database.BeginTransactionAsync(cancellationToken);
+
+        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        {
+            return Results.NotFound();
+        }
+
+        var item = await find();
+        if (item is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (to is { } visibility && item.Visibility != visibility)
+        {
+            if (visibility == ContentVisibility.Public)
+            {
+                item.PublicSlug ??= await mint!(item);
+                item.PublishedAt ??= DateTime.UtcNow;
+            }
+
+            item.Visibility = visibility;
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        var universeIsPublic = await PublicationRules.Public(db).AnyAsync(universe => universe.Id == universeId, cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        return Results.Ok(new ContentPublicationState(item.Visibility, item.PublicSlug, item.PublishedAt, universeIsPublic));
+    }
+}

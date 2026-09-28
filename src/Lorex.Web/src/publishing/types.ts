@@ -130,3 +130,18 @@ export interface PublicationDetails {
 
 /** The ratio the card is framed at, 16:10 - the server's `ImageFrame.Card`. */
 export const CARD_ASPECT = 16 / 10
+
+/**
+ * One lore entry's or story's publication, as its owner sees it (Task 010). `visibility` is the author's selection
+ * (the same numbers as `Visibility`); the item is public to anyone exactly when it is `Public` and
+ * `universeIsPublic` is true - a private universe hides everything in it without clearing the selection.
+ */
+export interface ContentPublicationState {
+  visibility: VisibilityValue
+  publicSlug: string | null
+  publishedAt: string | null
+  universeIsPublic: boolean
+}
+
+/** Which kind of item a publication control is for - they share one control and one set of routes. */
+export type ContentKind = 'entry' | 'story'
