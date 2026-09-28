@@ -694,11 +694,9 @@ A public, read-only discovery experience beside the workspace, in the same appli
 ## Baseline
 
 - **1053 API integration tests, 204 Playwright tests** (Public portal 008: +54 API, +4 Playwright). API suite 1053/1053
-  twice. Playwright for 008 never got one clean full pass: the machine's C: drive reached **0 bytes free** mid-validation
-  (outside the repository), so SQLite hit `disk I/O error`, `npx` hit `ENOSPC` and workers died of OOM as the page file
-  could not grow. With the database, TEMP and npm cache moved to D:, a fresh-database full run passed 198/204 (six story
-  specs lost to worker aborts) and every spec that failed in any run passed together, 76/76, at two workers. Free C:
-  before the next full run. Design refactor 007's full run on a fresh database:
+  twice. Playwright for 008: full run on a fresh database **204/204**, one invocation, two workers, retries 0. An
+  earlier run at the default eight workers lost six tests to host and dev-server resource pressure (blank pages, Vite
+  failing to serve a module) in specs 008 does not touch; not a regression. Design refactor 007's full run on a fresh database:
   **200/200** first time (196 plus `polish.spec.ts`'s four). 006's runs lost one test each to known infrastructure (a
   `/register` timeout, Vite `ERR_CONNECTION_REFUSED`) before 196/196; 005's drawer guards lost two to Vite cold dynamic
   imports before passing. No backend change since, so the API suite and Release build were not rerun.
