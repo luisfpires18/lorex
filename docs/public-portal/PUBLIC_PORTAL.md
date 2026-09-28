@@ -69,8 +69,10 @@ of every published world. Required to publish; cannot be cleared while any unive
 One per universe (`UniverseArtworks`): the untouched original and one 16:10 card, at most 960 px wide, never
 enlarged, cut on the server from the frame the author chose in the shared cropper, metadata stripped. 16:10 because
 the portal card is about as tall as wide with the picture as its top five eighths. Only the card is ever public. A
-hero cut for Task 011 is a new frame of the same original. The static Explore background
-(`explore-worlds-background.png`, repository root, owner-approved) is not universe artwork; Task 009 places it.
+hero cut for Task 011 is a new frame of the same original. The static Explore background is not universe artwork:
+`src/Lorex.Web/src/portal/explore-worlds-background.png`, owner-approved, 1916 x 821, 2,370,934 bytes, SHA-256
+`31e6995251e1145f792664fac61de586fd730f63b3f30dc7d4b8850fce5abe49`. Never edited, recompressed or converted; CSS crops
+it. Vite emits it unchanged under a content-hashed name, which the service worker may cache for good.
 
 ## 11. Slug model
 
@@ -82,26 +84,72 @@ renames and unpublishing keep it. No manual editing yet.
 
 | Route | Answers |
 | --- | --- |
-| `GET /api/public/universes?page=&pageSize=` | Public universes, first published most recently first, 24 per page (max 48). |
+| `GET /api/public/universes?page=&pageSize=&category=&genre=&q=&sort=` | Public universes, 24 per page (max 48), filtered and ordered as below. |
 | `GET /api/public/universes/{slug}` | One public universe, or 404 (private and missing alike). |
 | `GET /api/public/universes/{slug}/artwork/card/{cardId}` | Its current card (WebP), ETag = card id, 304 when current, 404 otherwise. |
 
-All `Cache-Control: no-cache`, no session needed, no cookie set. Filters (category, genre, search) and a second sort
-(A-Z) are Task 009's to add to the list query, before its projection.
+All `Cache-Control: no-cache`, no session needed, no cookie set.
 
-## 13. Public and private navigation
+The list query (009). Every parameter narrows the one public predicate before counting, ordering and projecting, so a
+private or incomplete universe is never matched, counted or ordered, and the response is still the eight-member
+allow-list.
 
-Now: Settings' Public portal section (status in words, public details, artwork, author, checklist, publish and make
-private with inline confirmations, "View public page"); "Explore worlds" in the universes header; the portal bar's
-"My workspace" or "Sign in" / "Create account". Later: portal header and search (009), "Edit this world" for an
-owner viewing their own world (011).
+| Parameter | Meaning |
+| --- | --- |
+| `category` | One category key: `original`, `movies-and-tv`, `games`, `books`, `comics`, `tabletop-and-rpg`, `audio`, `other`. Absent is all. |
+| `genre` | One genre key: `fantasy`, `science-fiction`, `adventure`, `horror`, `mystery`, `historical`, `romance`, `thriller`, `supernatural`, `post-apocalyptic`, `contemporary`, `other`. Matches a universe listing it among its genres. |
+| `q` | Trimmed; a parameterized `LIKE` substring of the name, the public summary or the author's public name - never the description, username, email, ids or content. Case-insensitive for ASCII only (SQLite `LIKE`); wildcards are literal. At most 100 characters. Blank is no search. |
+| `sort` | `recent` (default): first publication, most recent first; republishing does not move a universe. `az`: name, `NOCASE`. The slug breaks every tie, so pages never repeat or skip. |
+| `page`, `pageSize` | Clamped to 1+ and 1-48, as every Lorex list is. |
 
-## 14. Preview
+Keys are derived from the enum names (`MoviesAndTv` -> `movies-and-tv`), exact and lower case - one spelling per
+value. An unknown category, genre or sort, or a longer search, is a 400 validation problem naming each bad parameter;
+nothing is reinterpreted. The web client's `publishing/types.ts` carries the same keys, and a test pins both.
+
+## 13. Explore (009)
+
+`/explore` answers one question - what worlds can I explore? - with one card per public universe.
+
+- **Hero.** The approved panorama under the bar, cropped by `object-fit` (leaning left, where the castle is), with
+  three washes for legibility: under the bar, into the page along the bottom, and on the reading side. "Explore
+  worlds", one line of support, and the search field. Loaded eagerly (`fetchpriority="high"`); it is above the fold.
+- **Categories.** Pills: All plus the eight, each a link to Explore filtered to it, the chosen one `aria-current`
+  and filled. Below 52rem they scroll sideways in their own strip, edge to edge, rather than stacking.
+- **Genre and sort.** Native selects, labelled: one genre or all; Recently published or A-Z. No popularity, trending
+  or rating sort exists, because no such data does.
+- **Search.** Sent 300 ms after typing stops, at once on Enter or when emptied. Earlier requests are aborted and a
+  stale answer is never shown. Starting or clearing a search adds a history entry; refining one replaces it.
+- **Address.** `q`, `category`, `genre`, `sort=az`, each omitted at its default - `/explore?category=games&genre=fantasy`.
+  Back, Forward and refresh restore it; an unknown value in a hand-edited address is ignored, not an error.
+- **Paging.** "Show more worlds" appends the next page, keeps the filters and drops any world already shown (a
+  publish in between shifts pages by one). No infinite scroll: a button is reachable, finite and says what it does.
+  The loaded pages are not in the address; a refresh starts from the first page with the same filters.
+- **Card.** Artwork (the 16:10 card, lazy-loaded), name (serif, two lines, `dir="auto"`), category and genres, and
+  `by` the public name - each authored string in `<bdi>`. The whole card is one link to `/worlds/{slug}`; nothing
+  inside it is interactive. The summary, counts and dates are not on the card. A picture that fails keeps the
+  card's shape with the Lorex mark, never someone else's art.
+- **States.** Card-shaped skeletons while loading; "No worlds have been published yet." for an empty platform; "No
+  published worlds match." with Clear search and filters; an error with Try again, never mistaken for empty.
+- **Visual boundary.** The portal is dark in either scheme. `.portal` redefines the shared tokens inside it (so shared
+  buttons, notices and menus draw dark) plus a few `--portal-*` values; the workspace's tokens are untouched. Motion
+  is a colour change and a 2.5% image lift on hover, only without reduced motion.
+- `/worlds/{slug}` keeps its 008 content inside the dark frame; the real public universe page is 011's.
+
+## 14. Public and private navigation
+
+Settings' Public portal section (status in words, public details, artwork, author, checklist, publish and make
+private with inline confirmations, "View public page"). The portal bar: the brand and Explore (on a phone the brand
+alone leads to Explore), then "Sign in" and "Create account", or "My workspace ↗" and the account menu. The
+universes header's "Explore worlds ↗" goes the other way. Visibility belongs to universes; the two sides are the
+portal and the workspace, never "public mode" and "private mode". Later: "Edit this world" for an owner viewing their
+own world (011).
+
+## 15. Preview
 
 Planned for Task 011: an authenticated owner-scoped route that renders the same allow-listed shape from saved
 details, with owner-scoped image addresses, so "what would anyone see" never needs anonymous access.
 
-## 15. Roadmap
+## 16. Roadmap
 
 | Task | Scope |
 | --- | --- |
@@ -111,7 +159,7 @@ details, with owner-scoped image addresses, so "what would anyone see" never nee
 | 011 | The public universe page and browsing published content; owner preview and "Edit this world". |
 | 012 | Portal polish, accessibility, SEO and Open Graph, caching and performance, security audit, remaining 007 polish. |
 
-## 16. Non-goals
+## 17. Non-goals
 
 No likes, ratings, comments, follows, view counts, popularity, trending, recommendations, feeds, bookmarks or public
 editing. No fake data, metrics or placeholder artwork. No creator profile pages yet.

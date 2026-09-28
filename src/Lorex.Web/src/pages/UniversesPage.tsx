@@ -1,3 +1,4 @@
+import { ArrowUpRight } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AccountMenu } from '../components/AccountMenu'
@@ -77,8 +78,9 @@ export default function UniversesPage() {
         </span>
         <div className="home__session">
           {/* The public portal, from the workspace's front door: what authors have published, this one included. */}
-          <Link className="home__back" to="/explore" data-testid="home-explore">
+          <Link className="home__back home__explore" to="/explore" data-testid="home-explore">
             Explore worlds
+            <ArrowUpRight aria-hidden="true" size={15} strokeWidth={1.75} />
           </Link>
           {/* Ideas belong to the account, not to a world, so they are reached from here without opening one. */}
           <Link className="home__back" to="/app/ideas" data-testid="home-ideas">

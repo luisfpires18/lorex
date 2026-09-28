@@ -50,8 +50,8 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
-- **Public portal phase begun.** Roadmap: **008** publication foundation (current), **009** Explore Worlds portal,
-  **010** content publishing controls, **011** public universe experience, **012** portal polish, SEO, performance and
+- **Public portal phase.** Roadmap: **008** publication foundation (done), **009** Explore Worlds portal (current),
+  **010** content publishing controls (next), **011** public universe experience, **012** portal polish, SEO, performance and
   safety. See Public portal below and `docs/public-portal/PUBLIC_PORTAL.md`.
 - **Entry images** (`feat/entity-images-r2`, merged into `dev`). An entry may carry one picture:
   uploaded through the API, decoded and thumbnailed server-side, stored as two objects in one
@@ -672,8 +672,7 @@ Canon change; the Lore list gains query parameters in 003 and nothing else touch
 A public, read-only discovery experience beside the workspace, in the same application. ADR 0036 is authoritative;
 `docs/public-portal/PUBLIC_PORTAL.md` is the working reference.
 
-- **008 - Publication foundation** (`feat/public-portal-foundation` off `dev` at `a87b7da`, committed, not merged, not
-  pushed).
+- **008 - Publication foundation** - done: `959fe07` + `6cf5101`, merged into `dev` at `2b74f26`; Deploy DEV #48 green.
   - Every universe private by default - the migration `AddUniversePublication` publishes nothing and copies nothing.
     `POST .../publish` refuses until summary, category, a genre, artwork and the owner's public name exist, mints the
     slug once and sets `publishedAt` once; `.../unpublish` is immediate. While public nothing required can be removed.
@@ -687,14 +686,28 @@ A public, read-only discovery experience beside the workspace, in the same appli
     on the Profile; `/explore` and `/worlds/:slug` under `PublicLayout`, outside the guards and the workspace chrome;
     "Explore worlds" in the universes header. The leave guard now asks one question when several forms are dirty.
   - Backup format **15**: public details and artwork, never visibility, slug, date or author. Restores are private.
-  - `explore-worlds-background.png` stays untracked at the repository root for Task 009.
   - Minor 007 polish (drawer button order, repeated Moment label, Settings danger styling, 200% zoom, loading/error
     states) is held for 012.
+  - Archived public universes stay public: the public predicate ignores archive state. An owner question for later;
+    009 follows the predicate exactly.
+- **009 - Explore Worlds portal** (`feat/explore-worlds-portal` off `dev` at `2b74f26`, committed, not merged, not
+  pushed). `PUBLIC_PORTAL.md` sections 12-14.
+  - API: the public list takes `category`, `genre` (keys from enum names), `q` (substring of name, public summary,
+    public author name; max 100) and `sort` (`recent` | `az`, slug tie-break), all inside the one public predicate.
+    Unknown values are a 400 validation problem; paging stays clamped. DTO unchanged. No schema, migration or backup
+    change.
+  - Web: `/explore` - hero on the owner's background (moved byte-identical to `src/Lorex.Web/src/portal/`), search,
+    category pills, genre and sort selects, all in the address; one card per universe; Show more worlds; loading,
+    empty, no-match and error states. The portal bar: Sign in / Create account, or My workspace and the account
+    menu. `.portal` scopes a dark token set; workspace tokens untouched. `/worlds/:slug` is 008's page in the dark frame.
+  - Debt for 012: the hero PNG is 2.37 MB, used as supplied - a smaller derivative needs the owner's approval. The
+    loaded "Show more" pages are not in the address.
 
 ## Baseline
 
-- **1053 API integration tests, 204 Playwright tests** (Public portal 008: +54 API, +4 Playwright). API suite 1053/1053
-  twice. Playwright for 008: full run on a fresh database **204/204**, one invocation, two workers, retries 0. An
+- **1077 API integration tests, 212 Playwright tests** (Explore 009: +24 API in `PublicExploreQueryTests`, +8 in
+  `explore.spec.ts`). 009: API 1077/1077, Release build 0 warnings; full Playwright on a fresh database **212/212**, one
+  invocation, two workers, retries 0, 9.6 min. Before it, 008: +54 API, +4 Playwright, API 1053/1053 twice. Playwright for 008: full run on a fresh database **204/204**, one invocation, two workers, retries 0. An
   earlier run at the default eight workers lost six tests to host and dev-server resource pressure (blank pages, Vite
   failing to serve a module) in specs 008 does not touch; not a regression. Design refactor 007's full run on a fresh database:
   **200/200** first time (196 plus `polish.spec.ts`'s four). 006's runs lost one test each to known infrastructure (a

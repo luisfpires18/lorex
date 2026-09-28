@@ -22,16 +22,19 @@ export const Category = {
 
 export type CategoryValue = (typeof Category)[keyof typeof Category]
 
-/** The categories in the order they are offered, with the words they are shown in. No enum name is ever shown. */
-export const CATEGORIES: { value: CategoryValue; label: string }[] = [
-  { value: Category.Original, label: 'Original' },
-  { value: Category.MoviesAndTv, label: 'Movies & TV' },
-  { value: Category.Games, label: 'Games' },
-  { value: Category.Books, label: 'Books' },
-  { value: Category.Comics, label: 'Comics' },
-  { value: Category.TabletopAndRpg, label: 'Tabletop & RPG' },
-  { value: Category.Audio, label: 'Audio' },
-  { value: Category.Other, label: 'Other' },
+/**
+ * The categories in the order they are offered, with the words they are shown in. No enum name is ever shown.
+ * `key` is how Explore's address and the public API name one - the API derives the same keys from its enum.
+ */
+export const CATEGORIES: { value: CategoryValue; key: string; label: string }[] = [
+  { value: Category.Original, key: 'original', label: 'Original' },
+  { value: Category.MoviesAndTv, key: 'movies-and-tv', label: 'Movies & TV' },
+  { value: Category.Games, key: 'games', label: 'Games' },
+  { value: Category.Books, key: 'books', label: 'Books' },
+  { value: Category.Comics, key: 'comics', label: 'Comics' },
+  { value: Category.TabletopAndRpg, key: 'tabletop-and-rpg', label: 'Tabletop & RPG' },
+  { value: Category.Audio, key: 'audio', label: 'Audio' },
+  { value: Category.Other, key: 'other', label: 'Other' },
 ]
 
 /** Mirrors `UniverseGenres`: one bit each, and the one order they are always listed in. */
@@ -52,19 +55,19 @@ export const Genre = {
 
 export type GenreValue = (typeof Genre)[keyof typeof Genre]
 
-export const GENRES: { value: GenreValue; label: string }[] = [
-  { value: Genre.Fantasy, label: 'Fantasy' },
-  { value: Genre.ScienceFiction, label: 'Science fiction' },
-  { value: Genre.Adventure, label: 'Adventure' },
-  { value: Genre.Horror, label: 'Horror' },
-  { value: Genre.Mystery, label: 'Mystery' },
-  { value: Genre.Historical, label: 'Historical' },
-  { value: Genre.Romance, label: 'Romance' },
-  { value: Genre.Thriller, label: 'Thriller' },
-  { value: Genre.Supernatural, label: 'Supernatural' },
-  { value: Genre.PostApocalyptic, label: 'Post-apocalyptic' },
-  { value: Genre.Contemporary, label: 'Contemporary' },
-  { value: Genre.Other, label: 'Other' },
+export const GENRES: { value: GenreValue; key: string; label: string }[] = [
+  { value: Genre.Fantasy, key: 'fantasy', label: 'Fantasy' },
+  { value: Genre.ScienceFiction, key: 'science-fiction', label: 'Science fiction' },
+  { value: Genre.Adventure, key: 'adventure', label: 'Adventure' },
+  { value: Genre.Horror, key: 'horror', label: 'Horror' },
+  { value: Genre.Mystery, key: 'mystery', label: 'Mystery' },
+  { value: Genre.Historical, key: 'historical', label: 'Historical' },
+  { value: Genre.Romance, key: 'romance', label: 'Romance' },
+  { value: Genre.Thriller, key: 'thriller', label: 'Thriller' },
+  { value: Genre.Supernatural, key: 'supernatural', label: 'Supernatural' },
+  { value: Genre.PostApocalyptic, key: 'post-apocalyptic', label: 'Post-apocalyptic' },
+  { value: Genre.Contemporary, key: 'contemporary', label: 'Contemporary' },
+  { value: Genre.Other, key: 'other', label: 'Other' },
 ]
 
 export function categoryLabel(value: CategoryValue) {

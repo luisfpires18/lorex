@@ -1,6 +1,8 @@
+using System.Collections.Frozen;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Lorex.Api.Data;
+using Lorex.Api.Features.Ideas;
 using Lorex.Api.Features.Media;
 using Lorex.Api.Features.Universes;
 using Microsoft.AspNetCore.Mvc;
@@ -29,6 +31,22 @@ public static partial class PublicUniverseEndpoints
 {
     private const int DefaultPageSize = 24;
     private const int MaxPageSize = 48;
+    private const int SearchMaxLength = 100;
+
+    /// <summary>
+    /// The address-friendly key of each category and genre, from its name: <c>MoviesAndTv</c> is
+    /// <c>movies-and-tv</c>. Derived rather than listed, so a new member has a key the moment it exists.
+    /// Exact and lower case only - one spelling per value, so a shared address means one thing.
+    /// </summary>
+    internal static readonly FrozenDictionary<string, UniverseCategory> CategoryKeys =
+        Enum.GetValues<UniverseCategory>().ToFrozenDictionary(value => Key(value.ToString()), StringComparer.Ordinal);
+
+    internal static readonly FrozenDictionary<string, UniverseGenres> GenreKeys =
+        Enum.GetValues<UniverseGenres>()
+            .Where(PublicationRules.IsOneGenre)
+            .ToFrozenDictionary(value => Key(value.ToString()), StringComparer.Ordinal);
+
+    private static string Key(string name) => KeyBreak().Replace(name, "-$1").ToLowerInvariant();
 
     public static IEndpointRouteBuilder MapPublicUniverseEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -49,28 +67,113 @@ public static partial class PublicUniverseEndpoints
     }
 
     /// <summary>
-    /// Public universes, most recently first published first, the address breaking ties. There is no
-    /// popularity to sort by and none is invented. Filters and other orders are the portal's to add.
+    /// Public universes, filtered and ordered the ways Explore offers. Every filter narrows the one public
+    /// query, so nothing private is ever counted, matched or ordered - a search cannot tell a private
+    /// universe from one that does not exist.
+    ///
+    /// <para><c>category</c> and <c>genre</c> are keys (<c>movies-and-tv</c>, <c>science-fiction</c>),
+    /// one of each at most; a genre matches any universe that lists it. <c>q</c> is a substring of the
+    /// name, the public summary or the author's public name - the public fields, never the description -
+    /// ASCII case aside. <c>sort</c> is <c>recent</c> (first published, most recent first; republishing
+    /// does not move a universe) or <c>az</c> (name, case aside). The address breaks every tie, so paging
+    /// is stable. There is no popularity to sort by and none is invented.</para>
+    ///
+    /// <para>An unknown key, sort or an overlong search is refused as a validation problem rather than
+    /// read as something else; out-of-range paging is clamped, as every Lorex list does.</para>
     /// </summary>
     private static async Task<IResult> ListAsync(
         LorexDbContext db,
         CancellationToken cancellationToken,
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = DefaultPageSize)
+        [FromQuery] int pageSize = DefaultPageSize,
+        [FromQuery] string? category = null,
+        [FromQuery] string? genre = null,
+        [FromQuery] string? q = null,
+        [FromQuery] string? sort = null)
     {
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
+        var errors = new Dictionary<string, string[]>();
+        UniverseCategory? onlyCategory = null;
+        UniverseGenres? onlyGenre = null;
+
+        if (!string.IsNullOrEmpty(category))
+        {
+            if (CategoryKeys.TryGetValue(category, out var found))
+            {
+                onlyCategory = found;
+            }
+            else
+            {
+                errors["category"] = ["Unknown category."];
+            }
+        }
+
+        if (!string.IsNullOrEmpty(genre))
+        {
+            if (GenreKeys.TryGetValue(genre, out var found))
+            {
+                onlyGenre = found;
+            }
+            else
+            {
+                errors["genre"] = ["Unknown genre."];
+            }
+        }
+
+        var alphabetical = sort switch
+        {
+            null or "" or "recent" => false,
+            "az" => true,
+            _ => (bool?)null,
+        };
+
+        if (alphabetical is null)
+        {
+            errors["sort"] = ["Sort by recent or az."];
+        }
+
+        var search = q?.Trim();
+        if (search is { Length: > SearchMaxLength })
+        {
+            errors["q"] = [$"Search for at most {SearchMaxLength} characters."];
+        }
+
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
         var query = PublicationRules.Public(db).AsNoTracking();
+
+        if (onlyCategory is { } wantedCategory)
+        {
+            query = query.Where(universe => universe.Category == wantedCategory);
+        }
+
+        if (onlyGenre is { } wantedGenre)
+        {
+            query = query.Where(universe => (universe.Genres & wantedGenre) == wantedGenre);
+        }
+
+        if (!string.IsNullOrEmpty(search))
+        {
+            var pattern = $"%{IdeaEndpoints.EscapeLike(search)}%";
+            query = query.Where(universe =>
+                EF.Functions.Like(universe.Name, pattern, "\\")
+                || EF.Functions.Like(universe.PublicSummary!, pattern, "\\")
+                || EF.Functions.Like(universe.Owner!.PublicDisplayName!, pattern, "\\"));
+        }
+
         var totalCount = await query.CountAsync(cancellationToken);
         var skip = (int)Math.Min((long)(page - 1) * pageSize, int.MaxValue);
 
-        var rows = await Project(db, query
-                .OrderByDescending(universe => universe.PublishedAt)
-                .ThenBy(universe => universe.PublicSlug)
-                .Skip(skip)
-                .Take(pageSize))
-            .ToListAsync(cancellationToken);
+        var ordered = alphabetical == true
+            ? query.OrderBy(universe => EF.Functions.Collate(universe.Name, "NOCASE")).ThenBy(universe => universe.PublicSlug)
+            : query.OrderByDescending(universe => universe.PublishedAt).ThenBy(universe => universe.PublicSlug);
+
+        var rows = await Project(db, ordered.Skip(skip).Take(pageSize)).ToListAsync(cancellationToken);
 
         var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize);
 
@@ -194,6 +297,9 @@ public static partial class PublicUniverseEndpoints
     /// <summary>Only what <see cref="PublicSlugs"/> can mint; anything else is not an address and costs no query.</summary>
     [GeneratedRegex("^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$")]
     private static partial Regex SlugShape();
+
+    [GeneratedRegex("(?<=[a-z])([A-Z])")]
+    private static partial Regex KeyBreak();
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Image storage failed while serving a public card.")]
     private static partial void LogStorageFailure(ILogger logger, Exception exception);

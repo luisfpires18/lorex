@@ -685,6 +685,13 @@ a.button--danger:visited {
   font-size: 0.875rem;
 }
 
+/* The way across to the public portal: an arrow out, the same one the portal's "My workspace" points back with. */
+.home__explore {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
 .home__body {
   flex: 1;
   width: 100%;
@@ -8600,41 +8607,94 @@ a.idearef__name {
   font-weight: 600;
 }
 
-/* ---------- The public portal's frame (ADR 0036) ----------
+/* ---------- The public portal (ADR 0036) ----------
 
-   Structure only: its own bar on the graphite plate, and none of the workspace's chrome. The portal's own
-   design - dark, image-led - is the Explore task's. */
+   A second visual world beside the workspace, in the same application. The workspace is paper under a
+   graphite plate; the portal is night under a panorama - dark in either scheme, because it is a place to
+   look at other people's artwork, and artwork reads truest on a quiet dark ground.
+
+   Scoped, not global: `.portal` redefines the shared tokens for everything inside it, so the shared
+   patterns (buttons, notices, empty states, menus) draw dark here without a second set of components,
+   and nothing outside it changes. The derived tokens are redeclared too, because a custom property that
+   reads another is resolved where it is declared (`:root`), not where it is used. `--portal-*` are the
+   portal's own few values; everything else is the Lorex scale. */
 
 .portal {
+  --portal-bg: #0b0c0e;
+  --portal-surface: #15171b;
+  --portal-raised: #1d2025;
+  --portal-ink: #f1ece3;
+  --portal-muted: #aba59b;
+  --portal-line: rgb(241 236 227 / 0.12);
+  --portal-line-strong: rgb(241 236 227 / 0.26);
+  --portal-width: 88rem;
+  --portal-gutter: clamp(1rem, 4vw, 3rem);
+  --portal-bar: 4.25rem;
+
+  --paper: var(--portal-surface);
+  --surface: var(--portal-bg);
+  --raised: var(--portal-raised);
+  --plate: #07080a;
+  --plate-ink: var(--portal-ink);
+  --plate-muted: var(--portal-muted);
+  --ink: var(--portal-ink);
+  --muted: var(--portal-muted);
+  --accent: #a3b3ec;
+  --danger: #eea197;
+  --warning: #e0b36b;
+  --rule: var(--portal-line);
+  --rule-strong: var(--portal-line-strong);
+  --border-control: #767a81;
+  --primary-bg: var(--portal-ink);
+  --primary-ink: #111214;
+  --accent-wash: color-mix(in srgb, var(--accent) 16%, var(--portal-raised));
+  --hover-wash: rgb(241 236 227 / 0.07);
+  --press-wash: rgb(241 236 227 / 0.12);
+  --focus-ring: var(--accent);
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.5);
+  --shadow-2: 0 8px 20px -8px rgb(0 0 0 / 0.7);
+  --shadow-3: 0 22px 50px -14px rgb(0 0 0 / 0.8);
+
+  color-scheme: dark;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: var(--surface);
+  background: var(--portal-bg);
+  color: var(--portal-ink);
 }
 
+.portal ::selection {
+  background: rgb(163 179 236 / 0.36);
+  color: var(--portal-ink);
+}
+
+/* The bar: brand, the one destination the portal has, and the way in or back. Transparent, so over
+   Explore's hero it is part of the picture; a hairline under it everywhere else. */
 .portal__bar {
+  position: relative;
+  z-index: var(--z-sticky);
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-3) var(--space-5);
-  padding: var(--space-4) clamp(1.25rem, 4vw, 3rem);
-  background: var(--plate);
-  color: var(--plate-ink);
+  gap: var(--space-5);
+  min-height: var(--portal-bar);
+  padding: 0 var(--portal-gutter);
+  border-bottom: 1px solid var(--portal-line);
 }
 
-.portal__bar :focus-visible {
-  outline-color: var(--plate-ink-accent);
+.portal:has(.explore-hero) .portal__bar {
+  border-bottom-color: transparent;
 }
 
 .portal__bar .wordmark__x {
-  color: var(--plate-ink-accent);
+  color: var(--accent);
 }
 
 .portal__brand {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  color: inherit;
+  flex: none;
+  color: var(--portal-ink);
   text-decoration: none;
 }
 
@@ -8645,96 +8705,598 @@ a.idearef__name {
 }
 
 .portal__link {
-  color: var(--plate-ink);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--control-md);
+  color: rgb(241 236 227 / 0.84);
   font-size: var(--text-ui);
+  font-weight: 500;
   text-decoration: none;
+  white-space: nowrap;
+  text-underline-offset: 0.45em;
+  text-decoration-thickness: 1px;
 }
 
-.portal__link:hover,
+.portal__link:hover {
+  color: var(--portal-ink);
+  text-decoration-line: underline;
+}
+
 .portal__link[aria-current='page'] {
-  text-decoration: underline;
-  text-underline-offset: 0.3em;
+  color: var(--portal-ink);
+  text-decoration-line: underline;
+  text-decoration-thickness: 2px;
 }
 
 .portal__session {
   display: flex;
   align-items: center;
   gap: var(--space-4);
+  flex: none;
+  margin-left: auto;
+}
+
+.portal__join {
+  padding-inline: var(--space-4);
+  white-space: nowrap;
+}
+
+/* Signed in, the account is the avatar alone: the bar is the portal's, and the name is in the menu. */
+.portal .accountmenu__name {
+  display: none;
 }
 
 .portal__body {
   flex: 1;
   width: 100%;
+}
+
+/* A page of ordinary width inside the full-bleed main: the minimal public world page (011 replaces it). */
+.portal__page {
+  width: 100%;
   max-width: 72rem;
   margin: 0 auto;
-  padding: clamp(2rem, 5vw, 3.5rem) clamp(1.25rem, 4vw, 3rem) 4rem;
+  padding: clamp(2rem, 5vw, 3.5rem) var(--portal-gutter) var(--space-9);
 }
 
-.explore__title {
-  margin: 0 0 var(--space-2);
+/* A phone: the brand is the way to Explore, so the bar keeps room for the way in. */
+@media (max-width: 40rem) {
+  .portal__bar {
+    gap: var(--space-3);
+  }
+
+  .portal__nav {
+    display: none;
+  }
+
+  .portal__session {
+    gap: var(--space-3);
+  }
+
+  .portal__brand .wordmark {
+    font-size: 1.05rem;
+  }
+}
+
+@media (pointer: coarse) {
+  .portal__link,
+  .portal__join {
+    min-height: var(--control-touch);
+  }
+}
+
+/* ---------- Explore: the hero ----------
+
+   The owner's panorama, as supplied (explore-worlds-background.png, 1916 x 821), cropped by the box and
+   never by an editor. It sits under the bar. Three washes keep the words legible without burying the
+   picture: a band under the bar, a fall into the page ground along the bottom, and a shade on the reading
+   side. The castle sits left of centre, so a narrow crop leans that way. */
+.explore-hero {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: flex-end;
+  min-height: clamp(24rem, 36vw, 32rem);
+  margin-top: calc(-1 * var(--portal-bar));
+  padding: calc(var(--portal-bar) + var(--space-7)) var(--portal-gutter) clamp(2rem, 4vw, 3.25rem);
+  overflow: hidden;
+}
+
+.explore-hero__image {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 42% 40%;
+}
+
+.explore-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(to bottom, rgb(7 8 10 / 0.72) 0, rgb(7 8 10 / 0) 9rem),
+    linear-gradient(to top, var(--portal-bg) 0, rgb(11 12 14 / 0.72) 30%, rgb(11 12 14 / 0) 64%),
+    linear-gradient(to right, rgb(7 8 10 / 0.62) 0, rgb(7 8 10 / 0.2) 45%, rgb(7 8 10 / 0) 70%);
+}
+
+.explore-hero__inner {
+  width: min(100%, var(--portal-width));
+  margin: 0 auto;
+}
+
+.explore-hero__title {
+  margin: 0 0 var(--space-3);
   font-family: var(--display);
   font-weight: 400;
-  font-size: var(--text-page);
+  font-size: clamp(2.625rem, 1.6rem + 3.6vw, 4.75rem);
+  line-height: 1.02;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+  text-shadow: 0 2px 24px rgb(0 0 0 / 0.5);
 }
 
-.explore__lede {
-  margin: 0 0 var(--space-7);
-  color: var(--muted);
+.explore-hero__lede {
+  max-width: 34rem;
+  margin: 0 0 var(--space-6);
+  color: rgb(241 236 227 / 0.88);
+  font-size: clamp(1rem, 0.95rem + 0.3vw, 1.125rem);
+  line-height: 1.55;
+  text-wrap: pretty;
+  text-shadow: 0 1px 14px rgb(0 0 0 / 0.7);
 }
 
-.explore__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
-  gap: var(--space-6);
-}
-
-.explore__item {
+.explore-search {
   position: relative;
+  display: flex;
+  align-items: center;
+  max-width: 34rem;
+}
+
+.explore-search__input {
+  width: 100%;
+  height: 3.25rem;
+  padding: 0 3rem;
+  border: 1px solid rgb(241 236 227 / 0.24);
+  border-radius: var(--radius-md);
+  background: rgb(13 14 17 / 0.82);
+  color: var(--portal-ink);
+  font: inherit;
+  font-size: var(--text-body);
+  box-shadow: 0 12px 32px -14px rgb(0 0 0 / 0.75);
+  transition: border-color var(--duration-1) var(--ease);
+}
+
+.explore-search__input::placeholder {
+  color: rgb(241 236 227 / 0.62);
+}
+
+.explore-search__input:hover {
+  border-color: rgb(241 236 227 / 0.42);
+}
+
+.explore-search__input:focus-visible {
+  border-color: var(--accent);
+}
+
+.explore-search__input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.explore-search__icon {
+  position: absolute;
+  left: 1rem;
+  color: var(--portal-muted);
+  pointer-events: none;
+}
+
+.explore-search__clear {
+  position: absolute;
+  right: 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-md);
+  height: var(--control-md);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--portal-muted);
+  cursor: pointer;
+}
+
+.explore-search__clear:hover {
+  background: var(--hover-wash);
+  color: var(--portal-ink);
+}
+
+/* ---------- Explore: discovery ---------- */
+
+/* The same measure as the hero's words, so the title, the filters and the first card share one edge. */
+.explore__body {
+  width: min(100% - 2 * var(--portal-gutter), var(--portal-width));
+  margin: 0 auto;
+  padding-bottom: var(--space-9);
+}
+
+.explore-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4) var(--space-7);
+  padding: var(--space-5) 0 var(--space-5);
+  border-bottom: 1px solid var(--portal-line);
+}
+
+.explore-cats {
+  flex: 1 1 36rem;
   min-width: 0;
 }
 
-.explore__card,
+.explore-cats__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Categories are addresses - each chip is a link to Explore filtered to it - so they are shared, opened
+   in a new tab and announced as links; the chosen one is `aria-current` and filled, not only coloured. */
+.explore-cats__chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.25rem;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--portal-line-strong);
+  border-radius: var(--radius-full);
+  color: rgb(241 236 227 / 0.86);
+  font-size: var(--text-ui);
+  font-weight: 500;
+  white-space: nowrap;
+  text-decoration: none;
+  transition:
+    background-color var(--duration-1) var(--ease),
+    border-color var(--duration-1) var(--ease),
+    color var(--duration-1) var(--ease);
+}
+
+.explore-cats__chip:hover {
+  border-color: rgb(241 236 227 / 0.5);
+  background: var(--hover-wash);
+  color: var(--portal-ink);
+}
+
+.explore-cats__chip[aria-current='true'] {
+  border-color: var(--portal-ink);
+  background: var(--portal-ink);
+  color: #111214;
+  font-weight: 600;
+}
+
+.explore-filters__selects {
+  display: flex;
+  gap: var(--space-4);
+  flex: none;
+}
+
+.explore-select {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.explore-select__label {
+  color: var(--portal-muted);
+  font-size: var(--text-ui);
+}
+
+.explore-select__control {
+  appearance: none;
+  min-width: 0;
+  height: var(--control-md);
+  padding: 0 2rem 0 var(--space-3);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  background: var(--portal-surface)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23aba59b' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E")
+    no-repeat right 0.625rem center;
+  color: var(--portal-ink);
+  font: inherit;
+  font-size: var(--text-ui);
+  cursor: pointer;
+}
+
+.explore-select__control:hover {
+  border-color: var(--portal-muted);
+}
+
+.explore-select__control option {
+  background: var(--portal-surface);
+  color: var(--portal-ink);
+}
+
+.explore__count {
+  min-height: 1.25rem;
+  margin: var(--space-5) 0 var(--space-5);
+  color: var(--portal-muted);
+  font-size: var(--text-ui);
+}
+
+.explore__error {
+  margin: var(--space-4) 0;
+  max-width: 40rem;
+}
+
+.explore .empty {
+  margin: var(--space-7) 0 var(--space-8);
+}
+
+/* A tablet and down: categories scroll sideways in their own strip, edge to edge, rather than stacking
+   three rows of chips over the worlds; genre and sort share one row beneath, label over control. */
+@media (max-width: 52rem) {
+  .explore-filters {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .explore-cats {
+    margin: 0 calc(-1 * var(--portal-gutter));
+  }
+
+  .explore-cats__list {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 0.125rem var(--portal-gutter);
+    scroll-padding-inline: var(--portal-gutter);
+    scrollbar-width: none;
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 var(--portal-gutter),
+      #000 calc(100% - 2.5rem),
+      transparent
+    );
+  }
+
+  .explore-cats__list::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Sort's longest choice is the longer, so it gets the wider share. */
+  .explore-filters__selects {
+    display: grid;
+    grid-template-columns: minmax(0, 4fr) minmax(0, 5fr);
+    gap: var(--space-3);
+  }
+
+  .explore-select {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-1);
+  }
+
+  .explore-select__label {
+    font-size: var(--text-sm);
+  }
+}
+
+@media (pointer: coarse) {
+  .explore-cats__chip,
+  .explore-select__control {
+    min-height: var(--control-touch);
+  }
+
+  .explore-search__clear {
+    width: var(--control-touch);
+    height: var(--control-touch);
+    right: 0.25rem;
+  }
+}
+
+/* ---------- Explore: the worlds ---------- */
+
+.explore-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  gap: clamp(1.75rem, 2.4vw, 2.5rem) clamp(1rem, 1.6vw, 1.5rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.worldcard {
+  min-width: 0;
+}
+
+/* The card is its one link: artwork, name, what it is and who made it. Nothing else in it is interactive. */
+.worldcard__link {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border-radius: var(--radius-md);
+  color: inherit;
+  text-decoration: none;
+}
+
+.worldcard__link:focus-visible {
+  outline-offset: 4px;
+}
+
+.worldcard__art {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--portal-surface);
+  transition: box-shadow var(--duration-3) var(--ease);
+}
+
+/* A hairline inside the frame, so a dark picture keeps its edge on the dark ground. */
+.worldcard__art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgb(241 236 227 / 0.08);
+  pointer-events: none;
+}
+
+.worldcard__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.worldcard__link:hover .worldcard__art {
+  box-shadow: 0 16px 32px -16px rgb(0 0 0 / 0.9);
+}
+
+.worldcard__link:hover .worldcard__art::after {
+  box-shadow: inset 0 0 0 1px rgb(241 236 227 / 0.24);
+}
+
+.worldcard__fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 50% 42%, #1f2228, var(--portal-surface) 70%);
+}
+
+.worldcard__mark {
+  width: 3rem;
+  height: 3rem;
+  opacity: 0.3;
+  filter: grayscale(1);
+}
+
+.worldcard__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) 0.125rem 0;
+}
+
+.worldcard__name {
+  display: -webkit-box;
+  margin: 0 0 0.125rem;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-family: var(--display);
+  font-size: 1.25rem;
+  font-weight: 400;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.worldcard__link:hover .worldcard__name bdi {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+.worldcard__facts,
+.worldcard__author {
+  margin: 0;
+  color: var(--portal-muted);
+  font-size: var(--text-ui);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.worldcard__category {
+  color: rgb(241 236 227 / 0.92);
+  font-weight: 500;
+}
+
+/* Loading: the grid's own shape, so the worlds arrive without the page jumping. */
+.worldcard--skeleton .worldcard__text {
+  gap: var(--space-2);
+}
+
+.worldcard__bone {
+  display: block;
+  width: 70%;
+  height: 0.875rem;
+  border-radius: var(--radius-xs);
+  background: rgb(241 236 227 / 0.07);
+}
+
+.worldcard__bone--name {
+  width: 82%;
+  height: 1.25rem;
+}
+
+.worldcard__bone--short {
+  width: 42%;
+}
+
+.explore__more {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-8);
+}
+
+.explore__more-button {
+  align-self: center;
+  min-width: 13rem;
+}
+
+.explore__more-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-ui);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .worldcard__image {
+    transition: transform var(--duration-3) var(--ease);
+  }
+
+  .worldcard__link:hover .worldcard__image {
+    transform: scale(1.025);
+  }
+
+  .worldcard--skeleton {
+    animation: worldcard-wait 1.6s var(--ease) infinite alternate;
+  }
+}
+
+@keyframes worldcard-wait {
+  to {
+    opacity: 0.55;
+  }
+}
+
+/* ---------- The public world page, minimal until 011 ---------- */
+
+.world {
+  max-width: 46rem;
+}
+
 .world__card {
   display: block;
   width: 100%;
   height: auto;
   aspect-ratio: 16 / 10;
   object-fit: cover;
-  border-radius: var(--radius-sm);
-  background: var(--paper);
-}
-
-.explore__name {
-  margin: var(--space-3) 0 var(--space-1);
-  font-size: var(--text-item);
-  overflow-wrap: anywhere;
-}
-
-/* The name is the item's one link, stretched over the whole item. */
-.explore__name a {
-  color: inherit;
-  text-decoration: none;
-}
-
-.explore__name a::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-}
-
-.explore__facts,
-.explore__author {
-  margin: 0;
-  font-size: var(--text-sm);
-  color: var(--muted);
-  overflow-wrap: anywhere;
-}
-
-.world {
-  max-width: 46rem;
+  border-radius: var(--radius-md);
+  background: var(--portal-surface);
 }
 
 .world__title {
