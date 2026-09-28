@@ -30,6 +30,9 @@ const IdeasPage = lazy(() => import('./pages/IdeasPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const LorePage = lazy(() => import('./pages/LorePage'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+const PublicAuthorPage = lazy(() => import('./pages/PublicAuthorPage'))
+const PublicLorePage = lazy(() => import('./pages/PublicLorePage'))
+const PublicStoryPage = lazy(() => import('./pages/PublicStoryPage'))
 const PublicWorldPage = lazy(() => import('./pages/PublicWorldPage'))
 const RegisterPage = lazy(() => import('./pages/RegisterPage'))
 const StoriesPage = lazy(() => import('./pages/StoriesPage'))
@@ -98,6 +101,15 @@ function Root() {
           <Route element={<PublicLayout />}>
             <Route path="/explore" element={asScreen('explore', <ExplorePage />)} />
             <Route path="/worlds/:slug" element={asScreen('world', <PublicWorldPage />)} />
+            <Route
+              path="/worlds/:slug/lore/:loreSlug"
+              element={asScreen('public-lore', <PublicLorePage />)}
+            />
+            <Route
+              path="/worlds/:slug/stories/:storySlug"
+              element={asScreen('public-story', <PublicStoryPage />)}
+            />
+            <Route path="/authors/:authorSlug" element={asScreen('author', <PublicAuthorPage />)} />
           </Route>
 
           {/* The front door is the portal, signed in or not; the workspace is a choice made from it. */}

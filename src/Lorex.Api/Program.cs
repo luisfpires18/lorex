@@ -32,6 +32,7 @@ builder.Services.AddLorexDatabase(builder.Configuration, builder.Environment);
 builder.Services.AddLorexAuth(builder.Environment);
 builder.Services.AddCanonIntegrity();
 builder.Services.AddLoreSearch();
+builder.Services.AddHostedService<Lorex.Api.Features.Publishing.PublicAuthorBackfill>();
 builder.Services.AddLorexMedia(builder.Configuration);
 builder.Services.AddBackupRestore();
 
@@ -78,6 +79,7 @@ app.MapContentPublicationEndpoints();
 app.MapUniverseArtworkEndpoints();
 app.MapPublicNameEndpoints();
 app.MapPublicUniverseEndpoints();
+app.MapPublicAuthorEndpoints();
 app.MapChronologyEndpoints();
 app.MapEntityTypeEndpoints();
 app.MapEntityEndpoints();

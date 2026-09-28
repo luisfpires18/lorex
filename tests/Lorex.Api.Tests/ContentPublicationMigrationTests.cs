@@ -67,6 +67,7 @@ public sealed class ContentPublicationMigrationTests : IDisposable
                 new EntityRequest(types[0].Id, "Migrated heir", "Summary kept.", CanonStatus.Canon, null, null, null))).Id;
             var story = await PlotTestClient.CreateStory(client, universeId, "Migrated tale");
             (await client.PostAsync($"/api/universes/{universeId}/entities/{entry}/publish", null)).EnsureSuccessStatusCode();
+            (await client.PutAsJsonAsync($"{PlotTestClient.Story(universeId, story)}/publication", new StoryPublicationRequest("For readers."))).EnsureSuccessStatusCode();
             (await client.PostAsync($"{PlotTestClient.Story(universeId, story)}/publish", null)).EnsureSuccessStatusCode();
         }
 
@@ -87,7 +88,8 @@ public sealed class ContentPublicationMigrationTests : IDisposable
             Assert.Equal(triggers, await Triggers(db));
             Assert.Equal(
                 indexes.Where(index => !index.StartsWith("IX_Entities_UniverseId_PublicSlug", StringComparison.Ordinal)
-                    && !index.StartsWith("IX_Stories_UniverseId_PublicSlug", StringComparison.Ordinal)),
+                    && !index.StartsWith("IX_Stories_UniverseId_PublicSlug", StringComparison.Ordinal)
+                    && !index.StartsWith("IX_AspNetUsers_PublicAuthorSlug", StringComparison.Ordinal)),
                 await Indexes(db));
             Assert.Equal(1, await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM Entities").SingleAsync());
             Assert.Equal(1, await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM Stories").SingleAsync());

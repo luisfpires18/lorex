@@ -232,6 +232,9 @@ public static partial class ProfileImageEndpoints
         stored.UploadedAt = DateTime.UtcNow;
         SetCrop(stored, prepared.Crop);
 
+        // A new picture is not the one its owner agreed to show publicly (ADR 0037): it starts private again.
+        stored.IsPublic = false;
+
         try
         {
             if (existing is null)

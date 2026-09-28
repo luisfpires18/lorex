@@ -3,6 +3,7 @@ using Lorex.Api.Data;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Stories;
 using Lorex.Api.Features.Universes;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace Lorex.Api.Features.Publishing;
@@ -20,6 +21,10 @@ namespace Lorex.Api.Features.Publishing;
 /// universe together, live only: another account's item, one from another universe and one in the Trash all answer
 /// 404. The item in the Trash keeps its selection and its address; restoring it lets it be read again if it and its
 /// universe are still public.</para>
+///
+/// <para><b>A story needs a public summary.</b> Publishing a story is refused (<c>publication_incomplete</c>) until its
+/// author has written the summary readers see (Task 011) - its premise is planning text and is never used instead. A
+/// story selected before that rule stays selected and stays hidden until it has one.</para>
 ///
 /// <para><b>Transitions, not fields.</b> POST with no body, like a universe's publish. No entry or story save binds
 /// the visibility, the address or the date. Publishing mints the address the first time - from the name or title,
@@ -44,6 +49,7 @@ public static class ContentPublicationEndpoints
             .RequireAuthorization();
 
         stories.MapGet("/publication", GetStoryAsync).WithName("GetStoryPublication");
+        stories.MapPut("/publication", SaveStorySummaryAsync).WithName("SaveStoryPublication");
         stories.MapPost("/publish", PublishStoryAsync).WithName("PublishStory");
         stories.MapPost("/unpublish", UnpublishStoryAsync).WithName("UnpublishStory");
 
@@ -99,7 +105,62 @@ public static class ContentPublicationEndpoints
                 story.Title,
                 PublicSlugs.StoryFallback,
                 cancellationToken),
-            cancellationToken);
+            cancellationToken,
+            story => story.PublicSummary is null
+                ? new Dictionary<string, string[]> { [PublicationRules.PublicSummary] = ["Write a public summary for readers before publishing this story."] }
+                : null);
+
+    /// <summary>
+    /// Saves the story's public summary (Task 011) - the one thing about a story written for the portal. Trimmed, blank
+    /// is none, at most <see cref="PublicationLimits.SummaryMaxLength"/>. While the story is selected it cannot be
+    /// removed - make the story private first - as a public universe keeps its own summary. Not an edit of the story:
+    /// its <c>UpdatedAt</c> and history are left alone, like every other publication write.
+    /// </summary>
+    private static async Task<IResult> SaveStorySummaryAsync(
+        Guid universeId,
+        Guid storyId,
+        [FromBody] StoryPublicationRequest request,
+        ClaimsPrincipal principal,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var summary = string.IsNullOrWhiteSpace(request.PublicSummary) ? null : request.PublicSummary.Trim();
+        if (summary is { Length: > PublicationLimits.SummaryMaxLength })
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [PublicationRules.PublicSummary] = [$"Keep the public summary under {PublicationLimits.SummaryMaxLength} characters."],
+            });
+        }
+
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken)
+            || await StoryEndpoints.FindAsync(db, universeId, storyId, cancellationToken) is not { } story)
+        {
+            return Results.NotFound();
+        }
+
+        if (summary is null && story.Visibility == ContentVisibility.Public)
+        {
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]>
+                {
+                    [PublicationRules.PublicSummary] = ["A published story needs its public summary. Make the story private before removing it."],
+                },
+                extensions: new Dictionary<string, object?> { ["code"] = PublicationEndpoints.RequiredWhilePublicCode });
+        }
+
+        if (story.PublicSummary != summary)
+        {
+            story.PublicSummary = summary;
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        var state = await StateAsync(db, universeId, story, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return Results.Ok(state);
+    }
 
     private static Task<IResult> UnpublishStoryAsync(
         Guid universeId, Guid storyId, ClaimsPrincipal principal, LorexDbContext db, CancellationToken cancellationToken) =>
@@ -121,7 +182,8 @@ public static class ContentPublicationEndpoints
         Func<Task<T?>> find,
         ContentVisibility? to,
         Func<T, Task<string>>? mint,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<T, Dictionary<string, string[]>?>? missing = null)
         where T : class, IPublishable
     {
         // A read takes no write lock: SQLite has one writer, and a GET should not queue behind it.
@@ -142,6 +204,14 @@ public static class ContentPublicationEndpoints
         {
             if (visibility == ContentVisibility.Public)
             {
+                if (missing?.Invoke(item) is { } needed)
+                {
+                    return Results.ValidationProblem(
+                        needed,
+                        detail: "This is not ready to publish yet.",
+                        extensions: new Dictionary<string, object?> { ["code"] = PublicationEndpoints.IncompleteCode });
+                }
+
                 item.PublicSlug ??= await mint!(item);
                 item.PublishedAt ??= DateTime.UtcNow;
             }
@@ -150,12 +220,25 @@ public static class ContentPublicationEndpoints
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        var universeIsPublic = await PublicationRules.Public(db).AnyAsync(universe => universe.Id == universeId, cancellationToken);
+        var state = await StateAsync(db, universeId, item, cancellationToken);
         if (transaction is not null)
         {
             await transaction.CommitAsync(cancellationToken);
         }
 
-        return Results.Ok(new ContentPublicationState(item.Visibility, item.PublicSlug, item.PublishedAt, universeIsPublic));
+        return Results.Ok(state);
     }
+
+    private static async Task<ContentPublicationState> StateAsync<T>(
+        LorexDbContext db,
+        Guid universeId,
+        T item,
+        CancellationToken cancellationToken)
+        where T : class, IPublishable =>
+        new(
+            item.Visibility,
+            item.PublicSlug,
+            item.PublishedAt,
+            await PublicationRules.Public(db).AnyAsync(universe => universe.Id == universeId, cancellationToken),
+            (item as Story)?.PublicSummary);
 }

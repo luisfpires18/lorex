@@ -158,7 +158,8 @@ public sealed class FamilySemanticMigrationTests : IDisposable
         || index.StartsWith("IX_Universes_Visibility_PublishedAt ", StringComparison.Ordinal)
         || index.EndsWith(" on UniverseArtworks", StringComparison.Ordinal)
         || index.StartsWith("IX_Entities_UniverseId_PublicSlug ", StringComparison.Ordinal)
-        || index.StartsWith("IX_Stories_UniverseId_PublicSlug ", StringComparison.Ordinal);
+        || index.StartsWith("IX_Stories_UniverseId_PublicSlug ", StringComparison.Ordinal)
+        || index.StartsWith("IX_AspNetUsers_PublicAuthorSlug ", StringComparison.Ordinal);
 
     private LorexDbContext Context() =>
         new(new DbContextOptionsBuilder<LorexDbContext>().UseSqlite($"Data Source={DataSource}").Options);

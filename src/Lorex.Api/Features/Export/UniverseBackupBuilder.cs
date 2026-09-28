@@ -741,7 +741,8 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                     Utc(story.DeletedAt),
                     chaptersByStory.GetValueOrDefault(story.Id, []),
                     scenesByStory.GetValueOrDefault(story.Id, []),
-                    arcsByStory.GetValueOrDefault(story.Id, []))),
+                    arcsByStory.GetValueOrDefault(story.Id, []),
+                    story.PublicSummary)),
         ];
     }
 

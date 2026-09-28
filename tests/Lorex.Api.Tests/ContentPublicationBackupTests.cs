@@ -27,7 +27,7 @@ public sealed class ContentPublicationBackupTests(LorexApiFactory factory) : ICl
         await Published(client, universe.Id);
 
         var archive = await PlotTestClient.RawArchive(client, universe.Id);
-        Assert.Equal(15, BackupOf(archive).FormatVersion);
+        Assert.Equal(16, BackupOf(archive).FormatVersion);
 
         var text = DocumentOf(archive);
         foreach (var absent in new[] { "visibility", "publicSlug", "publishedAt", "backed-heir", "backed-tale" })
@@ -69,6 +69,30 @@ public sealed class ContentPublicationBackupTests(LorexApiFactory factory) : ICl
         await AssertNothingPublished(client, fromOlder.Id, "cp-backup-older-restored");
     }
 
+    [Fact]
+    public async Task A_storys_public_summary_travels_and_comes_back_on_a_private_story_and_an_older_file_has_none()
+    {
+        var (client, _) = await Account(_factory, "cpbak-summary");
+        var universe = await Ready(client, "Cp backup summary");
+        await PublishedItems(client, universe.Id);
+        var archive = await PlotTestClient.RawArchive(client, universe.Id);
+
+        Assert.Equal("For readers.", Assert.Single(BackupOf(archive).Payload.Stories!).PublicSummary);
+
+        var restored = await RestoreArchive(client, archive, "Cp backup summary restored");
+        var story = Assert.Single((await client.GetFromJsonAsync<List<StorySummary>>(PlotTestClient.Stories(restored.Id)))!);
+        var state = (await client.GetFromJsonAsync<ContentPublicationState>($"{PlotTestClient.Story(restored.Id, story.Id)}/publication"))!;
+        Assert.Equal((ContentVisibility.Private, "For readers."), (state.Visibility, state.PublicSummary));
+
+        var older = await RestoreArchive(client, Downgrade(archive, 15), "Cp backup summary older");
+        var olderStory = Assert.Single((await client.GetFromJsonAsync<List<StorySummary>>(PlotTestClient.Stories(older.Id)))!);
+        Assert.Null((await client.GetFromJsonAsync<ContentPublicationState>($"{PlotTestClient.Story(older.Id, olderStory.Id)}/publication"))!.PublicSummary);
+
+        // A summary longer than Lorex writes is refused, not cut.
+        var overlong = Rewrite(archive, root => StoryTitled(root, "Backed tale")["publicSummary"] = new string('x', PublicationLimits.SummaryMaxLength + 1));
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, (await Validate(client, overlong)).StatusCode);
+    }
+
     /// <summary>An entry and a story, both selected - the universe itself left as it is.</summary>
     private static async Task PublishedItems(HttpClient client, Guid universeId)
     {
@@ -80,6 +104,7 @@ public sealed class ContentPublicationBackupTests(LorexApiFactory factory) : ICl
         var story = await PlotTestClient.CreateStory(client, universeId, "Backed tale");
 
         (await client.PostAsync($"/api/universes/{universeId}/entities/{entry}/publish", null)).EnsureSuccessStatusCode();
+        (await client.PutAsJsonAsync($"{PlotTestClient.Story(universeId, story)}/publication", new StoryPublicationRequest("For readers."))).EnsureSuccessStatusCode();
         (await client.PostAsync($"{PlotTestClient.Story(universeId, story)}/publish", null)).EnsureSuccessStatusCode();
     }
 

@@ -40,6 +40,8 @@ namespace Lorex.Api.Features.Restore;
 /// name (<c>AddRelationshipFamilySemantics</c>, ADR 0035).</item>
 /// <item>Versions 1-14: no public summary, category, genre or artwork, even when the file carries them (<c>AddUniversePublication</c>,
 /// ADR 0036). In every version the restored universe is private: no version of the format can say otherwise.</item>
+/// <item>Versions 1-15: no story has a public summary, even when the file carries one, and none is ever taken from a
+/// premise (<c>AddPublicReading</c>, Task 011). In every version every restored entry and story is private.</item>
 /// </list>
 ///
 /// One thing is normalized for every version: the live rows of each ordered collection are numbered
@@ -115,6 +117,7 @@ internal static class BackupNormalization
     private static BackupStory ProjectStory(BackupStory story, int version) => story with
     {
         DeletedAt = version >= 10 ? story.DeletedAt : null,
+        PublicSummary = version >= 16 ? story.PublicSummary : null,
         Chapters = version >= 6 && story.Chapters is not null
             ? [.. story.Chapters.Select(chapter => chapter is null ? null! : chapter with { DeletedAt = version >= 10 ? chapter.DeletedAt : null })]
             : version >= 6 ? null : [],

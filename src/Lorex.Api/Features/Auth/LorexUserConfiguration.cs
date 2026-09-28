@@ -18,5 +18,11 @@ public sealed class LorexUserConfiguration : IEntityTypeConfiguration<LorexUser>
 
         builder.Property(user => user.PublicDisplayName)
             .HasMaxLength(Publishing.PublicationLimits.DisplayNameMaxLength);
+
+        // The public author address (ADR 0037): unique across accounts; nulls - every account never published -
+        // do not collide.
+        builder.Property(user => user.PublicAuthorSlug)
+            .HasMaxLength(Publishing.PublicationLimits.SlugMaxLength);
+        builder.HasIndex(user => user.PublicAuthorSlug).IsUnique();
     }
 }

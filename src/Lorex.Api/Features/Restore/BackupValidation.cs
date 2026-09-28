@@ -1033,6 +1033,7 @@ internal static partial class BackupValidation
             var what = $"The story {Quote(story.Title)}";
             Text(story.Title, StoryLimits.TitleMaxLength, $"{what}'s title", required: true);
             Text(story.Premise, StoryLimits.PremiseMaxLength, $"{what}'s premise");
+            Text(story.PublicSummary, PublicationLimits.SummaryMaxLength, $"{what}'s public summary");
             Defined(story.Status, $"{what}'s status");
 
             var chapters = new HashSet<Guid>();

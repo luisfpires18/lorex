@@ -102,3 +102,10 @@ a different feature's endpoint, and it changes while the session does not.
   will not delete is logged by key and left.
 - Two write paths now depend on `ImagePreparation`. Changing an accepted format or a limit changes
   both at once, which is the point, and both suites cover it.
+
+## Amendment: a photo may be shown on the public author page, by choice (2026-09-28)
+
+The photo is private to its owner's session unless its owner chooses to show it on their public author page (ADR 0037):
+`ProfileImages.IsPublic`, false by default and false again whenever the photo is replaced. Only its square is ever served
+publicly, and only through the author routes, which ask on every request whether the choice is on and the author has a
+public universe. The owner's own routes here are unchanged.

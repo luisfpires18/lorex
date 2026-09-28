@@ -74,6 +74,11 @@ export function categoryLabel(value: CategoryValue) {
   return CATEGORIES.find((category) => category.value === value)?.label ?? ''
 }
 
+/** A genre's address key, which is also what its chip is tinted by. */
+export function genreKey(value: GenreValue) {
+  return GENRES.find((genre) => genre.value === value)?.key
+}
+
 export function genreLabel(value: GenreValue) {
   return GENRES.find((genre) => genre.value === value)?.label ?? ''
 }
@@ -141,7 +146,23 @@ export interface ContentPublicationState {
   publicSlug: string | null
   publishedAt: string | null
   universeIsPublic: boolean
+  /**
+   * A story's public summary (Task 011), written for readers and never taken from its premise; a story needs one to be
+   * published, and one selected without it stays hidden. Always null for a lore entry.
+   */
+  publicSummary: string | null
 }
 
 /** Which kind of item a publication control is for - they share one control and one set of routes. */
 export type ContentKind = 'entry' | 'story'
+
+/** The signed-in account's public author page, as its owner manages it (ADR 0037). */
+export interface PublicAuthorSettings {
+  /** The page's address once the first universe is published; null before. */
+  authorSlug: string | null
+  /** Whether the page resolves now: it does only while one of the account's universes is public. */
+  hasPublicWorld: boolean
+  hasPhoto: boolean
+  /** Whether the owner chose to show their photo there. Replacing the photo turns this off again. */
+  photoIsPublic: boolean
+}

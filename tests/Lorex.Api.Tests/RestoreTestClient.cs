@@ -471,6 +471,15 @@ internal static partial class RestoreTestClient
             }
         }
 
+        if (version < 16)
+        {
+            // A story's public summary arrived in version 16.
+            foreach (var story in payload["stories"]?.AsArray() ?? [])
+            {
+                Drop(story, "publicSummary");
+            }
+        }
+
         if (version < 15)
         {
             // A universe's public details and its artwork arrived in version 15; the artwork's original with them.

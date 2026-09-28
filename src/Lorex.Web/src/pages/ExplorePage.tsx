@@ -1,15 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { BrandMark } from '../components/BrandMark'
 import { EmptyState } from '../components/EmptyState'
-import {
-  listPublicUniverses,
-  worldPath,
-  type ExploreQuery,
-  type PublicUniverse,
-} from '../portal/api'
+import { WorldCard } from '../components/WorldCard'
+import { listPublicUniverses, type ExploreQuery, type PublicUniverse } from '../portal/api'
 import heroImage from '../portal/explore-worlds-background.png'
-import { CATEGORIES, categoryLabel, GENRES, genreLabel, type GenreValue } from '../publishing/types'
+import { CATEGORIES, GENRES } from '../publishing/types'
 
 /** The API's own limit on a search; the portal bar's field holds the same. */
 const SEARCH_MAX = 100
@@ -284,65 +279,6 @@ export default function ExplorePage() {
       </div>
     </div>
   )
-}
-
-/**
- * One public universe as a card: one dark panel with the artwork across its top, fading into the panel, the name
- * set over the picture's lower edge, the genres as chips, and a line with the author and the category. The picture
- * is the author's 16:10 frame, whole - the panel grows around it rather than cropping it. The whole card is one link
- * to its page; nothing else inside it is interactive. If the picture cannot be shown, the card keeps its shape with
- * the Lorex mark rather than borrowing anyone's art.
- */
-function WorldCard({ world }: { world: PublicUniverse }) {
-  const [broken, setBroken] = useState(false)
-
-  return (
-    <li className="worldcard">
-      <Link className="worldcard__link" to={worldPath(world.slug)}>
-        <div className="worldcard__art">
-          {broken ? (
-            <span className="worldcard__fallback" data-testid="worldcard-fallback">
-              <BrandMark className="worldcard__mark" />
-            </span>
-          ) : (
-            <img
-              className="worldcard__image"
-              src={world.cardImageUrl}
-              alt=""
-              width={960}
-              height={600}
-              loading="lazy"
-              decoding="async"
-              onError={() => setBroken(true)}
-            />
-          )}
-        </div>
-        <div className="worldcard__text">
-          <h3 className="worldcard__name" dir="auto" title={world.name}>
-            <bdi>{world.name}</bdi>
-          </h3>
-          <ul className="worldcard__genres" aria-label="Genres">
-            {world.genres.map((genre) => (
-              <li className="genrechip" data-genre={genreKey(genre)} key={genre}>
-                {genreLabel(genre)}
-              </li>
-            ))}
-          </ul>
-          <p className="worldcard__byline">
-            <span className="worldcard__author" dir="auto" title={`by ${world.authorDisplayName}`}>
-              by <bdi>{world.authorDisplayName}</bdi>
-            </span>
-            <span className="worldcard__category">{categoryLabel(world.category)}</span>
-          </p>
-        </div>
-      </Link>
-    </li>
-  )
-}
-
-/** A genre's address key, which is also what its chip is tinted by. */
-function genreKey(value: GenreValue) {
-  return GENRES.find((genre) => genre.value === value)?.key
 }
 
 /** The current address with one parameter set, or removed when it would be the default. */

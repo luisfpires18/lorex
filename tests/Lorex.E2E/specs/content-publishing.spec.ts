@@ -140,9 +140,9 @@ test.describe('publishing lore and stories', () => {
     await expect(panel).toContainText(
       'Publishing this lore entry makes it available in your public universe.',
     )
-    await expect(panel).toContainText('Its name, type, summary and thumbnail are listed.')
+    await expect(panel).toContainText('Readers see its name, type, summary, picture and article.')
     await expect(panel).toContainText(
-      'Its article, fields, relationships and history are not published.',
+      'Its fields, aliases, tags, relationships and history are not published.',
     )
     await expect(page.getByTestId('publish-entry')).toBeFocused()
     await page.getByTestId('publish-entry').click()
@@ -202,13 +202,29 @@ test.describe('publishing lore and stories', () => {
     const pill = page.getByTestId('story-publication')
     await expect(page.getByTestId('story-publication-state')).toHaveText('Private')
 
+    // A story needs a public summary before it can be published (Task 011); the premise never stands in for it.
     await pill.click()
     const panel = page.getByTestId('story-publication-panel')
     await expect(panel).toContainText(
-      'Your universe is private. Publishing selects this story: it remains hidden while the universe is private.',
+      'A story needs a public summary, written for readers, before it can be published.',
     )
     await expect(panel).toContainText(
       'Its premise, chapters, scenes, manuscript, plot and notes are not published.',
+    )
+    await expect(page.getByTestId('publish-story')).toBeDisabled()
+    await page.getByTestId('edit-story-public-summary').click()
+    await page
+      .getByTestId('story-public-summary-input')
+      .fill('Told for readers: a tide that counts.')
+    await page.getByTestId('save-story-public-summary').click()
+    await expect(page.getByTestId('story-public-summary-form')).toHaveCount(0)
+
+    await pill.click()
+    await expect(panel).toContainText(
+      'Your universe is private. Publishing selects this story: it remains hidden while the universe is private.',
+    )
+    await expect(page.getByTestId('story-public-summary')).toContainText(
+      'Told for readers: a tide that counts.',
     )
     await page.getByTestId('publish-story').click()
     await expect(page.getByTestId('story-publication-state')).toHaveText('Selected')

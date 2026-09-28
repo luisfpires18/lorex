@@ -66,13 +66,28 @@ public sealed record UniverseArtworkCardRequest(Guid AssetId, ImageCrop? Crop);
 /// One lore entry's or story's publication, as its owner sees it: whether they selected it, its address and first
 /// publication date once it has them, and whether its universe is public now - so a screen can say "public" or
 /// "selected, but the universe is private" without the author having to work it out. The item is public to anyone
-/// exactly when <see cref="Visibility"/> is <c>Public</c> and <see cref="UniverseIsPublic"/> is true.
+/// exactly when <see cref="Visibility"/> is <c>Public</c> and <see cref="UniverseIsPublic"/> is true - and, for a
+/// story, when it has its <see cref="PublicSummary"/> (Task 011). Always null for a lore entry.
 /// </summary>
 public sealed record ContentPublicationState(
     ContentVisibility Visibility,
     string? PublicSlug,
     DateTime? PublishedAt,
-    bool UniverseIsPublic);
+    bool UniverseIsPublic,
+    string? PublicSummary = null);
+
+/// <summary>
+/// A story's public summary as its owner saves it, on its publication route and nowhere else. Visibility, address and
+/// date are not here: a body carrying them has them ignored.
+/// </summary>
+public sealed record StoryPublicationRequest(string? PublicSummary);
+
+/// <summary>
+/// Where the signed-in owner edits what a public address shows (Task 011): the ids of their own universe and, when
+/// asked, of the entry or story at a child address. Answered only to that owner; everyone else gets a 404, so it says
+/// nothing about who owns a world.
+/// </summary>
+public sealed record WorkspaceLink(Guid UniverseId, Guid? EntityId, Guid? StoryId);
 
 // ---------- The public side: anonymous ----------
 
@@ -81,6 +96,7 @@ public sealed record ContentPublicationState(
 /// public, and it is built by a projection that names each one - never by serialising a universe and
 /// leaving things out - so a property added to <c>Universe</c> can never reach this by accident. No
 /// id, no owner, no username or email, no description, no colour, no audit dates, no object key.
+/// <see cref="AuthorSlug"/> is the author's public address (ADR 0037), never an account id.
 ///
 /// None of these is ever null: the public query only returns universes that have all of them.
 /// <see cref="Genres"/> are in their one fixed order. <see cref="CardImageUrl"/> is a same-origin
@@ -94,6 +110,7 @@ public sealed record PublicUniverse(
     UniverseCategory Category,
     IReadOnlyList<UniverseGenres> Genres,
     string AuthorDisplayName,
+    string AuthorSlug,
     string CardImageUrl,
     DateTime PublishedAt);
 
@@ -122,14 +139,42 @@ public sealed record PublicLoreEntry(
     DateTime PublishedAt);
 
 /// <summary>
-/// A published story, as anyone may list it (Task 010): its address, title and first publication. Nothing else -
-/// not its premise, which is the author's planning text, and nothing inside it: no chapter, scene, manuscript, plot
-/// or note. What a reader reads of a story is Task 011's contract, and it will be its own.
+/// A published story, as anyone may read it - in a listing and at its own address alike (Tasks 010-011): its address,
+/// title, the public summary its author wrote for readers, and its first publication. Nothing else - not its premise,
+/// which is the author's planning text, and nothing inside it: no chapter, scene, manuscript, plot, point of view, lore
+/// reference or note.
 /// </summary>
 public sealed record PublicStory(
     string Slug,
     string Title,
+    string PublicSummary,
     DateTime PublishedAt);
+
+/// <summary>
+/// A published lore entry's own page (Task 011): what <see cref="PublicLoreEntry"/> lists, plus its article.
+/// <see cref="Article"/> is the entry's Tiptap document as a string - the one the workspace renders - with every link
+/// that is not an absolute http, https or mailto address unwrapped to its text, so no workspace address or id rides
+/// along; null when the entry has no article. Never its fields, aliases, tags, Canon status, relationships, history,
+/// ids or the picture's original.
+/// </summary>
+public sealed record PublicLoreDetail(
+    string Slug,
+    string Name,
+    string? Summary,
+    string TypeName,
+    string? ThumbnailUrl,
+    string? Article,
+    DateTime PublishedAt);
+
+/// <summary>
+/// An author, as anyone may read them (ADR 0037): their address, their public name, and their photo's public square
+/// only if they chose to show it. Answered only while they have a public universe. No account id, username, email or
+/// counts.
+/// </summary>
+public sealed record PublicAuthor(
+    string Slug,
+    string DisplayName,
+    string? AvatarUrl);
 
 /// <summary>One page of a public universe's published entries or stories.</summary>
 public sealed record PublicContentPage<T>(
@@ -142,5 +187,17 @@ public sealed record PublicContentPage<T>(
 // ---------- The account's public name ----------
 
 public sealed record PublicNameRequest(string? PublicDisplayName);
+
+/// <summary>
+/// The signed-in account's public author page, as its owner manages it (ADR 0037): its address once minted, whether it
+/// resolves now (it has a public universe), whether there is a photo, and whether the owner chose to show it.
+/// </summary>
+public sealed record PublicAuthorSettings(
+    string? AuthorSlug,
+    bool HasPublicWorld,
+    bool HasPhoto,
+    bool PhotoIsPublic);
+
+public sealed record PublicAuthorPhotoRequest(bool IsPublic);
 
 public sealed record PublicNameResponse(string? PublicDisplayName);

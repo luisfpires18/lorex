@@ -119,3 +119,24 @@ The same principle, one level down: nothing inside a universe is public because 
   of any version, or of a forged file claiming otherwise - has every item private.
 - Relationships, family trees, timeline, world rules, ideas and Canon stay private; no public detail route for an entry
   or a story exists yet. Task 011 builds reading on these contracts with its own detail DTOs.
+
+## Amendment (2026-09-28, Task 011) - public reading: an entry's page, a story's page, and a story's public summary
+
+- **An entry's page carries its article.** `GET /api/public/universes/{slug}/lore/{loreSlug}` -> `PublicLoreDetail`: the
+  listing's members plus `article`, the stored Tiptap document with every link that is not an absolute http, https or
+  mailto address unwrapped to its text (so no relative workspace link or id is published) and its first-level headings
+  read as second-level ones (the page's title is its only `h1`). Rendered by the workspace's own read-only renderer, which
+  builds DOM from the schema and never parses HTML. Still never the entry's fields, aliases, tags, Canon status,
+  relationships, history or ids: aliases can be secret names and fields can reference private entries.
+- **A story is published only with a public summary.** `Stories.PublicSummary` (at most 300), written on the story's
+  publication route (`PUT .../stories/{id}/publication`) and never by a story save; publishing refuses
+  (`publication_incomplete`, `publicSummary`) without it, and it cannot be removed while the story is selected. The
+  premise is planning text and is never shown or copied. `PublicStories` requires the summary, so a story selected in Task
+  010 without one stays selected and stays hidden until its author writes one. `PublicStory` gains `publicSummary`; a
+  story's page (`.../stories/{storySlug}`) is that same allow-list - no prose, chapters, scenes, plot or notes. Publishing
+  prose is a later decision about chapters and scenes, not made here.
+- **Public universes name their author's address.** `PublicUniverse` gains `authorSlug` (nine members) - see ADR 0037.
+- **Owners find their way back without anything public changing.** `GET /api/universes/by-address/{slug}?lore=&story=`,
+  owner-scoped, answers the owner's own universe, entry and story ids; everyone else gets a 404. The portal asks it only
+  when someone is signed in, and shows "Edit this world" / "Edit in workspace" to the owner alone.
+- Backup format 16 carries a story's public summary; publication never. Every restore is private.
