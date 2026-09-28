@@ -16,6 +16,15 @@ type LoadState =
  * public page, with what its author publishes inside it, is a later task's.
  */
 export default function PublicWorldPage() {
+  // A page width of its own: the portal's main is full-bleed, for Explore's hero.
+  return (
+    <div className="portal__page">
+      <PublicWorld />
+    </div>
+  )
+}
+
+function PublicWorld() {
   const { slug = '' } = useParams<{ slug: string }>()
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
 

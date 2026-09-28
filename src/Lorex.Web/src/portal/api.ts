@@ -27,9 +27,24 @@ export interface PublicUniversePage {
 
 const BASE = '/api/public/universes'
 
-/** Public universes, most recently published first. Works signed in or out; sends nothing about the session. */
-export function listPublicUniverses(page: number, signal?: AbortSignal) {
-  return apiFetch<PublicUniversePage>(`${BASE}?page=${page}`, { signal })
+/**
+ * What Explore asks for, in the public API's own terms: category and genre keys (`games`, `science-fiction`),
+ * a search over the public fields, and `az` or the default, most recently published first.
+ */
+export interface ExploreQuery {
+  category?: string
+  genre?: string
+  q?: string
+  sort?: 'az'
+}
+
+/** One page of public universes. Works signed in or out; sends nothing about the session. */
+export function listPublicUniverses(query: ExploreQuery, page: number, signal?: AbortSignal) {
+  const params = new URLSearchParams({ page: String(page) })
+  for (const [name, value] of Object.entries(query)) {
+    if (value) params.set(name, value)
+  }
+  return apiFetch<PublicUniversePage>(`${BASE}?${params}`, { signal })
 }
 
 /** One public universe by its address. A private or missing one is the same 404. */

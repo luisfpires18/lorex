@@ -1,13 +1,15 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { AuthLayout } from '../components/AuthLayout'
 import { Field } from '../components/Field'
+import { returnPath } from '../auth/returnPath'
 import { useAuth } from '../auth/useAuth'
 import { ApiError } from '../lib/api'
 
 export default function RegisterPage() {
   const { register } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
@@ -31,7 +33,7 @@ export default function RegisterPage() {
 
     try {
       await register({ username, email, password })
-      await navigate('/app', { replace: true })
+      await navigate(returnPath(location.state), { replace: true })
     } catch (error: unknown) {
       if (error instanceof ApiError) {
         setFieldErrors(error.fieldErrors)
@@ -51,7 +53,10 @@ export default function RegisterPage() {
       intro="Claim a name, and the workroom is yours."
       footer={
         <>
-          Already have an account? <Link to="/login">Sign in</Link>
+          Already have an account?{' '}
+          <Link to="/login" state={location.state}>
+            Sign in
+          </Link>
         </>
       }
     >

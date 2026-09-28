@@ -316,7 +316,7 @@ test.describe('publishing a universe', () => {
     await expect(visitor.getByTestId('public-world').getByRole('heading', { level: 1 })).toHaveText(
       name,
     )
-    await expect(visitor.getByTestId('portal-session')).toContainText('Sign in')
+    await expect(visitor.getByTestId('portal-session')).toContainText('Log in')
     await expect(visitor.getByTestId('portal-session')).toContainText('Create account')
 
     // ---------- Making it private again ----------

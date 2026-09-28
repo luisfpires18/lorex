@@ -100,6 +100,9 @@ function Root() {
             <Route path="/worlds/:slug" element={asScreen('world', <PublicWorldPage />)} />
           </Route>
 
+          {/* The front door is the portal, signed in or not; the workspace is a choice made from it. */}
+          <Route path="/" element={<Navigate to="/explore" replace />} />
+
           <Route element={<RequireGuest />}>
             <Route path="/login" element={asScreen('login', <LoginPage />)} />
             <Route path="/register" element={asScreen('register', <RegisterPage />)} />
