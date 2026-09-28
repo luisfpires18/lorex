@@ -74,6 +74,7 @@ app.MapAuthEndpoints();
 app.MapProfileImageEndpoints();
 app.MapUniverseEndpoints();
 app.MapPublicationEndpoints();
+app.MapContentPublicationEndpoints();
 app.MapUniverseArtworkEndpoints();
 app.MapPublicNameEndpoints();
 app.MapPublicUniverseEndpoints();

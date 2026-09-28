@@ -141,7 +141,7 @@ public sealed class EntityFieldOption
 /// A record in a universe. Named LoreEntity so it does not collide with EF Core's own
 /// use of "entity" throughout the codebase.
 /// </summary>
-public sealed class LoreEntity
+public sealed class LoreEntity : Publishing.IPublishable
 {
     public Guid Id { get; set; }
 
@@ -181,6 +181,19 @@ public sealed class LoreEntity
     /// <c>docs/architecture/decisions/0015-entity-trash-and-restore.md</c>.
     /// </summary>
     public DateTime? DeletedAt { get; set; }
+
+    /// <summary>
+    /// Whether the author selected this entry for the public portal. Read only together with its universe's
+    /// visibility and <see cref="DeletedAt"/> - <see cref="Publishing.PublicationRules.PublicLore"/> - and changed
+    /// only by the entry's publish and unpublish routes (ADR 0036).
+    /// </summary>
+    public Publishing.ContentVisibility Visibility { get; set; }
+
+    /// <summary>The entry's public address inside its universe, minted at first publication and never changed after.</summary>
+    public string? PublicSlug { get; set; }
+
+    /// <summary>When the entry was first published. Republishing keeps it.</summary>
+    public DateTime? PublishedAt { get; set; }
 
     public DateTime CreatedAt { get; set; }
 

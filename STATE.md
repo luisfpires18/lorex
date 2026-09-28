@@ -50,9 +50,9 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
-- **Public portal phase.** Roadmap: **008** publication foundation (done), **009** Explore Worlds portal (current),
-  **010** content publishing controls (next), **011** public universe experience, **012** portal polish, SEO, performance and
-  safety. See Public portal below and `docs/public-portal/PUBLIC_PORTAL.md`.
+- **Public portal phase.** Roadmap: **008** publication foundation (done), **009** Explore Worlds portal (done),
+  **010** content publishing controls (current, on its branch), **011** public universe experience (next), **012** portal
+  polish, SEO, performance and safety. See Public portal below and `docs/public-portal/PUBLIC_PORTAL.md`.
 - **Entry images** (`feat/entity-images-r2`, merged into `dev`). An entry may carry one picture:
   uploaded through the API, decoded and thumbnailed server-side, stored as two objects in one
   private Cloudflare R2 bucket, and served back only through an authenticated owner-scoped Lorex
@@ -690,29 +690,41 @@ A public, read-only discovery experience beside the workspace, in the same appli
     states) is held for 012.
   - Archived public universes stay public: the public predicate ignores archive state. An owner question for later;
     009 follows the predicate exactly.
-- **009 - Explore Worlds portal** (`feat/explore-worlds-portal` off `dev` at `2b74f26`, committed, not merged, not
-  pushed). `PUBLIC_PORTAL.md` sections 12-14.
-  - API: the public list takes `category`, `genre` (keys from enum names), `q` (substring of name, public summary,
-    public author name; max 100) and `sort` (`recent` | `az`, slug tie-break), all inside the one public predicate.
-    Unknown values are a 400 validation problem; paging stays clamped. DTO unchanged. No schema, migration or backup
-    change.
-  - Web: `/explore` - hero on the owner's background (moved byte-identical to `src/Lorex.Web/src/portal/`), search,
-    category pills, genre and sort selects, all in the address; one card per universe; Show more worlds; loading,
-    empty, no-match and error states. The portal bar: Sign in / Create account, or My workspace and the account
-    menu. `.portal` scopes a dark token set; workspace tokens untouched. `/worlds/:slug` is 008's page in the dark frame.
-  - Follow-up (review of `e47c1c7`): the layout now follows the owner's portal reference - search in a solid bar,
-    a compact panoramic band holding the title and categories, four large card panels with the artwork bleeding in
-    and genre chips. The portal is the front door: `/` opens `/explore`; Log in and Create account return to the
-    public page they were chosen on (router state, checked by `auth/returnPath.ts`); only My workspace enters the
-    workspace. `RequireGuest` redirects to the same return path, so it no longer races a sign-in to `/app`.
-  - Debt for 012: the hero PNG is 2.37 MB, used as supplied - a smaller derivative needs the owner's approval. The
-    loaded "Show more" pages are not in the address.
+- **009 - Explore Worlds portal** - done: `e47c1c7` + `c789b3a`, merged into `dev` at `72c50eb`; Deploy DEV #49 green.
+  `PUBLIC_PORTAL.md` sections 12-14. The public list filters (`category`, `genre`, `q`, `sort`) inside the one predicate;
+  `/explore` in the owner's portal layout; `/` opens Explore; Log in and Create account return to the public page they
+  were chosen on (`auth/returnPath.ts`). Debt for 012: the 2.37 MB hero PNG (a derivative needs the owner's approval),
+  and "Show more" pages not in the address.
+- **010 - Content publishing controls** (`feat/content-publishing-controls` off `dev` at `72c50eb`, committed, not
+  merged, not pushed). ADR 0036 amended; `PUBLIC_PORTAL.md` section 15.
+  - Entries and stories each carry `Visibility` (`ContentVisibility`, Private default), `PublicSlug`, `PublishedAt`.
+    Migration `AddContentPublication` leaves every item private, unaddressed, undated - public universes included.
+  - Public to anyone only while the item is selected, out of the Trash and in a public universe: `PublicLore` /
+    `PublicStories` hold the universe predicate. Universe private hides every selected item and clears nothing; an owner
+    may select while private ("Selected"). Trash hides; restore brings the selection back.
+  - Owner routes: `GET .../{entities|stories}/{id}/publication`, `POST .../publish`, `.../unpublish` - owner-only,
+    idempotent, no body; not an edit (no `UpdatedAt`, history or search write). Addresses from the shared generator,
+    unique per universe and kind, `entry`/`story` fallbacks, kept through renames and unpublishing.
+  - Anonymous: `/api/public/universes/{slug}/lore` (`slug`, `name`, `summary`, `typeName`, `thumbnailUrl`,
+    `publishedAt`), `/stories` (`slug`, `title`, `publishedAt`), `/lore/{loreSlug}/thumbnail/{id}` (square thumbnail
+    only, ETag after the check). Paged 24/48, by name or title then address. Story premise not published.
+  - Web: a Private / Public / Selected pill before Edit on an entry and in a story's line of facts, opening an
+    `ActionMenu` panel that is the confirmation. Settings' note and publish confirmation now say items are published
+    one by one. No list badges, counts, bulk actions or child public pages (011).
+  - Backup format 15 unchanged; restores private whatever the file says.
+  - Owner questions for 011: whether a story needs a reader-facing summary (the premise is planning text); whether
+    restoring a published entry from the Trash should ask before it is public again.
 
 ## Baseline
 
-- **1077 API integration tests, 217 Playwright tests** (Explore 009: +24 API in `PublicExploreQueryTests`, +13 in
-  `explore.spec.ts`). 009 follow-up: full Playwright on a fresh database **217/217**, one invocation, two workers,
-  retries 0, 9.6 min; no backend change, so the API suite (1077/1077) and Release build were not rerun. 009:
+- **1093 API integration tests, 222 Playwright tests** (Content publishing 010: +16 API - 13 in
+  `ContentPublicationTests`, 2 in `ContentPublicationBackupTests`, 1 in `ContentPublicationMigrationTests` - and +5 in
+  `content-publishing.spec.ts`). 010: API **1093/1093**, Release build clean, no pending model changes; full Playwright on
+  a fresh database **222/222**, one invocation, two workers, retries 0, 9.8 min. An earlier full run the same way was
+  221/222: `story-drawers.spec.ts` met a blank `/register` (a dev-server module that never arrived - the known host
+  flake, in a spec 010 does not touch), green alone, then the complete rerun above. Before it, 009: 1077 API, 217
+  Playwright (+24 API in `PublicExploreQueryTests`, +13 in `explore.spec.ts`); 009 follow-up full run **217/217**, one
+  invocation, two workers, retries 0, 9.6 min. 009:
   **212/212** the same way. Before it, 008: +54 API, +4 Playwright, API 1053/1053 twice. Playwright for 008: full run on a fresh database **204/204**, one invocation, two workers, retries 0. An
   earlier run at the default eight workers lost six tests to host and dev-server resource pressure (blank pages, Vite
   failing to serve a module) in specs 008 does not touch; not a regression. Design refactor 007's full run on a fresh database:
@@ -743,7 +755,10 @@ A public, read-only discovery experience beside the workspace, in the same appli
     fails as a failure instead of telling the author a free name is taken.
 - Under a full parallel Playwright run, `auth.spec.ts` "rejects a wrong password" intermittently
   times out (it navigates to `/login` without awaiting sign-out).
-- 32 migrations, latest `AddUniversePublication` - additive: six columns on `Universes` (`Visibility` default Private),
+- 33 migrations, latest `AddContentPublication` - additive: three columns each on `Entities` and `Stories`
+  (`Visibility` default Private, `PublicSlug`, `PublishedAt`) and a unique `(UniverseId, PublicSlug)` index on each; the
+  rollback uses native `DROP COLUMN`. `ContentPublicationMigrationTests` walks it on a file under a public universe. Before
+  it, `AddUniversePublication` - additive: six columns on `Universes` (`Visibility` default Private),
   `AspNetUsers.PublicDisplayName`, `UniverseArtworks`, two indexes; the rollback uses native `DROP COLUMN`.
   `UniversePublicationMigrationTests` walks it on a file. Before it, `AddRelationshipFamilySemantics` - one additive column on `RelationshipTypes`, defaulting to no family
   meaning; the rollback uses SQLite's native `DROP COLUMN` so nothing that points at the table is rebuilt under it.

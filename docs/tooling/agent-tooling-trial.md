@@ -438,3 +438,9 @@ No verdict in Phase 012.
 `rtk proxy` used for every Deploy DEV status check, deliberately and never for a failure: `gh run list --json` and `gh run view --json`,
 whose filtered forms drop the JSON fields (run number, head SHA, job conclusions) needed to verify Deploy DEV #47
 before branching. No diagnostic was missing from a filtered build or test run.
+
+## Public portal 010 (2026-09-28)
+
+`rtk proxy` used once, deliberately and not for a failure: `gh run list --json` to read Deploy DEV #49's run number,
+head SHA and conclusion before branching - the filtered form drops those fields, as in 008. No diagnostic was missing
+from a filtered build or test run.

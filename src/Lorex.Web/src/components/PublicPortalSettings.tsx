@@ -15,7 +15,7 @@ import { UniverseArtworkField } from './UniverseArtworkField'
 
 /** What the everything-else list names, so an author knows exactly what publishing leaves private. */
 const STAYS_PRIVATE =
-  'Lore entries, stories, notes, ideas, the timeline, world rules, relationships, Canon, the Trash, and everything else you edit in the workspace.'
+  'Any lore entry or story you have not published on its own page, notes, ideas, the timeline, world rules, relationships, Canon, the Trash, and everything else you edit in the workspace.'
 
 type Confirming = { kind: 'publish'; state: PublicationState } | { kind: 'unpublish' }
 
@@ -190,7 +190,8 @@ export function PublicPortalSettings({ universeId }: { universeId: string }) {
           : 'This universe is visible only inside your Lorex workspace.'}
       </p>
       <p className="settings__note">
-        Publishing this universe does not publish its lore entries or stories.
+        Publishing this universe does not publish its lore entries or stories: each one is published
+        from its own page, and is seen only while this universe is public.
       </p>
 
       {isPublic && state.publicSlug ? (

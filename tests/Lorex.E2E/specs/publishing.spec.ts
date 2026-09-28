@@ -249,7 +249,7 @@ test.describe('publishing a universe', () => {
     await expect(confirm.locator('dl')).toContainText('GenresFantasy, Adventure')
     await expect(confirm.locator('dl')).toContainText(`Author${author}`)
     await expect(confirm).toContainText(
-      'Not published: Lore entries, stories, notes, ideas, the timeline, world rules, relationships, Canon, the Trash',
+      'Not published: Any lore entry or story you have not published on its own page, notes, ideas, the timeline, world rules, relationships, Canon, the Trash',
     )
 
     // Keeping it private changes nothing.

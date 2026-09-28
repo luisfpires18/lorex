@@ -62,6 +62,18 @@ public sealed record UniverseArtworkRef(
 /// <summary>A new card frame for the artwork already stored; refused if the artwork was replaced since.</summary>
 public sealed record UniverseArtworkCardRequest(Guid AssetId, ImageCrop? Crop);
 
+/// <summary>
+/// One lore entry's or story's publication, as its owner sees it: whether they selected it, its address and first
+/// publication date once it has them, and whether its universe is public now - so a screen can say "public" or
+/// "selected, but the universe is private" without the author having to work it out. The item is public to anyone
+/// exactly when <see cref="Visibility"/> is <c>Public</c> and <see cref="UniverseIsPublic"/> is true.
+/// </summary>
+public sealed record ContentPublicationState(
+    ContentVisibility Visibility,
+    string? PublicSlug,
+    DateTime? PublishedAt,
+    bool UniverseIsPublic);
+
 // ---------- The public side: anonymous ----------
 
 /// <summary>
@@ -88,6 +100,40 @@ public sealed record PublicUniverse(
 /// <summary>One page of the public listing, most recently published first.</summary>
 public sealed record PublicUniversePage(
     IReadOnlyList<PublicUniverse> Items,
+    int Page,
+    int PageSize,
+    int TotalCount,
+    int TotalPages);
+
+/// <summary>
+/// A published lore entry, as anyone may list it (Task 010). <b>An allow-list</b>, projected member by member like
+/// <see cref="PublicUniverse"/>: no id, no universe or owner, no Canon status, fields, aliases, tags, relationships,
+/// history, article or storage key. <see cref="Summary"/> is the entry's own one-or-two-line lead, null when it has
+/// none. <see cref="TypeName"/> is the name of its type. <see cref="ThumbnailUrl"/> is a same-origin path to its
+/// square thumbnail - never the original - that answers only while the entry is public, or null when it has no
+/// picture. <see cref="PublishedAt"/> is its first publication.
+/// </summary>
+public sealed record PublicLoreEntry(
+    string Slug,
+    string Name,
+    string? Summary,
+    string TypeName,
+    string? ThumbnailUrl,
+    DateTime PublishedAt);
+
+/// <summary>
+/// A published story, as anyone may list it (Task 010): its address, title and first publication. Nothing else -
+/// not its premise, which is the author's planning text, and nothing inside it: no chapter, scene, manuscript, plot
+/// or note. What a reader reads of a story is Task 011's contract, and it will be its own.
+/// </summary>
+public sealed record PublicStory(
+    string Slug,
+    string Title,
+    DateTime PublishedAt);
+
+/// <summary>One page of a public universe's published entries or stories.</summary>
+public sealed record PublicContentPage<T>(
+    IReadOnlyList<T> Items,
     int Page,
     int PageSize,
     int TotalCount,

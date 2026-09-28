@@ -21,7 +21,9 @@ namespace Lorex.Api.Features.Publishing;
 /// rather than each passing its own check against the other's stale read.</para>
 ///
 /// <para><b>Publishing publishes the shell only.</b> Nothing inside the universe - lore, stories,
-/// timeline, ideas, rules, relationships, Canon, the Trash - is read or changed by any of this.</para>
+/// timeline, ideas, rules, relationships, Canon, the Trash - is read or changed by any of this. An entry or
+/// a story is published on its own (<see cref="ContentPublicationEndpoints"/>); publishing the universe lets
+/// the ones already selected be read, and making it private hides them again without clearing the selection.</para>
 /// </summary>
 public static class PublicationEndpoints
 {
@@ -203,7 +205,11 @@ public static class PublicationEndpoints
             }
 
             var now = DateTime.UtcNow;
-            universe.PublicSlug ??= await PublicSlugs.ChooseAsync(db, universe.Name, cancellationToken);
+            universe.PublicSlug ??= await PublicSlugs.ChooseAsync(
+                db.Universes.AsNoTracking().Select(candidate => candidate.PublicSlug),
+                universe.Name,
+                PublicSlugs.UniverseFallback,
+                cancellationToken);
             universe.PublishedAt ??= now;
             universe.Visibility = UniverseVisibility.Public;
             universe.UpdatedAt = now;

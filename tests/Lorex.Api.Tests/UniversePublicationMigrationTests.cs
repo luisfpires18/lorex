@@ -76,7 +76,8 @@ public sealed class UniversePublicationMigrationTests : IDisposable
             Assert.Equal(
                 indexes.Where(index => !index.StartsWith("IX_Universes_PublicSlug", StringComparison.Ordinal)
                     && !index.StartsWith("IX_Universes_Visibility", StringComparison.Ordinal)
-                    && !index.Contains("UniverseArtworks", StringComparison.Ordinal)),
+                    && !index.Contains("UniverseArtworks", StringComparison.Ordinal)
+                    && !index.Contains("_UniverseId_PublicSlug", StringComparison.Ordinal)),
                 await Indexes(db));
             Assert.Equal(2, await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM Universes").SingleAsync());
         }

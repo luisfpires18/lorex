@@ -121,6 +121,12 @@ public sealed class LoreEntityConfiguration : IEntityTypeConfiguration<LoreEntit
         });
         builder.HasIndex(entity => new { entity.UniverseId, entity.EntityTypeId });
         builder.HasIndex(entity => new { entity.UniverseId, entity.Name });
+
+        // Publishing (ADR 0036). An address is unique among one universe's entries - a story may share it, under
+        // its own route segment. Only entries ever published have one, so the same index is what the public
+        // listing reads: UniverseId, and a slug that is not null.
+        builder.Property(entity => entity.PublicSlug).HasMaxLength(Publishing.PublicationLimits.SlugMaxLength);
+        builder.HasIndex(entity => new { entity.UniverseId, entity.PublicSlug }).IsUnique();
     }
 }
 

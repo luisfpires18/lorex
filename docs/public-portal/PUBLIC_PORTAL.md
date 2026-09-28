@@ -24,8 +24,9 @@ workspace" in the portal bar and a signed-out one sees "Sign in" and "Create acc
 
 ## 3. Privacy model
 
-Private by default; publication explicit; allow-list only. No route infers publication, no save or restore sets it,
-and no public response is an internal object with fields removed. A private universe overrides everything inside it.
+Private by default; publication explicit at every level; allow-list only. No route infers publication, no save or
+restore sets it, and no public response is an internal object with fields removed. A private universe overrides
+everything inside it, and a public one publishes nothing inside it (section 15).
 
 ## 4. Universe visibility
 
@@ -43,9 +44,9 @@ Exactly `PublicUniverse`: `slug`, `name`, `publicSummary`, `category`, `genres`,
 ## 6. What stays private
 
 Everything else: the description, colour, archive state, ids, owner, username, email, audit dates, storage keys, the
-original artwork, and all content - lore entries and articles, relationships, family trees, stories, scenes,
-manuscripts, plot, timeline, ideas, world rules, Canon, the Trash, history and drafts. Task 010 adds explicit
-per-item publication; nothing inside a universe is public before then.
+original artwork, and all content - except the listing metadata of lore entries and stories their author published one
+by one (section 15). Articles, fields, relationships, family trees, chapters, scenes, manuscripts, plot, timeline,
+ideas, world rules, Canon, the Trash, history and drafts stay private whatever is published.
 
 ## 7. Category taxonomy
 
@@ -87,6 +88,9 @@ renames and unpublishing keep it. No manual editing yet.
 | `GET /api/public/universes?page=&pageSize=&category=&genre=&q=&sort=` | Public universes, 24 per page (max 48), filtered and ordered as below. |
 | `GET /api/public/universes/{slug}` | One public universe, or 404 (private and missing alike). |
 | `GET /api/public/universes/{slug}/artwork/card/{cardId}` | Its current card (WebP), ETag = card id, 304 when current, 404 otherwise. |
+| `GET /api/public/universes/{slug}/lore?page=&pageSize=` | Its published lore entries (010), 24 per page (max 48). 404 unless the universe is public. |
+| `GET /api/public/universes/{slug}/lore/{loreSlug}/thumbnail/{thumbnailId}` | A published entry's current square thumbnail (WebP), as the card route. |
+| `GET /api/public/universes/{slug}/stories?page=&pageSize=` | Its published stories (010), as the lore listing. |
 
 All `Cache-Control: no-cache`, no session needed, no cookie set.
 
@@ -165,25 +169,89 @@ directly, after a refresh, in a new browser. Signing in is a choice made from it
   same answer, so it cannot race a successful sign-in somewhere else.
 
 Settings' Public portal section (status in words, public details, artwork, author, checklist, publish and make private
-with inline confirmations, "View public page") is unchanged. Later: "Edit this world" for an owner viewing their own
-world (011).
+with inline confirmations, "View public page") is unchanged, except that since 010 its note and its publish
+confirmation say that each entry and story is published from its own page. Later: "Edit this world" for an owner viewing
+their own world (011).
 
-## 15. Preview
+## 15. Content publication (010)
+
+A lore entry or a story is published on its own, by its owner, from its own page. Publishing a universe publishes none
+of them; publishing one of them publishes nothing of its universe.
+
+**Model.** `Entities` and `Stories` carry `Visibility` (`ContentVisibility`: `Private` 0 - every existing and new item -
+or `Public` 1), `PublicSlug` and `PublishedAt`. Set only by `POST /api/universes/{id}/entities/{entityId}/publish` and
+`/unpublish`, and the same under `/stories/{storyId}`; read by `GET .../publication`, which also says whether the
+universe is public. Owner-only (401 anonymous, 404 anyone else, as every universe route), idempotent, no body. No entry
+or story save binds any of the three. Publishing needs nothing the item does not always have; it mints the address and
+the date the first time and keeps both through unpublishing and renames. It is not an edit: `UpdatedAt`, history and
+search are untouched.
+
+**Effective visibility.** One predicate per kind - `PublicationRules.PublicLore`, `PublicStories` - holding the universe
+predicate inside it:
+
+| Universe | Item | In the Trash | Anyone can list it |
+| --- | --- | --- | --- |
+| Private | Private | - | No |
+| Private | Public (selected) | - | No |
+| Public | Private | - | No |
+| Public | Public | No | **Yes** |
+| any | any | Yes | No |
+
+**Preparing while private.** An owner may publish an item while its universe is private. It is then *selected*: the
+page says "Selected" and why nothing shows yet, and it appears the moment the universe is published. Making the universe
+private hides every selected item at once and clears nothing, so publishing it again brings back exactly those.
+
+**Lore listing contract** - `PublicLoreEntry`, exactly: `slug`, `name`, `summary` (the entry's own "what this is"
+lead, null when empty), `typeName`, `thumbnailUrl` (null without a picture), `publishedAt` (first publication). Ordered
+by name, case aside, then address. The summary is published because it is the entry's authored lead - shown under its
+name in its own header - and the publish panel says it is listed. Never the article, fields, aliases, tags, Canon status,
+relationships, history, ids or keys.
+
+**Story listing contract** - `PublicStory`, exactly: `slug`, `title`, `publishedAt`. Ordered by title, case aside, then
+address - the workspace's own order; stories have no order an author sets. The premise is not published: it is the
+author's planning text and may give the story away, as the universe description is not. No chapter, scene, manuscript,
+plot, note or status. Whether a reader-facing story summary is needed is Task 011's call.
+
+**Thumbnail.** The entry's existing square thumbnail (the upload gate's WebP, metadata stripped) - never the original -
+through the lore predicate by both addresses and the current thumbnail id; ETag = thumbnail id, checked after
+visibility, `no-cache`. It stops answering when the entry or universe goes private, the entry goes to the Trash, or the
+picture is replaced, reframed or removed. No picture is fine: pictures are not required.
+
+**Addresses.** The universe generator (section 11), falling back to `entry` or `story`, unique per universe and kind -
+an entry and a story may share one. A trashed item keeps its address, so it stays taken.
+
+**Trash and status.** Trash hides an item whatever its selection; restoring it brings the selection back, so it is
+public again only if it and its universe still are. Canon status (Idea, Draft, Canon) and story status (Planning,
+Drafting, Complete) are workflow, not visibility, and change nothing here. Entries have an `IsArchived` column no route
+sets; publication ignores it, as it ignores a universe's archive state.
+
+**Backup.** Format 15 is unchanged and carries no item's visibility, address or date. Every restore - any version, or a
+forged file - has every entry and story private.
+
+**UI.** On an entry, a pill before Edit; on a story, a pill in its line of facts (the story bar is full at 360px). The
+pill says Private, Public or Selected, and opens a panel (the `ActionMenu` disclosure) saying what that means, what is
+listed, what is not, and the one action - Publish entry/story or Make private. The panel is the confirmation.
+
+**For 011.** Reading pages at `/worlds/{universeSlug}/lore/{loreSlug}` and `/worlds/{universeSlug}/stories/{storySlug}`,
+each with its own detail DTO read through the same predicate - never the workspace DTOs. No child route exists yet, so
+nothing links to one. Relationships, family trees and the timeline stay private until a decision says otherwise.
+
+## 16. Preview
 
 Planned for Task 011: an authenticated owner-scoped route that renders the same allow-listed shape from saved
 details, with owner-scoped image addresses, so "what would anyone see" never needs anonymous access.
 
-## 16. Roadmap
+## 17. Roadmap
 
 | Task | Scope |
 | --- | --- |
 | 008 | Publication foundation: visibility, public metadata, artwork, slug, anonymous API, settings, privacy tests. |
 | 009 | Explore Worlds portal from the owner's visual references and the approved background. |
-| 010 | Explicit publishing of individual lore entries and stories. |
+| 010 | Explicit publishing of individual lore entries and stories: selection, addresses, listings, thumbnail, owner controls. Done. |
 | 011 | The public universe page and browsing published content; owner preview and "Edit this world". |
 | 012 | Portal polish, accessibility, SEO and Open Graph, caching and performance, security audit, remaining 007 polish. |
 
-## 17. Non-goals
+## 18. Non-goals
 
 No likes, ratings, comments, follows, view counts, popularity, trending, recommendations, feeds, bookmarks or public
 editing. No fake data, metrics or placeholder artwork. No creator profile pages yet.
