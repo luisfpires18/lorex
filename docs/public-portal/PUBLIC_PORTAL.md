@@ -78,7 +78,10 @@ the portal card is about as tall as wide with the picture as its top five eighth
 hero cut for Task 011 is a new frame of the same original. The static Explore background is not universe artwork:
 `src/Lorex.Web/src/portal/explore-worlds-background.png`, owner-approved, 1916 x 821, 2,370,934 bytes, SHA-256
 `31e6995251e1145f792664fac61de586fd730f63b3f30dc7d4b8850fce5abe49`. Never edited, recompressed or converted; CSS crops
-it. Vite emits it unchanged under a content-hashed name, which the service worker may cache for good.
+it. Vite emits it unchanged under a content-hashed name, which the service worker may cache for good. Since 012 it is
+delivered as a derivative beside it, `explore-worlds-background.webp` (250,016 bytes, same 1916 x 821, PSNR 43 dB against
+the PNG, made with `ffmpeg -i explore-worlds-background.png -c:v libwebp -quality 86 -compression_level 6 -preset photo`),
+through `<picture>` with the untouched PNG as the fallback (section 19).
 
 ## 11. Slug model
 
@@ -308,10 +311,67 @@ once published, and Settings' checklist before that.
 | 009 | Explore Worlds portal from the owner's visual references and the approved background. |
 | 010 | Explicit publishing of individual lore entries and stories: selection, addresses, listings, thumbnail, owner controls. Done. |
 | 011 | Public reading: the universe page, entry and story pages, a story's public summary, author pages and photos, "Edit this world", the portal as the installed app's start. Done (owner preview not built). |
-| 012 | Portal polish, accessibility, SEO and Open Graph, caching and performance, security audit, remaining 007 polish. |
+| 012 | Portal polish, accessibility, SEO and Open Graph, caching and performance, security audit, remaining 007 polish. Done (section 19). |
 
 ## 18. Non-goals
 
 No likes, ratings, comments, follows, view counts, popularity, trending, recommendations, feeds, bookmarks or public
 editing. No fake data, metrics or placeholder artwork. Author pages (011) hold a public name, a chosen photo and public
 worlds - no bio, followers, contact or counts of anything private.
+
+## 19. Final polish and hardening (012)
+
+**Route set, final.** Public: `/explore`, `/worlds/{slug}`, `/worlds/{slug}/lore/{loreSlug}`,
+`/worlds/{slug}/stories/{storySlug}`, `/authors/{slug}`; `/` redirects to `/explore`. Everything else is the workspace or
+sign-in and is never indexed.
+
+**SEO (ADR 0038).** The API writes each public page's head into the shell on the server: `<title>` ("Explore Worlds |
+Lorex", "World | Lorex", "Entry — World | Lorex", "Story — World | Lorex", "Author | Lorex"), description from public text
+only (public summary; an entry's lead; a story's public summary - never the premise; "Name, creator on Lorex. Worlds: …"),
+robots, canonical, Open Graph (`og:site_name`, `type`, `title`, `description`, `url`, `image`) and `twitter:card`.
+Images are the public derivatives (card, thumbnail, a shown photo) or `icon-512.png`. Hidden and missing public addresses
+are a 404 with a generic `noindex` head. Workspace, sign-in, profile and unknown paths are `noindex,nofollow`, header and
+meta. **The body is still rendered in the browser**: a crawler that runs no JavaScript reads the head, not the article.
+The app keeps the tab title in the same words on client navigation. No structured data.
+
+**Indexing.** Explore itself is indexable; any `q`/`category`/`genre`/`sort` state is `noindex,follow`, canonical
+`/explore`. `robots.txt` allows `/explore`, `/worlds/`, `/authors/`, `/api/public/`; disallows `/api/`, `/app`, `/login`,
+`/register`; names the sitemap. `/sitemap.xml` lists Explore, public universes, effective-public entries and stories and
+authors with a public world, computed per request (`no-cache`), so unpublishing removes an address from the next read. API
+responses carry `X-Robots-Tag: noindex`. Robots and noindex are courtesy, never protection: authorization is.
+
+**Origin.** `PublicSite:Origin` and `PublicSite:AllowIndexing` (default false) - configuration, never the `Host` header.
+Unset (DEV today): no canonical or absolute URL, `robots.txt` disallows everything, no sitemap. Production sets
+`PublicSite__Origin=https://<its host>` and `PublicSite__AllowIndexing=true` as app settings; no code change.
+
+**Publication edge cases.**
+- *Trash restore.* The Trash listing now says what a restore would do (`publication`: `None`, `Hidden`, `Visible`, from the
+  same predicates). Restoring a selected entry or story asks first: in a public universe "Restoring “X” makes it public
+  again - This entry was public before it was moved to the Trash…", with Restore and publish, Restore as private (restore,
+  then unpublish at once) and Cancel; in a private universe (or a story without a public summary) it says it is still
+  selected and readers cannot see it now, and never claims it becomes visible. No second publication state.
+- *Archive.* Archive and publication stay separate: an archived public universe remains public until made private.
+  Archiving a public universe asks first ("It stays public"), offers "Make it private first" (which leads to Public
+  portal's own control), and an archived public universe's Settings says "Still public." Restoring from the archive
+  never asks. Deleting (archived only) says a public page goes with it.
+
+**Performance.** Explore's hero ships as WebP (250 kB, was 2.37 MB) with the PNG fallback. Cards and thumbnails were
+already lazy with explicit dimensions; the hero is eager (above the fold). Page screens are split chunks; the rich-text
+editor (393 kB) loads only on screens that render an article. `/assets/*` is `immutable` for a year; the shell,
+manifest, icons and `sw.js` are `no-cache`. A public hero stays the 960-wide card (blurred behind): privacy over
+sharpness; a larger public derivative is future image-pipeline work.
+
+**PWA and cache.** `start_url` `/explore`, `id` `/app` (unchanged identity). The service worker caches only same-origin
+`GET` build output and root static files; it never touches `/api`, navigations, non-`GET` or cross-origin requests, so no
+public or private API response, picture or page is persisted by it and an unpublish is never bypassed. The browser's own
+HTTP cache may hold a public picture it already fetched; `no-cache` makes it revalidate, and revalidation of something no
+longer public is a 404 (visibility is checked before the 304). Verified in code and by `pwa.spec.ts`; installed-device
+behaviour was not manually re-tested.
+
+**Dates.** Timestamps are stored in UTC and serialize without a zone (`2026-09-28T10:00:00`). The client's
+`parseApiDate` reads a zone-less value as UTC everywhere (`lib/dates.ts`); the API contract is unchanged.
+
+**Polish.** One action order - primary first, then the way out, in sight and in Tab order - in drawers, inline forms,
+confirmations and now the entry form and article bars too. New-item drawers no longer say "A new moment" over "New
+moment". Settings' delete is a ruled danger panel with a quiet danger-ink first step and a filled last step; its
+confirmations take and return focus. A network failure reads "Lorex could not be reached…", never the browser's words.

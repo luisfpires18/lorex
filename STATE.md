@@ -50,9 +50,10 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
-- **Public portal phase.** Roadmap: **008** publication foundation (done), **009** Explore Worlds portal (done),
-  **010** content publishing controls (done), **011** public universe experience (current, on its branch), **012** portal
-  polish, SEO, performance and safety (next). See Public portal below and `docs/public-portal/PUBLIC_PORTAL.md`.
+- **Public portal roadmap 008-012 complete.** 008 publication foundation, 009 Explore Worlds, 010 content publishing
+  controls, 011 public universe experience - all merged; **012** final polish, SEO, performance and safety on
+  `feat/final-product-polish`, committed, not merged, not pushed. See Public portal below and
+  `docs/public-portal/PUBLIC_PORTAL.md`.
 - **Entry images** (`feat/entity-images-r2`, merged into `dev`). An entry may carry one picture:
   uploaded through the API, decoded and thumbnailed server-side, stored as two objects in one
   private Cloudflare R2 bucket, and served back only through an authenticated owner-scoped Lorex
@@ -699,8 +700,8 @@ A public, read-only discovery experience beside the workspace, in the same appli
   and stories are published one by one (`ContentVisibility`, `PublicSlug`, `PublishedAt`); public only while selected, out
   of the Trash and in a public universe (`PublicLore` / `PublicStories`); owner routes `.../publish|unpublish`; anonymous
   listings `/lore`, `/stories` and the entry's thumbnail. ADR 0036 amended; `PUBLIC_PORTAL.md` section 15.
-- **011 - Public universe experience** (`feat/public-universe-experience` off `dev` at `33b191c`, committed, not merged,
-  not pushed). ADR 0036 amended, ADR 0037 new; `PUBLIC_PORTAL.md` section 16.
+- **011 - Public universe experience** - done: `ed3c6f9`, merged into `dev` at `181941c`; Deploy DEV #51 green. ADR 0036
+  amended, ADR 0037 new; `PUBLIC_PORTAL.md` section 16.
   - Pages under `PublicLayout`: `/worlds/:slug` (hero from the public card - crisp at its own size, blurred behind - with
     category, name, author link, genres, summary; published lore and stories, Show more; empty state), an entry's page
     (type, name, lead, square, article), a story's landing page (title, public summary, author, date, its world), and
@@ -721,16 +722,32 @@ A public, read-only discovery experience beside the workspace, in the same appli
   - Front door: manifest `start_url` `/explore` (`id` stays `/app`). Migration `AddPublicReading`; backup format 16.
   - Not built: owner preview of a private universe; public story prose (needs a chapter/scene publication decision).
 
-- **012 debt** (recorded, not started): a confirmation before a Trash restore that would make a selected entry or story
-  public at once; 200% zoom audit; loading/error visual audit; drawer action-order mismatch; repeated Moment label;
-  Settings danger-section styling; final portal accessibility; SEO, Open Graph, sitemap, robots, canonical; image and
-  performance (the 2.37 MB Explore PNG, a public hero derivative if wanted, lazy chunks); cache review; final
-  security/privacy sweep; the "Show more" pages not in the address. Archived public universes stay public (the predicate
-  ignores archive) - an owner question, unchanged.
+- **012 - Final polish and hardening** (`feat/final-product-polish` off `dev` at `181941c`, committed, not merged, not
+  pushed). ADR 0038 new; `PUBLIC_PORTAL.md` section 19. No migration, no backup change.
+  - SEO: the API writes each public page's head into the shell (title, description from public text only, robots,
+    canonical, Open Graph, `twitter:card`); hidden/missing public addresses are a noindex 404; workspace and sign-in
+    `noindex,nofollow`; Explore's search states `noindex,follow`, canonical `/explore`; `/` redirects to `/explore`.
+    `/robots.txt` and `/sitemap.xml` from the public predicates, per request. Origin from `PublicSite:Origin` +
+    `AllowIndexing` (default off - DEV is shut out), never `Host`. Body still client-rendered.
+  - Trash: `TrashItem.publication` (None/Hidden/Visible); restoring a selected entry or story asks first - Restore and
+    publish / Restore as private / Cancel - with copy true to the universe's visibility.
+  - Archive of a public universe asks ("It stays public", Make it private first); archived + public says "Still public."
+    Archive and publication stay separate by policy.
+  - One action order (primary first) now also in the entry form and article bars; new-item drawers lose the repeated
+    "A new …" eyebrow; Settings' delete is a ruled danger panel, confirmations take and return focus; network failures
+    in words; zone-less API timestamps read as UTC on the client.
+  - Explore hero delivered as WebP 250,016 bytes (PNG 2,370,934 kept untouched as fallback).
+  - Service worker unchanged: it already refuses `/api`, navigations, non-`GET` and cross-origin.
+  - Open, not blocking: "Show more" pages not in the address; public hero sharpness bounded by the 960 card; no owner
+    preview of a private universe; public story prose undecided; account-wide search.
 
 ## Baseline
 
-- **1111 API integration tests, 229 Playwright tests** (Public reading 011: +18 API - 7 `PublicReadingTests`, 8
+- **1124 API integration tests, 240 Playwright tests** (012: +13 API in `SeoTests`, +11 in `final-polish.spec.ts`;
+  API **1124/1124**, Release build clean, no pending model changes; full Playwright on a fresh database
+  **240/240**, one invocation, two workers, retries 0, 10.4 min. The first full run was 239/240:
+  `entity-page.spec.ts` still pinned 004's Cancel-before-Save order, which 012 deliberately changed; updated, then the
+  complete rerun above). Before it, 1111 API, 229 Playwright (Public reading 011: +18 API - 7 `PublicReadingTests`, 8
   `PublicAuthorTests`, 1 `PublicReadingMigrationTests`, 1 story-summary backup test, 1 version-16 case - and +7 in
   `public-reading.spec.ts`; 010's and 008's tests updated for the story summary rule, `authorSlug` and format 16). 011:
   API **1111/1111**, Release build clean, no pending model changes; full Playwright on a fresh database **229/229**, one

@@ -28,6 +28,23 @@ public enum TrashRestoreBlock
 }
 
 /// <summary>
+/// What restoring a row would do on the public portal (Task 012). Trash keeps an entry's or story's public selection
+/// (ADR 0036), so a restore can make it readable again at once; the Trash asks before that happens. Derived from the same
+/// predicates the public API reads, never stored.
+/// </summary>
+public enum TrashRestorePublication
+{
+    /// <summary>Not selected for publication, or not a kind that can be: restoring shows nothing to anyone.</summary>
+    None = 0,
+
+    /// <summary>Selected, but restoring would not make it readable: its universe is private, or a story has no public summary.</summary>
+    Hidden = 1,
+
+    /// <summary>Selected in a public universe: restoring makes it readable on the public portal straight away.</summary>
+    Visible = 2,
+}
+
+/// <summary>
 /// One row in the Trash, as the list shows it.
 ///
 /// Deliberately thin. The Trash is a recovery surface, not a second browser: it answers "what did I throw away, where was
@@ -39,7 +56,7 @@ public enum TrashRestoreBlock
 /// <paramref name="StoryId"/> is set for everything from a story: the story itself, and the chapter, scene, arc or beat's
 /// own story, whose <paramref name="StoryTitle"/> says where it was. <paramref name="PlotArcId"/> and
 /// <paramref name="PlotArcTitle"/> are a beat's arc. <paramref name="BlockedBy"/> says the row cannot come back until what
-/// it belongs to does.
+/// it belongs to does. <paramref name="Publication"/> says whether restoring an entry or story would publish it again.
 /// </summary>
 public sealed record TrashItem(
     TrashItemKind Kind,
@@ -55,7 +72,8 @@ public sealed record TrashItem(
     string? StoryTitle,
     Guid? PlotArcId,
     string? PlotArcTitle,
-    TrashRestoreBlock BlockedBy);
+    TrashRestoreBlock BlockedBy,
+    TrashRestorePublication Publication);
 
 public sealed record TrashPage(
     IReadOnlyList<TrashItem> Items,

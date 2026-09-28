@@ -533,16 +533,6 @@ export function EntityArticleSection({
             ) : null}
             <div className="article__actions">
               <button
-                className="button button--secondary"
-                type="button"
-                onClick={finishEditing}
-                disabled={isSaving}
-                data-testid="article-done"
-              >
-                <ActionIcon icon={X} />
-                Done
-              </button>
-              <button
                 className="button"
                 type="button"
                 disabled={!isDirty || isSaving || isTooLong}
@@ -553,6 +543,16 @@ export function EntityArticleSection({
               >
                 <ActionIcon icon={Check} />
                 {isSaving ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                className="button button--secondary"
+                type="button"
+                onClick={finishEditing}
+                disabled={isSaving}
+                data-testid="article-done"
+              >
+                <ActionIcon icon={X} />
+                Done
               </button>
             </div>
           </div>

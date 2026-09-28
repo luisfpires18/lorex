@@ -17,6 +17,9 @@ import { UniverseArtworkField } from './UniverseArtworkField'
 const STAYS_PRIVATE =
   'Any lore entry or story you have not published on its own page, notes, ideas, the timeline, world rules, relationships, Canon, the Trash, and everything else you edit in the workspace.'
 
+/** The section's own anchor, so another part of Settings can lead the author to it. */
+export const PUBLIC_PORTAL_SECTION_ID = 'public-portal'
+
 type Confirming = { kind: 'publish'; state: PublicationState } | { kind: 'unpublish' }
 
 /**
@@ -28,7 +31,14 @@ type Confirming = { kind: 'publish'; state: PublicationState } | { kind: 'unpubl
  * is saved; it is refused - with the missing things listed - until everything is there, and it will not publish
  * over unsaved public details. Making it private again is deliberate too, and calm about it.
  */
-export function PublicPortalSettings({ universeId }: { universeId: string }) {
+export function PublicPortalSettings({
+  universeId,
+  onVisibilityChange,
+}: {
+  universeId: string
+  /** Told whether the universe is public whenever that is known or changes - Settings' archive section reads it. */
+  onVisibilityChange?: (isPublic: boolean) => void
+}) {
   const headingId = useId()
   const [state, setState] = useState<PublicationState | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -63,6 +73,11 @@ export function PublicPortalSettings({ universeId }: { universeId: string }) {
       controller.abort()
     }
   }, [load])
+
+  const isPublicNow = state ? state.visibility === Visibility.Public : null
+  useEffect(() => {
+    if (isPublicNow !== null) onVisibilityChange?.(isPublicNow)
+  }, [isPublicNow, onVisibilityChange])
 
   // The confirmation takes the focus when it opens, and a refusal does when it appears.
   useEffect(() => {
@@ -174,10 +189,11 @@ export function PublicPortalSettings({ universeId }: { universeId: string }) {
   return (
     <section
       className="settings__section publication"
+      id={PUBLIC_PORTAL_SECTION_ID}
       aria-labelledby={headingId}
       data-testid="public-portal"
     >
-      <h2 className="settings__heading" id={headingId}>
+      <h2 className="settings__heading" id={headingId} tabIndex={-1}>
         Public portal
       </h2>
 

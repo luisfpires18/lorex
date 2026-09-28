@@ -14,6 +14,7 @@ using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.Restore;
 using Lorex.Api.Features.RuleValidation;
 using Lorex.Api.Features.Search;
+using Lorex.Api.Features.Seo;
 using Lorex.Api.Features.Stories;
 using Lorex.Api.Features.Timeline;
 using Lorex.Api.Features.Trash;
@@ -35,6 +36,7 @@ builder.Services.AddLoreSearch();
 builder.Services.AddHostedService<Lorex.Api.Features.Publishing.PublicAuthorBackfill>();
 builder.Services.AddLorexMedia(builder.Configuration);
 builder.Services.AddBackupRestore();
+builder.Services.AddLorexSeo(builder.Configuration);
 
 var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 if (corsOrigins.Length > 0)
@@ -51,6 +53,7 @@ var app = builder.Build();
 // First: everything after this point may read the request scheme, and behind a TLS-terminating
 // proxy the scheme is only correct once the forwarded header has been applied.
 app.UseLorexForwardedHeaders();
+app.UseLorexRobotsHeaders();
 
 if (app.Environment.IsDevelopment())
 {
@@ -104,6 +107,7 @@ app.MapIdeaEndpoints();
 app.MapUniverseSearchEndpoints();
 app.MapUniverseExportEndpoints();
 app.MapBackupRestoreEndpoints();
+app.MapSeoEndpoints();
 
 // Last: the client-side routing fallback only answers what no route above claimed.
 app.MapLorexFrontendFallback();

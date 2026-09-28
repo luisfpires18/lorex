@@ -169,7 +169,7 @@ export function PlotBeatForm({
         }}
       >
         <header className="drawer__head">
-          <p className="drawer__eyebrow">{beat ? 'Editing a beat' : 'A new beat'}</p>
+          {beat ? <p className="drawer__eyebrow">Editing a beat</p> : null}
           <h2 className="drawer__title" id="plot-beat-heading">
             {beat ? beat.title : 'New beat'}
           </h2>

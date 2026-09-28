@@ -360,7 +360,8 @@ export function TimelineEntryForm({
         }}
       >
         <header className="drawer__head">
-          <p className="drawer__eyebrow">{entry ? 'Editing a moment' : 'A new moment'}</p>
+          {/* A new moment's title already says so; the eyebrow names only what is being edited. */}
+          {entry ? <p className="drawer__eyebrow">Editing a moment</p> : null}
           <h2 className="drawer__title" id="moment-heading">
             {entry ? entry.title || 'Untitled moment' : 'New moment'}
           </h2>

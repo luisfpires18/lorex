@@ -16,12 +16,14 @@ import type { CanonBlockingFinding } from '../canon/types'
 import { CanonBlockNotice } from '../components/CanonBlockNotice'
 import { Quoted } from '../components/NameList'
 import { formatDateTime } from '../lib/dates'
+import { unpublishContent } from '../publishing/api'
 import { CANON_LABELS } from '../lore/types'
 import { listTrash, restoredPath, restoreFromTrash } from '../trash/api'
 import {
   TRASH_KIND_LABELS,
   TrashBlock,
   TrashKind,
+  TrashPublication,
   type TrashItem,
   type TrashKindValue,
   type TrashPage,
@@ -149,6 +151,27 @@ export default function UniverseTrash() {
   const [blocked, setBlocked] = useState<CanonBlockingFinding[] | null>(null)
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const outcomeRef = useRef<HTMLDivElement>(null)
+  // A restore that would publish again asks first (Task 012); the question sits in the row it is about.
+  const [confirming, setConfirming] = useState<TrashItem | null>(null)
+  const confirmRef = useRef<HTMLDivElement>(null)
+  const restoreButtons = useRef(new Map<string, HTMLButtonElement>())
+
+  // Cancelling hands the focus back to the row's Restore - once it is enabled again, so after the render.
+  const returnFocusTo = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (confirming) {
+      confirmRef.current?.focus()
+    } else if (returnFocusTo.current) {
+      restoreButtons.current.get(returnFocusTo.current)?.focus()
+      returnFocusTo.current = null
+    }
+  }, [confirming])
+
+  function cancelConfirming() {
+    returnFocusTo.current = confirming?.id ?? null
+    setConfirming(null)
+  }
 
   const load = useCallback(
     (signal?: AbortSignal) => {
@@ -178,15 +201,48 @@ export default function UniverseTrash() {
     if (outcome) outcomeRef.current?.focus()
   }, [outcome])
 
-  async function restore(item: TrashItem) {
+  function askToRestore(item: TrashItem) {
+    if (item.publication === TrashPublication.None) {
+      void restore(item)
+      return
+    }
+    setBlocked(null)
+    setOutcome(null)
+    setConfirming(item)
+  }
+
+  /**
+   * `keepPrivate` restores and then takes the selection back at once - the only order the API allows, since an item in
+   * the Trash has no publication route. The window between the two is one round trip.
+   */
+  async function restore(item: TrashItem, keepPrivate = false) {
+    setConfirming(null)
     setRestoring(item.id)
     setBlocked(null)
     setOutcome(null)
 
     try {
       await restoreFromTrash(universe.id, item)
+      let privateNote: ReactNode = null
+      if (keepPrivate) {
+        try {
+          await unpublishContent(
+            universe.id,
+            item.kind === TrashKind.Entry ? 'entry' : 'story',
+            item.id,
+          )
+          privateNote = ' It is private now.'
+        } catch {
+          privateNote = ' It could not be made private: open it and choose Make private.'
+        }
+      }
       setOutcome({
-        text: backText(item),
+        text: (
+          <>
+            {backText(item)}
+            {privateNote}
+          </>
+        ),
         link: {
           to: restoredPath(universe.id, item),
           label: (
@@ -330,17 +386,30 @@ export default function UniverseTrash() {
                   ) : null}
                 </div>
                 <button
+                  ref={(node) => {
+                    if (node) restoreButtons.current.set(item.id, node)
+                    else restoreButtons.current.delete(item.id)
+                  }}
                   className="button button--secondary"
                   type="button"
-                  disabled={restoring !== null || waiting !== null}
+                  disabled={restoring !== null || waiting !== null || confirming !== null}
                   aria-label={`Restore ${kind.toLowerCase()} “${item.name}”`}
                   aria-describedby={waiting ? waitingId : undefined}
-                  onClick={() => void restore(item)}
+                  onClick={() => askToRestore(item)}
                   data-testid={`restore-${item.name}`}
                 >
                   <ActionIcon icon={ArchiveRestore} />
                   {restoring === item.id ? 'Restoring…' : 'Restore'}
                 </button>
+                {confirming?.id === item.id && confirming.kind === item.kind ? (
+                  <RestorePublicConfirm
+                    item={item}
+                    panelRef={confirmRef}
+                    onRestore={() => void restore(item)}
+                    onRestorePrivate={() => void restore(item, true)}
+                    onCancel={cancelConfirming}
+                  />
+                ) : null}
               </li>
             )
           })}
@@ -379,6 +448,94 @@ export default function UniverseTrash() {
         </nav>
       ) : null}
     </article>
+  )
+}
+
+/**
+ * The question before a restore that touches the public portal. Trash keeps an entry's or story's public selection, so
+ * restoring it brings that back: straight into public view when its universe is public, or silently selected when it
+ * is not. The copy says which, and never claims visibility the item will not have.
+ */
+function RestorePublicConfirm({
+  item,
+  panelRef,
+  onRestore,
+  onRestorePrivate,
+  onCancel,
+}: {
+  item: TrashItem
+  panelRef: React.RefObject<HTMLDivElement | null>
+  onRestore: () => void
+  onRestorePrivate: () => void
+  onCancel: () => void
+}) {
+  const noun = item.kind === TrashKind.Entry ? 'entry' : 'story'
+  const visible = item.publication === TrashPublication.Visible
+  const titleId = `trash-confirm-${item.id}`
+
+  return (
+    <div
+      className="trash__confirm"
+      role="group"
+      aria-labelledby={titleId}
+      tabIndex={-1}
+      ref={panelRef}
+      data-testid="trash-publication-confirm"
+      data-publication={visible ? 'visible' : 'hidden'}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.stopPropagation()
+          onCancel()
+        }
+      }}
+    >
+      <p className="trash__confirmtitle" id={titleId}>
+        {visible ? (
+          <>
+            Restoring <Quoted text={item.name} /> makes it public again.
+          </>
+        ) : (
+          <>
+            <Quoted text={item.name} /> is still selected for publication.
+          </>
+        )}
+      </p>
+      <p className="trash__confirmtext" data-testid="trash-publication-text">
+        {visible
+          ? `This ${noun} was public before it was moved to the Trash. Restoring it will make it visible again in your public universe, to anyone, straight away.`
+          : `It was selected for publication before it was moved to the Trash. Readers cannot see it now, and restoring it does not change that: it would appear once ${
+              item.kind === TrashKind.Story
+                ? 'this universe is public and the story has a public summary'
+                : 'this universe is public'
+            }.`}
+      </p>
+      <div className="form__actions">
+        <button
+          className="button"
+          type="button"
+          onClick={onRestore}
+          data-testid="trash-confirm-restore"
+        >
+          {visible ? 'Restore and publish' : 'Restore, keep selected'}
+        </button>
+        <button
+          className="button button--secondary"
+          type="button"
+          onClick={onRestorePrivate}
+          data-testid="trash-confirm-private"
+        >
+          Restore as private
+        </button>
+        <button
+          className="button button--text"
+          type="button"
+          onClick={onCancel}
+          data-testid="trash-confirm-cancel"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
   )
 }
 
