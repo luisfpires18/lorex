@@ -68,6 +68,9 @@ export function apiErrorFrom(status: number, payload: unknown) {
   return new ApiError(status, message, fieldErrors, problem.code ?? null, payload)
 }
 
+/** What any screen says when the server could not be reached at all. */
+export const NETWORK_FAILURE = 'Lorex could not be reached. Check your connection and try again.'
+
 /**
  * Calls the API on the same origin. The session cookie is HttpOnly, so the browser
  * attaches it and no token is ever held in JavaScript.
@@ -78,15 +81,23 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   // default only applies to the JSON bodies every other call sends.
   const isForm = init?.body instanceof FormData
 
-  const response = await fetch(path, {
-    ...init,
-    credentials: 'same-origin',
-    headers: {
-      Accept: 'application/json',
-      ...(init?.body && !isForm ? { 'Content-Type': 'application/json' } : {}),
-      ...init?.headers,
-    },
-  })
+  let response: Response
+  try {
+    response = await fetch(path, {
+      ...init,
+      credentials: 'same-origin',
+      headers: {
+        Accept: 'application/json',
+        ...(init?.body && !isForm ? { 'Content-Type': 'application/json' } : {}),
+        ...init?.headers,
+      },
+    })
+  } catch (error: unknown) {
+    // An abort is the caller's own doing and is passed on as it is. Anything else is the network, and the browser's
+    // own words for it ("Failed to fetch", "NetworkError when…") are not something to put in front of an author.
+    if (error instanceof DOMException && error.name === 'AbortError') throw error
+    throw new ApiError(0, NETWORK_FAILURE, {}, null, null)
+  }
 
   if (response.status === 204) {
     return undefined as T

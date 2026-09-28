@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { ChronologySettings } from '../components/ChronologySettings'
-import { PublicPortalSettings } from '../components/PublicPortalSettings'
+import { PUBLIC_PORTAL_SECTION_ID, PublicPortalSettings } from '../components/PublicPortalSettings'
 import { UniverseForm } from '../components/UniverseForm'
 import { downloadUniverseBackup } from '../export/api'
 import { discardUniverseDrafts } from '../lib/localDrafts'
+import { getPublication } from '../publishing/api'
+import { Visibility } from '../publishing/types'
 import { deleteUniverse, setUniverseArchived, updateUniverse } from '../universes/api'
 import { PageHeader } from '../components/PageHeader'
 import type { WorkspaceContext } from './UniverseWorkspace'
@@ -18,7 +20,36 @@ export default function UniverseSettings() {
   const [saved, setSaved] = useState(false)
   const [busy, setBusy] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [confirmingArchive, setConfirmingArchive] = useState(false)
+  const [isPublic, setIsPublic] = useState<boolean | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const archiveConfirm = useRef<HTMLDivElement>(null)
+  const archiveButton = useRef<HTMLButtonElement>(null)
+  const deleteConfirm = useRef<HTMLDivElement>(null)
+  const deleteButton = useRef<HTMLButtonElement>(null)
+  const hadDeleteConfirm = useRef(false)
+
+  // A confirmation takes the focus when it opens; closing it hands the focus back to what opened it.
+  // Cancel hands the focus back to Archive universe, which is only mounted again after the render.
+  const archiveCancelled = useRef(false)
+  useEffect(() => {
+    if (confirmingArchive) {
+      archiveConfirm.current?.focus()
+    } else if (archiveCancelled.current) {
+      archiveCancelled.current = false
+      archiveButton.current?.focus()
+    }
+  }, [confirmingArchive])
+
+  useEffect(() => {
+    if (confirmingDelete) {
+      hadDeleteConfirm.current = true
+      deleteConfirm.current?.focus()
+    } else if (hadDeleteConfirm.current) {
+      hadDeleteConfirm.current = false
+      deleteButton.current?.focus()
+    }
+  }, [confirmingDelete])
 
   const [exporting, setExporting] = useState(false)
   const [exportedAs, setExportedAs] = useState<string | null>(null)
@@ -44,11 +75,46 @@ export default function UniverseSettings() {
     setError(null)
     try {
       refresh(await setUniverseArchived(universe.id, !universe.isArchived))
+      setConfirmingArchive(false)
     } catch (problem: unknown) {
       setError(problem instanceof Error ? problem.message : 'That could not be changed.')
     } finally {
       setBusy(false)
     }
+  }
+
+  /**
+   * Archive and publication are separate (ADR 0036): an archived universe that is public stays public until its author
+   * makes it private. So archiving a public universe asks first and says so, read fresh from the server, rather than
+   * letting "archived" be mistaken for "taken down". Restoring from the archive changes nothing public and never asks.
+   */
+  async function askToArchive() {
+    if (universe.isArchived) {
+      await toggleArchived()
+      return
+    }
+    setBusy(true)
+    setError(null)
+    let publicNow: boolean | null = null
+    try {
+      publicNow = (await getPublication(universe.id)).visibility === Visibility.Public
+      setIsPublic(publicNow)
+    } catch {
+      // Unknown: ask anyway rather than archive a possibly public universe without a word.
+    }
+    if (publicNow === false) {
+      await toggleArchived()
+      return
+    }
+    setConfirmingArchive(true)
+    setBusy(false)
+  }
+
+  function goToPublicPortal() {
+    setConfirmingArchive(false)
+    const section = document.getElementById(PUBLIC_PORTAL_SECTION_ID)
+    section?.scrollIntoView({ block: 'start' })
+    section?.querySelector<HTMLElement>('h2')?.focus({ preventScroll: true })
   }
 
   async function remove() {
@@ -93,7 +159,7 @@ export default function UniverseSettings() {
         />
       </section>
 
-      <PublicPortalSettings universeId={universe.id} />
+      <PublicPortalSettings universeId={universe.id} onVisibilityChange={setIsPublic} />
 
       <ChronologySettings
         universeId={universe.id}
@@ -139,38 +205,119 @@ export default function UniverseSettings() {
         ) : null}
       </section>
 
-      <section className="settings__section">
+      <section className="settings__section" data-testid="archive-section">
         <h2 className="settings__heading">{universe.isArchived ? 'Restore' : 'Archive'}</h2>
         <p className="settings__note">
           {universe.isArchived
             ? 'This universe is archived. Restoring puts it back in your active list.'
-            : 'Archiving keeps everything and takes the universe out of your active list.'}
+            : 'Archiving keeps everything and takes the universe out of your active list. It does not change whether the universe is public.'}
         </p>
-        <button
-          className="button button--secondary"
-          type="button"
-          onClick={toggleArchived}
-          disabled={busy}
-          data-testid="toggle-archive"
-        >
-          {universe.isArchived ? 'Restore universe' : 'Archive universe'}
-        </button>
+        {universe.isArchived && isPublic ? (
+          <p className="settings__note" data-testid="archived-still-public">
+            <strong>Still public.</strong> Archiving does not take a universe off the public portal.{' '}
+            <button className="linkbutton" type="button" onClick={goToPublicPortal}>
+              Make it private in Public portal
+            </button>{' '}
+            to remove its public page.
+          </p>
+        ) : null}
+        {confirmingArchive ? (
+          <div
+            className="settings__confirm"
+            role="group"
+            aria-labelledby="archive-confirm-title"
+            tabIndex={-1}
+            ref={archiveConfirm}
+            data-testid="archive-public-confirm"
+          >
+            <p className="settings__confirmtitle" id="archive-confirm-title">
+              {isPublic ? (
+                <>
+                  Archive <bdi>{universe.name}</bdi>? It stays public.
+                </>
+              ) : (
+                <>
+                  Archive <bdi>{universe.name}</bdi>?
+                </>
+              )}
+            </p>
+            <p className="settings__note">
+              {isPublic
+                ? 'Archiving only takes it out of your active list. Its public page, its place in Explore and everything you published in it stay available to anyone until you make it private in Public portal.'
+                : 'Lorex could not check whether this universe is public. Archiving never changes that: if it is public, it stays public until you make it private in Public portal.'}
+            </p>
+            <div className="form__actions">
+              <button
+                className="button"
+                type="button"
+                onClick={() => void toggleArchived()}
+                disabled={busy}
+                data-testid="confirm-archive"
+              >
+                {busy ? 'Archiving' : isPublic ? 'Archive, keep public' : 'Archive universe'}
+              </button>
+              <button
+                className="button button--secondary"
+                type="button"
+                onClick={goToPublicPortal}
+                data-testid="archive-go-private"
+              >
+                Make it private first
+              </button>
+              <button
+                className="button button--text"
+                type="button"
+                onClick={() => {
+                  archiveCancelled.current = true
+                  setConfirmingArchive(false)
+                }}
+                data-testid="cancel-archive"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            ref={archiveButton}
+            className="button button--secondary"
+            type="button"
+            onClick={() => void askToArchive()}
+            disabled={busy}
+            data-testid="toggle-archive"
+          >
+            {universe.isArchived ? 'Restore universe' : 'Archive universe'}
+          </button>
+        )}
       </section>
 
       {universe.isArchived ? (
-        <section className="settings__section settings__section--danger">
-          <h2 className="settings__heading">Delete</h2>
+        <section
+          className="settings__section settings__section--danger"
+          aria-labelledby="danger-heading"
+          data-testid="danger-section"
+        >
+          <h2 className="settings__heading" id="danger-heading">
+            Delete universe
+          </h2>
           <p className="settings__note">
-            Deleting removes this universe and everything in it. There is no undo.
+            Deleting removes this universe and everything in it, for good. There is no undo and no
+            Trash for it.{isPublic ? ' Its public page goes with it.' : null}
           </p>
           <p className="settings__note" data-testid="delete-ideas-note">
             Your ideas about it are kept: they belong to your account, so they stay in Ideas with no
             universe, and only their references to this universe&rsquo;s content go.
           </p>
           {confirmingDelete ? (
-            <div className="settings__confirm">
-              <p className="settings__note">
-                Delete <strong>{universe.name}</strong> permanently?
+            <div
+              className="settings__confirm"
+              role="group"
+              aria-labelledby="delete-confirm-title"
+              tabIndex={-1}
+              ref={deleteConfirm}
+            >
+              <p className="settings__confirmtitle" id="delete-confirm-title">
+                Delete <bdi>{universe.name}</bdi> permanently?
               </p>
               <div className="form__actions">
                 <button
@@ -193,11 +340,13 @@ export default function UniverseSettings() {
             </div>
           ) : (
             <button
-              className="button button--secondary"
+              ref={deleteButton}
+              className="button button--secondary button--danger-quiet"
               type="button"
               onClick={() => setConfirmingDelete(true)}
+              data-testid="delete-universe"
             >
-              Delete universe
+              Delete universe…
             </button>
           )}
         </section>

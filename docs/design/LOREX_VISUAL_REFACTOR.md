@@ -575,7 +575,9 @@ drops the movement.
    visible where order is the point (scenes, chapters, arcs, beats), everything else in ⋯.
 4. **Destructive** never sits beside Save or Create: last in a ⋯ menu, or in Settings' danger
    section, with today's confirmation.
-5. **Editors:** the ActionBar holds the status on the left and Cancel or Done plus Save on the right.
+5. **Editors:** the ActionBar holds the status on the left and Save, then Cancel or Done, on the right.
+   *Amended in public portal 012:* one order everywhere - the primary action first, then the way out, in sight and
+   in Tab order - as every drawer, inline form and confirmation already had it.
 6. **A link styled as a button is never underlined** - fixed once, in `.button`.
 7. **Labels** are three words or fewer where possible and never wrap on a desktop.
 

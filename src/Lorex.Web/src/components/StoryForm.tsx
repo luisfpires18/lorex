@@ -117,7 +117,7 @@ export function StoryForm({ universeId, story, onClose, onSaved }: StoryFormProp
         }}
       >
         <header className="drawer__head">
-          <p className="drawer__eyebrow">{story ? 'Editing a story' : 'A new story'}</p>
+          {story ? <p className="drawer__eyebrow">Editing a story</p> : null}
           <h2 className="drawer__title" id="story-heading">
             {story ? story.title : 'New story'}
           </h2>

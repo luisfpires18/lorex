@@ -2263,8 +2263,62 @@ a.button--danger:visited {
   color: var(--accent);
 }
 
+/* The one place in Settings where something cannot be taken back: its own ruled panel, set apart from
+   ordinary configuration by a hairline in the danger ink and a faint wash - restrained, never an alarm. The
+   first step is a quiet button in the danger ink; only the confirmation's last step is filled. */
+.settings__section--danger {
+  margin-top: var(--space-5);
+  padding: var(--space-5);
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--rule));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--danger) 4%, var(--surface));
+}
+
 .settings__section--danger .settings__heading {
   color: var(--danger);
+}
+
+.button--secondary.button--danger-quiet,
+.button--secondary.button--danger-quiet:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border-control));
+}
+
+/* An inline confirmation: the question, what follows from it, and its choices - primary first. The same
+   bordered plate as Public portal's publish confirmation, never a side stripe (retired in 007). */
+.settings__confirm {
+  margin-top: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+}
+
+.settings__confirm:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.settings__section--danger .settings__confirm {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--rule));
+}
+
+.settings__confirmtitle {
+  margin: 0 0 var(--space-2);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* A button that reads as a link inside a sentence. */
+.linkbutton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  cursor: pointer;
 }
 
 .settings__caution {
@@ -7205,10 +7259,39 @@ a.lorechip--pov:focus-visible .lorechip__name {
 
 .trash__row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-1);
   border-bottom: 1px solid var(--rule);
+}
+
+/* The question before a restore that would publish again: the row's full width, under what it is about. */
+.trash__confirm {
+  flex: 1 1 100%;
+  padding: var(--space-4);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+}
+
+.trash__confirm:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.trash__confirmtitle {
+  margin: 0 0 var(--space-2);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.trash__confirmtext {
+  margin: 0 0 var(--space-3);
+  color: var(--muted);
+  font-size: var(--text-ui);
+  line-height: 1.55;
+  max-width: 60ch;
 }
 
 /* 40px: an entry's type tile, or a story part's kind, so a row says what it held before its words do. */
@@ -9071,7 +9154,7 @@ a.idearef__name {
 
 /* ---------- Explore: the band ----------
 
-   The owner's panorama, as supplied (explore-worlds-background.png, 1916 x 821), as a wide band that holds the
+   The owner's panorama, as supplied (explore-worlds-background.png, 1916 x 821, delivered as its WebP copy), as a wide band that holds the
    title and the category row. The file is never edited: on a wide screen the picture is drawn a third larger
    from its left edge, which carries the castle out from under the title to the right of it; on a narrow one it
    is simply cropped. A shade on the reading side and a fall into the page along the bottom keep it legible. */
@@ -9080,6 +9163,10 @@ a.idearef__name {
   isolation: isolate;
   overflow: hidden;
   padding: clamp(2rem, 4vw, 3.25rem) 0 clamp(1.5rem, 2.5vw, 2rem);
+}
+
+.explore-hero__picture {
+  display: contents;
 }
 
 .explore-hero__image {

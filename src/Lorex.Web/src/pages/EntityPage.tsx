@@ -862,7 +862,8 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
         </div>
       )}
 
-      {/* The form's own bar: what state the form is in on the left, Cancel and Save on the right. It holds
+      {/* The form's own bar: what state the form is in on the left, Save then Cancel on the right -
+          primary first, as in every drawer and confirmation. It holds
           to the bottom of the screen while the form is longer than it, and settles at the form's end. */}
       {isEditing ? (
         <footer className="entry__actions actionbar">
@@ -870,6 +871,17 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
             {isDirty ? 'Unsaved changes' : isNew ? 'New entry' : 'No changes yet'}
           </p>
           <div className="actionbar__actions">
+            <button
+              className="button"
+              type="button"
+              onClick={save}
+              disabled={isSaving}
+              aria-busy={isSaving}
+              data-testid="save-entity"
+            >
+              <ActionIcon icon={Check} />
+              {isSaving ? 'Saving' : isNew ? 'Create entry' : 'Save changes'}
+            </button>
             {!isNew ? (
               <button
                 className="button button--secondary"
@@ -892,17 +904,6 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
                 Cancel
               </button>
             ) : null}
-            <button
-              className="button"
-              type="button"
-              onClick={save}
-              disabled={isSaving}
-              aria-busy={isSaving}
-              data-testid="save-entity"
-            >
-              <ActionIcon icon={Check} />
-              {isSaving ? 'Saving' : isNew ? 'Create entry' : 'Save changes'}
-            </button>
           </div>
         </footer>
       ) : null}

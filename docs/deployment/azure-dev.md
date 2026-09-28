@@ -171,6 +171,14 @@ Accepted deliberately. Each one is a reason this topology is not a production to
   `backup.json` plus every entry's original picture, so it does not depend on R2 surviving -
   ADR 0014. It is still a manual, per-universe download and still not a disaster-recovery story.
 
+## Search indexing (ADR 0038)
+
+DEV sets no `PublicSite__Origin` and no `PublicSite__AllowIndexing`, on purpose: `robots.txt` answers `Disallow: /`,
+every page says `noindex`, `/sitemap.xml` is 404, and no canonical or `og:url` is emitted. Page titles and descriptions
+are still written server-side. A production deployment sets both as app settings - `PublicSite__Origin` to its own
+`https://` origin (no path) and `PublicSite__AllowIndexing=true` - and needs no code change. Never point a DEV host's
+setting at the production origin. Check with `curl -s https://<host>/worlds/<slug> | grep -E "<title>|canonical|robots"`.
+
 ## Verifying the PWA
 
 Over HTTPS, which the site is (`httpsOnly` is set), from a Chromium browser:

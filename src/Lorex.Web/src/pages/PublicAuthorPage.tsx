@@ -9,6 +9,7 @@ import {
   type PublicUniverse,
 } from '../portal/api'
 import { usePublicPages } from '../portal/usePublicPages'
+import { useDocumentTitle } from '../portal/useDocumentTitle'
 
 type LoadState =
   | { slug: string; kind: 'ready'; author: PublicAuthor }
@@ -67,6 +68,7 @@ export default function PublicAuthorPage() {
 }
 
 function Author({ author }: { author: PublicAuthor }) {
+  useDocumentTitle(author.displayName)
   const fetchWorlds = useCallback(
     (page: number, signal: AbortSignal) =>
       listPublicUniverses({ author: author.slug }, page, signal),

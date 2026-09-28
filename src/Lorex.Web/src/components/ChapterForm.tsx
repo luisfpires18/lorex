@@ -128,9 +128,7 @@ export function ChapterForm({
         }}
       >
         <header className="drawer__head">
-          <p className="drawer__eyebrow">
-            {chapter ? `Editing ${number ?? 'a chapter'}` : 'A new chapter'}
-          </p>
+          {chapter ? <p className="drawer__eyebrow">{`Editing ${number ?? 'a chapter'}`}</p> : null}
           <h2 className="drawer__title" id="chapter-heading">
             {chapter ? chapter.title : 'New chapter'}
           </h2>

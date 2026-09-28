@@ -4,9 +4,19 @@ const formatter = new Intl.DateTimeFormat(undefined, {
   year: 'numeric',
 })
 
+/**
+ * Reads an API timestamp as the instant it is. The API stores every timestamp in UTC, but those read back from SQLite
+ * serialize without a zone ("2026-09-28T10:00:00"), which `Date` would take as the reader's local time. A value with no
+ * zone designator is therefore read as UTC; one that carries `Z` or an offset is read as written. (Task 012: the
+ * contract is left as it is - changing every timestamp's serialization is not a polish-phase change.)
+ */
+export function parseApiDate(iso: string) {
+  return new Date(/T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(iso) ? `${iso}Z` : iso)
+}
+
 /** Formats an API timestamp, returning an empty string rather than "Invalid Date". */
 export function formatDate(iso: string) {
-  const parsed = new Date(iso)
+  const parsed = parseApiDate(iso)
   return Number.isNaN(parsed.getTime()) ? '' : formatter.format(parsed)
 }
 
@@ -23,7 +33,7 @@ const stampFormatter = new Intl.DateTimeFormat(undefined, {
  * same day have to be told apart - a document history, and the Trash.
  */
 export function formatDateTime(iso: string) {
-  const parsed = new Date(iso)
+  const parsed = parseApiDate(iso)
   return Number.isNaN(parsed.getTime()) ? '' : stampFormatter.format(parsed)
 }
 

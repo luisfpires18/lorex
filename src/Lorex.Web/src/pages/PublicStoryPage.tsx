@@ -12,6 +12,7 @@ import {
   type PublicUniverse,
 } from '../portal/api'
 import { useWorkspaceLink } from '../portal/useWorkspaceLink'
+import { useDocumentTitle } from '../portal/useDocumentTitle'
 
 type LoadState =
   | { key: string; kind: 'ready'; world: PublicUniverse; story: PublicStory }
@@ -69,6 +70,7 @@ export default function PublicStoryPage() {
 }
 
 function Story({ world, story }: { world: PublicUniverse; story: PublicStory }) {
+  useDocumentTitle(story.title, world.name)
   const owner = useWorkspaceLink(world.slug, { story: story.slug })
 
   return (

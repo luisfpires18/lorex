@@ -41,8 +41,9 @@ One ADR per durable decision. Rationale lives in the ADR, never here.
 | 0035 | A relation kind may carry an explicit family meaning, and a family tree derives the rest | [0035-family-trees.md](0035-family-trees.md) |
 | 0036 | A universe is private until its owner publishes its shell, and the portal reads only an allow-list (amended for 010: entries and stories are published one by one, and a private universe overrides them; for 011: an entry's page carries its article, and a story needs a public summary) | [0036-universe-publication.md](0036-universe-publication.md) |
 | 0037 | An author is public only through a chosen name, a minted address and a photo they chose to show | [0037-public-author-identity.md](0037-public-author-identity.md) |
+| 0038 | Public pages carry server-rendered metadata from the public predicates, on a configured origin | [0038-public-page-metadata.md](0038-public-page-metadata.md) |
 
-All accepted. Next number: `0037`.
+All accepted. Next number: `0039`.
 
 Known limitations are recorded in the ADR that owns them - cross-era ordering on the plain
 reckoning in 0009 and 0011, and years written before a universe named its eras, the listing's
@@ -71,4 +72,5 @@ what a rule's check deliberately is not - a second pattern, a builder, a conditi
 moments - and that it is only as complete as the details authors record, in 0034, and the duplicate relationships an older
 database may already hold, which nothing deletes and no unique index refuses, in 0008, and what unpublishing cannot
 recall - a copy a visitor already has - and the slug a deleted world frees, and the stem an entry or story address
-reveals was once taken, in 0036, and the author address a second author of one name gets, in 0037.
+reveals was once taken, in 0036, and the author address a second author of one name gets, in 0037, and the body a non-rendering crawler cannot see and
+the copies search engines keep after an unpublish, in 0038.

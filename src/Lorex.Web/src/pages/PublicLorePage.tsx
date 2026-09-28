@@ -11,6 +11,7 @@ import {
   type PublicUniverse,
 } from '../portal/api'
 import { useWorkspaceLink } from '../portal/useWorkspaceLink'
+import { useDocumentTitle } from '../portal/useDocumentTitle'
 
 type LoadState =
   | { key: string; kind: 'ready'; world: PublicUniverse; entry: PublicLoreDetail }
@@ -71,6 +72,7 @@ export default function PublicLorePage() {
 }
 
 function Entry({ world, entry }: { world: PublicUniverse; entry: PublicLoreDetail }) {
+  useDocumentTitle(entry.name, world.name)
   const owner = useWorkspaceLink(world.slug, { lore: entry.slug })
 
   return (

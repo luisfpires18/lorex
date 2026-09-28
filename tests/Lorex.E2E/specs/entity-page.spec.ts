@@ -126,10 +126,11 @@ test.describe('an entry page', () => {
     await page.getByLabel('Summary').fill('Warden of the drowned coast.')
     await expect(status).toHaveText('Unsaved changes')
 
-    // Save is the primary; Cancel sits before it and leaves everything as it was.
+    // Save is the primary and comes first, as in every drawer and confirmation (012); Cancel follows it and leaves
+    // everything as it was.
     const save = page.getByTestId('save-entity')
     const cancel = page.getByRole('button', { name: 'Cancel' })
-    expect((await cancel.boundingBox())!.x).toBeLessThan((await save.boundingBox())!.x)
+    expect((await save.boundingBox())!.x).toBeLessThan((await cancel.boundingBox())!.x)
     page.once('dialog', (dialog) => void dialog.accept())
     await cancel.click()
     await expect(page.getByTestId('entry-summary')).toHaveText('Keeper of the tide ledger.')

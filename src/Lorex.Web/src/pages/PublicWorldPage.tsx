@@ -17,6 +17,7 @@ import {
 import { usePublicPages } from '../portal/usePublicPages'
 import { useWorkspaceLink } from '../portal/useWorkspaceLink'
 import { categoryLabel, genreKey, genreLabel } from '../publishing/types'
+import { useDocumentTitle } from '../portal/useDocumentTitle'
 
 type LoadState =
   | { slug: string; kind: 'ready'; world: PublicUniverse }
@@ -77,6 +78,7 @@ export default function PublicWorldPage() {
 }
 
 function World({ world }: { world: PublicUniverse }) {
+  useDocumentTitle(world.name)
   const owner = useWorkspaceLink(world.slug)
   const fetchLore = useCallback(
     (page: number, signal: AbortSignal) => listPublicLore(world.slug, page, signal),

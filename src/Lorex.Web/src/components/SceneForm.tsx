@@ -229,7 +229,7 @@ export function SceneForm({
         }}
       >
         <header className="drawer__head">
-          <p className="drawer__eyebrow">{scene ? 'Editing a scene' : 'A new scene'}</p>
+          {scene ? <p className="drawer__eyebrow">Editing a scene</p> : null}
           <h2 className="drawer__title" id="scene-heading">
             {scene ? scene.title : 'New scene'}
           </h2>

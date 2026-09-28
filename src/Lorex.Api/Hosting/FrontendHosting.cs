@@ -1,3 +1,4 @@
+using Lorex.Api.Features.Seo;
 using Microsoft.AspNetCore.StaticFiles;
 
 namespace Lorex.Api.Hosting;
@@ -12,7 +13,7 @@ namespace Lorex.Api.Hosting;
 /// the test host see no static-file middleware and no fallback route at all - their behaviour
 /// is unchanged.
 /// </summary>
-public static class FrontendHosting
+public static partial class FrontendHosting
 {
     /// <summary>True when a built client has been published alongside the API.</summary>
     public static bool HasBuiltFrontend(this IWebHostEnvironment environment) =>
@@ -30,7 +31,6 @@ public static class FrontendHosting
             return app;
         }
 
-        app.UseDefaultFiles();
         app.UseStaticFiles(new StaticFileOptions { OnPrepareResponse = SetCacheHeaders });
         return app;
     }
@@ -39,17 +39,50 @@ public static class FrontendHosting
     /// The client-side routing fallback. Mapped after every API route, and paired with a
     /// catch-all under <c>/api</c> so an unknown API path stays a 404 instead of being answered
     /// with the app shell and a 200.
+    ///
+    /// The shell is the built <c>index.html</c> with each page's head written in on the server
+    /// (<see cref="SeoEndpoints.RenderShellAsync"/>, ADR 0038), so a crawler or link preview that
+    /// runs no JavaScript still reads a public page's title, description and Open Graph. The
+    /// template is <c>Frontend:ShellPath</c> when configured (development points it at the source
+    /// <c>index.html</c> so the head can be checked over HTTP), else <c>wwwroot/index.html</c>.
     /// </summary>
     public static WebApplication MapLorexFrontendFallback(this WebApplication app)
     {
-        if (!app.Environment.HasBuiltFrontend())
+        var shellPath = ShellPath(app);
+        if (shellPath is null)
         {
             return app;
         }
 
+        var template = new ShellTemplate(File.ReadAllText(shellPath));
+        if (!template.HasMarkers)
+        {
+            LogNoMarkers(app.Logger, shellPath);
+        }
+
         app.Map("/api/{**path}", () => Results.NotFound());
-        app.MapFallbackToFile("index.html", new StaticFileOptions { OnPrepareResponse = SetCacheHeaders });
+
+        // "/" is the portal's front door, as it is in the client: a crawler is sent there rather than shown an empty shell.
+        app.MapGet("/", () => Results.Redirect("/explore")).AllowAnonymous().ExcludeFromDescription();
+
+        // Paths that look like files ("nonfile" excludes them) stay 404s, as MapFallbackToFile left them.
+        app.MapFallback("{*path:nonfile}", context => SeoEndpoints.RenderShellAsync(context, template)).AllowAnonymous();
         return app;
+    }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The app shell at {Path} has no lorex:head markers; pages are served without their own metadata.")]
+    private static partial void LogNoMarkers(ILogger logger, string path);
+
+    private static string? ShellPath(WebApplication app)
+    {
+        var configured = app.Configuration["Frontend:ShellPath"];
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            var full = Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, configured));
+            return File.Exists(full) ? full : null;
+        }
+
+        return app.Environment.HasBuiltFrontend() ? Path.Combine(app.Environment.WebRootPath, "index.html") : null;
     }
 
     /// <summary>

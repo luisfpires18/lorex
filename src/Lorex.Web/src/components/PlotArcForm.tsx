@@ -128,7 +128,7 @@ export function PlotArcForm({
         }}
       >
         <header className="drawer__head">
-          <p className="drawer__eyebrow">{arc ? `Editing ${number ?? 'an arc'}` : 'A new arc'}</p>
+          {arc ? <p className="drawer__eyebrow">{`Editing ${number ?? 'an arc'}`}</p> : null}
           <h2 className="drawer__title" id="plot-arc-heading">
             {arc ? arc.title : 'New arc'}
           </h2>

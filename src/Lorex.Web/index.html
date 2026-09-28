@@ -20,16 +20,22 @@
     <meta name="theme-color" content="#f6f2ea" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#151617" media="(prefers-color-scheme: dark)" />
 
-    <meta
-      name="description"
-      content="A workroom for the worlds you keep — their people, places, history and the rules that hold them together."
-    />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Lorex" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="mobile-web-app-capable" content="yes" />
 
+    <!-- The server replaces everything between these two markers with each page's own head -
+         title, description, robots, canonical, Open Graph (ADR 0038). What stays here is the head
+         for anything served without that step: the dev server, and /index.html itself. -->
+    <!-- lorex:head -->
     <title>Lorex</title>
+    <meta
+      name="description"
+      content="A workroom for the worlds you keep — their people, places, history and the rules that hold them together."
+    />
+    <meta name="robots" content="noindex,nofollow" />
+    <!-- /lorex:head -->
   </head>
   <body>
     <div id="root"></div>

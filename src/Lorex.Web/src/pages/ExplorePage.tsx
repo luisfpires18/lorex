@@ -4,7 +4,9 @@ import { EmptyState } from '../components/EmptyState'
 import { WorldCard } from '../components/WorldCard'
 import { listPublicUniverses, type ExploreQuery, type PublicUniverse } from '../portal/api'
 import heroImage from '../portal/explore-worlds-background.png'
+import heroImageWebp from '../portal/explore-worlds-background.webp'
 import { CATEGORIES, GENRES } from '../publishing/types'
+import { useDocumentTitle } from '../portal/useDocumentTitle'
 
 /** The API's own limit on a search; the portal bar's field holds the same. */
 const SEARCH_MAX = 100
@@ -32,6 +34,7 @@ type Results =
  * address - a refresh starts from the first page again, with the same filters.</p>
  */
 export default function ExplorePage() {
+  useDocumentTitle('Explore Worlds')
   const [params, setParams] = useSearchParams()
 
   // Only keys Lorex knows. A stale or hand-edited address shows everything rather than an error.
@@ -103,15 +106,20 @@ export default function ExplorePage() {
   return (
     <div className="explore" data-testid="explore">
       <section className="explore-hero" aria-labelledby="explore-title">
-        <img
-          className="explore-hero__image"
-          src={heroImage}
-          alt=""
-          width={1916}
-          height={821}
-          fetchPriority="high"
-          decoding="async"
-        />
+        {/* A WebP delivery copy of the approved panorama (Task 012: 250 kB for 2.37 MB), the untouched PNG behind it
+            for a browser without WebP. Same pixels, same crop. */}
+        <picture className="explore-hero__picture">
+          <source srcSet={heroImageWebp} type="image/webp" />
+          <img
+            className="explore-hero__image"
+            src={heroImage}
+            alt=""
+            width={1916}
+            height={821}
+            fetchPriority="high"
+            decoding="async"
+          />
+        </picture>
         <div className="explore-hero__inner">
           <h1 className="explore-hero__title" id="explore-title">
             Explore Worlds

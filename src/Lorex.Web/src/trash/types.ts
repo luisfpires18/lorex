@@ -34,6 +34,20 @@ export const TrashBlock = {
 export type TrashBlockValue = (typeof TrashBlock)[keyof typeof TrashBlock]
 
 /**
+ * Mirrors the backend enum. What restoring an entry or story would do on the public portal: Trash keeps its public
+ * selection (ADR 0036), so a restore can publish it again at once.
+ */
+export const TrashPublication = {
+  None: 0,
+  /** Selected, but its universe is private (or a story has no public summary): restoring shows nothing to readers. */
+  Hidden: 1,
+  /** Selected in a public universe: restoring makes it readable again straight away. */
+  Visible: 2,
+} as const
+
+export type TrashPublicationValue = (typeof TrashPublication)[keyof typeof TrashPublication]
+
+/**
  * One row in the Trash. Deliberately thin: it answers what was thrown away, where it was and when, and everything it
  * held is readable again the moment it comes back.
  *
@@ -55,6 +69,7 @@ export interface TrashItem {
   plotArcId: string | null
   plotArcTitle: string | null
   blockedBy: TrashBlockValue
+  publication: TrashPublicationValue
 }
 
 export interface TrashPage {

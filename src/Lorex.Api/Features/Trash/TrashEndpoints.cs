@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Lorex.Api.Data;
 using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Lore;
+using Lorex.Api.Features.Publishing;
 using Lorex.Api.Features.Universes;
 using Lorex.Api.Features.WorldRules;
 using Microsoft.AspNetCore.Mvc;
@@ -83,6 +84,10 @@ public static class TrashEndpoints
 
         var rows = new List<TrashItem>();
 
+        // Whether the universe itself is readable publicly, by the one predicate the portal uses: a selected item comes
+        // back into public view only then.
+        var universeIsPublic = await PublicationRules.Public(db).AnyAsync(universe => universe.Id == universeId, cancellationToken);
+
         rows.AddRange(await db.Entities.AsNoTracking()
             .Where(entity => entity.UniverseId == universeId && entity.DeletedAt != null)
             .Select(entity => new TrashItem(
@@ -99,7 +104,10 @@ public static class TrashEndpoints
                 null,
                 null,
                 null,
-                TrashRestoreBlock.None))
+                TrashRestoreBlock.None,
+                entity.Visibility != ContentVisibility.Public
+                    ? TrashRestorePublication.None
+                    : universeIsPublic ? TrashRestorePublication.Visible : TrashRestorePublication.Hidden))
             .ToListAsync(cancellationToken));
 
         rows.AddRange(await db.Stories.AsNoTracking()
@@ -118,7 +126,10 @@ public static class TrashEndpoints
                 null,
                 null,
                 null,
-                TrashRestoreBlock.None))
+                TrashRestoreBlock.None,
+                story.Visibility != ContentVisibility.Public
+                    ? TrashRestorePublication.None
+                    : universeIsPublic && story.PublicSummary != null ? TrashRestorePublication.Visible : TrashRestorePublication.Hidden))
             .ToListAsync(cancellationToken));
 
         rows.AddRange(await db.Chapters.AsNoTracking()
@@ -137,7 +148,8 @@ public static class TrashEndpoints
                 chapter.Story!.Title,
                 null,
                 null,
-                chapter.Story.DeletedAt != null ? TrashRestoreBlock.StoryInTrash : TrashRestoreBlock.None))
+                chapter.Story.DeletedAt != null ? TrashRestoreBlock.StoryInTrash : TrashRestoreBlock.None,
+                TrashRestorePublication.None))
             .ToListAsync(cancellationToken));
 
         rows.AddRange(await db.Scenes.AsNoTracking()
@@ -156,7 +168,8 @@ public static class TrashEndpoints
                 scene.Story!.Title,
                 null,
                 null,
-                scene.Story.DeletedAt != null ? TrashRestoreBlock.StoryInTrash : TrashRestoreBlock.None))
+                scene.Story.DeletedAt != null ? TrashRestoreBlock.StoryInTrash : TrashRestoreBlock.None,
+                TrashRestorePublication.None))
             .ToListAsync(cancellationToken));
 
         rows.AddRange(await db.PlotArcs.AsNoTracking()
@@ -175,7 +188,8 @@ public static class TrashEndpoints
                 arc.Story!.Title,
                 null,
                 null,
-                arc.Story.DeletedAt != null ? TrashRestoreBlock.StoryInTrash : TrashRestoreBlock.None))
+                arc.Story.DeletedAt != null ? TrashRestoreBlock.StoryInTrash : TrashRestoreBlock.None,
+                TrashRestorePublication.None))
             .ToListAsync(cancellationToken));
 
         rows.AddRange(await db.PlotBeats.AsNoTracking()
@@ -198,7 +212,8 @@ public static class TrashEndpoints
                     ? TrashRestoreBlock.StoryInTrash
                     : beat.PlotArc.DeletedAt != null
                         ? TrashRestoreBlock.ArcInTrash
-                        : TrashRestoreBlock.None))
+                        : TrashRestoreBlock.None,
+                TrashRestorePublication.None))
             .ToListAsync(cancellationToken));
 
         // A world rule belongs to its universe directly, so it has no story, arc or anything else to wait for.
@@ -218,7 +233,8 @@ public static class TrashEndpoints
                 null,
                 null,
                 null,
-                TrashRestoreBlock.None))
+                TrashRestoreBlock.None,
+                TrashRestorePublication.None))
             .ToListAsync(cancellationToken));
 
         var totalCount = rows.Count;
