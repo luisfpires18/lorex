@@ -76,6 +76,10 @@ export default function UniversesPage() {
           <Wordmark />
         </span>
         <div className="home__session">
+          {/* The public portal, from the workspace's front door: what authors have published, this one included. */}
+          <Link className="home__back" to="/explore" data-testid="home-explore">
+            Explore worlds
+          </Link>
           {/* Ideas belong to the account, not to a world, so they are reached from here without opening one. */}
           <Link className="home__back" to="/app/ideas" data-testid="home-ideas">
             Ideas

@@ -1,0 +1,129 @@
+import type { ImageCrop } from '../lib/imageCrop'
+
+/** Mirrors `UniverseVisibility`. Private until its owner publishes it (ADR 0036). */
+export const Visibility = {
+  Private: 0,
+  Public: 1,
+} as const
+
+export type VisibilityValue = (typeof Visibility)[keyof typeof Visibility]
+
+/** Mirrors `UniverseCategory`: what kind of creative property a universe belongs to. Numbered from 1. */
+export const Category = {
+  Original: 1,
+  MoviesAndTv: 2,
+  Games: 3,
+  Books: 4,
+  Comics: 5,
+  TabletopAndRpg: 6,
+  Audio: 7,
+  Other: 8,
+} as const
+
+export type CategoryValue = (typeof Category)[keyof typeof Category]
+
+/** The categories in the order they are offered, with the words they are shown in. No enum name is ever shown. */
+export const CATEGORIES: { value: CategoryValue; label: string }[] = [
+  { value: Category.Original, label: 'Original' },
+  { value: Category.MoviesAndTv, label: 'Movies & TV' },
+  { value: Category.Games, label: 'Games' },
+  { value: Category.Books, label: 'Books' },
+  { value: Category.Comics, label: 'Comics' },
+  { value: Category.TabletopAndRpg, label: 'Tabletop & RPG' },
+  { value: Category.Audio, label: 'Audio' },
+  { value: Category.Other, label: 'Other' },
+]
+
+/** Mirrors `UniverseGenres`: one bit each, and the one order they are always listed in. */
+export const Genre = {
+  Fantasy: 1,
+  ScienceFiction: 2,
+  Adventure: 4,
+  Horror: 8,
+  Mystery: 16,
+  Historical: 32,
+  Romance: 64,
+  Thriller: 128,
+  Supernatural: 256,
+  PostApocalyptic: 512,
+  Contemporary: 1024,
+  Other: 2048,
+} as const
+
+export type GenreValue = (typeof Genre)[keyof typeof Genre]
+
+export const GENRES: { value: GenreValue; label: string }[] = [
+  { value: Genre.Fantasy, label: 'Fantasy' },
+  { value: Genre.ScienceFiction, label: 'Science fiction' },
+  { value: Genre.Adventure, label: 'Adventure' },
+  { value: Genre.Horror, label: 'Horror' },
+  { value: Genre.Mystery, label: 'Mystery' },
+  { value: Genre.Historical, label: 'Historical' },
+  { value: Genre.Romance, label: 'Romance' },
+  { value: Genre.Thriller, label: 'Thriller' },
+  { value: Genre.Supernatural, label: 'Supernatural' },
+  { value: Genre.PostApocalyptic, label: 'Post-apocalyptic' },
+  { value: Genre.Contemporary, label: 'Contemporary' },
+  { value: Genre.Other, label: 'Other' },
+]
+
+export function categoryLabel(value: CategoryValue) {
+  return CATEGORIES.find((category) => category.value === value)?.label ?? ''
+}
+
+export function genreLabel(value: GenreValue) {
+  return GENRES.find((genre) => genre.value === value)?.label ?? ''
+}
+
+/** Mirrors `PublicationLimits`. */
+export const PUBLIC_SUMMARY_MAX = 300
+export const MAX_GENRES = 3
+export const PUBLIC_NAME_MAX = 60
+
+/**
+ * What publishing needs, in the order Settings lists it, keyed as the API reports a missing one. The words
+ * are the checklist's; the API's own sentence is what a refusal shows.
+ */
+export const REQUIREMENTS = [
+  { key: 'publicSummary', label: 'Public summary' },
+  { key: 'category', label: 'Category' },
+  { key: 'genres', label: 'At least one genre' },
+  { key: 'artwork', label: 'Artwork' },
+  { key: 'publicDisplayName', label: 'Your public name' },
+] as const
+
+export interface UniverseArtworkRef {
+  assetId: string
+  cardId: string
+  width: number
+  height: number
+  contentType: string
+  fileName: string | null
+  byteSize: number
+  uploadedAt: string
+  crop: ImageCrop
+}
+
+/** One universe's public face, as its owner sees it in Settings. */
+export interface PublicationState {
+  name: string
+  visibility: VisibilityValue
+  publicSummary: string | null
+  category: CategoryValue | null
+  genres: GenreValue[]
+  publicSlug: string | null
+  publishedAt: string | null
+  authorDisplayName: string | null
+  artwork: UniverseArtworkRef | null
+  /** What publishing still needs, keyed as `REQUIREMENTS`. Empty when it may be published. */
+  missing: Record<string, string[]>
+}
+
+export interface PublicationDetails {
+  publicSummary: string | null
+  category: CategoryValue | null
+  genres: GenreValue[]
+}
+
+/** The ratio the card is framed at, 16:10 - the server's `ImageFrame.Card`. */
+export const CARD_ASPECT = 16 / 10

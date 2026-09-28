@@ -15,5 +15,8 @@ public sealed class LorexUserConfiguration : IEntityTypeConfiguration<LorexUser>
         builder.HasIndex(user => user.NormalizedEmail)
             .HasDatabaseName("EmailIndex")
             .IsUnique();
+
+        builder.Property(user => user.PublicDisplayName)
+            .HasMaxLength(Publishing.PublicationLimits.DisplayNameMaxLength);
     }
 }

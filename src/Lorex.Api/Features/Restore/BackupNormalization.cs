@@ -38,6 +38,8 @@ namespace Lorex.Api.Features.Restore;
 /// every version, a check of kind <c>None</c> is no check and a moment's details with no part are no details.</item>
 /// <item>Versions 1-13: no relation kind has a family meaning, even when the file carries one, and none is ever read from a kind's
 /// name (<c>AddRelationshipFamilySemantics</c>, ADR 0035).</item>
+/// <item>Versions 1-14: no public summary, category, genre or artwork, even when the file carries them (<c>AddUniversePublication</c>,
+/// ADR 0036). In every version the restored universe is private: no version of the format can say otherwise.</item>
 /// </list>
 ///
 /// One thing is normalized for every version: the live rows of each ordered collection are numbered
@@ -52,6 +54,9 @@ internal static class BackupNormalization
 
     public static UniverseBackupPayload Project(UniverseBackupPayload payload, int version) => payload with
     {
+        Universe = version >= 15 || payload.Universe is null
+            ? payload.Universe!
+            : payload.Universe with { PublicSummary = null, Category = null, Genres = null, Artwork = null },
         ChronologyEras = version >= 4 ? payload.ChronologyEras : null,
         Entities = payload.Entities is null ? null! : [.. payload.Entities.Select(entity => entity is null ? null! : ProjectEntity(entity, version))],
         RelationshipTypes = version >= 14 || payload.RelationshipTypes is null

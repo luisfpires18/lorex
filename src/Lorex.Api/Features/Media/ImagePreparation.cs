@@ -10,7 +10,8 @@ namespace Lorex.Api.Features.Media;
 /// <summary>What passed validation, and everything a write path needs from the bytes.</summary>
 /// <param name="Width">Displayed width - after orientation, see <see cref="ImagePreparation"/>.</param>
 /// <param name="Height">Displayed height.</param>
-/// <param name="Crop">The square actually cut, as fractions. Always set, even when none was asked for.</param>
+/// <param name="Crop">The frame actually cut, as fractions. Always set, even when none was asked for.</param>
+/// <param name="Thumbnail">The derivative the frame asked for: the square thumbnail, or a universe's card.</param>
 internal sealed record PreparedImage(
     string ContentType,
     string Extension,
@@ -22,8 +23,26 @@ internal sealed record PreparedImage(
 /// <summary>Why an image was not accepted, and which part of the request to blame.</summary>
 internal sealed record ImageRejection(string Field, string Message);
 
-/// <summary>A crop, placed on pixels: a square, inside the image, in whole pixels.</summary>
-internal readonly record struct CropSquare(int Left, int Top, int Side);
+/// <summary>A crop, placed on pixels: a rectangle of the frame's shape, inside the image, in whole pixels.</summary>
+internal readonly record struct CropRect(int Left, int Top, int Width, int Height);
+
+/// <summary>
+/// The shape a derivative is cut to and the widest it is stored at. <see cref="Square"/> is every
+/// thumbnail and avatar; <see cref="Card"/> is a universe's artwork on its public card (ADR 0036).
+/// <paramref name="Noun"/> and <paramref name="ShapeRule"/> are only the words a refusal uses.
+/// </summary>
+internal sealed record ImageFrame(int AspectWidth, int AspectHeight, int MaxWidth, string Noun, string ShapeRule)
+{
+    public static readonly ImageFrame Square = new(1, 1, ImagePreparation.ThumbnailSize, "thumbnail", "square");
+
+    /// <summary>
+    /// 16:10, because that is the picture above a card's words in the portal's composition: a card
+    /// about as tall as it is wide, its top five eighths picture. 960 wide covers a card drawn up to
+    /// 480 CSS pixels on a 2x screen; a hero cut for a universe's own page is a later frame of the
+    /// same original.
+    /// </summary>
+    public static readonly ImageFrame Card = new(16, 10, 960, "card", "16:10");
+}
 
 /// <summary>
 /// The upload gate: what Lorex will accept as a picture anywhere in the product, and the square
@@ -108,26 +127,28 @@ internal static class ImagePreparation
     /// <summary>
     /// A crop's own shape, checked before a byte of the image is read: four finite fractions
     /// describing a non-empty rectangle that stays inside the picture. Whether it is square can
-    /// only be decided against the picture's pixels, and <see cref="Place"/> does that.
+    /// only be decided against the picture's pixels, and <see cref="Place(ImageCrop?, int, int, ImageFrame)"/> does that.
     /// </summary>
-    public static string? CheckCrop(ImageCrop crop)
+    public static string? CheckCrop(ImageCrop crop) => CheckCrop(crop, ImageFrame.Square);
+
+    public static string? CheckCrop(ImageCrop crop, ImageFrame frame)
     {
         if (!double.IsFinite(crop.X) || !double.IsFinite(crop.Y)
             || !double.IsFinite(crop.Width) || !double.IsFinite(crop.Height))
         {
-            return "The thumbnail selection must be four numbers.";
+            return $"The {frame.Noun} selection must be four numbers.";
         }
 
         if (crop.Width <= 0 || crop.Height <= 0)
         {
-            return "The thumbnail selection must have a size.";
+            return $"The {frame.Noun} selection must have a size.";
         }
 
         if (crop.X < -EdgeTolerance || crop.Y < -EdgeTolerance
             || crop.X + crop.Width > 1 + EdgeTolerance
             || crop.Y + crop.Height > 1 + EdgeTolerance)
         {
-            return "The thumbnail selection must lie inside the image.";
+            return $"The {frame.Noun} selection must lie inside the image.";
         }
 
         return null;
@@ -141,10 +162,19 @@ internal static class ImagePreparation
     /// centred square, and the crop that describes it is returned anyway, so every picture
     /// stored from here on records its framing.
     /// </summary>
+    public static Task<(PreparedImage? Image, ImageRejection? Rejection)> PrepareAsync(
+        Stream upload,
+        long byteLength,
+        ImageCrop? crop,
+        CancellationToken cancellationToken) =>
+        PrepareAsync(upload, byteLength, crop, ImageFrame.Square, cancellationToken);
+
+    /// <summary>The same gate, cutting <paramref name="frame"/>'s shape rather than the square.</summary>
     public static async Task<(PreparedImage? Image, ImageRejection? Rejection)> PrepareAsync(
         Stream upload,
         long byteLength,
         ImageCrop? crop,
+        ImageFrame frame,
         CancellationToken cancellationToken)
     {
         if (byteLength <= 0)
@@ -157,7 +187,7 @@ internal static class ImagePreparation
             return Refuse(FileField, $"Images must be {MaxUploadBytes / (1024 * 1024)} MB or smaller.");
         }
 
-        if (crop is not null && CheckCrop(crop) is { } badCrop)
+        if (crop is not null && CheckCrop(crop, frame) is { } badCrop)
         {
             return Refuse(CropField, badCrop);
         }
@@ -231,14 +261,14 @@ internal static class ImagePreparation
             var width = decoded.Width;
             var height = decoded.Height;
 
-            var (square, rejection) = Place(crop, width, height);
+            var (rect, rejection) = Place(crop, width, height, frame);
 
             if (rejection is not null)
             {
                 return Refuse(CropField, rejection);
             }
 
-            var thumbnail = await RenderThumbnailAsync(decoded, square, cancellationToken);
+            var thumbnail = await RenderAsync(decoded, rect, frame, cancellationToken);
 
             return (
                 new PreparedImage(
@@ -246,7 +276,7 @@ internal static class ImagePreparation
                     extension,
                     width,
                     height,
-                    Describe(square, width, height),
+                    Describe(rect, width, height),
                     thumbnail),
                 null);
         }
@@ -269,18 +299,21 @@ internal static class ImagePreparation
     ///
     /// Each edge is rounded to the nearest pixel on its own, so a crop that was computed from
     /// whole pixels - as the cropper's is, and as a stored one is - lands back on exactly those
-    /// pixels. A crop that is square to within a pixel, or one percent, is squared by trimming the
-    /// longer side evenly; anything further from square is refused rather than stretched.
+    /// pixels. A crop within a pixel, or one percent, of the frame's shape is trimmed to it evenly
+    /// on its longer side; anything further off is refused rather than stretched.
     ///
-    /// No crop means the largest centred square, which is what every thumbnail was before an
-    /// author could choose.
+    /// No crop means the largest centred frame - for the square, what every thumbnail was before
+    /// an author could choose.
     /// </summary>
-    internal static (CropSquare Square, string? Rejection) Place(ImageCrop? crop, int width, int height)
+    internal static (CropRect Rect, string? Rejection) Place(ImageCrop? crop, int width, int height) =>
+        Place(crop, width, height, ImageFrame.Square);
+
+    internal static (CropRect Rect, string? Rejection) Place(ImageCrop? crop, int width, int height, ImageFrame frame)
     {
         if (crop is null)
         {
-            var edge = Math.Min(width, height);
-            return (new CropSquare((width - edge) / 2, (height - edge) / 2, edge), null);
+            var (fitWidth, fitHeight) = Fit(width, height, frame);
+            return (new CropRect((width - fitWidth) / 2, (height - fitHeight) / 2, fitWidth, fitHeight), null);
         }
 
         var left = Math.Clamp(Pixel(crop.X * width), 0, width);
@@ -293,56 +326,73 @@ internal static class ImagePreparation
 
         if (across < 1 || down < 1)
         {
-            return (default, "The thumbnail selection is smaller than a pixel.");
+            return (default, $"The {frame.Noun} selection is smaller than a pixel.");
         }
 
         var slack = Math.Max(1, (int)Math.Ceiling(Math.Max(across, down) * 0.01));
 
-        if (Math.Abs(across - down) > slack)
+        // How far the height is from the one the frame's shape gives this width. For the square
+        // that is simply the difference between the two sides.
+        if (Math.Abs(down - (double)across * frame.AspectHeight / frame.AspectWidth) > slack)
         {
-            return (default, "The thumbnail selection must be square.");
+            return (default, $"The {frame.Noun} selection must be {frame.ShapeRule}.");
         }
 
-        var side = Math.Min(across, down);
+        var (cutWidth, cutHeight) = Fit(across, down, frame);
 
-        return (new CropSquare(left + (across - side) / 2, top + (down - side) / 2, side), null);
+        return (new CropRect(left + (across - cutWidth) / 2, top + (down - cutHeight) / 2, cutWidth, cutHeight), null);
     }
 
-    /// <summary>The square that was cut, back as fractions - the form it is stored and exported in.</summary>
-    private static ImageCrop Describe(CropSquare square, int width, int height) =>
+    /// <summary>
+    /// The largest rectangle of the frame's shape inside <paramref name="across"/> by
+    /// <paramref name="down"/>, in whole pixels. For the square, the shorter side both ways.
+    /// Rounding cannot overshoot: the side it computes is at most the one it is measured against.
+    /// </summary>
+    private static (int Width, int Height) Fit(int across, int down, ImageFrame frame) =>
+        (long)across * frame.AspectHeight <= (long)down * frame.AspectWidth
+            ? (across, Math.Max(1, Pixel((double)across * frame.AspectHeight / frame.AspectWidth)))
+            : (Math.Max(1, Pixel((double)down * frame.AspectWidth / frame.AspectHeight)), down);
+
+    /// <summary>The frame that was cut, back as fractions - the form it is stored and exported in.</summary>
+    private static ImageCrop Describe(CropRect rect, int width, int height) =>
         new(
-            (double)square.Left / width,
-            (double)square.Top / height,
-            (double)square.Side / width,
-            (double)square.Side / height);
+            (double)rect.Left / width,
+            (double)rect.Top / height,
+            (double)rect.Width / width,
+            (double)rect.Height / height);
 
     private static int Pixel(double value) => (int)Math.Round(value, MidpointRounding.AwayFromZero);
 
     /// <summary>
-    /// The chosen square, cut from the upright original and scaled to the portrait size.
+    /// The chosen frame, cut from the upright original and scaled to the frame's width.
     ///
-    /// Cut first, then scale, and nothing else: the square is already square, so scaling it
-    /// cannot stretch it, and nothing outside it can leak in at the edges.
+    /// Cut first, then scale, and nothing else: the cut is already the frame's shape, so scaling
+    /// it cannot stretch it by more than the rounding of one pixel, and nothing outside it can
+    /// leak in at the edges.
     ///
-    /// It never enlarges. A square already smaller than the target is kept at its own resolution,
+    /// It never enlarges. A cut already narrower than the target is kept at its own resolution,
     /// because upscaling would store more bytes to show the same detail blurrier.
     /// </summary>
-    private static async Task<byte[]> RenderThumbnailAsync(
+    private static async Task<byte[]> RenderAsync(
         Image image,
-        CropSquare square,
+        CropRect rect,
+        ImageFrame frame,
         CancellationToken cancellationToken)
     {
-        var edge = Math.Min(ThumbnailSize, square.Side);
+        var outWidth = Math.Min(frame.MaxWidth, rect.Width);
+        var outHeight = outWidth == rect.Width
+            ? rect.Height
+            : Math.Max(1, Pixel((double)outWidth * frame.AspectHeight / frame.AspectWidth));
 
         image.Mutate(context =>
         {
-            context.Crop(new Rectangle(square.Left, square.Top, square.Side, square.Side));
+            context.Crop(new Rectangle(rect.Left, rect.Top, rect.Width, rect.Height));
 
-            if (edge != square.Side)
+            if (outWidth != rect.Width)
             {
                 context.Resize(new ResizeOptions
                 {
-                    Size = new Size(edge, edge),
+                    Size = new Size(outWidth, outHeight),
                     Mode = ResizeMode.Stretch,
                     Sampler = KnownResamplers.Lanczos3,
                 });

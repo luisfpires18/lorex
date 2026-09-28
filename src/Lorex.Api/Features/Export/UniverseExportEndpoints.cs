@@ -90,8 +90,10 @@ public static partial class UniverseExportEndpoints
             // is told their backup is incomplete rather than handed one that quietly is.
             return Results.Problem(
                 title: "That backup could not be completed.",
-                detail: $"An image belonging to entry {missing.EntityId:D} could not be read, so the "
-                    + "backup would have been missing it. Nothing was downloaded.",
+                detail: (missing.EntityId is { } entityId
+                        ? $"An image belonging to entry {entityId:D} could not be read"
+                        : "The universe's artwork could not be read")
+                    + ", so the backup would have been missing it. Nothing was downloaded.",
                 statusCode: StatusCodes.Status500InternalServerError,
                 extensions: new Dictionary<string, object?> { ["code"] = MediaMissingCode });
         }

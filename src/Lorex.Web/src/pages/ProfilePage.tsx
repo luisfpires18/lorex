@@ -4,6 +4,7 @@ import { useAuth } from '../auth/useAuth'
 import { AccountMenu } from '../components/AccountMenu'
 import { BrandMark } from '../components/BrandMark'
 import { ProfileAvatar } from '../components/ProfileAvatar'
+import { PublicNameForm } from '../components/PublicNameForm'
 import { MAIN_CONTENT_ID } from '../components/SkipLink'
 import { Wordmark } from '../components/Wordmark'
 import { listUniverses } from '../universes/api'
@@ -15,9 +16,9 @@ import { listUniverses } from '../universes/api'
  * beside the universe browser at `/app/profile` and wears the same bar. The workspace sidebar
  * still links to it, which is where an author is when they think to look.
  *
- * The circle near the top is the account's photo, or its initial when there is none. There is no
- * display name in the auth model, so the username is the name, and the page shows only what Lorex
- * genuinely holds rather than fields it would have to invent.
+ * The circle near the top is the account's photo, or its initial when there is none. The username is
+ * the account's name here; the public name is a separate, chosen one, shown only as the author of
+ * published universes (ADR 0036). The page shows only what Lorex genuinely holds.
  */
 export default function ProfilePage() {
   const { user } = useAuth()
@@ -89,10 +90,18 @@ export default function ProfilePage() {
             </div>
           </dl>
 
+          <section className="profile__public" aria-labelledby="profile-public-heading">
+            <h2 className="profile__subtitle" id="profile-public-heading">
+              Publishing
+            </h2>
+            <PublicNameForm />
+          </section>
+
           <p className="profile__note">
             Lorex keeps only what it needs to sign you in: a username, an email address, and the
-            photo above if you add one. Your photo is private - it is served only to your own
-            signed-in session, and it is never part of a universe backup.
+            photo above if you add one - and the public name above, if you choose one, which is the
+            only thing the public portal ever shows about you. Your photo is private - it is served
+            only to your own signed-in session, and it is never part of a universe backup.
           </p>
         </article>
       </main>

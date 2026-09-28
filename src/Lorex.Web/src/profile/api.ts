@@ -70,3 +70,23 @@ export function setProfileThumbnail(assetId: string, crop: ImageCrop) {
 export function removeProfileImage() {
   return apiFetch<void>(BASE, { method: 'DELETE' })
 }
+
+/**
+ * The name the account's published universes show as their author - the only thing about an account the
+ * public portal ever shows. Null until one is chosen; never filled in from the username or the email.
+ */
+export async function getPublicName(signal?: AbortSignal) {
+  return (
+    await apiFetch<{ publicDisplayName: string | null }>('/api/profile/public-name', { signal })
+  ).publicDisplayName
+}
+
+/** Sets it, or clears it with null - refused while any of the account's universes is public. */
+export async function setPublicName(publicDisplayName: string | null) {
+  return (
+    await apiFetch<{ publicDisplayName: string | null }>('/api/profile/public-name', {
+      method: 'PUT',
+      body: JSON.stringify({ publicDisplayName }),
+    })
+  ).publicDisplayName
+}

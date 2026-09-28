@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { ChronologySettings } from '../components/ChronologySettings'
+import { PublicPortalSettings } from '../components/PublicPortalSettings'
 import { UniverseForm } from '../components/UniverseForm'
 import { downloadUniverseBackup } from '../export/api'
 import { discardUniverseDrafts } from '../lib/localDrafts'
@@ -92,6 +93,8 @@ export default function UniverseSettings() {
         />
       </section>
 
+      <PublicPortalSettings universeId={universe.id} />
+
       <ChronologySettings
         universeId={universe.id}
         chronology={chronology}
@@ -103,9 +106,11 @@ export default function UniverseSettings() {
         <p className="settings__note">
           Download this universe as a single archive: its entries and their articles, types and
           fields, tags, relationships, the timeline, its world rules, every entry&rsquo;s history,
-          and the full-size image of every entry that has one, and the ideas that belong to this
-          universe. Nothing about your account is in it - so ideas that belong to no universe are in
-          no universe&rsquo;s backup. Keep the file somewhere you trust.
+          and the full-size image of every entry that has one, the ideas that belong to this
+          universe, and its public details and artwork. Nothing about your account is in it - so
+          ideas that belong to no universe are in no universe&rsquo;s backup - and neither is
+          whether it is public: a restored universe is always private. Keep the file somewhere you
+          trust.
         </p>
         <p className="settings__note">
           A backup is restored as a new universe beside this one - never over it.{' '}

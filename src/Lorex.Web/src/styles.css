@@ -8400,3 +8400,367 @@ a.idearef__name {
     order: -1;
   }
 }
+
+/* ---------- Publishing: Settings' Public portal section (ADR 0036) ----------
+
+   Workspace chrome, not the portal's: the same settings section, fields and callouts as the rest of the
+   screen. Visibility is a word in a quiet pill, never a colour alone. */
+
+.publication__state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  line-height: 1.5;
+}
+
+.publication__badge {
+  display: inline-block;
+  padding: 0.1rem 0.6rem;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--paper);
+}
+
+.publication__badge[data-state='public'] {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+
+.publication__address {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-ui);
+}
+
+.publication__label {
+  font-weight: 600;
+}
+
+.publication__path {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.publication__heading {
+  font-size: var(--text-ui);
+  font-weight: 600;
+  margin: var(--space-6) 0 var(--space-3);
+}
+
+.publication__genres {
+  min-width: 0;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  border: 0;
+}
+
+.publication__genrelist {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr));
+  gap: var(--space-2) var(--space-4);
+}
+
+.publication__genrelist .check {
+  min-height: var(--control-sm);
+}
+
+.publication__checklist {
+  list-style: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-ui);
+}
+
+.publication__checklist li[data-state='needed'] {
+  color: var(--muted);
+}
+
+.publication__mark {
+  display: inline-block;
+  width: 1.25rem;
+}
+
+.publication__word {
+  font-size: var(--text-sm);
+}
+
+.publication__problem {
+  margin: 0 0 var(--space-4);
+}
+
+.publication__missing {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.publication__confirm {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+}
+
+.publication__confirmtitle {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-item);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.publication__facts {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-ui);
+}
+
+.publication__facts > div {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.publication__facts dt {
+  color: var(--muted);
+}
+
+.publication__facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .publication__facts > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+}
+
+/* The artwork, drawn as its card: the 16:10 frame the server cuts, so what is here is what is published. */
+.artwork__frame {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  max-width: 24rem;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+}
+
+.artwork__card {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.artwork__empty {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.artwork__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 var(--space-2);
+}
+
+.cropper__preview--wide {
+  width: 5.2rem;
+  height: 3.25rem;
+}
+
+/* The public name on the Profile screen: a form of its own under the circle. */
+.profile__public {
+  margin-top: var(--space-7);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--rule);
+  text-align: left;
+}
+
+.profile__subtitle {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+
+/* ---------- The public portal's frame (ADR 0036) ----------
+
+   Structure only: its own bar on the graphite plate, and none of the workspace's chrome. The portal's own
+   design - dark, image-led - is the Explore task's. */
+
+.portal {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+}
+
+.portal__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-4) clamp(1.25rem, 4vw, 3rem);
+  background: var(--plate);
+  color: var(--plate-ink);
+}
+
+.portal__bar :focus-visible {
+  outline-color: var(--plate-ink-accent);
+}
+
+.portal__bar .wordmark__x {
+  color: var(--plate-ink-accent);
+}
+
+.portal__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.portal__nav {
+  flex: 1;
+  display: flex;
+  gap: var(--space-4);
+}
+
+.portal__link {
+  color: var(--plate-ink);
+  font-size: var(--text-ui);
+  text-decoration: none;
+}
+
+.portal__link:hover,
+.portal__link[aria-current='page'] {
+  text-decoration: underline;
+  text-underline-offset: 0.3em;
+}
+
+.portal__session {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.portal__body {
+  flex: 1;
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: clamp(2rem, 5vw, 3.5rem) clamp(1.25rem, 4vw, 3rem) 4rem;
+}
+
+.explore__title {
+  margin: 0 0 var(--space-2);
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: var(--text-page);
+}
+
+.explore__lede {
+  margin: 0 0 var(--space-7);
+  color: var(--muted);
+}
+
+.explore__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+  gap: var(--space-6);
+}
+
+.explore__item {
+  position: relative;
+  min-width: 0;
+}
+
+.explore__card,
+.world__card {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+}
+
+.explore__name {
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: var(--text-item);
+  overflow-wrap: anywhere;
+}
+
+/* The name is the item's one link, stretched over the whole item. */
+.explore__name a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.explore__name a::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.explore__facts,
+.explore__author {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.world {
+  max-width: 46rem;
+}
+
+.world__title {
+  margin: var(--space-6) 0 var(--space-2);
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: var(--text-document);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.world__author,
+.world__facts {
+  margin: 0 0 var(--space-2);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.world__summary {
+  margin: var(--space-5) 0 0;
+  font-size: var(--text-item);
+  line-height: 1.6;
+}
+
+@media (max-width: 640px) {
+  .world__title {
+    font-size: var(--text-page);
+  }
+}

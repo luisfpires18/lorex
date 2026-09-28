@@ -4,6 +4,7 @@ using Lorex.Api.Features.Chronology;
 using Lorex.Api.Features.Ideas;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Profile;
+using Lorex.Api.Features.Publishing;
 using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.RuleValidation;
 using Lorex.Api.Features.Stories;
@@ -24,6 +25,8 @@ public class LorexDbContext(DbContextOptions<LorexDbContext> options)
     : IdentityDbContext<LorexUser>(options)
 {
     public DbSet<Universe> Universes => Set<Universe>();
+
+    public DbSet<UniverseArtwork> UniverseArtworks => Set<UniverseArtwork>();
 
     public DbSet<EntityType> EntityTypes => Set<EntityType>();
 

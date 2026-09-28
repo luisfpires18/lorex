@@ -1075,7 +1075,7 @@ public sealed class EntityImageTests(LorexApiFactory factory) : IClassFixture<Lo
         var (square, rejection) = ImagePreparation.Place(crop.ToShared(), width, height);
 
         Assert.Null(rejection);
-        Assert.Equal(new CropSquare(left, top, side), square);
+        Assert.Equal(new CropRect(left, top, side, side), square);
     }
 
     [Fact]

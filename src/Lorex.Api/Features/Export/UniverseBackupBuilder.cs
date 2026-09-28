@@ -2,6 +2,7 @@ using Lorex.Api.Data;
 using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Ideas;
 using Lorex.Api.Features.Lore;
+using Lorex.Api.Features.Publishing;
 using Microsoft.EntityFrameworkCore;
 
 namespace Lorex.Api.Features.Export;
@@ -53,6 +54,8 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
         }
 
         var images = await ImagesAsync(universeId, cancellationToken);
+        var artwork = await db.UniverseArtworks.AsNoTracking()
+            .FirstOrDefaultAsync(candidate => candidate.UniverseId == universeId, cancellationToken);
 
         var payload = new UniverseBackupPayload(
             new BackupUniverse(
@@ -62,7 +65,24 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                 universe.AccentColor,
                 universe.IsArchived,
                 Utc(universe.CreatedAt),
-                Utc(universe.UpdatedAt)),
+                Utc(universe.UpdatedAt),
+
+                // Its public details, as authored. Never whether it is public, its address or when it was
+                // published: a restore is a new universe that has never been (ADR 0036).
+                universe.PublicSummary,
+                universe.Category,
+                PublicationRules.List(universe.Genres),
+                artwork is null
+                    ? null
+                    : new BackupUniverseArtwork(
+                        artwork.AssetId,
+                        artwork.FileName,
+                        artwork.ContentType,
+                        artwork.Width,
+                        artwork.Height,
+                        artwork.ByteSize,
+                        BackupArchive.ArtworkPathFor(artwork.ContentType),
+                        new BackupImageCrop(artwork.CropX, artwork.CropY, artwork.CropWidth, artwork.CropHeight))),
             await ErasAsync(universeId, cancellationToken),
             await EntityTypesAsync(universeId, cancellationToken),
             await TagsAsync(universeId, cancellationToken),
@@ -88,6 +108,9 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                         BackupArchive.MediaPathFor(image.EntityId, image.ContentType),
                         image.OriginalKey,
                         image.ContentType))
+                    .Concat(artwork is null
+                        ? []
+                        : [new BackupMediaObject(null, BackupArchive.ArtworkPathFor(artwork.ContentType), artwork.OriginalKey, artwork.ContentType)])
                     .OrderBy(one => one.ArchivePath, StringComparer.Ordinal),
             ]);
     }

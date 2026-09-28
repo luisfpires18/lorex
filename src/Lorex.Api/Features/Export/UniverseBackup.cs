@@ -2,6 +2,7 @@ using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Chronology;
 using Lorex.Api.Features.Ideas;
 using Lorex.Api.Features.Lore;
+using Lorex.Api.Features.Publishing;
 using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.RuleValidation;
 using Lorex.Api.Features.Stories;
@@ -137,8 +138,18 @@ public sealed record UniverseBackup(
     /// that meaning. It is authored, nothing derives it again - and nothing may derive it from the kind's name - so a version 13
     /// reader would restore every link with the family it records silently gone and every family tree in the universe empty. A
     /// file at version 13 or earlier has no <c>familySemantic</c>; it reads as <c>None</c>, whatever a kind is called.
+    ///
+    /// 15 - A universe may be prepared for the public portal (ADR 0036). <see cref="BackupUniverse.PublicSummary"/>,
+    /// <see cref="BackupUniverse.Category"/>, <see cref="BackupUniverse.Genres"/> and <see cref="BackupUniverse.Artwork"/>
+    /// carry what its author wrote and chose for it, and the archive gains the artwork's original beside the entries'
+    /// pictures. Not ignorable: the summary is authored text and the artwork an authored picture, so a version 14 reader
+    /// would lose both silently - and would refuse the archive anyway, over a file it does not know. <b>Whether the universe
+    /// is public is deliberately not in the format</b>, and neither is its address or when it was published: publishing is
+    /// a decision about one universe in one installation, and a restore makes a new universe that has never been
+    /// published. A restored universe is always private. A file at version 14 or earlier has none of these members; each
+    /// reads as null, which means none.
     /// </summary>
-    public const int CurrentVersion = 14;
+    public const int CurrentVersion = 15;
 
     public static UniverseBackup Of(UniverseBackupPayload payload, DateTime generatedAt) =>
         new(FormatName, CurrentVersion, generatedAt, payload);
@@ -184,6 +195,11 @@ public sealed record UniverseBackupPayload(
 /// The universe itself. <c>OwnerId</c> is deliberately absent: it names an Identity row that
 /// means nothing outside the installation that issued it, and a backup that carried it would
 /// be a backup of an account rather than of a world.
+///
+/// Since version 15, its public details: <paramref name="PublicSummary"/>, <paramref name="Category"/> and
+/// <paramref name="Genres"/> (by name, in their fixed order), and <paramref name="Artwork"/>. Visibility, the
+/// public address and the publication date are never here, and neither is the author's public name, which is
+/// the account's - see <see cref="UniverseBackup.CurrentVersion"/>.
 /// </summary>
 public sealed record BackupUniverse(
     Guid Id,
@@ -192,7 +208,27 @@ public sealed record BackupUniverse(
     string? AccentColor,
     bool IsArchived,
     DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    string? PublicSummary = null,
+    UniverseCategory? Category = null,
+    IReadOnlyList<UniverseGenres>? Genres = null,
+    BackupUniverseArtwork? Artwork = null);
+
+/// <summary>
+/// The universe's artwork, as <see cref="BackupEntityImage"/> describes an entry's picture: the original's
+/// identity and shape and where it sits in this archive (<see cref="BackupArchive.ArtworkPathFor"/>), and the
+/// 16:10 frame its card was cut with. The card itself is derived and is not carried; an importer cuts it again
+/// from the original and this frame. No object key, no URL.
+/// </summary>
+public sealed record BackupUniverseArtwork(
+    Guid AssetId,
+    string? FileName,
+    string ContentType,
+    int Width,
+    int Height,
+    long ByteSize,
+    string MediaPath,
+    BackupImageCrop Crop);
 
 /// <summary>
 /// One era of the universe's reckoning. The id is preserved because timeline entries and years on
