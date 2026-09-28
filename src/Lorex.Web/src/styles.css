@@ -8611,7 +8611,9 @@ a.idearef__name {
 
    A second visual world beside the workspace, in the same application. The workspace is paper under a
    graphite plate; the portal is night under a panorama - dark in either scheme, because it is a place to
-   look at other people's artwork, and artwork reads truest on a quiet dark ground.
+   look at other people's artwork, and artwork reads truest on a quiet dark ground. Composition follows the
+   owner's portal reference: a solid bar with the search in it, a compact panoramic band holding the title
+   and the category row, then a wide grid of dark card panels, the artwork bleeding into each.
 
    Scoped, not global: `.portal` redefines the shared tokens for everything inside it, so the shared
    patterns (buttons, notices, empty states, menus) draw dark here without a second set of components,
@@ -8620,16 +8622,18 @@ a.idearef__name {
    portal's own few values; everything else is the Lorex scale. */
 
 .portal {
-  --portal-bg: #0b0c0e;
-  --portal-surface: #15171b;
+  --portal-bg: #0b0d10;
+  --portal-bar-bg: #0e1115;
+  --portal-surface: #15181d;
+  --portal-card: #13161b;
   --portal-raised: #1d2025;
   --portal-ink: #f1ece3;
   --portal-muted: #aba59b;
-  --portal-line: rgb(241 236 227 / 0.12);
-  --portal-line-strong: rgb(241 236 227 / 0.26);
-  --portal-width: 88rem;
-  --portal-gutter: clamp(1rem, 4vw, 3rem);
-  --portal-bar: 4.25rem;
+  --portal-line: rgb(241 236 227 / 0.1);
+  --portal-line-strong: rgb(241 236 227 / 0.24);
+  --portal-width: 92rem;
+  --portal-gutter: clamp(1rem, 2.5vw, 2rem);
+  --portal-radius: 0.75rem;
 
   --paper: var(--portal-surface);
   --surface: var(--portal-bg);
@@ -8648,8 +8652,8 @@ a.idearef__name {
   --primary-bg: var(--portal-ink);
   --primary-ink: #111214;
   --accent-wash: color-mix(in srgb, var(--accent) 16%, var(--portal-raised));
-  --hover-wash: rgb(241 236 227 / 0.07);
-  --press-wash: rgb(241 236 227 / 0.12);
+  --hover-wash: rgb(241 236 227 / 0.08);
+  --press-wash: rgb(241 236 227 / 0.13);
   --focus-ring: var(--accent);
   --shadow-1: 0 1px 2px rgb(0 0 0 / 0.5);
   --shadow-2: 0 8px 20px -8px rgb(0 0 0 / 0.7);
@@ -8668,21 +8672,24 @@ a.idearef__name {
   color: var(--portal-ink);
 }
 
-/* The bar: brand, the one destination the portal has, and the way in or back. Transparent, so over
-   Explore's hero it is part of the picture; a hairline under it everywhere else. */
+/* ---------- The bar ----------
+
+   Brand, the one destination the portal has, the search, and the way in - or back to the workspace. Solid,
+   with a hairline, above every portal page. On a tablet and down the search takes a row of its own. */
 .portal__bar {
   position: relative;
   z-index: var(--z-sticky);
   display: flex;
   align-items: center;
-  gap: var(--space-5);
-  min-height: var(--portal-bar);
-  padding: 0 var(--portal-gutter);
+  gap: var(--space-3) var(--space-6);
+  min-height: 4rem;
+  padding: 0 max(var(--portal-gutter), (100% - var(--portal-width)) / 2);
   border-bottom: 1px solid var(--portal-line);
+  background: var(--portal-bar-bg);
 }
 
-.portal:has(.explore-hero) .portal__bar {
-  border-bottom-color: transparent;
+.portal__bar .wordmark {
+  font-size: 1.5rem;
 }
 
 .portal__bar .wordmark__x {
@@ -8699,52 +8706,145 @@ a.idearef__name {
 }
 
 .portal__nav {
-  flex: 1;
   display: flex;
-  gap: var(--space-4);
+  align-self: stretch;
+  gap: var(--space-5);
 }
 
+/* A destination: the page you are on is marked by a rule along the bar's foot, as well as by colour. */
 .portal__link {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  min-height: var(--control-md);
-  color: rgb(241 236 227 / 0.84);
+  color: rgb(241 236 227 / 0.78);
   font-size: var(--text-ui);
   font-weight: 500;
   text-decoration: none;
   white-space: nowrap;
-  text-underline-offset: 0.45em;
-  text-decoration-thickness: 1px;
 }
 
 .portal__link:hover {
   color: var(--portal-ink);
-  text-decoration-line: underline;
 }
 
 .portal__link[aria-current='page'] {
   color: var(--portal-ink);
-  text-decoration-line: underline;
-  text-decoration-thickness: 2px;
+  box-shadow: inset 0 -2px 0 var(--portal-ink);
 }
 
 .portal__session {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
   flex: none;
-  margin-left: auto;
 }
 
-.portal__join {
-  padding-inline: var(--space-4);
+/* The way in and the way across: outlined, and the one filled pill for joining. */
+.portal__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: var(--control-md);
+  padding: 0 1.125rem;
+  border: 1px solid var(--portal-line-strong);
+  border-radius: var(--radius-full);
+  color: var(--portal-ink);
+  font-size: var(--text-ui);
+  font-weight: 500;
+  text-decoration: none;
   white-space: nowrap;
+  transition:
+    background-color var(--duration-1) var(--ease),
+    border-color var(--duration-1) var(--ease);
+}
+
+.portal__pill:hover {
+  border-color: rgb(241 236 227 / 0.5);
+  background: var(--hover-wash);
+}
+
+.portal__pill--primary {
+  border-color: var(--portal-ink);
+  background: var(--portal-ink);
+  color: #111214;
+}
+
+.portal__pill--primary:hover {
+  border-color: #fff;
+  background: #fff;
 }
 
 /* Signed in, the account is the avatar alone: the bar is the portal's, and the name is in the menu. */
 .portal .accountmenu__name {
   display: none;
+}
+
+.portal-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 1 24rem;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.portal-search__input {
+  width: 100%;
+  height: var(--control-md);
+  padding: 0 2.5rem;
+  border: 1px solid var(--portal-line-strong);
+  border-radius: var(--radius-full);
+  background: rgb(241 236 227 / 0.04);
+  color: var(--portal-ink);
+  font: inherit;
+  font-size: var(--text-ui);
+  transition:
+    border-color var(--duration-1) var(--ease),
+    background-color var(--duration-1) var(--ease);
+}
+
+.portal-search__input::placeholder {
+  color: rgb(241 236 227 / 0.6);
+}
+
+.portal-search__input:hover {
+  border-color: rgb(241 236 227 / 0.4);
+}
+
+.portal-search__input:focus-visible {
+  border-color: var(--accent);
+  background: rgb(241 236 227 / 0.07);
+}
+
+.portal-search__input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.portal-search__icon {
+  position: absolute;
+  left: 0.875rem;
+  color: var(--portal-muted);
+  pointer-events: none;
+}
+
+.portal-search__clear {
+  position: absolute;
+  right: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--portal-muted);
+  cursor: pointer;
+}
+
+.portal-search__clear:hover {
+  background: var(--hover-wash);
+  color: var(--portal-ink);
 }
 
 .portal__body {
@@ -8760,47 +8860,93 @@ a.idearef__name {
   padding: clamp(2rem, 5vw, 3.5rem) var(--portal-gutter) var(--space-9);
 }
 
-/* A phone: the brand is the way to Explore, so the bar keeps room for the way in. */
-@media (max-width: 40rem) {
+@media (max-width: 52rem) {
   .portal__bar {
-    gap: var(--space-3);
+    flex-wrap: wrap;
+    padding-block: var(--space-3);
   }
 
+  .portal__session {
+    margin-left: auto;
+  }
+
+  .portal-search {
+    order: 3;
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+
+  .portal__link[aria-current='page'] {
+    box-shadow: none;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.45em;
+  }
+}
+
+/* A phone: the brand is the way to Explore, so the bar keeps room for the way in. */
+@media (max-width: 40rem) {
   .portal__nav {
     display: none;
   }
 
-  .portal__session {
+  .portal__bar {
     gap: var(--space-3);
   }
 
-  .portal__brand .wordmark {
-    font-size: 1.05rem;
+  .portal__bar .wordmark {
+    font-size: 1.2rem;
+  }
+
+  .portal__pill {
+    padding: 0 0.875rem;
+  }
+}
+
+/* The narrowest phones: brand and the two ways in still share one row. */
+@media (max-width: 25rem) {
+  .portal__bar .brandmark {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+
+  .portal__bar .wordmark {
+    font-size: 1.1rem;
+  }
+
+  .portal__session {
+    gap: var(--space-2);
+  }
+
+  .portal__pill {
+    padding: 0 0.75rem;
+    font-size: var(--text-sm);
   }
 }
 
 @media (pointer: coarse) {
-  .portal__link,
-  .portal__join {
+  .portal__pill,
+  .portal-search__input {
     min-height: var(--control-touch);
+  }
+
+  .portal-search__clear {
+    width: var(--control-md);
+    height: var(--control-md);
   }
 }
 
-/* ---------- Explore: the hero ----------
+/* ---------- Explore: the band ----------
 
-   The owner's panorama, as supplied (explore-worlds-background.png, 1916 x 821), cropped by the box and
-   never by an editor. It sits under the bar. Three washes keep the words legible without burying the
-   picture: a band under the bar, a fall into the page ground along the bottom, and a shade on the reading
-   side. The castle sits left of centre, so a narrow crop leans that way. */
+   The owner's panorama, as supplied (explore-worlds-background.png, 1916 x 821), as a wide band that holds the
+   title and the category row. The file is never edited: on a wide screen the picture is drawn a third larger
+   from its left edge, which carries the castle out from under the title to the right of it; on a narrow one it
+   is simply cropped. A shade on the reading side and a fall into the page along the bottom keep it legible. */
 .explore-hero {
   position: relative;
   isolation: isolate;
-  display: flex;
-  align-items: flex-end;
-  min-height: clamp(24rem, 36vw, 32rem);
-  margin-top: calc(-1 * var(--portal-bar));
-  padding: calc(var(--portal-bar) + var(--space-7)) var(--portal-gutter) clamp(2rem, 4vw, 3.25rem);
   overflow: hidden;
+  padding: clamp(2rem, 4vw, 3.25rem) 0 clamp(1.5rem, 2.5vw, 2rem);
 }
 
 .explore-hero__image {
@@ -8810,7 +8956,9 @@ a.idearef__name {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 42% 40%;
+  object-position: 0 32%;
+  transform: scale(1.3);
+  transform-origin: 0 32%;
 }
 
 .explore-hero::after {
@@ -8819,109 +8967,62 @@ a.idearef__name {
   inset: 0;
   z-index: -1;
   background:
-    linear-gradient(to bottom, rgb(7 8 10 / 0.72) 0, rgb(7 8 10 / 0) 9rem),
-    linear-gradient(to top, var(--portal-bg) 0, rgb(11 12 14 / 0.72) 30%, rgb(11 12 14 / 0) 64%),
-    linear-gradient(to right, rgb(7 8 10 / 0.62) 0, rgb(7 8 10 / 0.2) 45%, rgb(7 8 10 / 0) 70%);
+    linear-gradient(
+      to right,
+      rgb(9 11 14 / 0.88) 0,
+      rgb(9 11 14 / 0.55) 30%,
+      rgb(9 11 14 / 0.08) 62%
+    ),
+    linear-gradient(to top, var(--portal-bg) 0, rgb(11 13 16 / 0.35) 36%, rgb(11 13 16 / 0) 70%);
 }
 
 .explore-hero__inner {
-  width: min(100%, var(--portal-width));
+  width: min(100% - 2 * var(--portal-gutter), var(--portal-width));
   margin: 0 auto;
 }
 
 .explore-hero__title {
-  margin: 0 0 var(--space-3);
+  margin: 0 0 var(--space-2);
   font-family: var(--display);
-  font-weight: 400;
-  font-size: clamp(2.625rem, 1.6rem + 3.6vw, 4.75rem);
-  line-height: 1.02;
-  letter-spacing: -0.015em;
+  font-weight: 600;
+  font-size: clamp(2.25rem, 1.4rem + 2.6vw, 3.625rem);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
   text-wrap: balance;
-  text-shadow: 0 2px 24px rgb(0 0 0 / 0.5);
+  text-shadow: 0 2px 20px rgb(0 0 0 / 0.55);
 }
 
 .explore-hero__lede {
-  max-width: 34rem;
-  margin: 0 0 var(--space-6);
+  max-width: 38rem;
+  margin: 0 0 clamp(1.5rem, 3vw, 2.25rem);
   color: rgb(241 236 227 / 0.88);
   font-size: clamp(1rem, 0.95rem + 0.3vw, 1.125rem);
-  line-height: 1.55;
+  line-height: 1.5;
   text-wrap: pretty;
-  text-shadow: 0 1px 14px rgb(0 0 0 / 0.7);
+  text-shadow: 0 1px 12px rgb(0 0 0 / 0.7);
 }
 
-.explore-search {
-  position: relative;
-  display: flex;
-  align-items: center;
-  max-width: 34rem;
-}
+/* Narrower, the band is taller than the picture is wide enough to shade from one side: shade it all a little. */
+@media (max-width: 52rem) {
+  .explore-hero__image {
+    object-position: 38% 35%;
+    transform: none;
+  }
 
-.explore-search__input {
-  width: 100%;
-  height: 3.25rem;
-  padding: 0 3rem;
-  border: 1px solid rgb(241 236 227 / 0.24);
-  border-radius: var(--radius-md);
-  background: rgb(13 14 17 / 0.82);
-  color: var(--portal-ink);
-  font: inherit;
-  font-size: var(--text-body);
-  box-shadow: 0 12px 32px -14px rgb(0 0 0 / 0.75);
-  transition: border-color var(--duration-1) var(--ease);
-}
-
-.explore-search__input::placeholder {
-  color: rgb(241 236 227 / 0.62);
-}
-
-.explore-search__input:hover {
-  border-color: rgb(241 236 227 / 0.42);
-}
-
-.explore-search__input:focus-visible {
-  border-color: var(--accent);
-}
-
-.explore-search__input::-webkit-search-cancel-button {
-  appearance: none;
-}
-
-.explore-search__icon {
-  position: absolute;
-  left: 1rem;
-  color: var(--portal-muted);
-  pointer-events: none;
-}
-
-.explore-search__clear {
-  position: absolute;
-  right: 0.375rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--control-md);
-  height: var(--control-md);
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--portal-muted);
-  cursor: pointer;
-}
-
-.explore-search__clear:hover {
-  background: var(--hover-wash);
-  color: var(--portal-ink);
+  .explore-hero::after {
+    background:
+      linear-gradient(rgb(9 11 14 / 0.4), rgb(9 11 14 / 0.4)),
+      linear-gradient(to right, rgb(9 11 14 / 0.7) 0, rgb(9 11 14 / 0) 75%),
+      linear-gradient(to top, var(--portal-bg) 0, rgb(11 13 16 / 0) 45%);
+  }
 }
 
 /* ---------- Explore: discovery ---------- */
 
-/* The same measure as the hero's words, so the title, the filters and the first card share one edge. */
 .explore__body {
   width: min(100% - 2 * var(--portal-gutter), var(--portal-width));
   margin: 0 auto;
-  padding-bottom: var(--space-9);
+  padding: var(--space-5) 0 var(--space-9);
 }
 
 .explore-filters {
@@ -8930,8 +9031,6 @@ a.idearef__name {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4) var(--space-7);
-  padding: var(--space-5) 0 var(--space-5);
-  border-bottom: 1px solid var(--portal-line);
 }
 
 .explore-cats {
@@ -8948,29 +9047,29 @@ a.idearef__name {
   list-style: none;
 }
 
-/* Categories are addresses - each chip is a link to Explore filtered to it - so they are shared, opened
-   in a new tab and announced as links; the chosen one is `aria-current` and filled, not only coloured. */
+/* Categories are addresses - each pill is a link to Explore filtered to it - so they are shared, opened
+   in a new tab and announced as links; the chosen one is `aria-current` and filled cream, not only coloured. */
 .explore-cats__chip {
   display: inline-flex;
   align-items: center;
   min-height: 2.25rem;
   padding: 0 var(--space-4);
-  border: 1px solid var(--portal-line-strong);
+  border: 1px solid rgb(241 236 227 / 0.12);
   border-radius: var(--radius-full);
-  color: rgb(241 236 227 / 0.86);
+  background: rgb(10 12 16 / 0.62);
+  color: rgb(241 236 227 / 0.92);
   font-size: var(--text-ui);
   font-weight: 500;
   white-space: nowrap;
   text-decoration: none;
   transition:
     background-color var(--duration-1) var(--ease),
-    border-color var(--duration-1) var(--ease),
     color var(--duration-1) var(--ease);
 }
 
 .explore-cats__chip:hover {
-  border-color: rgb(241 236 227 / 0.5);
-  background: var(--hover-wash);
+  border-color: rgb(241 236 227 / 0.32);
+  background: rgb(26 29 35 / 0.86);
   color: var(--portal-ink);
 }
 
@@ -8995,8 +9094,9 @@ a.idearef__name {
 }
 
 .explore-select__label {
-  color: var(--portal-muted);
+  color: rgb(241 236 227 / 0.84);
   font-size: var(--text-ui);
+  text-shadow: 0 1px 8px rgb(0 0 0 / 0.6);
 }
 
 .explore-select__control {
@@ -9004,9 +9104,9 @@ a.idearef__name {
   min-width: 0;
   height: var(--control-md);
   padding: 0 2rem 0 var(--space-3);
-  border: 1px solid var(--border-control);
+  border: 1px solid var(--portal-line-strong);
   border-radius: var(--radius-md);
-  background: var(--portal-surface)
+  background: rgb(13 15 19 / 0.78)
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23aba59b' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E")
     no-repeat right 0.625rem center;
   color: var(--portal-ink);
@@ -9016,19 +9116,12 @@ a.idearef__name {
 }
 
 .explore-select__control:hover {
-  border-color: var(--portal-muted);
+  border-color: rgb(241 236 227 / 0.45);
 }
 
 .explore-select__control option {
   background: var(--portal-surface);
   color: var(--portal-ink);
-}
-
-.explore__count {
-  min-height: 1.25rem;
-  margin: var(--space-5) 0 var(--space-5);
-  color: var(--portal-muted);
-  font-size: var(--text-ui);
 }
 
 .explore__error {
@@ -9037,11 +9130,11 @@ a.idearef__name {
 }
 
 .explore .empty {
-  margin: var(--space-7) 0 var(--space-8);
+  margin: var(--space-6) 0 var(--space-8);
 }
 
 /* A tablet and down: categories scroll sideways in their own strip, edge to edge, rather than stacking
-   three rows of chips over the worlds; genre and sort share one row beneath, label over control. */
+   three rows of pills over the worlds; genre and sort share one row beneath, label over control. */
 @media (max-width: 52rem) {
   .explore-filters {
     display: grid;
@@ -9094,20 +9187,16 @@ a.idearef__name {
   .explore-select__control {
     min-height: var(--control-touch);
   }
-
-  .explore-search__clear {
-    width: var(--control-touch);
-    height: var(--control-touch);
-    right: 0.25rem;
-  }
 }
 
 /* ---------- Explore: the worlds ---------- */
 
+/* Four across at a laptop and up, as the reference has it - large enough for the artwork to lead - then three,
+   two and one. Steps rather than auto-fill, so a wide screen never shrinks the cards to fit a fifth. */
 .explore-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
-  gap: clamp(1.75rem, 2.4vw, 2.5rem) clamp(1rem, 1.6vw, 1.5rem);
+  grid-template-columns: 1fr;
+  gap: clamp(1rem, 1.6vw, 1.5rem);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -9117,18 +9206,50 @@ a.idearef__name {
   min-width: 0;
 }
 
-/* The card is its one link: artwork, name, what it is and who made it. Nothing else in it is interactive. */
+@media (min-width: 34rem) {
+  .explore-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 56rem) {
+  .explore-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 75rem) {
+  .explore-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* One dark panel, and its one link: the author's whole 16:10 picture across the top, fading into the panel, the
+   name set over the picture's lower edge, then the genres and the byline. */
 .worldcard__link {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
-  border-radius: var(--radius-md);
+  overflow: hidden;
+  border-radius: var(--portal-radius);
+  background: var(--portal-card);
+  box-shadow:
+    inset 0 0 0 1px rgb(241 236 227 / 0.07),
+    0 12px 30px -20px rgb(0 0 0 / 0.9);
   color: inherit;
   text-decoration: none;
+  transition: box-shadow var(--duration-3) var(--ease);
+}
+
+.worldcard__link:hover {
+  box-shadow:
+    inset 0 0 0 1px rgb(241 236 227 / 0.2),
+    0 18px 40px -20px rgb(0 0 0 / 1);
 }
 
 .worldcard__link:focus-visible {
-  outline-offset: 4px;
+  outline-offset: 3px;
 }
 
 .worldcard__art {
@@ -9136,18 +9257,19 @@ a.idearef__name {
   display: block;
   aspect-ratio: 16 / 10;
   overflow: hidden;
-  border-radius: var(--radius-md);
   background: var(--portal-surface);
-  transition: box-shadow var(--duration-3) var(--ease);
 }
 
-/* A hairline inside the frame, so a dark picture keeps its edge on the dark ground. */
 .worldcard__art::after {
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: inherit;
-  box-shadow: inset 0 0 0 1px rgb(241 236 227 / 0.08);
+  background: linear-gradient(
+    to top,
+    var(--portal-card) 0,
+    rgb(19 22 27 / 0.72) 22%,
+    rgb(19 22 27 / 0) 55%
+  );
   pointer-events: none;
 }
 
@@ -9156,14 +9278,6 @@ a.idearef__name {
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-.worldcard__link:hover .worldcard__art {
-  box-shadow: 0 16px 32px -16px rgb(0 0 0 / 0.9);
-}
-
-.worldcard__link:hover .worldcard__art::after {
-  box-shadow: inset 0 0 0 1px rgb(241 236 227 / 0.24);
 }
 
 .worldcard__fallback {
@@ -9183,23 +9297,28 @@ a.idearef__name {
 }
 
 .worldcard__text {
+  position: relative;
   display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-3) 0.125rem 0;
+  gap: 0.625rem;
+  margin-top: -2.75rem;
+  padding: 0 1.125rem 1rem;
 }
 
 .worldcard__name {
   display: -webkit-box;
-  margin: 0 0 0.125rem;
+  margin: 0;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  color: #f7f2e9;
   font-family: var(--display);
-  font-size: 1.25rem;
-  font-weight: 400;
-  line-height: 1.25;
+  font-size: 1.375rem;
+  font-weight: 600;
+  line-height: 1.2;
   overflow-wrap: anywhere;
+  text-shadow: 0 1px 14px rgb(0 0 0 / 0.7);
 }
 
 .worldcard__link:hover .worldcard__name bdi {
@@ -9208,23 +9327,111 @@ a.idearef__name {
   text-underline-offset: 0.2em;
 }
 
-.worldcard__facts,
-.worldcard__author {
+.worldcard__genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
   margin: 0;
-  color: var(--portal-muted);
+  padding: 0;
+  list-style: none;
+}
+
+/* A genre, tinted by which one it is - a hint of colour, with the word always there. */
+.genrechip {
+  --tint: 150 150 150;
+
+  padding: 0.1875rem 0.625rem;
+  border-radius: var(--radius-full);
+  background: rgb(var(--tint) / 0.24);
+  box-shadow: inset 0 0 0 1px rgb(var(--tint) / 0.34);
+  color: rgb(241 236 227 / 0.95);
+  font-size: var(--text-sm);
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.genrechip[data-genre='fantasy'] {
+  --tint: 104 132 230;
+}
+
+.genrechip[data-genre='science-fiction'] {
+  --tint: 80 168 214;
+}
+
+.genrechip[data-genre='adventure'] {
+  --tint: 206 150 72;
+}
+
+.genrechip[data-genre='horror'] {
+  --tint: 214 84 74;
+}
+
+.genrechip[data-genre='mystery'] {
+  --tint: 152 110 214;
+}
+
+.genrechip[data-genre='historical'] {
+  --tint: 190 150 96;
+}
+
+.genrechip[data-genre='romance'] {
+  --tint: 222 110 150;
+}
+
+.genrechip[data-genre='thriller'] {
+  --tint: 140 150 168;
+}
+
+.genrechip[data-genre='supernatural'] {
+  --tint: 124 104 220;
+}
+
+.genrechip[data-genre='post-apocalyptic'] {
+  --tint: 200 112 70;
+}
+
+.genrechip[data-genre='contemporary'] {
+  --tint: 104 170 146;
+}
+
+/* Who made it, and what kind of property it is - where a streaming card would put its numbers. */
+.worldcard__byline {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: auto 0 0;
   font-size: var(--text-ui);
   line-height: 1.4;
-  overflow-wrap: anywhere;
+}
+
+.worldcard__author {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--portal-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .worldcard__category {
-  color: rgb(241 236 227 / 0.92);
+  flex: none;
+  color: rgb(241 236 227 / 0.86);
   font-weight: 500;
+  white-space: nowrap;
 }
 
 /* Loading: the grid's own shape, so the worlds arrive without the page jumping. */
+.worldcard--skeleton {
+  overflow: hidden;
+  border-radius: var(--portal-radius);
+  background: var(--portal-card);
+  box-shadow: inset 0 0 0 1px rgb(241 236 227 / 0.07);
+}
+
 .worldcard--skeleton .worldcard__text {
-  gap: var(--space-2);
+  gap: var(--space-3);
+  margin-top: 0;
+  padding: 1rem 1.125rem 1.25rem;
 }
 
 .worldcard__bone {
@@ -9236,12 +9443,18 @@ a.idearef__name {
 }
 
 .worldcard__bone--name {
-  width: 82%;
-  height: 1.25rem;
+  width: 78%;
+  height: 1.375rem;
+}
+
+.worldcard__bone--chips {
+  width: 48%;
+  height: 1.375rem;
+  border-radius: var(--radius-full);
 }
 
 .worldcard__bone--short {
-  width: 42%;
+  width: 40%;
 }
 
 .explore__more {
@@ -9250,6 +9463,12 @@ a.idearef__name {
   align-items: center;
   gap: var(--space-3);
   margin-top: var(--space-8);
+}
+
+.explore__shown {
+  margin: 0;
+  color: var(--portal-muted);
+  font-size: var(--text-ui);
 }
 
 .explore__more-button {
@@ -9269,7 +9488,7 @@ a.idearef__name {
   }
 
   .worldcard__link:hover .worldcard__image {
-    transform: scale(1.025);
+    transform: scale(1.03);
   }
 
   .worldcard--skeleton {

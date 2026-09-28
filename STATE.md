@@ -700,14 +700,20 @@ A public, read-only discovery experience beside the workspace, in the same appli
     category pills, genre and sort selects, all in the address; one card per universe; Show more worlds; loading,
     empty, no-match and error states. The portal bar: Sign in / Create account, or My workspace and the account
     menu. `.portal` scopes a dark token set; workspace tokens untouched. `/worlds/:slug` is 008's page in the dark frame.
+  - Follow-up (review of `e47c1c7`): the layout now follows the owner's portal reference - search in a solid bar,
+    a compact panoramic band holding the title and categories, four large card panels with the artwork bleeding in
+    and genre chips. The portal is the front door: `/` opens `/explore`; Log in and Create account return to the
+    public page they were chosen on (router state, checked by `auth/returnPath.ts`); only My workspace enters the
+    workspace. `RequireGuest` redirects to the same return path, so it no longer races a sign-in to `/app`.
   - Debt for 012: the hero PNG is 2.37 MB, used as supplied - a smaller derivative needs the owner's approval. The
     loaded "Show more" pages are not in the address.
 
 ## Baseline
 
-- **1077 API integration tests, 212 Playwright tests** (Explore 009: +24 API in `PublicExploreQueryTests`, +8 in
-  `explore.spec.ts`). 009: API 1077/1077, Release build 0 warnings; full Playwright on a fresh database **212/212**, one
-  invocation, two workers, retries 0, 9.6 min. Before it, 008: +54 API, +4 Playwright, API 1053/1053 twice. Playwright for 008: full run on a fresh database **204/204**, one invocation, two workers, retries 0. An
+- **1077 API integration tests, 217 Playwright tests** (Explore 009: +24 API in `PublicExploreQueryTests`, +13 in
+  `explore.spec.ts`). 009 follow-up: full Playwright on a fresh database **217/217**, one invocation, two workers,
+  retries 0, 9.6 min; no backend change, so the API suite (1077/1077) and Release build were not rerun. 009:
+  **212/212** the same way. Before it, 008: +54 API, +4 Playwright, API 1053/1053 twice. Playwright for 008: full run on a fresh database **204/204**, one invocation, two workers, retries 0. An
   earlier run at the default eight workers lost six tests to host and dev-server resource pressure (blank pages, Vite
   failing to serve a module) in specs 008 does not touch; not a regression. Design refactor 007's full run on a fresh database:
   **200/200** first time (196 plus `polish.spec.ts`'s four). 006's runs lost one test each to known infrastructure (a

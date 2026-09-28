@@ -1,4 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { returnPath } from './returnPath'
 import { useAuth } from './useAuth'
 
 /** Held while the session probe is in flight, so no screen paints before it settles. */
@@ -12,15 +13,23 @@ export function RequireAuth() {
   const location = useLocation()
 
   if (isLoading) return <SessionPending />
-  if (!user) return <Navigate to="/login" state={{ from: location.pathname }} replace />
+  if (!user)
+    return (
+      <Navigate to="/login" state={{ from: `${location.pathname}${location.search}` }} replace />
+    )
   return <Outlet />
 }
 
-/** Keeps signed-in people out of the sign-in and registration screens. */
+/**
+ * Keeps signed-in people out of the sign-in and registration screens - sending them where those screens would
+ * have: the page they came from, else the workspace. The same answer matters, because this guard also sees the
+ * session arrive the moment a sign-in succeeds, and must not race the screen's own redirect somewhere else.
+ */
 export function RequireGuest() {
   const { user, isLoading } = useAuth()
+  const location = useLocation()
 
   if (isLoading) return <SessionPending />
-  if (user) return <Navigate to="/app" replace />
+  if (user) return <Navigate to={returnPath(location.state)} replace />
   return <Outlet />
 }

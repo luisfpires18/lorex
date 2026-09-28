@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Page } from '@playwright/test'
+import { expect, test, type APIRequestContext, type Browser, type Page } from '@playwright/test'
 import { png } from './support/png'
 
 /**
@@ -119,10 +119,10 @@ test.describe('Explore worlds', () => {
     const { context, page: visitor } = await stranger(browser)
     await visitor.goto(`/explore?q=${word}`)
 
-    await expect(visitor.getByRole('heading', { level: 1 })).toHaveText('Explore worlds')
+    await expect(visitor.getByRole('heading', { level: 1 })).toHaveText('Explore Worlds')
     await expect(visitor.getByRole('heading', { level: 1 })).toHaveCount(1)
     const session = visitor.getByTestId('portal-session')
-    await expect(session.getByRole('link', { name: 'Sign in' })).toBeVisible()
+    await expect(session.getByRole('link', { name: 'Log in' })).toBeVisible()
     await expect(session.getByRole('link', { name: 'Create account' })).toBeVisible()
     await expect(visitor.getByTestId('portal-workspace')).toHaveCount(0)
     await expect(
@@ -133,7 +133,9 @@ test.describe('Explore worlds', () => {
     await expect(cards(visitor)).toHaveText([`${word} Saltglass`, `${word} Hollowmere`])
     await expect(visitor.getByTestId('explore-count')).toHaveText('2 worlds match')
     const card = visitor.getByRole('link', { name: new RegExp(`${word} Hollowmere`) })
-    await expect(card).toContainText('Games · Fantasy, Horror')
+    // Genres as chips, and the category beside the author.
+    await expect(card.locator('.genrechip')).toHaveText(['Fantasy', 'Horror'])
+    await expect(card.locator('.worldcard__category')).toHaveText('Games')
     await expect(card).toContainText('by Mara Vell')
     await expect(card).not.toContainText('Unpublished')
     await expect
@@ -158,14 +160,14 @@ test.describe('Explore worlds', () => {
     await expect(workspace).toHaveText('My workspace')
     await expect(page.getByTestId('account-menu-trigger')).toBeVisible()
     await expect(
-      page.getByTestId('portal-session').getByRole('link', { name: 'Sign in' }),
+      page.getByTestId('portal-session').getByRole('link', { name: 'Log in' }),
     ).toHaveCount(0)
 
     await workspace.click()
     await page.waitForURL('/app')
     await page.getByTestId('home-explore').click()
     await page.waitForURL('/explore')
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Explore worlds')
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Explore Worlds')
   })
 
   test('category, genre, search and sort compose in the address, and Back, Forward and refresh restore them', async ({
@@ -381,9 +383,9 @@ test.describe('Explore worlds', () => {
     await expect(
       visitor.getByTestId('explore-list').locator('.worldcard__author bdi').first(),
     ).toHaveText('مارا فيل')
-    await expect(
-      visitor.getByTestId('explore-list').locator('.worldcard__facts').first(),
-    ).toHaveText('Books · Fantasy, Horror, Mystery')
+    const hebrew = visitor.getByTestId('explore-list').locator('.worldcard').first()
+    await expect(hebrew.locator('.genrechip')).toHaveText(['Fantasy', 'Horror', 'Mystery'])
+    await expect(hebrew.locator('.worldcard__category')).toHaveText('Books')
 
     // One authored title does not turn the portal around.
     expect(
@@ -418,5 +420,169 @@ test.describe('Explore worlds', () => {
     const art = await card.locator('.worldcard__art').boundingBox()
     expect(Math.round((art!.width / art!.height) * 10) / 10).toBe(1.6)
     await context.close()
+  })
+})
+
+/** An account made through the API, outside any page, so a test can then log in with it the way a visitor does. */
+async function account(request: APIRequestContext) {
+  const username = unique('visitor')
+  const response = await request.post('/api/auth/register', {
+    data: { username, email: `${username}@example.test`, password: PASSWORD },
+  })
+  expect(response.ok()).toBe(true)
+  return username
+}
+
+async function logInOnPage(page: Page, username: string) {
+  await expect(page).toHaveURL(/\/login$/)
+  await page.getByLabel('Username or email').fill(username)
+  await page.getByLabel('Password').fill(PASSWORD)
+  await page.getByRole('button', { name: 'Sign in' }).click()
+}
+
+test.describe('the portal is the front door', () => {
+  test('anyone reaches Explore and a public world directly, from the root, after a refresh and in a new session', async ({
+    page,
+    browser,
+  }) => {
+    const word = token()
+    await author(page, 'Ada Quill')
+    const slug = await world(page, {
+      name: `${word} Open Door`,
+      category: GAMES,
+      genres: [FANTASY],
+    })
+
+    const { context, page: visitor } = await stranger(browser)
+    await visitor.goto('/')
+    await visitor.waitForURL('/explore')
+    await expect(visitor.getByRole('heading', { level: 1 })).toHaveText('Explore Worlds')
+    await visitor.reload()
+    await expect(visitor).toHaveURL(/\/explore$/)
+    await expect(visitor.getByTestId('portal-login')).toBeVisible()
+    await context.close()
+
+    // The address pasted into a browser with no session at all, then refreshed.
+    const fresh = await stranger(browser)
+    await fresh.page.goto(`/worlds/${slug}`)
+    await expect(
+      fresh.page.getByTestId('public-world').getByRole('heading', { level: 1 }),
+    ).toHaveText(`${word} Open Door`)
+    await fresh.page.reload()
+    await expect(fresh.page).toHaveURL(new RegExp(`/worlds/${slug}$`))
+    await expect(fresh.page.getByTestId('public-world')).toBeVisible()
+
+    // The bar's search is on every portal page; from a world it opens Explore with the search.
+    await fresh.page.getByTestId('explore-search').fill(word)
+    await fresh.page.getByTestId('explore-search').press('Enter')
+    await fresh.page.waitForURL(`/explore?q=${word}`)
+    await expect(cards(fresh.page)).toHaveText([`${word} Open Door`])
+    await fresh.context.close()
+  })
+
+  test('Log in from Explore comes back to Explore, not the workspace; My workspace and Explore worlds cross over', async ({
+    page,
+    request,
+  }) => {
+    const username = await account(request)
+    await page.goto(`/explore?category=games`)
+    await page.getByTestId('portal-login').click()
+    await logInOnPage(page, username)
+
+    await page.waitForURL('/explore?category=games')
+    await expect(page.getByTestId('portal-workspace')).toHaveText('My workspace')
+    await expect(page.getByTestId('portal-login')).toHaveCount(0)
+    await expect(page.getByTestId('explore-category-games')).toHaveAttribute('aria-current', 'true')
+
+    await page.getByTestId('portal-workspace').click()
+    await page.waitForURL('/app')
+    await page.getByTestId('home-explore').click()
+    await page.waitForURL('/explore')
+
+    // Signing out in the portal leaves the visitor where they were reading.
+    await page.getByTestId('account-menu-trigger').click()
+    await page.getByRole('button', { name: 'Sign out' }).click()
+    await expect(page.getByTestId('portal-login')).toBeVisible()
+    await expect(page).toHaveURL(/\/explore$/)
+  })
+
+  test('Log in from a public world comes back to that world', async ({
+    page,
+    request,
+    browser,
+  }) => {
+    const word = token()
+    await author(page, 'Bram Ellery')
+    const slug = await world(page, { name: `${word} Return`, category: BOOKS, genres: [MYSTERY] })
+
+    const { context, page: visitor } = await stranger(browser)
+    const username = await account(request)
+    await visitor.goto(`/worlds/${slug}`)
+    await visitor.getByTestId('portal-login').click()
+    await logInOnPage(visitor, username)
+    await visitor.waitForURL(`/worlds/${slug}`)
+    await expect(visitor.getByTestId('portal-workspace')).toBeVisible()
+    await expect(visitor.getByTestId('public-world')).toBeVisible()
+    await context.close()
+  })
+
+  test('Create account, reached through Log in from a public world, comes back to that world', async ({
+    page,
+    browser,
+  }) => {
+    const word = token()
+    await author(page, 'Cato Wren')
+    const slug = await world(page, { name: `${word} Welcome`, category: BOOKS, genres: [MYSTERY] })
+
+    const { context, page: visitor } = await stranger(browser)
+    await visitor.goto(`/worlds/${slug}`)
+    await visitor.getByTestId('portal-login').click()
+    await visitor.waitForURL('/login')
+    await visitor.getByRole('link', { name: 'Create account' }).click()
+    await visitor.waitForURL('/register')
+    // A cold dev server may reload the page once while it prepares the screen's code; fill it after that.
+    await visitor.waitForLoadState('networkidle')
+    const newcomer = unique('newcomer')
+    const username = visitor.getByLabel('Username')
+    await username.fill(newcomer)
+    await visitor.getByLabel('Email').fill(`${newcomer}@example.test`)
+    await visitor.getByLabel('Password', { exact: true }).fill(PASSWORD)
+    await visitor.getByLabel('Confirm password').fill(PASSWORD)
+    await expect(username).toHaveValue(newcomer)
+    await visitor.getByRole('button', { name: 'Create account' }).click()
+    await visitor.waitForURL(`/worlds/${slug}`)
+    await expect(visitor.getByTestId('portal-workspace')).toBeVisible()
+    await context.close()
+  })
+
+  test('a return address that is not a Lorex page is never followed', async ({
+    page,
+    request,
+    baseURL,
+  }) => {
+    const username = await account(request)
+    const origin = new URL(baseURL!).origin
+
+    // Router state is the only carrier, and anything on the page could write history state - so forge it.
+    for (const from of [
+      '//evil.example/steal',
+      '/\evil.example',
+      '/\t/evil.example',
+      'https://evil.example/',
+      'javascript:alert(1)',
+      '/login',
+    ]) {
+      await page.goto('/login')
+      await page.evaluate((value) => {
+        history.replaceState({ usr: { from: value }, key: 'forged', idx: 0 }, '', '/login')
+      }, from)
+      await page.reload()
+      await logInOnPage(page, username)
+      await page.waitForURL('/app')
+      expect(new URL(page.url()).origin, from).toBe(origin)
+      await page.getByTestId('account-menu-trigger').click()
+      await page.getByRole('button', { name: 'Sign out' }).click()
+      await page.waitForURL('/login')
+    }
   })
 })

@@ -108,41 +108,65 @@ nothing is reinterpreted. The web client's `publishing/types.ts` carries the sam
 
 ## 13. Explore (009)
 
-`/explore` answers one question - what worlds can I explore? - with one card per public universe.
+`/explore` answers one question - what worlds can I explore? - with one card per public universe. The layout follows
+the owner's portal reference: a solid bar with the search in it, a compact panoramic band holding the title and the
+category row, then a wide grid of dark card panels. Its metrics, ratings, avatars and extra nav items are not copied:
+no such data or destinations exist.
 
-- **Hero.** The approved panorama under the bar, cropped by `object-fit` (leaning left, where the castle is), with
-  three washes for legibility: under the bar, into the page along the bottom, and on the reading side. "Explore
-  worlds", one line of support, and the search field. Loaded eagerly (`fetchpriority="high"`); it is above the fold.
-- **Categories.** Pills: All plus the eight, each a link to Explore filtered to it, the chosen one `aria-current`
-  and filled. Below 52rem they scroll sideways in their own strip, edge to edge, rather than stacking.
-- **Genre and sort.** Native selects, labelled: one genre or all; Recently published or A-Z. No popularity, trending
-  or rating sort exists, because no such data does.
-- **Search.** Sent 300 ms after typing stops, at once on Enter or when emptied. Earlier requests are aborted and a
-  stale answer is never shown. Starting or clearing a search adds a history entry; refining one replaces it.
+- **Bar.** Brand, Explore (marked by a rule along the bar's foot), the search, then Log in and Create account - or
+  My workspace and the account menu. Below 52rem the search takes its own row; below 40rem the brand alone leads to
+  Explore.
+- **Band.** The approved panorama behind "Explore Worlds", one line of support, the category pills and the genre and
+  sort selects. On a wide screen the picture is drawn 1.3x from its left edge (a CSS transform; the file is
+  untouched), which carries the castle out from under the title; narrower, it is cropped at 38% 35% and shaded
+  whole. A shade on the reading side and a fall into the page keep it legible. Loaded eagerly: it is above the fold.
+- **Categories.** Pills: All plus the eight, each a link to Explore filtered to it, dark translucent so they read
+  over the picture, the chosen one `aria-current` and filled cream. Below 52rem they scroll sideways in their own
+  strip, edge to edge, rather than stacking.
+- **Genre and sort.** Native selects, labelled "Genre" and "Sort by": one genre or all; Recently published or A-Z. No
+  popularity, trending or rating sort exists, because no such data does.
+- **Search.** In the bar, on every portal page. On Explore it is `q`: sent 300 ms after typing stops, at once on
+  Enter or when emptied; earlier requests are aborted and a stale answer is never shown; starting or clearing a
+  search adds a history entry, refining one replaces it. Elsewhere, Enter opens Explore with the search.
 - **Address.** `q`, `category`, `genre`, `sort=az`, each omitted at its default - `/explore?category=games&genre=fantasy`.
   Back, Forward and refresh restore it; an unknown value in a hand-edited address is ignored, not an error.
-- **Paging.** "Show more worlds" appends the next page, keeps the filters and drops any world already shown (a
-  publish in between shifts pages by one). No infinite scroll: a button is reachable, finite and says what it does.
-  The loaded pages are not in the address; a refresh starts from the first page with the same filters.
-- **Card.** Artwork (the 16:10 card, lazy-loaded), name (serif, two lines, `dir="auto"`), category and genres, and
-  `by` the public name - each authored string in `<bdi>`. The whole card is one link to `/worlds/{slug}`; nothing
-  inside it is interactive. The summary, counts and dates are not on the card. A picture that fails keeps the
-  card's shape with the Lorex mark, never someone else's art.
+- **Paging.** "Show more worlds", under "Showing 24 of 52 worlds", appends the next page, keeps the filters and drops
+  any world already shown (a publish in between shifts pages by one). No infinite scroll. The loaded pages are not in
+  the address; a refresh starts from the first page with the same filters. The count is also a polite status.
+- **Grid.** Four across from 75rem, three from 56rem, two from 34rem, one below: steps, so a wide screen never
+  shrinks the cards to fit a fifth.
+- **Card.** One dark panel and one link to `/worlds/{slug}`: the author's whole 16:10 card picture across the top
+  (lazy-loaded, never cropped further), fading into the panel; the name (serif, two lines, `dir="auto"`) set over the
+  picture's lower edge; the genres as chips tinted per genre, the word always there; then "by" the public name (one
+  line, cut with an ellipsis, full name in `title`) and the category where a streaming card puts its numbers. Every
+  authored string in `<bdi>`. No summary, counts or dates. A picture that fails keeps the panel with the Lorex mark.
 - **States.** Card-shaped skeletons while loading; "No worlds have been published yet." for an empty platform; "No
   published worlds match." with Clear search and filters; an error with Try again, never mistaken for empty.
 - **Visual boundary.** The portal is dark in either scheme. `.portal` redefines the shared tokens inside it (so shared
   buttons, notices and menus draw dark) plus a few `--portal-*` values; the workspace's tokens are untouched. Motion
-  is a colour change and a 2.5% image lift on hover, only without reduced motion.
+  is a panel edge brightening and a 3% image lift on hover, the lift only without reduced motion.
 - `/worlds/{slug}` keeps its 008 content inside the dark frame; the real public universe page is 011's.
 
 ## 14. Public and private navigation
 
-Settings' Public portal section (status in words, public details, artwork, author, checklist, publish and make
-private with inline confirmations, "View public page"). The portal bar: the brand and Explore (on a phone the brand
-alone leads to Explore), then "Sign in" and "Create account", or "My workspace ↗" and the account menu. The
-universes header's "Explore worlds ↗" goes the other way. Visibility belongs to universes; the two sides are the
-portal and the workspace, never "public mode" and "private mode". Later: "Edit this world" for an owner viewing their
-own world (011).
+The portal is the front door: `/` opens `/explore`, and `/explore` and `/worlds/{slug}` answer without a session -
+directly, after a refresh, in a new browser. Signing in is a choice made from it, and it comes back:
+
+- **Log in** and **Create account** in the portal bar pass the current page (path and query) as router state
+  (`{ from }`) - the same mechanism `RequireAuth` uses. Signing in or registering returns there, not to the workspace;
+  the Login and Register screens' links to each other carry it along. Signing out from the portal stays on the page.
+- **My workspace ↗** is the one way into the workspace from the portal; the universes header's **Explore worlds ↗**
+  is the way back. Visibility belongs to universes; the two sides are the portal and the workspace, never "public
+  mode" and "private mode".
+- **Return safety.** The page travels in history state, never in the address, so no link anyone else writes can choose
+  it. `auth/returnPath.ts` still checks it, since anything on the page can write history state: it resolves the value
+  against the site's own origin and follows only a same-origin path that is not Login or Register itself; `//host`,
+  `/\host`, tab-smuggled `//`, absolute and `javascript:` values fall back to `/app`. `RequireGuest` redirects to the
+  same answer, so it cannot race a successful sign-in somewhere else.
+
+Settings' Public portal section (status in words, public details, artwork, author, checklist, publish and make private
+with inline confirmations, "View public page") is unchanged. Later: "Edit this world" for an owner viewing their own
+world (011).
 
 ## 15. Preview
 

@@ -21,10 +21,19 @@ import { Avatar } from './Avatar'
  * Lorex: a disclosure of ordinary links and buttons, opened by a click or a tap, closed by Escape
  * (focus back on the trigger) or by a press outside.
  *
+ * Signing out lands on `/login` from the workspace; the portal passes `signedOutTo` so a visitor stays on the
+ * public page they were reading - the portal needs no session.
+ *
  * The avatar comes from `useProfileImage`, so every one of these and the Profile screen show the
  * same photo the moment it changes - see `ProfileImageProvider`.
  */
-export function AccountMenu({ variant }: { variant: 'rail' | 'bar' }) {
+export function AccountMenu({
+  variant,
+  signedOutTo = '/login',
+}: {
+  variant: 'rail' | 'bar'
+  signedOutTo?: string
+}) {
   const { user, logOut } = useAuth()
   const { image } = useProfileImage()
   const navigate = useNavigate()
@@ -42,7 +51,7 @@ export function AccountMenu({ variant }: { variant: 'rail' | 'bar' }) {
     setBusy(true)
     try {
       await logOut()
-      await navigate('/login', { replace: true })
+      await navigate(signedOutTo, { replace: true })
     } finally {
       setBusy(false)
     }

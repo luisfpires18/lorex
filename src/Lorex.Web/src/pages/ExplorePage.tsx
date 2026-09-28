@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Link, useSearchParams, type SetURLSearchParams } from 'react-router-dom'
-import { Search, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark'
 import { EmptyState } from '../components/EmptyState'
 import {
@@ -10,12 +9,10 @@ import {
   type PublicUniverse,
 } from '../portal/api'
 import heroImage from '../portal/explore-worlds-background.png'
-import { CATEGORIES, categoryLabel, GENRES, genreLabel } from '../publishing/types'
+import { CATEGORIES, categoryLabel, GENRES, genreLabel, type GenreValue } from '../publishing/types'
 
-/** The API's own limit on a search, so the field cannot ask for something it would refuse. */
+/** The API's own limit on a search; the portal bar's field holds the same. */
 const SEARCH_MAX = 100
-/** Long enough to let a word be typed, short enough that results follow the typing. */
-const SEARCH_PAUSE_MS = 300
 
 type Results =
   | {
@@ -122,74 +119,72 @@ export default function ExplorePage() {
         />
         <div className="explore-hero__inner">
           <h1 className="explore-hero__title" id="explore-title">
-            Explore worlds
+            Explore Worlds
           </h1>
           <p className="explore-hero__lede">
-            Universes their authors have chosen to share. Find one by its name, its author or what
-            it is about.
+            Discover universes their authors have chosen to share.
           </p>
-          <SearchField q={q} setParams={setParams} />
+          <div className="explore-filters">
+            <nav className="explore-cats" aria-label="Categories">
+              <ul className="explore-cats__list">
+                {[{ key: undefined, label: 'All' }, ...CATEGORIES].map((option) => (
+                  <li key={option.label}>
+                    <Link
+                      className="explore-cats__chip"
+                      to={{ search: withParam(params, 'category', option.key) }}
+                      aria-current={option.key === category ? 'true' : undefined}
+                      data-testid={`explore-category-${option.key ?? 'all'}`}
+                    >
+                      {option.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+
+            <div className="explore-filters__selects">
+              <label className="explore-select">
+                <span className="explore-select__label">Genre</span>
+                <select
+                  className="explore-select__control"
+                  value={genre ?? ''}
+                  onChange={(event) =>
+                    setParams(withParam(params, 'genre', event.target.value || undefined))
+                  }
+                  data-testid="explore-genre"
+                >
+                  <option value="">All genres</option>
+                  {GENRES.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="explore-select">
+                <span className="explore-select__label">Sort by</span>
+                <select
+                  className="explore-select__control"
+                  value={sort ?? 'recent'}
+                  onChange={(event) =>
+                    setParams(
+                      withParam(params, 'sort', event.target.value === 'az' ? 'az' : undefined),
+                    )
+                  }
+                  data-testid="explore-sort"
+                >
+                  <option value="recent">Recently published</option>
+                  <option value="az">A–Z</option>
+                </select>
+              </label>
+            </div>
+          </div>
         </div>
       </section>
 
       <div className="explore__body">
-        <div className="explore-filters">
-          <nav className="explore-cats" aria-label="Categories">
-            <ul className="explore-cats__list">
-              {[{ key: undefined, label: 'All' }, ...CATEGORIES].map((option) => (
-                <li key={option.label}>
-                  <Link
-                    className="explore-cats__chip"
-                    to={{ search: withParam(params, 'category', option.key) }}
-                    aria-current={option.key === category ? 'true' : undefined}
-                    data-testid={`explore-category-${option.key ?? 'all'}`}
-                  >
-                    {option.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-
-          <div className="explore-filters__selects">
-            <label className="explore-select">
-              <span className="explore-select__label">Genre</span>
-              <select
-                className="explore-select__control"
-                value={genre ?? ''}
-                onChange={(event) =>
-                  setParams(withParam(params, 'genre', event.target.value || undefined))
-                }
-                data-testid="explore-genre"
-              >
-                <option value="">All genres</option>
-                {GENRES.map((option) => (
-                  <option key={option.key} value={option.key}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="explore-select">
-              <span className="explore-select__label">Sort</span>
-              <select
-                className="explore-select__control"
-                value={sort ?? 'recent'}
-                onChange={(event) =>
-                  setParams(
-                    withParam(params, 'sort', event.target.value === 'az' ? 'az' : undefined),
-                  )
-                }
-                data-testid="explore-sort"
-              >
-                <option value="recent">Recently published</option>
-                <option value="az">A–Z</option>
-              </select>
-            </label>
-          </div>
-        </div>
-
-        <p className="explore__count" role="status" data-testid="explore-count">
+        {/* Announced, not shown: the grid says how many at a glance, and Show more says how many are left. */}
+        <p className="visually-hidden" role="status" data-testid="explore-count">
           {current === null
             ? 'Finding worlds…'
             : ready
@@ -206,7 +201,7 @@ export default function ExplorePage() {
                 <span className="worldcard__art" />
                 <span className="worldcard__text">
                   <span className="worldcard__bone worldcard__bone--name" />
-                  <span className="worldcard__bone" />
+                  <span className="worldcard__bone worldcard__bone--chips" />
                   <span className="worldcard__bone worldcard__bone--short" />
                 </span>
               </li>
@@ -262,6 +257,9 @@ export default function ExplorePage() {
 
         {ready && ready.page < ready.totalPages ? (
           <div className="explore__more">
+            <p className="explore__shown" aria-hidden="true">
+              Showing {ready.items.length} of {ready.totalCount} worlds
+            </p>
             {more === 'error' ? (
               <p className="explore__more-error" role="alert">
                 More worlds could not be loaded.
@@ -289,80 +287,11 @@ export default function ExplorePage() {
 }
 
 /**
- * The search field. What is typed is sent after a short pause - or at once on Enter, and at once when it is
- * emptied - so the address and the results follow a word, not every keystroke. Refining a search replaces the
- * history entry; starting or clearing one adds an entry, so Back returns to the unsearched page.
- */
-function SearchField({ q, setParams }: { q: string; setParams: SetURLSearchParams }) {
-  const [draft, setDraft] = useState(q)
-  const [draftFor, setDraftFor] = useState(q)
-
-  // Back, Forward or a filter reset changed the address: the field shows what the address now says - unless it
-  // already does, give or take the spaces still being typed.
-  if (draftFor !== q) {
-    setDraftFor(q)
-    if (draft.trim() !== q) setDraft(q)
-  }
-
-  useEffect(() => {
-    if (draft.trim() === q || draft.trim() === '') return
-    const timer = window.setTimeout(() => commitSearch(draft, q, setParams), SEARCH_PAUSE_MS)
-    return () => {
-      window.clearTimeout(timer)
-    }
-  }, [draft, q, setParams])
-
-  return (
-    <form
-      className="explore-search"
-      role="search"
-      onSubmit={(event: FormEvent) => {
-        event.preventDefault()
-        commitSearch(draft, q, setParams)
-      }}
-    >
-      <label className="visually-hidden" htmlFor="explore-q">
-        Search worlds
-      </label>
-      <Search className="explore-search__icon" aria-hidden="true" size={20} strokeWidth={1.75} />
-      <input
-        className="explore-search__input"
-        id="explore-q"
-        type="search"
-        placeholder="Search worlds and authors"
-        value={draft}
-        maxLength={SEARCH_MAX}
-        autoComplete="off"
-        dir="auto"
-        onChange={(event) => {
-          setDraft(event.target.value)
-          if (event.target.value.trim() === '') commitSearch('', q, setParams)
-        }}
-        data-testid="explore-search"
-      />
-      {draft ? (
-        <button
-          className="explore-search__clear"
-          type="button"
-          aria-label="Clear search"
-          onClick={() => {
-            setDraft('')
-            commitSearch('', q, setParams)
-            document.getElementById('explore-q')?.focus()
-          }}
-          data-testid="explore-search-clear"
-        >
-          <X aria-hidden="true" size={18} strokeWidth={1.75} />
-        </button>
-      ) : null}
-    </form>
-  )
-}
-
-/**
- * One public universe as a card: its artwork, name, category and genres, and its author. The whole card is one
- * link to its page - nothing else inside it is interactive. If the picture cannot be shown, the card keeps its
- * shape with the Lorex mark rather than borrowing anyone's art.
+ * One public universe as a card: one dark panel with the artwork across its top, fading into the panel, the name
+ * set over the picture's lower edge, the genres as chips, and a line with the author and the category. The picture
+ * is the author's 16:10 frame, whole - the panel grows around it rather than cropping it. The whole card is one link
+ * to its page; nothing else inside it is interactive. If the picture cannot be shown, the card keeps its shape with
+ * the Lorex mark rather than borrowing anyone's art.
  */
 function WorldCard({ world }: { world: PublicUniverse }) {
   const [broken, setBroken] = useState(false)
@@ -392,12 +321,18 @@ function WorldCard({ world }: { world: PublicUniverse }) {
           <h3 className="worldcard__name" dir="auto" title={world.name}>
             <bdi>{world.name}</bdi>
           </h3>
-          <p className="worldcard__facts">
-            <span className="worldcard__category">{categoryLabel(world.category)}</span> ·{' '}
-            {world.genres.map(genreLabel).join(', ')}
-          </p>
-          <p className="worldcard__author">
-            by <bdi>{world.authorDisplayName}</bdi>
+          <ul className="worldcard__genres" aria-label="Genres">
+            {world.genres.map((genre) => (
+              <li className="genrechip" data-genre={genreKey(genre)} key={genre}>
+                {genreLabel(genre)}
+              </li>
+            ))}
+          </ul>
+          <p className="worldcard__byline">
+            <span className="worldcard__author" dir="auto" title={`by ${world.authorDisplayName}`}>
+              by <bdi>{world.authorDisplayName}</bdi>
+            </span>
+            <span className="worldcard__category">{categoryLabel(world.category)}</span>
           </p>
         </div>
       </Link>
@@ -405,19 +340,9 @@ function WorldCard({ world }: { world: PublicUniverse }) {
   )
 }
 
-/** Puts a search into the address. Refining one replaces the entry; starting or clearing one adds an entry. */
-function commitSearch(value: string, q: string, setParams: SetURLSearchParams) {
-  const next = value.trim().slice(0, SEARCH_MAX)
-  if (next === q) return
-  setParams(
-    (was) => {
-      const now = new URLSearchParams(was)
-      if (next) now.set('q', next)
-      else now.delete('q')
-      return now
-    },
-    { replace: Boolean(q) && Boolean(next) },
-  )
+/** A genre's address key, which is also what its chip is tinted by. */
+function genreKey(value: GenreValue) {
+  return GENRES.find((genre) => genre.value === value)?.key
 }
 
 /** The current address with one parameter set, or removed when it would be the default. */
