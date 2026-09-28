@@ -239,10 +239,19 @@ textarea,
 
 /* Mark and wordmark as one lockup in the paper bars, so they move together and the bar's own
    space-between still puts the account menu opposite them. */
-.home__brand {
+.home__brand,
+.auth__brand {
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.auth__brand {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
 }
 
 .wordmark {
@@ -1409,65 +1418,49 @@ a.button--danger:visited {
   }
 }
 
-/* ---------- Colour swatches ---------- */
+/* ---------- A universe's colour (014) ----------
 
-.swatches {
-  border: 0;
-  padding: 0;
-  margin: 0;
-}
+   The author's own colour: the platform's picker beside the value it holds, in hex, and a way back to none. No
+   palette. The picker is a real control, drawn as a square the size of a field so it lines up with the text beside
+   it. */
 
-.swatches__row {
+.colourfield__row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem 1.1rem;
-  margin-top: 0.6rem;
-}
-
-.swatch {
-  position: relative;
-  display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-  color: var(--muted);
+  gap: var(--space-2) var(--space-3);
 }
 
-/* Transparent but still a real hit target covering the whole swatch, so pointer,
-   keyboard and assistive tooling all reach the same control. */
-.swatch input {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  opacity: 0;
+.colourfield__picker {
+  flex: none;
+  width: var(--control-md);
+  height: var(--control-md);
+  padding: 2px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-sm);
+  background: var(--raised);
   cursor: pointer;
 }
 
-.swatch__dot {
-  width: 0.85rem;
-  height: 0.85rem;
-  border-radius: 50%;
-  border: 1px solid var(--rule-strong);
-  box-shadow: 0 0 0 0 transparent;
-  transition: box-shadow 120ms ease;
+.colourfield__picker::-webkit-color-swatch-wrapper {
+  padding: 0;
 }
 
-.swatch input:checked ~ .swatch__dot {
-  box-shadow:
-    0 0 0 3px var(--surface),
-    0 0 0 4px var(--ink);
+.colourfield__picker::-webkit-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-sm) - 2px);
 }
 
-.swatch input:focus-visible ~ .swatch__dot {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
+.colourfield__picker::-moz-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-sm) - 2px);
 }
 
-.swatch input:checked ~ .swatch__label {
-  color: var(--ink);
+.colourfield__hex {
+  width: 12ch;
+  min-width: 0;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  text-transform: lowercase;
 }
 
 /* ---------- Controls ---------- */
@@ -2277,6 +2270,126 @@ a.button--danger:visited {
 .settings__section:first-of-type {
   border-top: 0;
   padding-top: 0;
+}
+
+/* ---------- Settings and Publish in a centred column (014) ----------
+
+   Both pages hold forms read top to bottom, so on a wide screen they sit in one centred column rather than against the
+   sidebar with the rest of the canvas empty. The column is the page's, not the text's: labels and fields stay left-
+   aligned inside it. Narrower than the column, they simply take the width there is. */
+.settings--tabbed,
+.publish {
+  width: 100%;
+  max-width: 46rem;
+  margin-inline: auto;
+}
+
+.settings--tabbed .settings__section {
+  max-width: none;
+}
+
+/* The tab row: words under a hairline, the chosen one inked and underlined - never colour alone. On a phone the row
+   scrolls sideways inside itself rather than wrapping or widening the page. */
+.tabs {
+  display: flex;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-6);
+  border-bottom: 1px solid var(--rule);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs__tab {
+  flex: none;
+  min-height: var(--control-md);
+  margin-bottom: -1px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--text-ui);
+  cursor: pointer;
+  transition:
+    color var(--duration-1) var(--ease),
+    border-color var(--duration-1) var(--ease);
+}
+
+.tabs__tab:hover {
+  color: var(--ink);
+}
+
+.tabs__tab[aria-selected='true'] {
+  border-bottom-color: var(--ink);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.tabs__tab:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.tabs__panel:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.tabs__panel > .settings__section:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+@media (pointer: coarse) {
+  .tabs__tab {
+    min-height: var(--control-touch);
+  }
+}
+
+/* Publish: sections spaced and ruled like Settings', headed at the section size, status first. */
+.publish__section {
+  padding: var(--space-7) 0;
+  border-top: 1px solid var(--rule);
+}
+
+.publish__section:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.publish__heading {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+
+.publish__content {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.publish__content li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  min-height: var(--control-md);
+}
+
+.publish__contentname {
+  font-weight: 600;
+}
+
+.publish__contentcount {
+  margin-right: auto;
+  color: var(--muted);
+  font-size: var(--text-ui);
 }
 
 .settings__heading {
@@ -5104,9 +5217,21 @@ html:has(.viewer[open]) {
     display: none;
   }
 
-  /* The bar already carries the name, the archived mark and the way back. */
+  /* The bar already carries the name and the archived mark. The way back to the universes stays here, at the head of
+     the sheet: the bar's mark is Lorex's and leads to the portal (014). */
   .sidebar__head {
+    margin: 0 0 var(--space-3);
+    padding: 0;
+    border: 0;
+  }
+
+  .sidebar__name,
+  .sidebar__archived {
     display: none;
+  }
+
+  .sidebar__back {
+    min-height: var(--control-touch);
   }
 
   /* Two columns filled top to bottom, each group kept whole, so the list reads down and not in a
@@ -7481,14 +7606,9 @@ a.lorechip--pov:focus-visible .lorechip__name {
     min-height: 2.5rem;
   }
 
-  /* The label and the dot are the visible swatch; the transparent input already covers
-     the whole of it, so growing the swatch grows the target with it. */
-  .swatch {
-    min-height: 2.75rem;
-  }
-
-  .swatches__row {
-    gap: 0 1.1rem;
+  .colourfield__picker {
+    width: var(--control-touch);
+    height: var(--control-touch);
   }
 
   /* Cast members and relation ends sit in lists rather than in sentences, so they can

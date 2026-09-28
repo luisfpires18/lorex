@@ -1370,3 +1370,18 @@ it afterwards. Every former `@media (prefers-color-scheme: dark)` rule is now `:
 so the workspace's dark is exactly the 002-007 dark. The portal has its own light and dark layer on the same attribute
 (`PUBLIC_PORTAL.md` section 20). The choice is Light or Dark in `ThemeSwitch` - the shared `.segmented` track, named
 buttons with `aria-pressed`, a decorative icon beside each word.
+
+## 21. Tabs, Publish and a universe's colour (UI refinement 014)
+
+- **Tabs** (`.tabs`, first used by Settings): words under a hairline, the chosen tab inked, semibold and underlined -
+  never colour alone; `role=tablist`/`tab`/`tabpanel`, arrows and Home/End choose; on a phone the row scrolls sideways
+  inside itself and keeps the chosen tab in view. Panels stay mounted and are hidden, so a form in one keeps its draft
+  and its leave guard. The address holds the tab (`?tab=`), replaced rather than pushed.
+- **Centred column** for pages that are forms read top to bottom (Settings, Publish): at most 46rem, centred in the
+  canvas, content left-aligned inside it; narrower, the full width.
+- **Publish** is a workspace page, not a portal one: status first (the Public/Private badge in words, the address, the
+  checklist, the one action and its confirmation), then public details, artwork, author, published content - sections
+  spaced and ruled like Settings', no cards.
+- **A universe's colour** is `[picker] [#rrggbb]` with "No colour"; the swatch palette (Lapis, Verdigris, Rust,
+  Amethyst, Brass, Slate) is retired and its `.swatch` styles deleted. Colours chosen from it are ordinary values.
+- The brand links to `/explore` wherever it is drawn.

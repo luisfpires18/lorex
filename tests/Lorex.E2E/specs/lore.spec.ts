@@ -122,7 +122,7 @@ test.describe('lore', () => {
     await expect(page.getByTestId('lore-article')).toContainText('built for running')
 
     // It shows on the grid, and search finds it.
-    await page.getByRole('link', { name: 'Lore' }).first().click()
+    await page.getByRole('link', { name: 'Lore', exact: true }).first().click()
     await page.waitForURL(/\/lore$/)
     await expect(card(page, name)).toBeVisible()
 
@@ -196,7 +196,7 @@ test.describe('lore', () => {
     await page.getByTestId('canon-canon').click()
     await expect(page.getByTestId('canon-canon')).toHaveAttribute('aria-pressed', 'true')
 
-    await page.getByRole('link', { name: 'Lore' }).first().click()
+    await page.getByRole('link', { name: 'Lore', exact: true }).first().click()
     await page.waitForURL(/\/lore$/)
     await page.getByTestId('new-entity').click()
     await page.waitForURL(/\/lore\/new$/)
@@ -205,7 +205,7 @@ test.describe('lore', () => {
     await page.getByTestId('save-entity').click()
     await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
 
-    await page.getByRole('link', { name: 'Lore' }).first().click()
+    await page.getByRole('link', { name: 'Lore', exact: true }).first().click()
     await page.waitForURL(/\/lore$/)
     await expect(page.getByTestId('entity-card')).toHaveCount(2)
 

@@ -184,11 +184,24 @@ setting at the production origin. Check with `curl -s https://<host>/worlds/<slu
 Over HTTPS, which the site is (`httpsOnly` is set), from a Chromium browser:
 
 1. Open `https://<app-name>.azurewebsites.net/`. DevTools -> Application -> Manifest should
-   show `Lorex`, `standalone`, start URL `/app`, and four icons that all load.
+   show `Lorex`, `standalone`, start URL `/explore`, id `/app`, and four icons that all load.
 2. Application -> Service workers should show `sw.js` **activated** with scope `/`.
-3. Application -> Cache storage should hold `lorex-static-v1`, and it must contain
-   **only** `/assets/...` entries. If anything under `/api` ever appears there, that is a bug -
-   see `public/sw.js`, which refuses those requests outright.
+3. Application -> Cache storage should hold only `lorex-static-v4`, containing `/assets/...` and
+   root icons - **never** `/manifest.webmanifest` and never anything under `/api`. An older
+   `lorex-static-v3` still there means the new worker has not activated yet: reload once.
+
+### The installed app's front door (manual, on a device)
+
+The automated suite proves the worker, the manifest and the routes; only a device proves an install. On an install
+made before UI refinement 014, open Lorex once in the browser first so the v4 worker activates, then:
+
+1. Close the installed app completely (remove it from recent apps).
+2. Launch it from its icon, signed out: it opens **Explore**, not Login.
+3. Sign in from Explore's Log in: it returns to Explore. Choose My workspace, open a universe, close the app completely.
+4. Launch it from its icon again: it opens **Explore** with "My workspace" offered, not the universe.
+5. If step 2 or 4 still opens the workspace or Login, the platform has not yet applied the new manifest (Android checks
+   about daily and applies it on a later launch); uninstall and reinstall, then repeat. A new install reads the current
+   manifest at once.
 4. The install affordance appears in the address bar. It will not on plain HTTP; installability
    needs a secure context.
 

@@ -585,11 +585,14 @@ test.describe('the portal is the front door', () => {
       }, from)
       await page.reload()
       await logInOnPage(page, username)
-      await page.waitForURL('/app')
+      // Never away from Lorex. A value that is only a same-origin path ('/\evil.example' is '/evil.example') may be
+      // followed to that path, which nothing holds, so it lands on the front door (014); everything else on /app.
+      await page.waitForURL((url) => url.pathname === '/app' || url.pathname === '/explore')
       expect(new URL(page.url()).origin, from).toBe(origin)
       await page.getByTestId('account-menu-trigger').click()
       await page.getByRole('button', { name: 'Sign out' }).click()
-      await page.waitForURL('/login')
+      // Signing out from the workspace lands on Login; from the portal it stays on the portal.
+      await expect(page.getByTestId('account-menu-trigger')).toHaveCount(0)
     }
   })
 })

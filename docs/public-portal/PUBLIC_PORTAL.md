@@ -396,3 +396,17 @@ in both.
 - **Stored in the browser**, not the account (no account appearance setting exists): signed in or out it is the same,
   and signing in or out never changes it. SEO is untouched: no address carries a theme, and the server-rendered head
   (section 19) does not mention it.
+
+## 21. Front door and brand (UI refinement 014)
+
+- **Lorex's brand always leads to `/explore`**: the portal bar, the workspace rail's "L", the universes, ideas and profile
+  headers, and the sign-in plate. It is not context-sensitive. **My workspace** stays the deliberate way in; "Explore
+  worlds" stays in the universes header as the labelled way out. The universes are "All universes", at the head of the
+  sidebar and of the phone's Sections sheet.
+- **The installed app opens Explore**, signed in or out, whatever was used last. The cause of it opening the workspace
+  or Login on real installs was the service worker keeping the pre-011 manifest (`start_url: /app`) - fixed in 014 by
+  never caching the manifest and bumping the worker's cache (ADR 0017 amendment). An unknown address now lands on
+  Explore rather than on the workspace's guard. Deep links - `/worlds/...`, `/authors/...`, `/app/...` - go where they
+  say, `/app/...` by the sign-in rules. A device check is in the DEV runbook ("The installed app's front door").
+- **Publishing moved** from Settings to its own workspace page, Publish (`/app/universes/{id}/publish`), just above
+  Settings. Same API, same rules, same confirmations (section 14's "Settings' Public portal section" is now this page).

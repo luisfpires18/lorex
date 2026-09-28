@@ -570,6 +570,7 @@ test.describe('an entry with a picture', () => {
 
     await page.getByTestId('workspace-settings').click()
     await page.waitForURL(/\/settings$/)
+    await page.getByTestId('settings-tab-data').click()
 
     const downloading = page.waitForEvent('download')
     await page.getByTestId('export-universe').click()

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 
+import { Link } from 'react-router-dom'
 import { BrandMark } from './BrandMark'
 import { MAIN_CONTENT_ID } from './SkipLink'
 import { Wordmark } from './Wordmark'
@@ -23,8 +24,16 @@ export function AuthLayout({ heading, intro, children, footer }: AuthLayoutProps
           {/* The one place the symbol is shown large. On the plate and unbacked: at this size
               the artwork's dark shading reads as modelling rather than as absence, which it
               does not at the size the workspace rail would draw it. */}
-          <BrandMark className="brandmark brandmark--plate" />
-          <Wordmark large />
+          {/* Lorex's brand leads to its front door, the portal (014). */}
+          <Link
+            className="auth__brand"
+            to="/explore"
+            title="Explore worlds"
+            data-testid="auth-brand"
+          >
+            <BrandMark className="brandmark brandmark--plate" />
+            <Wordmark large />
+          </Link>
           <span className="auth__rule" aria-hidden="true" />
           <p className="auth__pitch">
             A workroom for the worlds you keep — their people, places, history and the rules that

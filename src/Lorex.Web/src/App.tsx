@@ -38,6 +38,7 @@ const RegisterPage = lazy(() => import('./pages/RegisterPage'))
 const StoriesPage = lazy(() => import('./pages/StoriesPage'))
 const StoryPage = lazy(() => import('./pages/StoryPage'))
 const TimelinePage = lazy(() => import('./pages/TimelinePage'))
+const UniversePublish = lazy(() => import('./pages/UniversePublish'))
 const UniverseSettings = lazy(() => import('./pages/UniverseSettings'))
 const UniverseTrash = lazy(() => import('./pages/UniverseTrash'))
 const UniverseTypes = lazy(() => import('./pages/UniverseTypes'))
@@ -167,11 +168,14 @@ function Root() {
               <Route path="canon" element={asSection('canon', <CanonPage />)} />
               <Route path="types" element={asSection('types', <UniverseTypes />)} />
               <Route path="trash" element={asSection('trash', <UniverseTrash />)} />
+              <Route path="publish" element={asSection('publish', <UniversePublish />)} />
               <Route path="settings" element={asSection('settings', <UniverseSettings />)} />
             </Route>
           </Route>
 
-          <Route path="*" element={<Navigate to="/app" replace />} />
+          {/* An address nobody holds: inside the workspace, the universes; anywhere else, the front door (014). */}
+          <Route path="/app/*" element={<Navigate to="/app" replace />} />
+          <Route path="*" element={<Navigate to="/explore" replace />} />
         </Routes>
       </ProfileImageProvider>
     </AuthProvider>

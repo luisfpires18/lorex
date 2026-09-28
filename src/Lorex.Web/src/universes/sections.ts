@@ -3,6 +3,7 @@ import {
   Blocks,
   Compass,
   Feather,
+  Globe,
   Hourglass,
   Library,
   Network,
@@ -113,11 +114,18 @@ export const SECTION_GROUPS: readonly (readonly Section[])[] = [
   ],
   [
     {
+      segment: 'publish',
+      label: 'Publish',
+      testId: 'workspace-publish',
+      icon: Globe,
+      purpose: 'How this universe appears on the public portal.',
+    },
+    {
       segment: 'settings',
       label: 'Settings',
       testId: 'workspace-settings',
       icon: Settings,
-      purpose: 'Name, description, chronology and backups.',
+      purpose: 'Name, colour, chronology, backups and archive.',
     },
   ],
 ]

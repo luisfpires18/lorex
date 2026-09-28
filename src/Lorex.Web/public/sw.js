@@ -16,6 +16,8 @@
     - navigation requests       so index.html is always fresh and nobody can be stranded
                                 on a frontend build that no longer matches the API
     - cross-origin requests
+    - the web app manifest      the browser reads the installed app's start_url, scope and
+                                id from it; a kept copy freezes all three (see v4 below)
 
   Those requests are not passed to respondWith at all, so the browser handles them exactly
   as it would with no worker installed. Nothing authenticated is ever written to a cache.
@@ -33,11 +35,16 @@
 // paper tile dropped from the favicons - and root static files are cached by path. Without a
 // bump, an installed or merely long-lived browser keeps serving whichever version it saw
 // first. The policy itself is unchanged.
-const CACHE_VERSION = 'v3'
+// v4 (UI refinement 014): the manifest is no longer cached. v3's cache-first rule matched
+// `/manifest.webmanifest`, so a browser that ran Lorex before Task 011 kept answering every
+// install and every manifest update check with the old file - `start_url: /app` - and the
+// installed app kept opening the workspace, or Login when signed out, long after the file on
+// the server said `/explore`. The bump deletes that cache on activate.
+const CACHE_VERSION = 'v4'
 const STATIC_CACHE = `lorex-static-${CACHE_VERSION}`
 
 /** Build output, plus the handful of static files that live at the web root. */
-const STATIC_ROOT_FILE = /^\/[^/]+\.(?:svg|png|ico|webmanifest|woff2?|css)$/
+const STATIC_ROOT_FILE = /^\/[^/]+\.(?:svg|png|ico|woff2?|css)$/
 
 function isCacheableStatic(url) {
   if (url.pathname.startsWith('/api/')) return false
@@ -68,6 +75,7 @@ self.addEventListener('fetch', (event) => {
 
   if (request.method !== 'GET') return
   if (request.mode === 'navigate') return
+  if (request.destination === 'manifest') return
 
   let url
   try {

@@ -155,7 +155,14 @@ export default function UniverseWorkspace() {
             puts the only saturated colour in the chrome directly above the universe's accent
             seal - which is the one thing in the rail that carries meaning. The mark is shown
             large on the auth plate and small in the paper bars instead. */}
-        <Link className="rail__mark" to="/app" title="Back to your universes">
+        {/* Lorex's mark leads to Lorex's front door, the portal, from everywhere (014). The universes are "All
+            universes", at the head of the sidebar and of the phone's Sections sheet. */}
+        <Link
+          className="rail__mark"
+          to="/explore"
+          aria-label="Lorex - explore worlds"
+          title="Explore worlds"
+        >
           L
         </Link>
         <span className="rail__seal" aria-hidden="true" />

@@ -47,10 +47,11 @@ export default function ProfilePage() {
   return (
     <div className="home">
       <header className="home__bar">
-        <span className="home__brand">
+        {/* The brand is Lorex's, so it leads to the portal (014). */}
+        <Link className="home__brand" to="/explore" title="Explore worlds" data-testid="home-brand">
           <BrandMark />
           <Wordmark />
-        </span>
+        </Link>
         <div className="home__session">
           <Link className="home__back" to="/app">
             All universes
