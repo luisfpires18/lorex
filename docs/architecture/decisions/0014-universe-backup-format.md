@@ -362,3 +362,11 @@ A universe may be prepared for the public portal (ADR 0036). `payload.universe` 
 **Visibility, the public address, the publication date and the author's public name are never in a backup.**
 Publishing is a decision about one universe in one installation; a restore makes a new universe that has never been
 published. A file at version 14 or earlier has none of these members, and they are ignored if one carries them.
+
+## Amendment: version 16, a story's public summary (2026-09-28)
+
+A story may carry a public summary written for readers of the portal (Task 011, ADR 0036): `payload.stories[].publicSummary`.
+Authored, so a version 15 reader would lose it: a bump. As in version 15, whether the story was published, its address and
+its date are never in a backup, and every restored story is private. A file at version 15 or earlier has no public summary
+on a story, and one it carries is ignored; nothing is ever taken from the premise. An account's author address and its
+photo's public choice (ADR 0037) belong to the account and are not in a universe backup.

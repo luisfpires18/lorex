@@ -785,6 +785,7 @@ internal sealed partial class UniverseRestore(
                 UniverseId = universeId,
                 Title = story.Title,
                 Premise = story.Premise,
+                PublicSummary = string.IsNullOrWhiteSpace(story.PublicSummary) ? null : story.PublicSummary,
                 Status = story.Status,
                 CreatedAt = story.CreatedAt,
                 UpdatedAt = story.UpdatedAt,

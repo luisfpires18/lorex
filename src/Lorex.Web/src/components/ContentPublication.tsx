@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react'
-import { ChevronDown, Globe, Lock } from 'lucide-react'
+import { ChevronDown, Globe, Lock, PenLine } from 'lucide-react'
 import { ActionMenu } from './ActionMenu'
+import { StoryPublicSummaryForm } from './StoryPublicSummaryForm'
 import { getContentPublication, publishContent, unpublishContent } from '../publishing/api'
 import { Visibility, type ContentKind, type ContentPublicationState } from '../publishing/types'
 
@@ -8,8 +9,8 @@ import { Visibility, type ContentKind, type ContentPublicationState } from '../p
 const WORDS = {
   entry: {
     noun: 'entry',
-    listed: 'Its name, type, summary and thumbnail are listed.',
-    kept: 'Its article, fields, relationships and history are not published.',
+    listed: 'Readers see its name, type, summary, picture and article.',
+    kept: 'Its fields, aliases, tags, relationships and history are not published.',
     isPublic: 'This lore entry is available in your public universe.',
     willPublish: 'Publishing this lore entry makes it available in your public universe.',
     selectedHidden:
@@ -19,8 +20,11 @@ const WORDS = {
   },
   story: {
     noun: 'story',
-    listed: 'Its title is listed.',
+    listed: 'Readers see its title and its public summary.',
     kept: 'Its premise, chapters, scenes, manuscript, plot and notes are not published.',
+    needsSummary:
+      'This story is selected for publication but needs a public summary before readers can see it.',
+    noSummary: 'A story needs a public summary, written for readers, before it can be published.',
     isPublic: 'This story is selected for your public universe.',
     willPublish: 'Publishing this story selects it for your public universe.',
     selectedHidden:
@@ -32,9 +36,14 @@ const WORDS = {
 
 type Shown = 'private' | 'public' | 'selected'
 
-function shownOf(state: ContentPublicationState): Shown {
+/** Whether a story still lacks the public summary readers need (Task 011). Always false for an entry. */
+function lacksSummary(kind: ContentKind, state: ContentPublicationState) {
+  return kind === 'story' && !state.publicSummary
+}
+
+function shownOf(kind: ContentKind, state: ContentPublicationState): Shown {
   if (state.visibility !== Visibility.Public) return 'private'
-  return state.universeIsPublic ? 'public' : 'selected'
+  return state.universeIsPublic && !lacksSummary(kind, state) ? 'public' : 'selected'
 }
 
 const LABELS: Record<Shown, string> = {
@@ -44,8 +53,9 @@ const LABELS: Record<Shown, string> = {
 }
 
 /**
- * One lore entry's or story's publication (ADR 0036, Task 010): its state as a pill, which opens what that state
- * means and the one thing to do about it.
+ * One lore entry's or story's publication (ADR 0036, Tasks 010-011): its state as a pill, which opens what that state
+ * means and the one thing to do about it. A story also carries its public summary here - written for readers, never its
+ * premise - which it needs before it can be published; one selected without one stays Selected, and says why.
  *
  * The state is always a word - Private, Public, or Selected when the item is chosen but its universe is private -
  * never a colour alone, and the universe's part is always said, so the author never has to work out whether anyone
@@ -74,6 +84,7 @@ export function ContentPublication({
   const [failed, setFailed] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [announcement, setAnnouncement] = useState('')
+  const [editingSummary, setEditingSummary] = useState(false)
   const words = WORDS[kind]
 
   useEffect(() => {
@@ -99,8 +110,9 @@ export function ContentPublication({
     ) : null
   }
 
-  const shown = shownOf(state)
+  const shown = shownOf(kind, state)
   const isSelected = state.visibility === Visibility.Public
+  const missingSummary = lacksSummary(kind, state)
 
   async function change(publish: boolean) {
     setBusy(true)
@@ -114,7 +126,7 @@ export function ContentPublication({
       setAnnouncement(
         !publish
           ? `Made private. It is no longer listed in your public universe.`
-          : next.universeIsPublic
+          : next.universeIsPublic && !lacksSummary(kind, next)
             ? `Published. It is listed in your public universe.`
             : `Selected for publication. It stays hidden while the universe is private.`,
       )
@@ -133,10 +145,14 @@ export function ContentPublication({
     shown === 'public'
       ? [words.isPublic, words.listed, words.kept]
       : shown === 'selected'
-        ? [words.selectedHidden, words.kept]
+        ? [missingSummary ? WORDS.story.needsSummary : words.selectedHidden, words.kept]
         : [
             `Only you can see this ${words.noun}.`,
-            state.universeIsPublic ? words.willPublish : words.willSelect,
+            missingSummary
+              ? WORDS.story.noSummary
+              : state.universeIsPublic
+                ? words.willPublish
+                : words.willSelect,
             words.listed,
             words.kept,
           ]
@@ -184,7 +200,30 @@ export function ContentPublication({
               {line}
             </p>
           ))}
+          {kind === 'story' && state.publicSummary ? (
+            <p className="contentpub__summary" data-testid="story-public-summary">
+              <span className="contentpub__summarylabel">Public summary</span>{' '}
+              <span dir="auto">{state.publicSummary}</span>
+            </p>
+          ) : null}
         </div>
+        {kind === 'story' ? (
+          <button
+            className="actionmenu__item"
+            type="button"
+            disabled={busy}
+            onClick={() => setEditingSummary(true)}
+            data-testid="edit-story-public-summary"
+          >
+            <PenLine
+              className="button__icon"
+              aria-hidden="true"
+              focusable="false"
+              strokeWidth={1.75}
+            />
+            {state.publicSummary ? 'Edit public summary…' : 'Write public summary…'}
+          </button>
+        ) : null}
         {isSelected ? (
           <button
             className="actionmenu__item"
@@ -206,7 +245,7 @@ export function ContentPublication({
           <button
             className="actionmenu__item"
             type="button"
-            disabled={busy}
+            disabled={busy || missingSummary}
             aria-describedby={noteId}
             onClick={() => void change(true)}
             data-testid={`publish-${kind}`}
@@ -225,6 +264,22 @@ export function ContentPublication({
         <span className="contentpub__error" role="alert" data-testid={`${kind}-publication-error`}>
           {failed}
         </span>
+      ) : null}
+      {editingSummary ? (
+        <StoryPublicSummaryForm
+          universeId={universeId}
+          storyId={id}
+          title={name}
+          summary={state.publicSummary ?? null}
+          onClose={() => setEditingSummary(false)}
+          onSaved={(next) => {
+            setEditingSummary(false)
+            setState(next)
+            setAnnouncement(
+              next.publicSummary ? 'Public summary saved.' : 'Public summary removed.',
+            )
+          }}
+        />
       ) : null}
       <span className="visually-hidden" role="status" data-testid={`${kind}-publication-announcer`}>
         {announcement ? (

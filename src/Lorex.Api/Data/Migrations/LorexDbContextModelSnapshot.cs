@@ -59,6 +59,10 @@ namespace Lorex.Api.Data.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("PublicAuthorSlug")
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("PublicDisplayName")
                         .HasMaxLength(60)
                         .HasColumnType("TEXT");
@@ -82,6 +86,9 @@ namespace Lorex.Api.Data.Migrations
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
+
+                    b.HasIndex("PublicAuthorSlug")
+                        .IsUnique();
 
                     b.ToTable("AspNetUsers", (string)null);
                 });
@@ -936,6 +943,9 @@ namespace Lorex.Api.Data.Migrations
                     b.Property<int>("Height")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("IsPublic")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("OriginalKey")
                         .IsRequired()
                         .HasMaxLength(400)
@@ -1551,6 +1561,10 @@ namespace Lorex.Api.Data.Migrations
 
                     b.Property<string>("PublicSlug")
                         .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PublicSummary")
+                        .HasMaxLength(300)
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("PublishedAt")

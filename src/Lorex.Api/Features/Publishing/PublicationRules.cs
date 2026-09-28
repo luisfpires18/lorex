@@ -67,7 +67,7 @@ internal static class PublicationRules
     ///
     /// Visibility alone would be enough while every write path holds the requirements - and they do
     /// (ADR 0036). The rest of the predicate is the second lock: a universe that were somehow public
-    /// without its summary, category, genres, artwork, author name or address is simply not public,
+    /// without its summary, category, genres, artwork, author name, author address or address is simply not public,
     /// rather than a record served with holes in it. It is also what lets the public contract promise
     /// that none of those fields is ever null.
     /// </summary>
@@ -80,6 +80,7 @@ internal static class PublicationRules
                 && universe.Category != null
                 && universe.Genres != UniverseGenres.None
                 && universe.Owner!.PublicDisplayName != null
+                && universe.Owner.PublicAuthorSlug != null
                 && db.UniverseArtworks.Any(artwork => artwork.UniverseId == universe.Id));
 
     /// <summary>
@@ -98,7 +99,11 @@ internal static class PublicationRules
             && universes.Any(universe => universe.Id == entity.UniverseId));
     }
 
-    /// <summary>Every story the public portal may read: the same two levels as <see cref="PublicLore"/>.</summary>
+    /// <summary>
+    /// Every story the public portal may read: the same two levels as <see cref="PublicLore"/>, and a public summary
+    /// its author wrote for readers (Task 011). A story selected before that summary existed stays selected and stays
+    /// hidden until it has one; nothing ever stands in for it - least of all the premise.
+    /// </summary>
     public static IQueryable<Story> PublicStories(LorexDbContext db)
     {
         var universes = Public(db);
@@ -106,6 +111,7 @@ internal static class PublicationRules
             && story.DeletedAt == null
             && story.PublicSlug != null
             && story.PublishedAt != null
+            && story.PublicSummary != null
             && universes.Any(universe => universe.Id == story.UniverseId));
     }
 

@@ -4,6 +4,7 @@ import { useAuth } from '../auth/useAuth'
 import { AccountMenu } from '../components/AccountMenu'
 import { BrandMark } from '../components/BrandMark'
 import { ProfileAvatar } from '../components/ProfileAvatar'
+import { PublicAuthorSection } from '../components/PublicAuthorSection'
 import { PublicNameForm } from '../components/PublicNameForm'
 import { MAIN_CONTENT_ID } from '../components/SkipLink'
 import { Wordmark } from '../components/Wordmark'
@@ -95,13 +96,15 @@ export default function ProfilePage() {
               Publishing
             </h2>
             <PublicNameForm />
+            <PublicAuthorSection />
           </section>
 
           <p className="profile__note">
             Lorex keeps only what it needs to sign you in: a username, an email address, and the
             photo above if you add one - and the public name above, if you choose one, which is the
-            only thing the public portal ever shows about you. Your photo is private - it is served
-            only to your own signed-in session, and it is never part of a universe backup.
+            only thing the public portal shows about you, with your author page's address. Your
+            photo is private - served only to your own signed-in session - unless you choose to show
+            it on your author page, and it is never part of a universe backup.
           </p>
         </article>
       </main>

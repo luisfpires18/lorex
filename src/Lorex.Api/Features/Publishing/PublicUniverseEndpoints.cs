@@ -75,6 +75,8 @@ public static partial class PublicUniverseEndpoints
     /// query, so nothing private is ever counted, matched or ordered - a search cannot tell a private
     /// universe from one that does not exist.
     ///
+    /// <para><c>author</c> is an author's public address (ADR 0037): only their worlds.</para>
+    ///
     /// <para><c>category</c> and <c>genre</c> are keys (<c>movies-and-tv</c>, <c>science-fiction</c>),
     /// one of each at most; a genre matches any universe that lists it. <c>q</c> is a substring of the
     /// name, the public summary or the author's public name - the public fields, never the description -
@@ -93,7 +95,8 @@ public static partial class PublicUniverseEndpoints
         [FromQuery] string? category = null,
         [FromQuery] string? genre = null,
         [FromQuery] string? q = null,
-        [FromQuery] string? sort = null)
+        [FromQuery] string? sort = null,
+        [FromQuery] string? author = null)
     {
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
@@ -138,6 +141,11 @@ public static partial class PublicUniverseEndpoints
             errors["sort"] = ["Sort by recent or az."];
         }
 
+        if (!string.IsNullOrEmpty(author) && !SlugShape().IsMatch(author))
+        {
+            errors["author"] = ["Unknown author."];
+        }
+
         var search = q?.Trim();
         if (search is { Length: > SearchMaxLength })
         {
@@ -159,6 +167,13 @@ public static partial class PublicUniverseEndpoints
         if (onlyGenre is { } wantedGenre)
         {
             query = query.Where(universe => (universe.Genres & wantedGenre) == wantedGenre);
+        }
+
+        if (!string.IsNullOrEmpty(author))
+        {
+            // One author's public worlds, for their author page (ADR 0037). An author with none matches nothing,
+            // exactly as an address no one holds does.
+            query = query.Where(universe => universe.Owner!.PublicAuthorSlug == author);
         }
 
         if (!string.IsNullOrEmpty(search))
@@ -290,6 +305,7 @@ public static partial class PublicUniverseEndpoints
             universe.Category!.Value,
             universe.Genres,
             universe.Owner!.PublicDisplayName!,
+            universe.Owner.PublicAuthorSlug!,
             db.UniverseArtworks.Where(artwork => artwork.UniverseId == universe.Id).Select(artwork => artwork.CardId).FirstOrDefault(),
             universe.PublishedAt!.Value));
 
@@ -300,6 +316,7 @@ public static partial class PublicUniverseEndpoints
         row.Category,
         PublicationRules.List(row.Genres),
         row.AuthorDisplayName,
+        row.AuthorSlug,
         CardUrl(row.Slug, row.CardId),
         row.PublishedAt);
 
@@ -313,6 +330,7 @@ public static partial class PublicUniverseEndpoints
         UniverseCategory Category,
         UniverseGenres Genres,
         string AuthorDisplayName,
+        string AuthorSlug,
         Guid CardId,
         DateTime PublishedAt);
 

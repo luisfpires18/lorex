@@ -444,3 +444,8 @@ before branching. No diagnostic was missing from a filtered build or test run.
 `rtk proxy` used once, deliberately and not for a failure: `gh run list --json` to read Deploy DEV #49's run number,
 head SHA and conclusion before branching - the filtered form drops those fields, as in 008. No diagnostic was missing
 from a filtered build or test run.
+
+## Public portal 011 (2026-09-28)
+
+`rtk proxy` used once, deliberately and not for a failure: `gh run list --json` to read Deploy DEV #50's number, head SHA
+and conclusion before branching. No diagnostic was missing from a filtered build or test run.

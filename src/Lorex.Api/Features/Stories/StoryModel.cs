@@ -69,6 +69,13 @@ public sealed class Story : Publishing.IPublishable
     /// <summary>When the story was first published. Republishing keeps it.</summary>
     public DateTime? PublishedAt { get; set; }
 
+    /// <summary>
+    /// What a reader is told the story is, written for the public portal and nothing else (ADR 0036, Task 011). Never
+    /// filled from <see cref="Premise"/>, which is the author's planning text: a story is readable publicly only once
+    /// its author has written this. Saved on the story's publication route, never by a story save.
+    /// </summary>
+    public string? PublicSummary { get; set; }
+
     public ICollection<Chapter> Chapters { get; } = [];
 
     public ICollection<Scene> Scenes { get; } = [];

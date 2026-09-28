@@ -147,3 +147,10 @@ a screen reader should not say "Lorex Lorex". The workspace rail keeps its drawn
 was tried there and at the ~30px a 3.5rem rail allows it reads as a red tangle, and it puts the
 only saturated colour in the chrome directly above the universe accent seal, which is the one
 thing in the rail that carries meaning.
+
+## Amendment: the installed app opens the portal (2026-09-28, Task 011)
+
+The manifest's `start_url` is `/explore`: launching the installed app opens the public portal, signed in or not, exactly as
+`/` does in a browser - the workspace is entered by choosing My workspace. Its `id` stays `/app`, because the id is the
+installed app's identity and changing it would orphan every existing install. A deep link the operating system opens is
+still that link. Nothing in the worker changed: navigations were never cached, so there is no stale start page to serve.

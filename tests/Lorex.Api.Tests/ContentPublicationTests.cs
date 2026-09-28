@@ -23,7 +23,7 @@ namespace Lorex.Api.Tests;
 public sealed class ContentPublicationTests(LorexApiFactory factory) : IClassFixture<LorexApiFactory>
 {
     private static readonly string[] LoreKeys = ["name", "publishedAt", "slug", "summary", "thumbnailUrl", "typeName"];
-    private static readonly string[] StoryKeys = ["publishedAt", "slug", "title"];
+    private static readonly string[] StoryKeys = ["publicSummary", "publishedAt", "slug", "title"];
     private static readonly string[] PageKeys = ["items", "page", "pageSize", "totalCount", "totalPages"];
 
     private readonly LorexApiFactory _factory = factory;
@@ -113,7 +113,7 @@ public sealed class ContentPublicationTests(LorexApiFactory factory) : IClassFix
     {
         var (owner, _) = await Account(_factory, "cp-story-matrix");
         var universe = await Ready(owner, "Cp story matrix");
-        var story = await PlotTestClient.CreateStory(owner, universe.Id, "The Long Ebb");
+        var story = await ReadableStory(owner, universe.Id, "The Long Ebb");
         var anonymous = Anonymous(_factory);
         const string worldSlug = "cp-story-matrix";
 
@@ -190,7 +190,7 @@ public sealed class ContentPublicationTests(LorexApiFactory factory) : IClassFix
         }
 
         // Nothing private sits under the entry's address either: no article, relationships, history or original.
-        foreach (var route in new[] { "", "/article", "/relationships", "/revisions", "/original", "/image" })
+        foreach (var route in new[] { "/article", "/relationships", "/revisions", "/original", "/image", "/fields" })
         {
             var response = await anonymous.GetAsync($"{LoreRoute(world.PublicSlug!)}/hidden-heir{route}");
             Assert.True(response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed, $"{route} answered {(int)response.StatusCode}");
@@ -210,6 +210,7 @@ public sealed class ContentPublicationTests(LorexApiFactory factory) : IClassFix
         await ManuscriptTestClient.WriteManuscript(owner, u, story.Id, scene, "Manuscript secret prose.");
         await PlotTestClient.CreateArc(owner, u, story.Id, "Arc secret");
 
+        await Summarize(owner, u, story.Id, "Told for readers: a coast that keeps count.");
         await PublishStory(owner, u, story.Id);
         var world = await Published(owner, u);
         var anonymous = Anonymous(_factory);
@@ -233,7 +234,7 @@ public sealed class ContentPublicationTests(LorexApiFactory factory) : IClassFix
         }
 
         // No chapter, scene, manuscript or plot route exists publicly, published or not.
-        foreach (var route in new[] { "", "/chapters", "/scenes", "/plot-arcs", $"/scenes/{scene}/manuscript" })
+        foreach (var route in new[] { "/chapters", "/scenes", "/plot-arcs", $"/scenes/{scene}/manuscript", "/manuscript", "/plot" })
         {
             var response = await anonymous.GetAsync($"{StoriesRoute(world.PublicSlug!)}/tide-of-glass{route}");
             Assert.True(response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed, $"{route} answered {(int)response.StatusCode}");
@@ -336,7 +337,7 @@ public sealed class ContentPublicationTests(LorexApiFactory factory) : IClassFix
         var u = universe.Id;
         var entry = await Entry(owner, u, "Discarded seer", null);
         var image = await UploadEntryImage(owner, u, entry, Png(300, 300));
-        var story = await PlotTestClient.CreateStory(owner, u, "Discarded tale");
+        var story = await ReadableStory(owner, u, "Discarded tale");
         await PublishEntry(owner, u, entry);
         await PublishStory(owner, u, story);
         await Published(owner, u);
@@ -464,7 +465,7 @@ public sealed class ContentPublicationTests(LorexApiFactory factory) : IClassFix
         var u = universe.Id;
         var entry = await Entry(owner, u, "Quiet keeper", null);
         var before = await owner.GetFromJsonAsync<EntityDetail>($"/api/universes/{u}/entities/{entry}");
-        var story = await PlotTestClient.CreateStory(owner, u, "Quiet tale");
+        var story = await ReadableStory(owner, u, "Quiet tale");
         var storyBefore = await PlotTestClient.ReadStory(owner, u, story);
 
         await PublishEntry(owner, u, entry);
@@ -501,10 +502,10 @@ public sealed class ContentPublicationTests(LorexApiFactory factory) : IClassFix
         var second = await Entry(owner, u, "ARIA!", null);
         var accented = await Entry(owner, u, "Ária", null);
         var elsewhere = await Entry(owner, other.Id, "Aria", null);
-        var story = await PlotTestClient.CreateStory(owner, u, "Aria");
+        var story = await ReadableStory(owner, u, "Aria");
         var arabic = await Entry(owner, u, "المدينة", null);
         var hebrew = await Entry(owner, u, "עיר", null);
-        var arabicStory = await PlotTestClient.CreateStory(owner, u, "مدينة النحاس");
+        var arabicStory = await ReadableStory(owner, u, "مدينة النحاس");
         var mixed = await Entry(owner, u, "Qasr القصر 7", null);
 
         Assert.Equal("aria", (await PublishEntry(owner, u, first)).PublicSlug);
@@ -542,7 +543,7 @@ public sealed class ContentPublicationTests(LorexApiFactory factory) : IClassFix
         foreach (var name in new[] { "charlie", "Alpha", "bravo" })
         {
             await PublishEntry(owner, u, await Entry(owner, u, name, null));
-            await PublishStory(owner, u, await PlotTestClient.CreateStory(owner, u, name));
+            await PublishStory(owner, u, await ReadableStory(owner, u, name));
         }
 
         await Published(owner, u);
@@ -592,6 +593,21 @@ public sealed class ContentPublicationTests(LorexApiFactory factory) : IClassFix
 
     private static Task<ContentPublicationState> UnpublishEntry(HttpClient client, Guid universeId, Guid entityId) =>
         Transition(client, EntryPath(universeId, entityId, "unpublish"));
+
+    /// <summary>A story with the public summary publishing needs (Task 011).</summary>
+    private static async Task<Guid> ReadableStory(HttpClient client, Guid universeId, string title)
+    {
+        var story = await PlotTestClient.CreateStory(client, universeId, title);
+        await Summarize(client, universeId, story, $"For readers: {title}.");
+        return story;
+    }
+
+    private static async Task<ContentPublicationState> Summarize(HttpClient client, Guid universeId, Guid storyId, string? summary)
+    {
+        var response = await client.PutAsJsonAsync(StoryPath(universeId, storyId, "publication"), new StoryPublicationRequest(summary));
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+        return (await response.Content.ReadFromJsonAsync<ContentPublicationState>())!;
+    }
 
     private static Task<ContentPublicationState> PublishStory(HttpClient client, Guid universeId, Guid storyId) =>
         Transition(client, StoryPath(universeId, storyId, "publish"));

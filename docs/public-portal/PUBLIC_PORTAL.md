@@ -14,10 +14,11 @@ allow-listed API to build on.
 | | Workspace | Public portal |
 | --- | --- | --- |
 | Who | The signed-in owner | Anyone, signed in or not |
-| Routes | `/app/...` behind `RequireAuth` | `/explore`, `/worlds/{slug}`, outside every guard |
+| Routes | `/app/...` behind `RequireAuth` | `/explore`, `/worlds/{slug}`, `/worlds/{slug}/lore/{loreSlug}`, `/worlds/{slug}/stories/{storySlug}`, `/authors/{slug}`, outside every guard |
 | Layout | Rail, universe sidebar, universe search | `PublicLayout`: its own bar, none of the workspace chrome |
-| API | Owner-scoped `/api/...` | `/api/public/universes...`, anonymous, read-only |
-| Identity | Warm editorial workbench (Design refactor 001-007) | Dark, image-led discovery (Task 009) |
+| API | Owner-scoped `/api/...` | `/api/public/universes...` and `/api/public/authors...`, anonymous, read-only |
+| Identity | Warm editorial workbench (Design refactor 001-007) | Dark, image-led discovery and reading (Tasks 009, 011) |
+| Account | `/app/profile`: email, account id, photo, public name - private | `/authors/{slug}`: public name, chosen photo, public worlds (ADR 0037) |
 
 One React application, two layouts: the session, router and build are shared, so a signed-in visitor sees "My
 workspace" in the portal bar and a signed-out one sees "Sign in" and "Create account".
@@ -38,8 +39,8 @@ can be replaced.
 
 ## 5. What a public universe exposes
 
-Exactly `PublicUniverse`: `slug`, `name`, `publicSummary`, `category`, `genres`, `authorDisplayName`,
-`cardImageUrl`, `publishedAt` (first publication). None is ever null.
+Exactly `PublicUniverse`: `slug`, `name`, `publicSummary`, `category`, `genres`, `authorDisplayName`, `authorSlug`
+(the author's page, ADR 0037), `cardImageUrl`, `publishedAt` (first publication). None is ever null.
 
 ## 6. What stays private
 
@@ -65,6 +66,10 @@ The account's `PublicDisplayName`, chosen on the Profile. Never filled from the 
 characters; no control characters or bidi overrides. Read live by the public API, so renaming it renames the author
 of every published world. Required to publish; cannot be cleared while any universe is public.
 
+Since 011 (ADR 0037) an author also has an address, `PublicAuthorSlug`, minted from the public name at first publication
+(`author` fallback, `-2` on collision) and never changed after, and a page at `/authors/{slug}` that resolves only while
+they have a public universe. Their photo is shown there only if they choose, per picture (section 16).
+
 ## 10. Universe artwork
 
 One per universe (`UniverseArtworks`): the untouched original and one 16:10 card, at most 960 px wide, never
@@ -85,12 +90,16 @@ renames and unpublishing keep it. No manual editing yet.
 
 | Route | Answers |
 | --- | --- |
-| `GET /api/public/universes?page=&pageSize=&category=&genre=&q=&sort=` | Public universes, 24 per page (max 48), filtered and ordered as below. |
+| `GET /api/public/universes?page=&pageSize=&category=&genre=&q=&sort=&author=` | Public universes, 24 per page (max 48), filtered and ordered as below; `author` is an author address (011). |
 | `GET /api/public/universes/{slug}` | One public universe, or 404 (private and missing alike). |
 | `GET /api/public/universes/{slug}/artwork/card/{cardId}` | Its current card (WebP), ETag = card id, 304 when current, 404 otherwise. |
 | `GET /api/public/universes/{slug}/lore?page=&pageSize=` | Its published lore entries (010), 24 per page (max 48). 404 unless the universe is public. |
 | `GET /api/public/universes/{slug}/lore/{loreSlug}/thumbnail/{thumbnailId}` | A published entry's current square thumbnail (WebP), as the card route. |
 | `GET /api/public/universes/{slug}/stories?page=&pageSize=` | Its published stories (010), as the lore listing. |
+| `GET /api/public/universes/{slug}/lore/{loreSlug}` | One published entry's page (011): `PublicLoreDetail`. 404 alike for private, trashed and missing. |
+| `GET /api/public/universes/{slug}/stories/{storySlug}` | One published story's page (011): `PublicStory`. Same 404. |
+| `GET /api/public/authors/{slug}` | An author (011): `PublicAuthor`, only while they have a public universe; otherwise 404. |
+| `GET /api/public/authors/{slug}/avatar/{thumbnailId}` | Their photo's current square, only if they chose to show it; as the card route. |
 
 All `Cache-Control: no-cache`, no session needed, no cookie set.
 
@@ -202,15 +211,17 @@ page says "Selected" and why nothing shows yet, and it appears the moment the un
 private hides every selected item at once and clears nothing, so publishing it again brings back exactly those.
 
 **Lore listing contract** - `PublicLoreEntry`, exactly: `slug`, `name`, `summary` (the entry's own "what this is"
-lead, null when empty), `typeName`, `thumbnailUrl` (null without a picture), `publishedAt` (first publication). Ordered
+lead, null when empty), `typeName`, `thumbnailUrl` (null without a picture), `publishedAt` (first publication). Its
+page (011) is `PublicLoreDetail`: the same plus `article` - see section 16. Ordered
 by name, case aside, then address. The summary is published because it is the entry's authored lead - shown under its
 name in its own header - and the publish panel says it is listed. Never the article, fields, aliases, tags, Canon status,
 relationships, history, ids or keys.
 
-**Story listing contract** - `PublicStory`, exactly: `slug`, `title`, `publishedAt`. Ordered by title, case aside, then
+**Story listing contract** - `PublicStory`, exactly: `slug`, `title`, `publicSummary` (011), `publishedAt`. Ordered by title, case aside, then
 address - the workspace's own order; stories have no order an author sets. The premise is not published: it is the
 author's planning text and may give the story away, as the universe description is not. No chapter, scene, manuscript,
-plot, note or status. Whether a reader-facing story summary is needed is Task 011's call.
+plot, note or status. Since 011 a story is published only with a public summary its author writes for readers
+(section 16).
 
 **Thumbnail.** The entry's existing square thumbnail (the upload gate's WebP, metadata stripped) - never the original -
 through the lore predicate by both addresses and the current thumbnail id; ETag = thumbnail id, checked after
@@ -233,13 +244,61 @@ pill says Private, Public or Selected, and opens a panel (the `ActionMenu` discl
 listed, what is not, and the one action - Publish entry/story or Make private. The panel is the confirmation.
 
 **For 011.** Reading pages at `/worlds/{universeSlug}/lore/{loreSlug}` and `/worlds/{universeSlug}/stories/{storySlug}`,
-each with its own detail DTO read through the same predicate - never the workspace DTOs. No child route exists yet, so
-nothing links to one. Relationships, family trees and the timeline stay private until a decision says otherwise.
+each with its own detail DTO read through the same predicate - never the workspace DTOs. Built in 011 (section 16).
+Relationships, family trees and the timeline stay private until a decision says otherwise.
 
-## 16. Preview
+## 16. Public reading (011)
 
-Planned for Task 011: an authenticated owner-scoped route that renders the same allow-listed shape from saved
-details, with owner-scoped image addresses, so "what would anyone see" never needs anonymous access.
+What an Explore card leads to. Every page is under `PublicLayout` - the portal bar, the search (which still opens
+Explore), Log in and Create account returning to this exact page, or My workspace - and answers signed in or out.
+
+**A universe** (`/worlds/{slug}`). A cinematic hero built from the one public picture a universe has, its 16:10 card:
+drawn crisp at no more than its own 960 pixels beside the title, and blurred behind the band, where the blur hides that
+it is enlarged - no new derivative, and never the private original. The category, the name, "by" the author (a link to
+their page), the genres and the public summary. Under it, what the author published: Lore (the entry's square or its
+initial, type, name, lead) and Stories (title, public summary), each 24 at a time with Show more, in the 010 order. A
+section with nothing in it is left out; with nothing at all, "No lore or stories have been published here yet." Nothing
+counts or hints at anything private. Anchors to Lore and Stories only when both exist.
+
+**An entry** (`/worlds/{slug}/lore/{loreSlug}`). A reference page: "← World / Lore", the type, the name, the entry's lead,
+its public square beside a reading column (40rem), and its article, rendered by the workspace's own read-only renderer.
+The API has already unwrapped every link that is not absolute http, https or mailto, and read its first-level headings
+as second-level ones, so the page has one `h1`. Never its fields, aliases, tags, Canon status, relationships or history.
+
+**A story** (`/worlds/{slug}/stories/{storySlug}`). A landing page, not a reader: its title, its public summary, "by" the
+author, when it was first published, and the world it is set in. **Public summary**: `Stories.PublicSummary`, at most
+300, written in the story's publication panel ("Write public summary…", a guarded drawer - "Shown to readers on the
+public portal. Your premise stays private."), saved on its own route, required to publish and not removable while the
+story is selected; never taken from the premise. A story selected in 010 without one stays selected and hidden, and its
+panel says "needs a public summary before readers can see it". Publishing a story's prose needs a decision about
+chapters and scenes; it is not made here.
+
+**An author** (`/authors/{slug}`, ADR 0037). Their public name, their photo's square only if they chose to show it -
+otherwise their initial in a ring - "Creator on Lorex", how many public worlds, and those worlds as the Explore cards (the
+author's name unlinked, since it would lead here). Only while they have a public world; otherwise the same not-found
+page as an address nobody holds. The address is minted from the public name at first publication and kept for good.
+
+**Public and private profile.** `/app/profile` is the workspace's account screen and stays so: email, account id, the
+photo, the public name, and now "Author page" - a link to the public page when it is live, and "Show my photo on my
+author page", off by default and off again when the photo is replaced. The photo's hint says it is private unless shown.
+
+**Cards.** An Explore card has two links and no nesting: the world's name, stretched over the whole card so the card is
+still one target, and the author's name laid above it.
+
+**Owner bridge.** Signed in as the owner, a world shows "Edit this world" and an entry or story a quiet "Edit in
+workspace", from `GET /api/universes/by-address/{slug}?lore=&story=`, which answers only the owner. Nothing public names
+an owner or an id; nobody else sees either link.
+
+**Not found.** One portal page for every hidden thing - private world, private or trashed entry or story, an author
+with nothing public, an address nobody held: "This page is not available. Its address may be wrong, or it is not
+public." A page that fails to load says so, with Try again, and is never mistaken for missing.
+
+**Front door.** `/` opens Explore, and so does the installed app: the manifest's `start_url` is `/explore` (its `id`
+stays `/app`, the install's identity). Signed in or out, and whatever was used last, the portal comes first; My
+workspace is the way in. Deep links are unaffected.
+
+**Owner preview** of a still-private universe was planned for 011 and is not built: an owner sees the real public page
+once published, and Settings' checklist before that.
 
 ## 17. Roadmap
 
@@ -248,10 +307,11 @@ details, with owner-scoped image addresses, so "what would anyone see" never nee
 | 008 | Publication foundation: visibility, public metadata, artwork, slug, anonymous API, settings, privacy tests. |
 | 009 | Explore Worlds portal from the owner's visual references and the approved background. |
 | 010 | Explicit publishing of individual lore entries and stories: selection, addresses, listings, thumbnail, owner controls. Done. |
-| 011 | The public universe page and browsing published content; owner preview and "Edit this world". |
+| 011 | Public reading: the universe page, entry and story pages, a story's public summary, author pages and photos, "Edit this world", the portal as the installed app's start. Done (owner preview not built). |
 | 012 | Portal polish, accessibility, SEO and Open Graph, caching and performance, security audit, remaining 007 polish. |
 
 ## 18. Non-goals
 
 No likes, ratings, comments, follows, view counts, popularity, trending, recommendations, feeds, bookmarks or public
-editing. No fake data, metrics or placeholder artwork. No creator profile pages yet.
+editing. No fake data, metrics or placeholder artwork. Author pages (011) hold a public name, a chosen photo and public
+worlds - no bio, followers, contact or counts of anything private.

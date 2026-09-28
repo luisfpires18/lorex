@@ -130,7 +130,7 @@ public sealed class UniversePublicationTests(LorexApiFactory factory) : IClassFi
         var state = await Published(owner, universe.Id);
         var anonymous = Anonymous(_factory);
 
-        string[] allowed = ["authorDisplayName", "cardImageUrl", "category", "genres", "name", "publicSummary", "publishedAt", "slug"];
+        string[] allowed = ["authorDisplayName", "authorSlug", "cardImageUrl", "category", "genres", "name", "publicSummary", "publishedAt", "slug"];
 
         var single = await anonymous.GetStringAsync($"{PublicRoute}/{state.PublicSlug}");
         using (var document = JsonDocument.Parse(single))

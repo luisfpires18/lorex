@@ -47,7 +47,69 @@ public static class PublicationEndpoints
         group.MapPost("/publish", PublishAsync).WithName("PublishUniverse");
         group.MapPost("/unpublish", UnpublishAsync).WithName("UnpublishUniverse");
 
+        // The owner bridge (Task 011): from a public address back to where it is edited. Not under a universe id -
+        // the public page knows only the address.
+        endpoints.MapGet("/api/universes/by-address/{slug}", WorkspaceLinkAsync)
+            .WithTags("Publishing")
+            .RequireAuthorization()
+            .WithName("GetWorkspaceLink");
+
         return endpoints;
+    }
+
+    /// <summary>
+    /// Where the signed-in account edits what a public address shows: its universe's id, and - asked with
+    /// <c>lore</c> or <c>story</c> - the live entry's or story's. Only the owner gets an answer; anyone else, and any
+    /// address the owner does not hold, is a 404, so a public page learns nothing about who owns a world except that the
+    /// person looking does. The public DTOs never carry an id or an owner for this.
+    /// </summary>
+    private static async Task<IResult> WorkspaceLinkAsync(
+        string slug,
+        ClaimsPrincipal principal,
+        LorexDbContext db,
+        CancellationToken cancellationToken,
+        [FromQuery] string? lore = null,
+        [FromQuery] string? story = null)
+    {
+        var ownerId = principal.RequireUserId();
+
+        var universeId = await db.Universes.AsNoTracking()
+            .Where(universe => universe.OwnerId == ownerId && universe.PublicSlug == slug)
+            .Select(universe => (Guid?)universe.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (universeId is not { } id)
+        {
+            return Results.NotFound();
+        }
+
+        Guid? entityId = null;
+        if (!string.IsNullOrEmpty(lore))
+        {
+            entityId = await db.Entities.AsNoTracking()
+                .Where(entity => entity.UniverseId == id && entity.PublicSlug == lore && entity.DeletedAt == null)
+                .Select(entity => (Guid?)entity.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (entityId is null)
+            {
+                return Results.NotFound();
+            }
+        }
+
+        Guid? storyId = null;
+        if (!string.IsNullOrEmpty(story))
+        {
+            storyId = await db.Stories.AsNoTracking()
+                .Where(candidate => candidate.UniverseId == id && candidate.PublicSlug == story && candidate.DeletedAt == null)
+                .Select(candidate => (Guid?)candidate.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (storyId is null)
+            {
+                return Results.NotFound();
+            }
+        }
+
+        return Results.Ok(new WorkspaceLink(id, entityId, storyId));
     }
 
     private static async Task<IResult> GetAsync(
@@ -203,6 +265,15 @@ public static class PublicationEndpoints
                     detail: "This universe is not ready to publish yet.",
                     extensions: new Dictionary<string, object?> { ["code"] = IncompleteCode });
             }
+
+            // The author's own address is minted with their first public universe, from the public name they chose -
+            // never the username or email - and kept for good (ADR 0037).
+            var owner = await db.Users.FirstAsync(user => user.Id == ownerId, cancellationToken);
+            owner.PublicAuthorSlug ??= await PublicSlugs.ChooseAsync(
+                db.Users.AsNoTracking().Select(user => user.PublicAuthorSlug),
+                owner.PublicDisplayName!,
+                PublicSlugs.AuthorFallback,
+                cancellationToken);
 
             var now = DateTime.UtcNow;
             universe.PublicSlug ??= await PublicSlugs.ChooseAsync(

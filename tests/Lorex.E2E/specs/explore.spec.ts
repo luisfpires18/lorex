@@ -132,7 +132,7 @@ test.describe('Explore worlds', () => {
     // Only what was published, each as one card: artwork, name, what it is, and who made it.
     await expect(cards(visitor)).toHaveText([`${word} Saltglass`, `${word} Hollowmere`])
     await expect(visitor.getByTestId('explore-count')).toHaveText('2 worlds match')
-    const card = visitor.getByRole('link', { name: new RegExp(`${word} Hollowmere`) })
+    const card = visitor.locator('.worldcard').filter({ hasText: `${word} Hollowmere` })
     // Genres as chips, and the category beside the author.
     await expect(card.locator('.genrechip')).toHaveText(['Fantasy', 'Horror'])
     await expect(card.locator('.worldcard__category')).toHaveText('Games')
@@ -141,10 +141,17 @@ test.describe('Explore worlds', () => {
     await expect
       .poll(() => card.locator('img').evaluate((image: HTMLImageElement) => image.naturalWidth))
       .toBeGreaterThan(0)
-    // The one link in the card: nothing interactive nested inside it.
-    await expect(card.locator('a, button, input, select')).toHaveCount(0)
+    // Two links, never nested (Task 011): the world by its name - stretched over the card - and its author.
+    const worldLink = card.getByRole('link', { name: `${word} Hollowmere` })
+    await expect(card.getByRole('link')).toHaveCount(2)
+    await expect(card.getByTestId('worldcard-author')).toHaveText('Mara Vell')
+    await expect(card.locator('a a, a button, button, input, select')).toHaveCount(0)
 
-    await card.click()
+    // The picture is part of the world's link.
+    await card.locator('.worldcard__panel').click({ position: { x: 40, y: 40 } })
+    await visitor.waitForURL(`/worlds/${slug}`)
+    await visitor.goBack()
+    await worldLink.click()
     await visitor.waitForURL(`/worlds/${slug}`)
     await expect(visitor.getByTestId('public-world').getByRole('heading', { level: 1 })).toHaveText(
       `${word} Hollowmere`,

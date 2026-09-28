@@ -51,8 +51,8 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
 - **Public portal phase.** Roadmap: **008** publication foundation (done), **009** Explore Worlds portal (done),
-  **010** content publishing controls (current, on its branch), **011** public universe experience (next), **012** portal
-  polish, SEO, performance and safety. See Public portal below and `docs/public-portal/PUBLIC_PORTAL.md`.
+  **010** content publishing controls (done), **011** public universe experience (current, on its branch), **012** portal
+  polish, SEO, performance and safety (next). See Public portal below and `docs/public-portal/PUBLIC_PORTAL.md`.
 - **Entry images** (`feat/entity-images-r2`, merged into `dev`). An entry may carry one picture:
   uploaded through the API, decoded and thumbnailed server-side, stored as two objects in one
   private Cloudflare R2 bucket, and served back only through an authenticated owner-scoped Lorex
@@ -695,29 +695,48 @@ A public, read-only discovery experience beside the workspace, in the same appli
   `/explore` in the owner's portal layout; `/` opens Explore; Log in and Create account return to the public page they
   were chosen on (`auth/returnPath.ts`). Debt for 012: the 2.37 MB hero PNG (a derivative needs the owner's approval),
   and "Show more" pages not in the address.
-- **010 - Content publishing controls** (`feat/content-publishing-controls` off `dev` at `72c50eb`, committed, not
-  merged, not pushed). ADR 0036 amended; `PUBLIC_PORTAL.md` section 15.
-  - Entries and stories each carry `Visibility` (`ContentVisibility`, Private default), `PublicSlug`, `PublishedAt`.
-    Migration `AddContentPublication` leaves every item private, unaddressed, undated - public universes included.
-  - Public to anyone only while the item is selected, out of the Trash and in a public universe: `PublicLore` /
-    `PublicStories` hold the universe predicate. Universe private hides every selected item and clears nothing; an owner
-    may select while private ("Selected"). Trash hides; restore brings the selection back.
-  - Owner routes: `GET .../{entities|stories}/{id}/publication`, `POST .../publish`, `.../unpublish` - owner-only,
-    idempotent, no body; not an edit (no `UpdatedAt`, history or search write). Addresses from the shared generator,
-    unique per universe and kind, `entry`/`story` fallbacks, kept through renames and unpublishing.
-  - Anonymous: `/api/public/universes/{slug}/lore` (`slug`, `name`, `summary`, `typeName`, `thumbnailUrl`,
-    `publishedAt`), `/stories` (`slug`, `title`, `publishedAt`), `/lore/{loreSlug}/thumbnail/{id}` (square thumbnail
-    only, ETag after the check). Paged 24/48, by name or title then address. Story premise not published.
-  - Web: a Private / Public / Selected pill before Edit on an entry and in a story's line of facts, opening an
-    `ActionMenu` panel that is the confirmation. Settings' note and publish confirmation now say items are published
-    one by one. No list badges, counts, bulk actions or child public pages (011).
-  - Backup format 15 unchanged; restores private whatever the file says.
-  - Owner questions for 011: whether a story needs a reader-facing summary (the premise is planning text); whether
-    restoring a published entry from the Trash should ask before it is public again.
+- **010 - Content publishing controls** - done: `e77393f`, merged into `dev` at `33b191c`; Deploy DEV #50 green. Entries
+  and stories are published one by one (`ContentVisibility`, `PublicSlug`, `PublishedAt`); public only while selected, out
+  of the Trash and in a public universe (`PublicLore` / `PublicStories`); owner routes `.../publish|unpublish`; anonymous
+  listings `/lore`, `/stories` and the entry's thumbnail. ADR 0036 amended; `PUBLIC_PORTAL.md` section 15.
+- **011 - Public universe experience** (`feat/public-universe-experience` off `dev` at `33b191c`, committed, not merged,
+  not pushed). ADR 0036 amended, ADR 0037 new; `PUBLIC_PORTAL.md` section 16.
+  - Pages under `PublicLayout`: `/worlds/:slug` (hero from the public card - crisp at its own size, blurred behind - with
+    category, name, author link, genres, summary; published lore and stories, Show more; empty state), an entry's page
+    (type, name, lead, square, article), a story's landing page (title, public summary, author, date, its world), and
+    `/authors/:slug`. One not-found page for every hidden thing; load failures say so with Try again.
+  - API: `GET .../lore/{loreSlug}` (`PublicLoreDetail` = listing + reader `article`: non-absolute links unwrapped, `h1`
+    demoted), `GET .../stories/{storySlug}` (`PublicStory`), `/api/public/authors/{slug}` and its avatar,
+    `?author=` on the universe list, `authorSlug` on `PublicUniverse` (nine members).
+  - Story `PublicSummary` (300): saved on `PUT .../stories/{id}/publication` from a guarded drawer in the publication
+    panel; required to publish, not removable while selected, never from the premise. `PublicStories` requires it, so a
+    010 story selected without one stays selected and hidden, and says why.
+  - Author identity (ADR 0037): `AspNetUsers.PublicAuthorSlug`, minted at first publication from the public name
+    (`author` fallback), kept for good; `PublicAuthorBackfill` mints it at startup for accounts public before 011; the
+    universe predicate requires it. Resolves only with a public universe. Photo: `ProfileImages.IsPublic`, off by default,
+    off again on replace, only the 320 square served; the Profile gets "Author page" with the toggle. `/app/profile`
+    stays the workspace.
+  - Owner bridge: `GET /api/universes/by-address/{slug}?lore=&story=`, owner-only; "Edit this world" and "Edit in
+    workspace" for the owner alone. Explore cards: the name stretched over the card, the author a second link.
+  - Front door: manifest `start_url` `/explore` (`id` stays `/app`). Migration `AddPublicReading`; backup format 16.
+  - Not built: owner preview of a private universe; public story prose (needs a chapter/scene publication decision).
+
+- **012 debt** (recorded, not started): a confirmation before a Trash restore that would make a selected entry or story
+  public at once; 200% zoom audit; loading/error visual audit; drawer action-order mismatch; repeated Moment label;
+  Settings danger-section styling; final portal accessibility; SEO, Open Graph, sitemap, robots, canonical; image and
+  performance (the 2.37 MB Explore PNG, a public hero derivative if wanted, lazy chunks); cache review; final
+  security/privacy sweep; the "Show more" pages not in the address. Archived public universes stay public (the predicate
+  ignores archive) - an owner question, unchanged.
 
 ## Baseline
 
-- **1093 API integration tests, 222 Playwright tests** (Content publishing 010: +16 API - 13 in
+- **1111 API integration tests, 229 Playwright tests** (Public reading 011: +18 API - 7 `PublicReadingTests`, 8
+  `PublicAuthorTests`, 1 `PublicReadingMigrationTests`, 1 story-summary backup test, 1 version-16 case - and +7 in
+  `public-reading.spec.ts`; 010's and 008's tests updated for the story summary rule, `authorSlug` and format 16). 011:
+  API **1111/1111**, Release build clean, no pending model changes; full Playwright on a fresh database **229/229**, one
+  invocation, two workers, retries 0, 10.2 min. The first full run was 226/229: two `restore.spec.ts` tests still pinned
+  format 15 (fixed to 16), and one `manuscript.spec.ts` measure test lost to load, green alone. Before it, 010: 1093 API,
+  222 Playwright (+16 API - 13 in
   `ContentPublicationTests`, 2 in `ContentPublicationBackupTests`, 1 in `ContentPublicationMigrationTests` - and +5 in
   `content-publishing.spec.ts`). 010: API **1093/1093**, Release build clean, no pending model changes; full Playwright on
   a fresh database **222/222**, one invocation, two workers, retries 0, 9.8 min. An earlier full run the same way was
@@ -755,7 +774,10 @@ A public, read-only discovery experience beside the workspace, in the same appli
     fails as a failure instead of telling the author a free name is taken.
 - Under a full parallel Playwright run, `auth.spec.ts` "rejects a wrong password" intermittently
   times out (it navigates to `/login` without awaiting sign-out).
-- 33 migrations, latest `AddContentPublication` - additive: three columns each on `Entities` and `Stories`
+- 34 migrations, latest `AddPublicReading` - additive: `Stories.PublicSummary`, `ProfileImages.IsPublic` (false),
+  `AspNetUsers.PublicAuthorSlug` with a unique index; nothing copied or made public; native `DROP COLUMN` rollback;
+  `PublicReadingMigrationTests` walks it on a file and through the startup backfill. Before it, `AddContentPublication` -
+  additive: three columns each on `Entities` and `Stories`
   (`Visibility` default Private, `PublicSlug`, `PublishedAt`) and a unique `(UniverseId, PublicSlug)` index on each; the
   rollback uses native `DROP COLUMN`. `ContentPublicationMigrationTests` walks it on a file under a public universe. Before
   it, `AddUniversePublication` - additive: six columns on `Universes` (`Visibility` default Private),

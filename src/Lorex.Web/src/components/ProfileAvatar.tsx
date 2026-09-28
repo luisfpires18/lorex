@@ -178,7 +178,9 @@ export function ProfileAvatar({ name }: { name: string }) {
         ) : null}
       </div>
 
-      <p className="avatar__hint">One photo. JPEG, PNG or WebP, up to 8 MB. Only you can see it.</p>
+      <p className="avatar__hint">
+        One photo. JPEG, PNG or WebP, up to 8 MB. Private unless you show it on your author page.
+      </p>
 
       {error ? (
         <p className="field__error" role="alert" data-testid="profile-photo-error">

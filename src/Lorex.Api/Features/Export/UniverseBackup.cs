@@ -148,8 +148,14 @@ public sealed record UniverseBackup(
     /// a decision about one universe in one installation, and a restore makes a new universe that has never been
     /// published. A restored universe is always private. A file at version 14 or earlier has none of these members; each
     /// reads as null, which means none.
+    ///
+    /// 16 - A story may carry a public summary (Task 011, ADR 0036): <see cref="BackupStory.PublicSummary"/>, what its
+    /// author wrote for readers of the portal, separate from its premise. Not ignorable - it is authored text, which a
+    /// version 15 reader would lose silently. As in 15, whether the story was published is not in the format, nor its
+    /// address or date: every restored story is private. A file at version 15 or earlier has no <c>publicSummary</c> on
+    /// a story; it reads as null, and nothing is ever filled from the premise.
     /// </summary>
-    public const int CurrentVersion = 15;
+    public const int CurrentVersion = 16;
 
     public static UniverseBackup Of(UniverseBackupPayload payload, DateTime generatedAt) =>
         new(FormatName, CurrentVersion, generatedAt, payload);
@@ -551,6 +557,9 @@ public sealed record BackupTimelineValidation(Guid? EventKindTermId, Guid? Metho
 /// <paramref name="PlotArcs"/> is the story's plot, arcs in order (since version 7). Empty means a story with no
 /// arcs; absent - null, in any earlier file - means the same thing.
 ///
+/// <paramref name="PublicSummary"/> is what its author wrote for readers of the public portal (since version 16); never
+/// its publication, address or date.
+///
 /// <paramref name="DeletedAt"/> is when the story was moved to the Trash, or null while it is live (since version 10).
 /// A story in the Trash travels whole - it is authored work its owner can still restore - and what it holds is exactly
 /// what it held: nothing inside it is marked on its account.
@@ -569,7 +578,8 @@ public sealed record BackupStory(
     DateTime? DeletedAt,
     IReadOnlyList<BackupChapter>? Chapters,
     IReadOnlyList<BackupScene> Scenes,
-    IReadOnlyList<BackupPlotArc>? PlotArcs);
+    IReadOnlyList<BackupPlotArc>? PlotArcs,
+    string? PublicSummary = null);
 
 /// <summary>
 /// One chapter (since version 6): its place in the story, from 0, and the author's title, summary and

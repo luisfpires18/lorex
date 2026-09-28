@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json.Nodes;
 using Lorex.Api.Data;
 using Lorex.Api.Features.Media;
 using Microsoft.AspNetCore.Mvc;
@@ -7,8 +8,8 @@ using Microsoft.EntityFrameworkCore;
 namespace Lorex.Api.Features.Publishing;
 
 /// <summary>
-/// What a public universe's author published inside it (Task 010): the listing of its published lore entries, the
-/// listing of its published stories, and an entry's thumbnail. Mapped on <see cref="PublicUniverseEndpoints"/>' group,
+/// What a public universe's author published inside it (Tasks 010-011): the listings of its published lore entries and
+/// stories, each one's own page, and an entry's thumbnail. Mapped on <see cref="PublicUniverseEndpoints"/>' group,
 /// so anonymous, read-only and <c>no-cache</c> like the rest of the portal's API.
 ///
 /// <para><b>Both levels, always.</b> Every read starts from <see cref="PublicationRules.PublicLore"/> or
@@ -18,8 +19,9 @@ namespace Lorex.Api.Features.Publishing;
 /// page, never a hint of what is private.</para>
 ///
 /// <para><b>Allow-lists, projected.</b> <see cref="PublicLoreEntry"/> and <see cref="PublicStory"/> are built member
-/// by member from the columns they name. No entry, story or workspace response is serialised: no ids, no article,
-/// fields, relationships, Canon, history, chapters, scenes, manuscript, plot or notes.</para>
+/// by member from the columns they name, and so are <see cref="PublicLoreDetail"/> and a story's page. No entry, story or
+/// workspace response is serialised: no ids, fields, relationships, Canon, history, chapters, scenes, manuscript, plot
+/// or notes. An entry's article is on its own page only, with its workspace links removed.</para>
 ///
 /// <para><b>Order.</b> Neither kind has an order an author sets for a whole universe, so both read the way the
 /// workspace lists them - by name or title, case aside - with the address breaking ties, so pages never repeat or
@@ -30,9 +32,11 @@ public static class PublicContentEndpoints
     public static RouteGroupBuilder MapPublicContentEndpoints(this RouteGroupBuilder group)
     {
         group.MapGet("/{slug}/lore", ListLoreAsync).WithName("ListPublicLore");
+        group.MapGet("/{slug}/lore/{loreSlug}", GetLoreAsync).WithName("GetPublicLore");
         group.MapGet("/{slug}/lore/{loreSlug}/thumbnail/{thumbnailId:guid}", ReadLoreThumbnailAsync)
             .WithName("ReadPublicLoreThumbnail");
         group.MapGet("/{slug}/stories", ListStoriesAsync).WithName("ListPublicStories");
+        group.MapGet("/{slug}/stories/{storySlug}", GetStoryAsync).WithName("GetPublicStory");
 
         return group;
     }
@@ -105,11 +109,145 @@ public static class PublicContentEndpoints
             .ThenBy(story => story.PublicSlug)
             .Skip(Skip(page, pageSize))
             .Take(pageSize)
-            .Select(story => new PublicStory(story.PublicSlug!, story.Title, story.PublishedAt!.Value))
+            .Select(story => new PublicStory(story.PublicSlug!, story.Title, story.PublicSummary!, story.PublishedAt!.Value))
             .ToListAsync(cancellationToken);
 
         return Results.Ok(Page(items, page, pageSize, totalCount));
     }
+
+    /// <summary>
+    /// One published entry's page: the listing's members and its article. Found by both addresses through the lore
+    /// predicate, so a private universe, a private or trashed entry and an address nobody holds are the same 404.
+    /// </summary>
+    private static async Task<IResult> GetLoreAsync(
+        string slug,
+        string loreSlug,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
+        if (!PublicUniverseEndpoints.SlugShape().IsMatch(slug) || !PublicUniverseEndpoints.SlugShape().IsMatch(loreSlug))
+        {
+            return Results.NotFound();
+        }
+
+        var row = await PublicationRules.PublicLore(db).AsNoTracking()
+            .Where(entity => entity.PublicSlug == loreSlug && entity.Universe!.PublicSlug == slug)
+            .Select(entity => new
+            {
+                entity.Name,
+                entity.Summary,
+                TypeName = entity.EntityType!.Name,
+                ThumbnailId = entity.Image == null ? (Guid?)null : entity.Image.ThumbnailId,
+                PublishedAt = entity.PublishedAt!.Value,
+                Article = db.EntityArticles.Where(article => article.EntityId == entity.Id).Select(article => article.Content).FirstOrDefault(),
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return row is null
+            ? Results.NotFound()
+            : Results.Ok(new PublicLoreDetail(
+                loreSlug,
+                row.Name,
+                row.Summary,
+                row.TypeName,
+                row.ThumbnailId is { } thumbnailId ? ThumbnailUrl(slug, loreSlug, thumbnailId) : null,
+                ReaderArticle(row.Article),
+                row.PublishedAt));
+    }
+
+    /// <summary>One published story, as its listing shows it. Same predicate, same 404.</summary>
+    private static async Task<IResult> GetStoryAsync(
+        string slug,
+        string storySlug,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
+        if (!PublicUniverseEndpoints.SlugShape().IsMatch(slug) || !PublicUniverseEndpoints.SlugShape().IsMatch(storySlug))
+        {
+            return Results.NotFound();
+        }
+
+        var story = await PublicationRules.PublicStories(db).AsNoTracking()
+            .Where(candidate => candidate.PublicSlug == storySlug && candidate.Universe!.PublicSlug == slug)
+            .Select(candidate => new PublicStory(candidate.PublicSlug!, candidate.Title, candidate.PublicSummary!, candidate.PublishedAt!.Value))
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return story is null ? Results.NotFound() : Results.Ok(story);
+    }
+
+    /// <summary>
+    /// The article as a reader gets it: the stored Tiptap document with every link mark whose address is not an
+    /// absolute http, https or mailto one removed - the text stays, the link goes - and its first-level headings read
+    /// as second-level ones, under the page's own title. A relative link is the only kind an
+    /// article can hold that points into Lorex, and inside Lorex it points into the workspace, carrying its ids. Null for
+    /// no article, a cleared one, or one that cannot be read (written before articles were validated): a reader gets
+    /// nothing rather than something broken.
+    /// </summary>
+    internal static string? ReaderArticle(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return null;
+        }
+
+        JsonNode? document;
+        try
+        {
+            document = JsonNode.Parse(content);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
+
+        if (document is not JsonObject root || (string?)root["type"] is not "doc")
+        {
+            return null;
+        }
+
+        Unlink(root);
+        return root.ToJsonString();
+    }
+
+    private static void Unlink(JsonObject node)
+    {
+        // The page's title is its one first-level heading: an article's own first-level headings read as the second level.
+        if ((string?)node["type"] is "heading" && node["attrs"] is JsonObject attrs && attrs["level"] is JsonValue level
+            && level.TryGetValue<int>(out var depth) && depth < 2)
+        {
+            attrs["level"] = 2;
+        }
+
+        if (node["marks"] is JsonArray marks)
+        {
+            for (var index = marks.Count - 1; index >= 0; index--)
+            {
+                if (marks[index] is JsonObject mark && (string?)mark["type"] is "link" && !IsReaderHref(mark["attrs"]?["href"]))
+                {
+                    marks.RemoveAt(index);
+                }
+            }
+
+            if (marks.Count == 0)
+            {
+                node.Remove("marks");
+            }
+        }
+
+        if (node["content"] is JsonArray children)
+        {
+            foreach (var child in children.OfType<JsonObject>())
+            {
+                Unlink(child);
+            }
+        }
+    }
+
+    private static bool IsReaderHref(JsonNode? href) =>
+        href is JsonValue value
+        && value.TryGetValue<string>(out var text)
+        && Uri.TryCreate(text.Trim(), UriKind.Absolute, out var uri)
+        && uri.Scheme is "http" or "https" or "mailto";
 
     /// <summary>
     /// A published entry's square thumbnail - never its original, which may carry what a camera wrote into it - and

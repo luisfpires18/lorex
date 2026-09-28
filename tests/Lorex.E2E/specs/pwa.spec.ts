@@ -73,7 +73,10 @@ test.describe('installability', () => {
 
     expect(manifest.name).toBe('Lorex')
     expect(manifest.short_name).toBe('Lorex')
-    expect(manifest.start_url).toBe('/app')
+    // The portal is the front door (Task 011): launching the installed app opens Explore, signed in or not. The id
+    // stays `/app`, which is the installed app's identity - changing it would orphan every existing install.
+    expect(manifest.start_url).toBe('/explore')
+    expect(manifest.id).toBe('/app')
     expect(manifest.scope).toBe('/')
     expect(manifest.display).toBe('standalone')
 

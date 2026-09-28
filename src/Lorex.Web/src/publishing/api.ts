@@ -6,6 +6,7 @@ import type {
   ContentPublicationState,
   PublicationDetails,
   PublicationState,
+  PublicAuthorSettings,
   UniverseArtworkRef,
 } from './types'
 
@@ -97,8 +98,35 @@ export function publishContent(universeId: string, kind: ContentKind, id: string
   })
 }
 
+/** Saves a story's public summary - on its publication route, never by a story save. Blank removes it. */
+export function saveStoryPublicSummary(
+  universeId: string,
+  storyId: string,
+  publicSummary: string | null,
+) {
+  return apiFetch<ContentPublicationState>(
+    `${contentBase(universeId, 'story', storyId)}/publication`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ publicSummary }),
+    },
+  )
+}
+
 export function unpublishContent(universeId: string, kind: ContentKind, id: string) {
   return apiFetch<ContentPublicationState>(`${contentBase(universeId, kind, id)}/unpublish`, {
     method: 'POST',
+  })
+}
+
+export function getPublicAuthorSettings(signal?: AbortSignal) {
+  return apiFetch<PublicAuthorSettings>('/api/profile/public-author', { signal })
+}
+
+/** Shows or hides the account's photo on its public author page. Hiding is immediate. */
+export function setPublicAuthorPhoto(isPublic: boolean) {
+  return apiFetch<PublicAuthorSettings>('/api/profile/public-author/photo', {
+    method: 'PUT',
+    body: JSON.stringify({ isPublic }),
   })
 }

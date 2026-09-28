@@ -77,6 +77,7 @@ public sealed class StoryConfiguration : IEntityTypeConfiguration<Story>
 
         // Publishing (ADR 0036): unique among one universe's stories, and the public listing's index, as on entries.
         builder.Property(story => story.PublicSlug).HasMaxLength(Publishing.PublicationLimits.SlugMaxLength);
+        builder.Property(story => story.PublicSummary).HasMaxLength(Publishing.PublicationLimits.SummaryMaxLength);
         builder.HasIndex(story => new { story.UniverseId, story.PublicSlug }).IsUnique();
     }
 }

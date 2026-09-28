@@ -14,4 +14,12 @@ public sealed class LorexUser : IdentityUser
     /// derived from either. Read live, so a change reaches every published world at once (ADR 0036).
     /// </summary>
     public string? PublicDisplayName { get; set; }
+
+    /// <summary>
+    /// The account's public author address, <c>/authors/{slug}</c> (ADR 0037). Minted once, from
+    /// <see cref="PublicDisplayName"/>, the first time the account publishes a universe, and never changed after -
+    /// renaming the public name keeps it. Never taken from the username or the email. Resolves publicly only while
+    /// the account has a public universe.
+    /// </summary>
+    public string? PublicAuthorSlug { get; set; }
 }

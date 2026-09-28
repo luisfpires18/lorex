@@ -16,6 +16,7 @@ const PASSWORD = 'Test-password-123!'
 const LEAVE_DETAILS = 'The public details have unsaved changes. Leave without saving them?'
 const ALLOWED = [
   'authorDisplayName',
+  'authorSlug',
   'cardImageUrl',
   'category',
   'genres',
@@ -160,7 +161,7 @@ test.describe('publishing a universe', () => {
     const { context, page: visitor } = await stranger(browser)
     await visitor.goto(`/worlds/${stem}`)
     await expect(visitor.getByTestId('world-missing')).toHaveText(
-      /This world is not available\.Its address may be wrong, or it is not public\./,
+      /This world is not available\.\s*Its address may be wrong, or it is not public\./,
     )
     await context.close()
 
@@ -290,7 +291,8 @@ test.describe('publishing a universe', () => {
     const world = page.getByTestId('public-world')
     await expect(world.getByRole('heading', { level: 1 })).toHaveText(name)
     await expect(world).toContainText(`by ${author}`)
-    await expect(world).toContainText('Games · Fantasy, Adventure')
+    await expect(world.getByTestId('public-world-category')).toHaveText('Games')
+    await expect(world.locator('.genrechip')).toHaveText(['Fantasy', 'Adventure'])
     await expect(world).toContainText('A drowned coast where the tide keeps count.')
     await expect
       .poll(() =>
@@ -464,7 +466,7 @@ test.describe('publishing a universe', () => {
     await visitor.goto(`/worlds/${slug}`)
     const world = visitor.getByTestId('public-world')
     await expect(world.getByRole('heading', { level: 1 }).locator('bdi')).toHaveText(name)
-    await expect(world.locator('.world__author bdi')).toHaveText('مارا فيل')
+    await expect(world.getByTestId('public-world-author').locator('bdi')).toHaveText('مارا فيل')
     await expect(world).toContainText('עיר שקועה, 12 שערים (וגשר אחד).')
     await noSidewaysScroll(visitor)
     await visitor.goto('/explore')

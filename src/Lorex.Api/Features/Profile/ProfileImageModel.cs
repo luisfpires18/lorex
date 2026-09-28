@@ -79,4 +79,11 @@ public sealed class ProfileImage
     public long ByteSize { get; set; }
 
     public DateTime UploadedAt { get; set; }
+
+    /// <summary>
+    /// Whether the account chose to show this photo on its public author page (ADR 0037). False for every photo until
+    /// its owner says otherwise, and false again whenever the photo is replaced: consent is for a picture, not for
+    /// whatever picture comes next. Only the square is ever served publicly, never the original.
+    /// </summary>
+    public bool IsPublic { get; set; }
 }

@@ -5,14 +5,15 @@ using Microsoft.EntityFrameworkCore;
 namespace Lorex.Api.Features.Publishing;
 
 /// <summary>
-/// A public address: a universe's, <c>/worlds/{slug}</c>, and - inside it - a lore entry's or a story's. Minted
+/// A public address: a universe's, <c>/worlds/{slug}</c>; inside it a lore entry's or a story's; and an author's,
+/// <c>/authors/{slug}</c>, from their public name (ADR 0037). Minted
 /// once, from the name or title, the first time it is published, and never changed after - not by a rename, not
 /// by unpublishing (ADR 0036). One generator for all three, so they cannot drift apart.
 ///
 /// <para><b>ASCII only.</b> Letters and digits a-z, 0-9 and single hyphens. Accents fold away
 /// ("Ilúvatar" is <c>iluvatar</c>, "Straße" <c>strasse</c>) and every other character is a word
 /// break. A name with nothing left - Arabic, Hebrew, Chinese, punctuation - takes the kind's fallback:
-/// <c>world</c>, <c>entry</c> or <c>story</c>. A
+/// <c>world</c>, <c>entry</c>, <c>story</c> or <c>author</c>. A
 /// Unicode address was the alternative and was refused: mixed-direction text and look-alike
 /// letters are how an address is made to read as another one. The name itself is never changed
 /// for the address; it is shown exactly as written.</para>
@@ -31,6 +32,7 @@ internal static class PublicSlugs
     public const string UniverseFallback = "world";
     public const string LoreFallback = "entry";
     public const string StoryFallback = "story";
+    public const string AuthorFallback = "author";
 
     /// <summary>
     /// The Latin letters of Latin-1 and Latin Extended-A, folded to plain ones. A table rather than
