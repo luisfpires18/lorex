@@ -234,12 +234,13 @@ test.describe('installability', () => {
     expect(viewport).toContain('width=device-width')
     expect(viewport).toContain('viewport-fit=cover')
 
-    // One theme colour per scheme, so the browser chrome follows the app into dark.
+    // One theme colour, set for the theme in use (013), so the browser chrome follows the app into dark.
     const themeColors = await page.locator('meta[name=theme-color]').all()
-    expect(themeColors.length).toBe(2)
-    const schemes = await Promise.all(themeColors.map((meta) => meta.getAttribute('media')))
-    expect(schemes).toEqual(
-      expect.arrayContaining(['(prefers-color-scheme: light)', '(prefers-color-scheme: dark)']),
+    expect(themeColors.length).toBe(1)
+    const theme = await page.evaluate(() => document.documentElement.dataset.theme)
+    await expect(themeColors[0]).toHaveAttribute(
+      'content',
+      theme === 'dark' ? '#151617' : '#f6f2ea',
     )
 
     await expect(page.locator('meta[name=apple-mobile-web-app-title]')).toHaveAttribute(

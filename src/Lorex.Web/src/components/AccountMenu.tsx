@@ -7,6 +7,7 @@ import { useProfileImage } from '../profile/useProfileImage'
 import { ActionIcon } from './ActionIcon'
 import { ActionMenu } from './ActionMenu'
 import { Avatar } from './Avatar'
+import { ThemeSwitch } from './ThemeSwitch'
 
 /**
  * The account, everywhere: a circular avatar that opens onto who you are, your profile and the way
@@ -86,6 +87,11 @@ export function AccountMenu({
           <ActionIcon icon={UserRound} />
           View profile
         </Link>
+
+        {/* The one appearance choice, for the portal and the workspace alike (013). */}
+        <div className="actionmenu__section">
+          <ThemeSwitch inMenu />
+        </div>
 
         {/* Stays open while it works, so "Signing out" is seen where the press was. */}
         <button

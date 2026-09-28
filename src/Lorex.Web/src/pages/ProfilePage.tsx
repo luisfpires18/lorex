@@ -6,6 +6,7 @@ import { BrandMark } from '../components/BrandMark'
 import { ProfileAvatar } from '../components/ProfileAvatar'
 import { PublicAuthorSection } from '../components/PublicAuthorSection'
 import { PublicNameForm } from '../components/PublicNameForm'
+import { ThemeSwitch } from '../components/ThemeSwitch'
 import { MAIN_CONTENT_ID } from '../components/SkipLink'
 import { Wordmark } from '../components/Wordmark'
 import { listUniverses } from '../universes/api'
@@ -97,6 +98,17 @@ export default function ProfilePage() {
             </h2>
             <PublicNameForm />
             <PublicAuthorSection />
+          </section>
+
+          <section className="profile__public" aria-labelledby="profile-appearance-heading">
+            <h2 className="profile__subtitle" id="profile-appearance-heading">
+              Appearance
+            </h2>
+            <p className="settings__note">
+              One theme for the whole of Lorex - the public portal and your workspace. It is kept in
+              this browser.
+            </p>
+            <ThemeSwitch />
           </section>
 
           <p className="profile__note">
