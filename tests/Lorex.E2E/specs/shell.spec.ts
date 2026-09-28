@@ -120,6 +120,11 @@ test.describe('the shell', () => {
     await expect(trigger).toHaveAttribute('aria-expanded', 'true')
     await expect(profile).toBeFocused()
 
+    // The theme's two buttons sit between the profile and the way out (013).
+    await page.keyboard.press('ArrowDown')
+    await expect(page.getByTestId('theme-light')).toBeFocused()
+    await page.keyboard.press('ArrowDown')
+    await expect(page.getByTestId('theme-dark')).toBeFocused()
     await page.keyboard.press('ArrowDown')
     await expect(signOut).toBeFocused()
     await page.keyboard.press('ArrowDown')
@@ -140,8 +145,8 @@ test.describe('the shell', () => {
     // Tab past the last item leaves the menu, and the menu closes behind it.
     await page.keyboard.press('Enter')
     await expect(profile).toBeFocused()
-    await page.keyboard.press('Tab')
-    await page.keyboard.press('Tab')
+    // Profile, Light, Dark, Sign out - and the next Tab is out.
+    for (let press = 0; press < 4; press++) await page.keyboard.press('Tab')
     await expect(panel).toHaveCount(0)
 
     // Choosing an item does what it says.

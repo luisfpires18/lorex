@@ -50,6 +50,13 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **UI refinement 013 - unified theme** (`feat/unified-theme-system` off `dev` at `f081ec1`, committed, not merged, not
+  pushed). One Lorex theme, Light or Dark, for the portal and the workspace at once: `html[data-theme]`, set before the
+  first paint by an inline bootstrap in `index.html` (saved choice in `localStorage['lorex-theme']`, else the system's,
+  followed live until a choice), changed by `lib/theme.ts`. Chosen in the account menu, the signed-out portal's
+  Appearance menu and the Profile. Workspace dark = the existing dark tokens, now on the attribute; portal dark
+  unchanged; a new portal light (parchment, graphite, pictures fading to paper). No backend, no migration.
+  `PUBLIC_PORTAL.md` section 20, design contract section 20.
 - **Public portal roadmap 008-012 complete.** 008 publication foundation, 009 Explore Worlds, 010 content publishing
   controls, 011 public universe experience - all merged; **012** final polish, SEO, performance and safety on
   `feat/final-product-polish`, committed, not merged, not pushed. See Public portal below and
@@ -743,7 +750,14 @@ A public, read-only discovery experience beside the workspace, in the same appli
 
 ## Baseline
 
-- **1124 API integration tests, 240 Playwright tests** (012: +13 API in `SeoTests`, +11 in `final-polish.spec.ts`;
+- **1124 API integration tests, 247 Playwright tests** (013: +7 in `theme.spec.ts`, no API change; API **1124/1124**,
+  Release build clean, no pending model changes; full Playwright on a fresh database **247/247**, one invocation, two workers, retries 0, 10.8 min. Four earlier complete
+  runs were not green, and are recorded: the first 244/247 - `pwa.spec.ts` and `shell.spec.ts` pinned the old two
+  theme-color metas and the account menu without the theme buttons (updated), and `entity-page.spec.ts`'s Back test,
+  green 3/3 alone; then three runs of 246/247, each a different test outside 013's code and green 3/3 alone: a
+  sign-up whose `/register` never showed its form, Vite failing to serve `TimelinePage.tsx`
+  ("Failed to fetch dynamically imported module"), and a world-rule conflict reload - the dev-server contention
+  recorded below). Before it, 1124 / 240 (012: +13 API in `SeoTests`, +11 in `final-polish.spec.ts`;
   API **1124/1124**, Release build clean, no pending model changes; full Playwright on a fresh database
   **240/240**, one invocation, two workers, retries 0, 10.4 min. The first full run was 239/240:
   `entity-page.spec.ts` still pinned 004's Cancel-before-Save order, which 012 deliberately changed; updated, then the

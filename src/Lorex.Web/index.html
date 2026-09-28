@@ -15,10 +15,31 @@
          bottom action bars on narrow screens rely on. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
-    <!-- The plate in dark, the paper in light: the browser chrome then continues the
-         surface the app is already painting rather than cutting across it. -->
-    <meta name="theme-color" content="#f6f2ea" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#151617" media="(prefers-color-scheme: dark)" />
+    <!-- The browser chrome continues the surface the app is painting: the paper in Light, the
+         plate in Dark. The bootstrap below sets it for the theme in use. -->
+    <meta name="theme-color" content="#f6f2ea" />
+
+    <!-- The theme, before anything is drawn (013). One Lorex theme for the portal and the
+         workspace: the choice saved in this browser, else the system's. Inline and first so
+         no page paints in one theme and then flips; lib/theme.ts owns it afterwards and uses
+         the same key and colours. Outside the lorex:head block, so the server's per-page head
+         never touches it. -->
+    <script>
+      ;(function () {
+        var theme = null
+        try {
+          theme = localStorage.getItem('lorex-theme')
+        } catch (e) {}
+        if (theme !== 'light' && theme !== 'dark') {
+          theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        }
+        var root = document.documentElement
+        root.setAttribute('data-theme', theme)
+        root.style.colorScheme = theme
+        var chrome = document.querySelector('meta[name="theme-color"]')
+        if (chrome) chrome.setAttribute('content', theme === 'dark' ? '#151617' : '#f6f2ea')
+      })()
+    </script>
 
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Lorex" />

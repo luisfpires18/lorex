@@ -66,7 +66,8 @@ write). **P2** is a clear defect or inconsistency. **P3** is polish.
 - **Identity.** Serif names and titles on warm paper, a graphite rail, an ink primary, one ink-blue
   accent. It already reads as a reference volume, not an admin panel.
 - **Tokens.** Every colour is a custom property and dark mode is one `prefers-color-scheme` block;
-  one raw colour sits outside `:root`.
+  one raw colour sits outside `:root`. *(Since UI refinement 013 that block is `:root[data-theme='dark']`: one Lorex
+  theme, chosen by the reader or taken from the system, set on `<html>` before the first paint - see section 20.)*
 - **The entry header (UX-001).** Identity, views and actions in one bar above the article.
 - **The timeline.** A serif year column and a spine whose glyphs encode the date kind (filled
   exact, hollow approximate, a bar for a range). The most characterful screen in the product.
@@ -1360,3 +1361,12 @@ primary first, Cancel after), which differs from the entry form's ActionBar.
 Future product work - a public portal, publishing, templates, collections, saved views, maps, autosave, bulk actions,
 AI - starts from this system and is not part of it.
 
+
+## 20. One theme (UI refinement 013)
+
+Dark mode no longer comes only from `prefers-color-scheme`. `<html data-theme="light|dark">` is the one switch: the
+bootstrap in `index.html` sets it before the first paint (a saved choice, else the system's), and `lib/theme.ts` changes
+it afterwards. Every former `@media (prefers-color-scheme: dark)` rule is now `:root[data-theme='dark'] …`, same values,
+so the workspace's dark is exactly the 002-007 dark. The portal has its own light and dark layer on the same attribute
+(`PUBLIC_PORTAL.md` section 20). The choice is Light or Dark in `ThemeSwitch` - the shared `.segmented` track, named
+buttons with `aria-pressed`, a decorative icon beside each word.

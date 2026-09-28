@@ -1,9 +1,11 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { ArrowUpRight } from 'lucide-react'
+import { ArrowUpRight, SunMoon } from 'lucide-react'
 import { useAuth } from '../auth/useAuth'
 import { AccountMenu } from './AccountMenu'
+import { ActionMenu } from './ActionMenu'
 import { BrandMark } from './BrandMark'
 import { PortalSearch } from './PortalSearch'
+import { ThemeSwitch } from './ThemeSwitch'
 import { MAIN_CONTENT_ID } from './SkipLink'
 import { Wordmark } from './Wordmark'
 
@@ -17,9 +19,10 @@ import { Wordmark } from './Wordmark'
  * passed as router state, which `returnPath` checks); the workspace is entered only by choosing My workspace, and
  * signing out from here stays here.
  *
- * The portal is dark whatever the workspace's scheme: `.portal` redefines the shared tokens for everything
- * inside it, so buttons, notices and menus drawn here follow without a second set of components. The bar is
- * a solid band above every page, holding the brand, Explore, the search (see `PortalSearch`) and the way in.
+ * The portal follows Lorex's one theme (013), in its own look: `.portal` redefines the shared tokens for everything
+ * inside it, dark or light, so buttons, notices and menus drawn here follow without a second set of components. The
+ * bar is a solid band above every page, holding the brand, Explore, the search (see `PortalSearch`) and the way in.
+ * The theme is chosen in the account menu; signed out, where there is no account menu, from Appearance beside Log in.
  */
 export function PublicLayout() {
   const { user, isLoading } = useAuth()
@@ -54,6 +57,15 @@ export function PublicLayout() {
             </>
           ) : (
             <>
+              <ActionMenu
+                label="Appearance"
+                trigger={<SunMoon aria-hidden="true" size={18} strokeWidth={1.75} />}
+                triggerClassName="portal__appearance"
+                panelClassName="portal__appearancepanel"
+                triggerTestId="portal-appearance"
+              >
+                <ThemeSwitch inMenu />
+              </ActionMenu>
               <Link
                 className="portal__pill"
                 to="/login"

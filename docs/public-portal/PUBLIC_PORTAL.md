@@ -158,8 +158,9 @@ no such data or destinations exist.
   authored string in `<bdi>`. No summary, counts or dates. A picture that fails keeps the panel with the Lorex mark.
 - **States.** Card-shaped skeletons while loading; "No worlds have been published yet." for an empty platform; "No
   published worlds match." with Clear search and filters; an error with Try again, never mistaken for empty.
-- **Visual boundary.** The portal is dark in either scheme. `.portal` redefines the shared tokens inside it (so shared
-  buttons, notices and menus draw dark) plus a few `--portal-*` values; the workspace's tokens are untouched. Motion
+- **Visual boundary.** Since 013 the portal follows Lorex's one theme (section 20): dark, as built here, or its light
+  interpretation. `.portal` redefines the shared tokens inside it (so shared buttons, notices and menus draw in the
+  portal's colours) plus a few `--portal-*` values; the workspace's tokens are untouched. Motion
   is a panel edge brightening and a 3% image lift on hover, the lift only without reduced motion.
 - `/worlds/{slug}` keeps its 008 content inside the dark frame; the real public universe page is 011's.
 
@@ -375,3 +376,23 @@ behaviour was not manually re-tested.
 confirmations and now the entry form and article bars too. New-item drawers no longer say "A new moment" over "New
 moment". Settings' delete is a ruled danger panel with a quiet danger-ink first step and a filled last step; its
 confirmations take and return focus. A network failure reads "Lorex could not be reached…", never the browser's words.
+
+## 20. One theme (UI refinement 013)
+
+Lorex has one appearance preference, **Light** or **Dark**, and it applies to the portal and the workspace at once. Theme
+is not identity: the portal stays image-led, serif and atmospheric in both; the workspace stays the editorial workbench
+in both.
+
+- **Portal Dark** is the 009-012 portal, unchanged in look. Its translucent inks, shades, drops and glows now read RGB
+  channels (`--portal-ink-rgb`, `--portal-shade-rgb`, `--portal-panel-rgb`, `--portal-accent-rgb`, `--portal-drop-rgb`,
+  `--portal-glow-rgb`) instead of literals, so the same rules draw both themes.
+- **Portal Light** (`:root[data-theme='light'] .portal`): warm parchment ground (`#f3eee5`), a deeper parchment bar, soft
+  near-white card panels, warm graphite ink (`#1f1c18`) and muted (`#5f574b`), lines as the ink at low alpha, the
+  workspace's accent and danger (they already pass on paper). Pictures fade into paper instead of into black; a card's
+  fade holds more in the light so its graphite name reads over the picture's foot. The hero, cards and artwork keep their
+  weight; no picture changes with the theme.
+- **Where it is chosen:** the account menu (portal bar and workspace rail alike); signed out, "Appearance" beside Log in;
+  and the Profile's Appearance section.
+- **Stored in the browser**, not the account (no account appearance setting exists): signed in or out it is the same,
+  and signing in or out never changes it. SEO is untouched: no address carries a theme, and the server-rendered head
+  (section 19) does not mention it.
