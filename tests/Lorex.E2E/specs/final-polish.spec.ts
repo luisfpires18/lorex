@@ -386,6 +386,10 @@ test.describe('states and zoom', () => {
   test('key screens reflow at 200% zoom and on the narrowest phones without sideways scrolling', async ({
     browser,
   }) => {
+    // About thirty navigations plus a sign-up and a picture upload: ~21 s here, most of Playwright's default 30 s. Its
+    // sibling in theme.spec.ts, the same loop, timed out on CI on all three attempts (Deploy DEV #53) with every page
+    // rendering in ~0.4 s. The loop is the test; its budget says so.
+    test.setTimeout(120_000)
     const setup = await browser.newContext()
     const owner = await setup.newPage()
     await signUp(owner)
