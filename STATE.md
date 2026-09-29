@@ -50,6 +50,22 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **UI refinement 014 - workspace navigation, Settings and Publish, PWA front door** (`feat/workspace-navigation-settings`
+  off `dev` at `9908b83`, committed, not merged, not pushed). No backend change, no migration.
+  - **Brand -> `/explore`** everywhere it is drawn (portal bar, rail "L", universes/ideas/profile headers, sign-in plate).
+    "All universes" is now also at the head of the phone's Sections sheet, since the rail's L no longer goes there.
+  - **Publish** is its own page at `/app/universes/{id}/publish`, in the sidebar just above Settings: status, checklist,
+    publish / make private with their confirmations, public details, artwork, author (shown, edited on the Profile), and
+    how many entries and stories readers can see (the public listings' own totals). Settings no longer holds any of it.
+  - **Settings** is five tabs - General, Appearance, Chronology, Data, Advanced - in a centred 46rem column; `?tab=`
+    replaced, not pushed; panels mounted and hidden so drafts and leave guards survive. Archive and delete in Advanced;
+    the 012 archive-while-public warning intact, now pointing at Publish.
+  - **A universe's colour** is the author's own: picker + `#rrggbb`, or none. The palette is gone; stored colours kept.
+  - **The installed PWA opened the workspace or Login because the service worker cached `/manifest.webmanifest`**
+    (cache-first, `v3`), so browsers that ran Lorex before 011 kept the old `start_url: /app`. Fixed: the worker never
+    touches the manifest and is `v4` (old cache deleted on activate); the client catch-all now lands on `/explore`.
+    `start_url` `/explore` and `id` `/app` unchanged. ADR 0017 amendment; device checklist in the DEV runbook. Not
+    verified on an installed device here.
 - **UI refinement 013 - unified theme** (`feat/unified-theme-system` off `dev` at `f081ec1`, committed, not merged, not
   pushed). One Lorex theme, Light or Dark, for the portal and the workspace at once: `html[data-theme]`, set before the
   first paint by an inline bootstrap in `index.html` (saved choice in `localStorage['lorex-theme']`, else the system's,
@@ -750,7 +766,13 @@ A public, read-only discovery experience beside the workspace, in the same appli
 
 ## Baseline
 
-- **1124 API integration tests, 247 Playwright tests** (013: +7 in `theme.spec.ts`, no API change; API **1124/1124**,
+- **1124 API integration tests, 256 Playwright tests** (014: +8 in `workspace-settings.spec.ts`, +1 in `pwa.spec.ts`; no API
+  change; API **1124/1124**, Release build clean, no pending model changes; full Playwright on a fresh database **256/256**, one invocation, two workers, retries 0, 11.1 min. The first complete run was
+  253/256, all three caused by 014 and fixed in the tests: two `lore.spec.ts` steps clicked the first link named like
+  "Lore" - now the rail's brand, "Lorex - explore worlds" - and are exact now; `explore.spec.ts`'s forged-return test
+  expected an unknown same-origin path to fall into `/app`, which now lands on Explore - the property it guards, never
+  leaving the origin, is unchanged).
+  Before it, 1124 / 247 (013: +7 in `theme.spec.ts`, no API change; API **1124/1124**,
   Release build clean, no pending model changes; full Playwright on a fresh database **247/247**, one invocation, two workers, retries 0, 10.8 min. Four earlier complete
   runs were not green, and are recorded: the first 244/247 - `pwa.spec.ts` and `shell.spec.ts` pinned the old two
   theme-color metas and the account menu without the theme buttons (updated), and `entity-page.spec.ts`'s Back test,

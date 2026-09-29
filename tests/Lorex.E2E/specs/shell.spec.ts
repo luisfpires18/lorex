@@ -68,7 +68,8 @@ test.describe('the shell', () => {
     const base = await newUniverse(page)
 
     const sections = page.getByRole('navigation', { name: 'Universe sections' })
-    await expect(sections.getByRole('link')).toHaveCount(11)
+    // Twelve since Publish joined Settings at the foot (014).
+    await expect(sections.getByRole('link')).toHaveCount(12)
 
     // One h1 per screen, and it is the screen's title - the universe name in the sidebar is not it.
     await page.goto(`${base}/timeline`)
@@ -179,7 +180,13 @@ test.describe('the shell', () => {
       expect(Math.abs(lore.x - overview.x)).toBeLessThanOrEqual(1)
       expect(lore.y).toBeGreaterThan(overview.y)
       expect(Math.abs(rules.x - overview.x)).toBeLessThanOrEqual(1)
-      expect(stories.x).toBeGreaterThan(overview.x + overview.width / 2)
+      // Groups stay whole: the writing pair shares a column, and the foot (Publish, Settings) sits in the second.
+      const ideas = await at('workspace-ideas')
+      const publish = await at('workspace-publish')
+      const settings = await at('workspace-settings')
+      expect(Math.abs(ideas.x - stories.x)).toBeLessThanOrEqual(1)
+      expect(publish.x).toBeGreaterThan(overview.x + overview.width / 2)
+      expect(Math.abs(settings.x - publish.x)).toBeLessThanOrEqual(1)
 
       // Every row is a target a thumb can hit.
       for (const id of ['workspace-overview', 'workspace-trash', 'workspace-settings']) {

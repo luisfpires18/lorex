@@ -128,10 +128,10 @@ test.describe('publishing a universe', () => {
     const name = unique('Hollowmere ')
     const universeId = await newUniverse(page, name)
 
-    await page.goto(`/app/universes/${universeId}/settings`)
+    await page.goto(`/app/universes/${universeId}/publish`)
     const section = page.getByTestId('public-portal')
     await expect(section.getByTestId('publication-status')).toHaveText(
-      'Private This universe is visible only inside your Lorex workspace.',
+      'Private This universe is visible only in your workspace.',
     )
     await expect(section.getByText('does not publish its lore entries or stories')).toBeVisible()
     await expect(section.getByTestId('publication-checklist').locator('li')).toHaveText([
@@ -177,9 +177,9 @@ test.describe('publishing a universe', () => {
     await signUp(page)
     const name = unique('The Nail Ark ')
     const universeId = await newUniverse(page, name)
-    const settingsUrl = `/app/universes/${universeId}/settings`
+    const publishUrl = `/app/universes/${universeId}/publish`
     const { asked } = dialogs(page)
-    await page.goto(settingsUrl)
+    await page.goto(publishUrl)
     const section = page.getByTestId('public-portal')
 
     // ---------- The public details ----------
@@ -226,7 +226,7 @@ test.describe('publishing a universe', () => {
     await page.getByTestId('save-public-name').click()
     await expect(page.getByTestId('public-name-saved')).toBeVisible()
 
-    await page.goto(settingsUrl)
+    await page.goto(publishUrl)
     await expect(section.getByTestId('publication-author')).toContainText(`Published as ${author}`)
     await expect(section.getByTestId('publication-checklist').locator('li')).toHaveText([
       '✓Public summary - done',
@@ -260,7 +260,7 @@ test.describe('publishing a universe', () => {
     await section.getByTestId('publish').click()
     await section.getByTestId('confirm-publish').click()
     await expect(section.getByTestId('publication-status')).toHaveText(
-      'Public This universe can appear in Lorex’s public portal.',
+      'Public This universe is visible on the Lorex portal.',
     )
     await expect(section.getByTestId('publication-announcement')).toBeVisible()
     const slug = name
@@ -323,7 +323,7 @@ test.describe('publishing a universe', () => {
 
     // ---------- Making it private again ----------
 
-    await page.goto(settingsUrl)
+    await page.goto(publishUrl)
     await section.getByTestId('unpublish').click()
     const unpublish = section.getByTestId('unpublish-confirm')
     await expect(unpublish).toBeFocused()
@@ -345,23 +345,23 @@ test.describe('publishing a universe', () => {
   }) => {
     await signUp(page)
     const universeId = await newUniverse(page, unique('Guarded '))
-    const settingsUrl = `/app/universes/${universeId}/settings`
+    const publishUrl = `/app/universes/${universeId}/publish`
     const { asked, answer } = dialogs(page)
-    await page.goto(settingsUrl)
+    await page.goto(publishUrl)
     const section = page.getByTestId('public-portal')
     const summary = section.getByLabel('Public summary')
 
     // Untouched, leaving asks nothing.
     await page.getByTestId('workspace-lore').click()
     await page.waitForURL(/\/lore$/)
-    await page.goto(settingsUrl)
+    await page.goto(publishUrl)
     expect(asked).toEqual([])
 
     // Written, a link asks, and staying keeps the draft.
     await summary.fill('A lake that remembers.')
     await page.getByTestId('workspace-lore').click()
     expect(asked).toEqual([LEAVE_DETAILS])
-    await expect(page).toHaveURL(/\/settings$/)
+    await expect(page).toHaveURL(/\/publish$/)
     await expect(summary).toHaveValue('A lake that remembers.')
 
     // Publishing will not go over unsaved details.
@@ -370,21 +370,14 @@ test.describe('publishing a universe', () => {
       'Save the public details first',
     )
 
-    // Two unsaved forms on the page are still one question.
-    await page.getByLabel('Description').fill('Private notes.')
-    await page.getByTestId('workspace-lore').click()
-    expect(asked).toHaveLength(2)
-    await expect(page).toHaveURL(/\/settings$/)
-    await page.getByLabel('Description').fill('')
-
-    // Put back, it is clean again.
+    // Put back, it is clean again. (Two unsaved forms as one question: Settings' tabs, in workspace-settings.spec.ts.)
     await summary.fill('')
     await page.getByTestId('workspace-lore').click()
     await page.waitForURL(/\/lore$/)
-    expect(asked).toHaveLength(2)
+    expect(asked).toHaveLength(1)
 
     // A failed save keeps the draft and the question.
-    await page.goto(settingsUrl)
+    await page.goto(publishUrl)
     await page.route('**/api/universes/*/publication', (route) =>
       route.request().method() === 'PUT'
         ? route.fulfill({
@@ -401,7 +394,7 @@ test.describe('publishing a universe', () => {
     )
     await page.getByTestId('workspace-lore').click()
     expect(asked.at(-1)).toBe(LEAVE_DETAILS)
-    await expect(page).toHaveURL(/\/settings$/)
+    await expect(page).toHaveURL(/\/publish$/)
 
     // A saved one lets it go.
     await page.unroute('**/api/universes/*/publication')
@@ -413,7 +406,7 @@ test.describe('publishing a universe', () => {
     expect(asked).toHaveLength(settled)
 
     // Answered yes, the author leaves.
-    await page.goto(settingsUrl)
+    await page.goto(publishUrl)
     await summary.fill('Changed again.')
     answer(true)
     await page.getByTestId('workspace-lore').click()
@@ -435,7 +428,7 @@ test.describe('publishing a universe', () => {
       genres: [16],
     })
 
-    await page.goto(`/app/universes/${universeId}/settings`)
+    await page.goto(`/app/universes/${universeId}/publish`)
     const section = page.getByTestId('public-portal')
     await expect(section.getByTestId('publication-author').locator('bdi')).toHaveText('مارا فيل')
     await noSidewaysScroll(page)
@@ -455,7 +448,7 @@ test.describe('publishing a universe', () => {
       for (const colorScheme of ['light', 'dark'] as const) {
         await page.setViewportSize({ width, height: 800 })
         await page.emulateMedia({ colorScheme })
-        await page.goto(`/app/universes/${universeId}/settings`)
+        await page.goto(`/app/universes/${universeId}/publish`)
         await expect(section.getByTestId('publication-status')).toContainText('Public')
         await noSidewaysScroll(page)
       }

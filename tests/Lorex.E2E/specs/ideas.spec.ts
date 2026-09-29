@@ -638,7 +638,7 @@ test.describe('ideas', () => {
       [{ kind: 0, id: entity }],
     )
 
-    await page.goto(`/app/universes/${doomed}/settings`)
+    await page.goto(`/app/universes/${doomed}/settings?tab=advanced`)
     await page.getByTestId('toggle-archive').click()
     await expect(page.getByTestId('delete-ideas-note')).toContainText(
       'Your ideas about it are kept',

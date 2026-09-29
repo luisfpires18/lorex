@@ -1,19 +1,28 @@
 import { useId, useState, type FormEvent } from 'react'
+import { X } from 'lucide-react'
+import { ActionIcon } from './ActionIcon'
 import { Field } from './Field'
 import { ApiError } from '../lib/api'
 import { payloadKey } from '../lib/drawerGuard'
 import { useLeaveGuard } from '../lib/leaveGuard'
 import type { UniverseInput } from '../universes/types'
 
-/** A short, deliberately unfussy palette. Worlds get an identity, not a colour picker. */
-const ACCENTS = [
-  { value: '#4f6bd6', label: 'Lapis' },
-  { value: '#1f8f74', label: 'Verdigris' },
-  { value: '#a8562c', label: 'Rust' },
-  { value: '#7a4bbd', label: 'Amethyst' },
-  { value: '#b3922f', label: 'Brass' },
-  { value: '#3c4a57', label: 'Slate' },
-]
+/**
+ * A universe's colour is the author's own (UI refinement 014): any `#rrggbb` - the one shape the API accepts - or none.
+ * No palette is offered. Colours chosen from the old palette are ordinary values and stay exactly as they were.
+ */
+const HEX = /^#[0-9a-fA-F]{6}$/
+
+/** What the picker shows while there is no colour: a neutral it never saves on its own. */
+const PICKER_IDLE = '#7a7468'
+
+/** The text as typed, made into the stored shape where it plainly is one: trimmed, `#` added, lower case. */
+function normalizeHex(text: string) {
+  const value = text.trim()
+  if (value === '') return ''
+  const withHash = value.startsWith('#') ? value : `#${value}`
+  return HEX.test(withHash) ? withHash.toLowerCase() : value
+}
 
 /** The universe as a save sends it. */
 function inputOf(name: string, description: string, accentColor: string): UniverseInput {
@@ -26,6 +35,11 @@ function inputOf(name: string, description: string, accentColor: string): Univer
 
 interface UniverseFormProps {
   initial?: UniverseInput
+  /**
+   * Which of the universe's own fields this form shows. Settings shows the name and description on General and the
+   * colour on Appearance; the one it does not show is sent as it opened and replaced by the caller with what is stored.
+   */
+  fields?: 'all' | 'details' | 'colour'
   submitLabel: string
   busyLabel: string
   onSubmit: (input: UniverseInput) => Promise<unknown>
@@ -35,16 +49,21 @@ interface UniverseFormProps {
 
 export function UniverseForm({
   initial,
+  fields = 'all',
   submitLabel,
   busyLabel,
   onSubmit,
   onCancel,
   onDone,
 }: UniverseFormProps) {
-  const groupId = useId()
+  const colourId = useId()
   const [name, setName] = useState(initial?.name ?? '')
   const [description, setDescription] = useState(initial?.description ?? '')
   const [accentColor, setAccentColor] = useState(initial?.accentColor ?? '')
+  const [colourText, setColourText] = useState(initial?.accentColor ?? '')
+  const showDetails = fields !== 'colour'
+  const showColour = fields !== 'details'
+  const colourInvalid = colourText.trim() !== '' && !HEX.test(normalizeHex(colourText))
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -74,6 +93,10 @@ export function UniverseForm({
     event.preventDefault()
     setMessage(null)
     setFieldErrors({})
+    if (showColour && colourInvalid) {
+      setFieldErrors({ accentcolor: 'Use a colour like #8b3242, or clear it for none.' })
+      return
+    }
     setIsSubmitting(true)
 
     try {
@@ -102,70 +125,112 @@ export function UniverseForm({
         </p>
       ) : null}
 
-      <Field
-        label="Name"
-        name="name"
-        // Opening a new universe starts at its name; Settings opens on the page, not in a field.
-        autoFocus={!initial}
-        required
-        maxLength={120}
-        dir="auto"
-        value={name}
-        error={fieldErrors.name}
-        onChange={(event) => setName(event.target.value)}
-      />
+      {showDetails ? (
+        <>
+          <Field
+            label="Name"
+            name="name"
+            // Opening a new universe starts at its name; Settings opens on the page, not in a field.
+            autoFocus={!initial}
+            required
+            maxLength={120}
+            dir="auto"
+            value={name}
+            error={fieldErrors.name}
+            onChange={(event) => setName(event.target.value)}
+          />
 
-      <div className="field">
-        <label className="field__label" htmlFor="description">
-          Description
-        </label>
-        <textarea
-          id="description"
-          name="description"
-          className="field__input field__input--area"
-          rows={3}
-          maxLength={2000}
-          value={description}
-          aria-invalid={fieldErrors.description ? true : undefined}
-          onChange={(event) => setDescription(event.target.value)}
-        />
-        {fieldErrors.description ? <p className="field__error">{fieldErrors.description}</p> : null}
-      </div>
-
-      <fieldset className="swatches">
-        <legend className="field__label">Colour</legend>
-        <div className="swatches__row">
-          <label className="swatch swatch--none">
-            <input
-              type="radio"
-              name={groupId}
-              value=""
-              checked={accentColor === ''}
-              onChange={() => setAccentColor('')}
-            />
-            <span className="swatch__dot" aria-hidden="true" />
-            <span className="swatch__label">None</span>
-          </label>
-          {ACCENTS.map((accent) => (
-            <label className="swatch" key={accent.value}>
-              <input
-                type="radio"
-                name={groupId}
-                value={accent.value}
-                checked={accentColor === accent.value}
-                onChange={() => setAccentColor(accent.value)}
-              />
-              <span
-                className="swatch__dot"
-                style={{ background: accent.value }}
-                aria-hidden="true"
-              />
-              <span className="swatch__label">{accent.label}</span>
+          <div className="field">
+            <label className="field__label" htmlFor="description">
+              Description
             </label>
-          ))}
+            <textarea
+              id="description"
+              name="description"
+              className="field__input field__input--area"
+              rows={3}
+              maxLength={2000}
+              value={description}
+              aria-invalid={fieldErrors.description ? true : undefined}
+              onChange={(event) => setDescription(event.target.value)}
+            />
+            {fieldErrors.description ? (
+              <p className="field__error">{fieldErrors.description}</p>
+            ) : null}
+          </div>
+        </>
+      ) : null}
+
+      {showColour ? (
+        <div className="field colourfield">
+          <label className="field__label" htmlFor={`${colourId}-hex`}>
+            Universe colour
+          </label>
+          <div className="colourfield__row">
+            <input
+              className="colourfield__picker"
+              type="color"
+              aria-label="Choose a colour"
+              value={HEX.test(accentColor) ? accentColor : PICKER_IDLE}
+              onChange={(event) => {
+                setAccentColor(event.target.value)
+                setColourText(event.target.value)
+              }}
+              data-testid="universe-colour-picker"
+            />
+            <input
+              id={`${colourId}-hex`}
+              className="field__input colourfield__hex"
+              type="text"
+              inputMode="text"
+              spellCheck={false}
+              autoComplete="off"
+              maxLength={7}
+              placeholder="None"
+              value={colourText}
+              aria-invalid={colourInvalid || fieldErrors.accentcolor ? true : undefined}
+              aria-describedby={`${colourId}-hint`}
+              onChange={(event) => {
+                setColourText(event.target.value)
+                const next = normalizeHex(event.target.value)
+                // The saved value follows the text only while the text is a colour, or empty for none.
+                if (next === '' || HEX.test(next)) setAccentColor(next)
+              }}
+              onBlur={() => setColourText(normalizeHex(colourText))}
+              data-testid="universe-colour-hex"
+            />
+            {accentColor ? (
+              <button
+                className="button button--text button--sm"
+                type="button"
+                onClick={() => {
+                  setAccentColor('')
+                  setColourText('')
+                }}
+                data-testid="universe-colour-clear"
+              >
+                <ActionIcon icon={X} />
+                No colour
+              </button>
+            ) : null}
+          </div>
+          <p className="field__hint" id={`${colourId}-hint`}>
+            {accentColor
+              ? 'Marks this universe in your workspace.'
+              : 'No colour: the universe uses Lorex’s own.'}
+          </p>
+          {colourInvalid && !fieldErrors.accentcolor ? (
+            <p className="field__error" role="alert">
+              Use a colour like #8b3242, or clear it for none.
+            </p>
+          ) : null}
+          {fieldErrors.accentcolor ? (
+            <p className="field__error" role="alert">
+              {fieldErrors.accentcolor}
+            </p>
+          ) : null}
         </div>
-        {fieldErrors.accentcolor ? <p className="field__error">{fieldErrors.accentcolor}</p> : null}
-      </fieldset>
+      ) : null}
 
       <div className="form__actions">
         <button className="button" type="submit" disabled={isSubmitting}>

@@ -72,10 +72,11 @@ export default function UniversesPage() {
   return (
     <div className="home">
       <header className="home__bar">
-        <span className="home__brand">
+        {/* The brand is Lorex's, so it leads to the portal (014). */}
+        <Link className="home__brand" to="/explore" title="Explore worlds" data-testid="home-brand">
           <BrandMark />
           <Wordmark />
-        </span>
+        </Link>
         <div className="home__session">
           {/* The public portal, from the workspace's front door: what authors have published, this one included. */}
           <Link className="home__back home__explore" to="/explore" data-testid="home-explore">

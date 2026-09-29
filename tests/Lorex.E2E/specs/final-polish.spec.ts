@@ -206,17 +206,18 @@ test.describe('publication edge cases', () => {
     await signUp(page)
     const w = await world(page, unique('Ione '))
 
-    await page.goto(`/app/universes/${w.id}/settings`)
+    await page.goto(`/app/universes/${w.id}/settings?tab=advanced`)
     await page.getByTestId('toggle-archive').click()
     const confirm = page.getByTestId('archive-public-confirm')
     await expect(confirm).toBeFocused()
     await expect(confirm).toContainText('It stays public.')
-    await expect(confirm).toContainText('until you make it private in Public portal')
+    await expect(confirm).toContainText('until you make it private on Publish')
 
-    // The obvious way to take it down instead leads to Public portal's own control.
+    // The obvious way to take it down instead leads to Publish, and its own control (014).
     await page.getByTestId('archive-go-private').click()
-    await expect(page.getByRole('heading', { name: 'Public portal' })).toBeFocused()
+    await page.waitForURL(`/app/universes/${w.id}/publish`)
     await expect(page.getByTestId('unpublish')).toBeVisible()
+    await page.goto(`/app/universes/${w.id}/settings?tab=advanced`)
 
     await page.getByTestId('toggle-archive').click()
     await page.getByTestId('cancel-archive').click()
@@ -236,7 +237,7 @@ test.describe('publication edge cases', () => {
   test('archiving a private universe asks nothing', async ({ page }) => {
     await signUp(page)
     const w = await world(page, unique('Ione '), false)
-    await page.goto(`/app/universes/${w.id}/settings`)
+    await page.goto(`/app/universes/${w.id}/settings?tab=advanced`)
     await page.getByTestId('toggle-archive').click()
     await expect(page.getByTestId('danger-section')).toBeVisible()
     await expect(page.getByTestId('archive-public-confirm')).toHaveCount(0)

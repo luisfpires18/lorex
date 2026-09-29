@@ -144,6 +144,7 @@ test.describe('chronology', () => {
 
     await page.getByTestId('workspace-settings').click()
     await page.waitForURL(/\/settings$/)
+    await page.getByTestId('settings-tab-chronology').click()
 
     const settings = page.getByTestId('chronology-settings')
     await expect(settings).toContainText('Years here are plain numbers')
@@ -222,6 +223,7 @@ test.describe('chronology', () => {
     // Relabelling an era rewords every date written in it and moves none of them.
     await page.getByTestId('workspace-settings').click()
     await page.waitForURL(/\/settings$/)
+    await page.getByTestId('settings-tab-chronology').click()
 
     const before = page.getByTestId('era').nth(0)
     await expect(before).toContainText('Dates 3 moments')
@@ -338,7 +340,7 @@ test.describe('chronology', () => {
     for (const width of [390, 768, 1440, 1920]) {
       await page.setViewportSize({ width, height: 900 })
 
-      await page.goto(`/app/universes/${universeId}/settings`)
+      await page.goto(`/app/universes/${universeId}/settings?tab=chronology`)
       await expect(page.getByTestId('era')).toHaveCount(4)
 
       // Every era's controls are on screen and reachable, not pushed off the right-hand edge.

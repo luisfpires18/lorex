@@ -337,7 +337,46 @@ test.describe('what the worker is allowed to keep', () => {
 
     // What it does keep, so the handler is doing real work rather than nothing at all.
     expect(urls.some((url) => url.endsWith('/favicon-32.png'))).toBeTruthy()
-    expect(urls.some((url) => url.endsWith('/manifest.webmanifest'))).toBeTruthy()
+    // Never the manifest (014): the browser reads the installed app's start_url from it, and a kept copy froze
+    // `/app` into every install made before Task 011 changed it.
+    expect(urls.some((url) => url.endsWith('/manifest.webmanifest'))).toBeFalsy()
+  })
+
+  test('an install made before 011 is freed: the old cache with its /app manifest goes, and the manifest is always fresh', async ({
+    page,
+  }) => {
+    await page.goto('/explore')
+    // What a browser that ran Lorex before Task 011 still holds: v3's cache, with the manifest that said /app.
+    await page.evaluate(async () => {
+      const stale = await caches.open('lorex-static-v3')
+      await stale.put(
+        '/manifest.webmanifest',
+        new Response(JSON.stringify({ id: '/app', start_url: '/app' }), {
+          headers: { 'Content-Type': 'application/manifest+json' },
+        }),
+      )
+    })
+
+    await installWorker(page)
+
+    // Activation deleted every older cache, the stale manifest with it.
+    expect(await page.evaluate(() => caches.keys())).not.toContain('lorex-static-v3')
+
+    // And the worker never answers for the manifest again: every read is the server's, and says /explore.
+    const served: boolean[] = []
+    page.on('response', (response) => {
+      if (response.url().endsWith('/manifest.webmanifest'))
+        served.push(response.fromServiceWorker())
+    })
+    const manifest = await page.evaluate(async () => {
+      await fetch('/manifest.webmanifest')
+      return (await fetch('/manifest.webmanifest')).json()
+    })
+    expect(manifest.start_url).toBe('/explore')
+    expect(manifest.id).toBe('/app')
+    expect(served.length).toBeGreaterThan(0)
+    expect(served.every((fromWorker) => !fromWorker)).toBe(true)
+    expect((await cachedUrls(page)).some((url) => url.endsWith('.webmanifest'))).toBe(false)
   })
 
   test('a navigation is never served from a cache', async ({ page }) => {

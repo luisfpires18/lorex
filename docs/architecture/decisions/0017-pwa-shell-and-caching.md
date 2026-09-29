@@ -154,3 +154,25 @@ The manifest's `start_url` is `/explore`: launching the installed app opens the 
 `/` does in a browser - the workspace is entered by choosing My workspace. Its `id` stays `/app`, because the id is the
 installed app's identity and changing it would orphan every existing install. A deep link the operating system opens is
 still that link. Nothing in the worker changed: navigations were never cached, so there is no stale start page to serve.
+
+## Amendment: the manifest is never cached (2026-09-28, UI refinement 014)
+
+The 011 amendment was wrong about the worker. Navigations were never cached, but the manifest was: `STATIC_ROOT_FILE`
+matched `*.webmanifest`, and the rule for root static files is cache-first until `CACHE_VERSION` changes. 011 changed
+`start_url` without bumping it, so every browser that had run Lorex before 011 kept answering the install and every
+manifest update check with the old file - `start_url: /app` - from its v3 cache. The installed app therefore kept
+launching `/app`, where `RequireAuth` sends a signed-in author to the universes and a signed-out one to Login. That is
+the behaviour the owner saw on a real install, with the correct manifest on the server the whole time.
+
+Decision: the worker never touches the web app manifest (`request.destination === 'manifest'` and the `.webmanifest`
+extension both refused), and `CACHE_VERSION` is `v4`, whose activation deletes the v3 cache and the stale file in it.
+The manifest is served `no-cache` by the host, so every read is the server's. `start_url` stays `/explore` and `id`
+stays `/app` - the identity was not the cause, and changing it would orphan existing installs. A second, smaller
+contributor is fixed with it: the client's catch-all sent any unknown address to `/app`; it now sends it to `/explore`
+(an unknown address under `/app/` still goes to `/app`).
+
+Consequences. An install made before this reaches `/explore` once its browser runs the v4 worker and then performs its
+own manifest update check - on Android when the installed app is launched and its last check is old enough (Chrome
+checks about daily and applies the update on a later launch), on desktop on a navigation within scope. Reinstalling
+applies it at once. What an operating system restores from its recent-apps list is the window it kept, not a launch,
+and a link the system hands the app is that link; neither is changed.

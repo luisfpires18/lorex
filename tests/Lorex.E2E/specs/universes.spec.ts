@@ -85,6 +85,7 @@ test.describe('universes', () => {
     // Archive it, and it leaves the active list.
     await card(page, renamed).click()
     await page.getByTestId('workspace-settings').click()
+    await page.getByTestId('settings-tab-advanced').click()
     await page.getByTestId('toggle-archive').click()
     await expect(page.getByRole('button', { name: 'Restore universe' })).toBeVisible()
 
