@@ -92,7 +92,7 @@ test.describe('product-wide polish', () => {
     expect(asked).toEqual([])
 
     // An era being named is unsaved work: a link asks, and staying keeps it.
-    await chronology.getByTestId('add-era').click()
+    await page.getByTestId('add-era').click()
     await page.getByTestId('era-name').fill('After the Fall')
     await page.getByTestId('workspace-timeline').click()
     expect(asked).toEqual([LEAVE])
@@ -126,7 +126,7 @@ test.describe('product-wide polish', () => {
 
     // A failed save keeps the draft and the question; a saved one lets both go.
     await page.goto(settingsUrl)
-    await chronology.getByTestId('add-era').click()
+    await page.getByTestId('add-era').click()
     await page.getByTestId('save-chronology').click()
     await expect(page.getByTestId('chronology-error')).toBeVisible()
     await page.getByTestId('workspace-lore').click()

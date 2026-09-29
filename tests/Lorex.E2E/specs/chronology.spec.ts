@@ -149,9 +149,9 @@ test.describe('chronology', () => {
     await expect(settings).toContainText('Years here are plain numbers')
 
     // Written in the wrong order on purpose, then put right.
-    await settings.getByTestId('add-era').click()
+    await page.getByTestId('add-era').click()
     await fillEra(page, 0, { name: 'After the Fall', abbreviation: 'AF' })
-    await settings.getByTestId('add-era').click()
+    await page.getByTestId('add-era').click()
     await fillEra(page, 1, { name: 'Before the Fall', abbreviation: 'BF', direction: 'down' })
     await page.getByTestId('era').nth(1).getByTestId('era-earlier').click()
     await expect(page.getByTestId('era').nth(0).getByTestId('era-name')).toHaveValue(

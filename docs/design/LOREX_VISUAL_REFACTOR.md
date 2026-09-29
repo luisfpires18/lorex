@@ -1390,6 +1390,20 @@ buttons with `aria-pressed`, a decorative icon beside each word.
 
 - **Sidebar:** worldbuilding groups spaced as before, then **upkeep** (Trash, Publish, Settings) under a hairline -
   `.sidebar__group--upkeep`; on a phone it spans the sheet as one row of three.
-- **Chronology** is a section page (centred column, `PageHeader` with its own `h1`), no longer a Settings tab.
+- **Chronology** is a section page, no longer a Settings tab.
+
+### 21.2 One page shell for worldbuilding, a column for configuration
+
+Two page frames, on purpose, and no third:
+
+- **Worldbuilding sections** - Overview, Lore, Family Tree, Timeline, World Rules, Chronology, Stories, Ideas, Canon,
+  Types, Trash - sit straight in `.canvas` with no width cap and no centring: `PageHeader` first (title and lede on the
+  left, the one primary action - New rule, New story, Add era... - at its far end, stacked under the title on a phone),
+  then the section's content. Their titles share one position at every width; a test holds Chronology to World Rules'.
+  Prose keeps a reading measure locally (a lede, a note at ~70ch), never the page.
+- **Configuration** - Publish and Settings - is forms read top to bottom, so it is a centred 46rem column (§21).
+
+The shell is `.canvas` plus `PageHeader`; no wrapper component was added, because every section already had it and only
+Chronology had drifted into the configuration column.
 - **Theme control:** `.themeswitch__track` - two equal grid halves on a 5% ink tint with a hairline, the chosen half on
   `--raised` ringed with `--border-control`; the label on its own line above; weight constant so nothing shifts.

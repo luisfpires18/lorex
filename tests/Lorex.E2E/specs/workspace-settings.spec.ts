@@ -209,6 +209,76 @@ test.describe('the sidebar, Chronology and the theme control (014 follow-up)', (
     await expect(page.getByTestId('era')).toHaveCount(1)
   })
 
+  test('Chronology wears the worldbuilding page shell, like World Rules; Settings and Publish keep their centred column', async ({
+    page,
+  }) => {
+    // Five widths across eleven pages: the loop is the test, and CI is slower than a desk (Deploy DEV #53).
+    test.setTimeout(180_000)
+    await signUp(page)
+    const w = await universe(page)
+    const frame = async (segment: string) => {
+      await page.goto(`/app/universes/${w.id}/${segment}`)
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+      return page.evaluate(() => {
+        const title = document.querySelector('h1')!.getBoundingClientRect()
+        const actions = document.querySelector('.pageheader__actions')?.getBoundingClientRect()
+        return {
+          x: Math.round(title.x),
+          y: Math.round(title.y),
+          actionsLeft: actions ? Math.round(actions.left) : null,
+          actionsRight: actions ? Math.round(actions.right) : null,
+          overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        }
+      })
+    }
+
+    for (const size of [
+      { width: 1440, height: 900 },
+      { width: 1024, height: 768 },
+      { width: 820, height: 1180 },
+      { width: 390, height: 844 },
+      { width: 360, height: 780 },
+    ]) {
+      await page.setViewportSize(size)
+      const rules = await frame('world-rules')
+      const chronology = await frame('chronology')
+      expect({ x: chronology.x, y: chronology.y }, `${size.width}`).toEqual({
+        x: rules.x,
+        y: rules.y,
+      })
+      // The primary action: at the header's far end on a wide screen, stacked under the title on a narrow one.
+      if (size.width >= 820) expect(chronology.actionsRight).toBe(rules.actionsRight)
+      else expect(chronology.actionsLeft).toBe(rules.actionsLeft)
+      expect(chronology.overflow).toBeLessThanOrEqual(0)
+      for (const segment of ['lore', 'stories', 'timeline', 'ideas', 'canon', 'types', 'trash']) {
+        const other = await frame(segment)
+        expect({ x: other.x, y: other.y }, `${segment} at ${size.width}`).toEqual({
+          x: rules.x,
+          y: rules.y,
+        })
+        expect(other.overflow).toBeLessThanOrEqual(0)
+      }
+      // Configuration is set apart on a wide screen: its column is centred, so its title sits further in.
+      if (size.width >= 1440) {
+        expect((await frame('settings')).x).toBeGreaterThan(rules.x + 40)
+        expect((await frame('publish')).x).toBeGreaterThan(rules.x + 40)
+      }
+    }
+
+    // Add era is the header's primary action; the new era's name takes the focus, and Save sits with the editor.
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto(`/app/universes/${w.id}/chronology`)
+    await expect(page.getByTestId('save-chronology')).toHaveCount(0)
+    const header = page.locator('.pageheader')
+    await header.getByTestId('add-era').click()
+    await expect(page.getByTestId('era-name')).toBeFocused()
+    await page.keyboard.type('Before the Flood')
+    const editor = page.getByTestId('chronology-settings')
+    await editor.getByTestId('save-chronology').click()
+    await expect(page.getByTestId('chronology-saved')).toBeVisible()
+    await expect(page.getByTestId('era')).toHaveCount(1)
+  })
+
   test('the theme control is one segmented control of two equal halves, worked from the keyboard', async ({
     page,
   }) => {
