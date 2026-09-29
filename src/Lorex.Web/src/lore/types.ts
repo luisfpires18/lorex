@@ -262,4 +262,6 @@ export interface EntityQuery {
   canonStatus: CanonStatusValue | null
   tag: string | null
   page: number
+  /** Entries per page; the API clamps it to 1-50. Absent is `ENTITY_PAGE_SIZE`. */
+  pageSize?: number
 }

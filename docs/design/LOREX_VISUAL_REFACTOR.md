@@ -1392,18 +1392,27 @@ buttons with `aria-pressed`, a decorative icon beside each word.
   `.sidebar__group--upkeep`; on a phone it spans the sheet as one row of three.
 - **Chronology** is a section page, no longer a Settings tab.
 
-### 21.2 One page shell for worldbuilding, a column for configuration
+### 21.2 One workspace page shell
 
-Two page frames, on purpose, and no third:
+Every destination inside a universe - Overview, Lore, Family Tree, Timeline, World Rules, Chronology, Stories, Ideas,
+Canon, Types, Trash, Publish, Settings - uses one outer shell: straight in `.canvas`, `PageHeader` first (title and lede
+on the left, the one primary action at its far end, stacked under the title on a phone; local navigation such as Lore's
+types or Settings' tabs in its slot), then the page's content. Every title starts at the same place at every width; a
+test holds all thirteen to World Rules'. There is no second, centred shell.
 
-- **Worldbuilding sections** - Overview, Lore, Family Tree, Timeline, World Rules, Chronology, Stories, Ideas, Canon,
-  Types, Trash - sit straight in `.canvas` with no width cap and no centring: `PageHeader` first (title and lede on the
-  left, the one primary action - New rule, New story, Add era... - at its far end, stacked under the title on a phone),
-  then the section's content. Their titles share one position at every width; a test holds Chronology to World Rules'.
-  Prose keeps a reading measure locally (a lede, a note at ~70ch), never the page.
-- **Configuration** - Publish and Settings - is forms read top to bottom, so it is a centred 46rem column (§21).
+Content decides its own inner width, never the page's origin: the Lore grid and Canon take the canvas; the forms of
+Settings (`.settings__body`) and Publish (`.publish__body`) keep a 46rem column, left-aligned under the title; prose keeps
+a reading measure (a lede 62ch, a note ~70ch, an article 62ch). The account's Profile, outside any universe, keeps its own
+centred frame.
 
-The shell is `.canvas` plus `PageHeader`; no wrapper component was added, because every section already had it and only
-Chronology had drifted into the configuration column.
-- **Theme control:** `.themeswitch__track` - two equal grid halves on a 5% ink tint with a hairline, the chosen half on
-  `--raised` ringed with `--border-control`; the label on its own line above; weight constant so nothing shifts.
+### 21.3 Lore grid and pagination
+
+- **Grid:** `repeat(auto-fill, minmax(min(100%, 16.5rem), 1fr))` for `.lore__grid` and its skeleton - columns come from
+  the width (three at 1440, four at 1536, five at 1920, one on a phone), cards stay 264-420px rather than stretching.
+- **Items per page:** 12 (default), 16, 20, 30, 40 - a select at the filter row's far end, kept in this browser
+  (`localStorage['lorex-lore-page-size']`), never in the address; changing it returns to page one; offered once there is
+  more than one page of 12 or a size was chosen. Within the API's 1-50 clamp, so no request is clamped behind it.
+- **Pager** (`.pager`, every paged list): three grid slots `1fr auto 1fr` across the list's width - Previous at the
+  start, "Page X of Y" truly centred, Next at the end; both buttons always drawn, disabled at the ends, so the position
+  never moves. Shown only with more than one page. Lore moves by the address's page, and a page past the end lands on the
+  last one.

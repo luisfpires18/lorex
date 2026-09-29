@@ -112,7 +112,7 @@ export default function UniversePublish() {
   const header = (
     <PageHeader
       title="Publish"
-      lede={<p>Control how this universe appears on the public Lorex portal.</p>}
+      lede={<p>Control how this universe appears on the public LoreX portal.</p>}
       actions={
         isPublic && slug ? (
           <Link
@@ -225,274 +225,279 @@ export default function UniversePublish() {
     <article className="publish" data-testid="public-portal">
       {header}
 
-      <section
-        className="publish__section publish__status"
-        aria-labelledby="publish-status-heading"
-      >
-        <h2 className="publish__heading" id="publish-status-heading">
-          Status
-        </h2>
-        <p className="publication__state" data-testid="publication-status">
-          <span className="publication__badge" data-state={isPublic ? 'public' : 'private'}>
-            {isPublic ? 'Public' : 'Private'}
-          </span>{' '}
-          {isPublic
-            ? 'This universe is visible on the Lorex portal.'
-            : 'This universe is visible only in your workspace.'}
-        </p>
-
-        {isPublic && slug ? (
-          <p className="publication__address" data-testid="publication-address">
-            <span className="publication__label">Public address</span>{' '}
-            <span className="publication__path">{worldPath(slug)}</span>
+      {/* One outer shell for every workspace page; only the form keeps a readable column. */}
+      <div className="publish__body">
+        <section
+          className="publish__section publish__status"
+          aria-labelledby="publish-status-heading"
+        >
+          <h2 className="publish__heading" id="publish-status-heading">
+            Status
+          </h2>
+          <p className="publication__state" data-testid="publication-status">
+            <span className="publication__badge" data-state={isPublic ? 'public' : 'private'}>
+              {isPublic ? 'Public' : 'Private'}
+            </span>{' '}
+            {isPublic
+              ? 'This universe is visible on the LoreX portal.'
+              : 'This universe is visible only in your workspace.'}
           </p>
-        ) : null}
 
-        {!isPublic ? (
-          <ul
-            className="publication__checklist"
-            aria-label="What publishing needs"
-            data-testid="publication-checklist"
-          >
-            {REQUIREMENTS.map((requirement) => {
-              const needed = requirement.key in state.missing
-              return (
-                <li key={requirement.key} data-state={needed ? 'needed' : 'done'}>
-                  <span className="publication__mark" aria-hidden="true">
-                    {needed ? '○' : '✓'}
-                  </span>
-                  {requirement.label}
-                  <span className="publication__word">{needed ? ' - needed' : ' - done'}</span>
-                </li>
-              )
-            })}
-          </ul>
-        ) : null}
+          {isPublic && slug ? (
+            <p className="publication__address" data-testid="publication-address">
+              <span className="publication__label">Public address</span>{' '}
+              <span className="publication__path">{worldPath(slug)}</span>
+            </p>
+          ) : null}
 
-        {problem ? (
-          <div
-            className="callout callout--warning publication__problem"
-            role="alert"
-            tabIndex={-1}
-            ref={problemRef}
-            data-testid="publication-problem"
-          >
-            <p className="callout__title">Not published yet</p>
-            <ul className="publication__missing">
-              {problem.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
+          {!isPublic ? (
+            <ul
+              className="publication__checklist"
+              aria-label="What publishing needs"
+              data-testid="publication-checklist"
+            >
+              {REQUIREMENTS.map((requirement) => {
+                const needed = requirement.key in state.missing
+                return (
+                  <li key={requirement.key} data-state={needed ? 'needed' : 'done'}>
+                    <span className="publication__mark" aria-hidden="true">
+                      {needed ? '○' : '✓'}
+                    </span>
+                    {requirement.label}
+                    <span className="publication__word">{needed ? ' - needed' : ' - done'}</span>
+                  </li>
+                )
+              })}
             </ul>
-          </div>
-        ) : null}
+          ) : null}
 
-        {announcement ? (
-          <p className="settings__saved" role="status" data-testid="publication-announcement">
-            {announcement}
-          </p>
-        ) : null}
-
-        {confirming?.kind === 'publish' ? (
-          <div
-            className="publication__confirm"
-            role="group"
-            aria-labelledby="publish-confirm-title"
-            tabIndex={-1}
-            ref={panel}
-            data-testid="publish-confirm"
-          >
-            <h3 className="publication__confirmtitle" id="publish-confirm-title">
-              Publish <bdi>{confirming.state.name}</bdi>?
-            </h3>
-            <p className="settings__note">Anyone will be able to see:</p>
-            <dl className="publication__facts">
-              <div>
-                <dt>Title</dt>
-                <dd>
-                  <bdi>{confirming.state.name}</bdi>
-                </dd>
-              </div>
-              <div>
-                <dt>Public summary</dt>
-                <dd className="prose">{confirming.state.publicSummary}</dd>
-              </div>
-              <div>
-                <dt>Artwork</dt>
-                <dd>Its card, as shown below</dd>
-              </div>
-              <div>
-                <dt>Category</dt>
-                <dd>{confirming.state.category ? categoryLabel(confirming.state.category) : ''}</dd>
-              </div>
-              <div>
-                <dt>Genres</dt>
-                <dd>{confirming.state.genres.map(genreLabel).join(', ')}</dd>
-              </div>
-              <div>
-                <dt>Author</dt>
-                <dd>
-                  <bdi>{confirming.state.authorDisplayName}</bdi>
-                </dd>
-              </div>
-            </dl>
-            <p className="settings__note">
-              <strong>Not published:</strong> {STAYS_PRIVATE}
-            </p>
-            <div className="form__actions">
-              <button
-                className="button"
-                type="button"
-                disabled={busy}
-                onClick={() => void publish()}
-                data-testid="confirm-publish"
-              >
-                {busy ? 'Publishing' : 'Publish universe'}
-              </button>
-              <button
-                className="button button--secondary"
-                type="button"
-                disabled={busy}
-                onClick={() => setConfirming(null)}
-              >
-                Keep private
-              </button>
+          {problem ? (
+            <div
+              className="callout callout--warning publication__problem"
+              role="alert"
+              tabIndex={-1}
+              ref={problemRef}
+              data-testid="publication-problem"
+            >
+              <p className="callout__title">Not published yet</p>
+              <ul className="publication__missing">
+                {problem.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        {confirming?.kind === 'unpublish' ? (
-          <div
-            className="publication__confirm"
-            role="group"
-            aria-labelledby="unpublish-confirm-title"
-            tabIndex={-1}
-            ref={panel}
-            data-testid="unpublish-confirm"
-          >
-            <h3 className="publication__confirmtitle" id="unpublish-confirm-title">
-              Make <bdi>{state.name}</bdi> private?
-            </h3>
-            <p className="settings__note">
-              Its public page and its place in Explore stop being available straight away. Its
-              public details stay here, and its address is kept for when you publish it again.
+          {announcement ? (
+            <p className="settings__saved" role="status" data-testid="publication-announcement">
+              {announcement}
             </p>
-            <div className="form__actions">
-              <button
-                className="button"
-                type="button"
-                disabled={busy}
-                onClick={() => void unpublish()}
-                data-testid="confirm-unpublish"
-              >
-                {busy ? 'Making private' : 'Make private'}
-              </button>
-              <button
-                className="button button--secondary"
-                type="button"
-                disabled={busy}
-                onClick={() => setConfirming(null)}
-              >
-                Keep public
-              </button>
+          ) : null}
+
+          {confirming?.kind === 'publish' ? (
+            <div
+              className="publication__confirm"
+              role="group"
+              aria-labelledby="publish-confirm-title"
+              tabIndex={-1}
+              ref={panel}
+              data-testid="publish-confirm"
+            >
+              <h3 className="publication__confirmtitle" id="publish-confirm-title">
+                Publish <bdi>{confirming.state.name}</bdi>?
+              </h3>
+              <p className="settings__note">Anyone will be able to see:</p>
+              <dl className="publication__facts">
+                <div>
+                  <dt>Title</dt>
+                  <dd>
+                    <bdi>{confirming.state.name}</bdi>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Public summary</dt>
+                  <dd className="prose">{confirming.state.publicSummary}</dd>
+                </div>
+                <div>
+                  <dt>Artwork</dt>
+                  <dd>Its card, as shown below</dd>
+                </div>
+                <div>
+                  <dt>Category</dt>
+                  <dd>
+                    {confirming.state.category ? categoryLabel(confirming.state.category) : ''}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Genres</dt>
+                  <dd>{confirming.state.genres.map(genreLabel).join(', ')}</dd>
+                </div>
+                <div>
+                  <dt>Author</dt>
+                  <dd>
+                    <bdi>{confirming.state.authorDisplayName}</bdi>
+                  </dd>
+                </div>
+              </dl>
+              <p className="settings__note">
+                <strong>Not published:</strong> {STAYS_PRIVATE}
+              </p>
+              <div className="form__actions">
+                <button
+                  className="button"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void publish()}
+                  data-testid="confirm-publish"
+                >
+                  {busy ? 'Publishing' : 'Publish universe'}
+                </button>
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setConfirming(null)}
+                >
+                  Keep private
+                </button>
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        {confirming === null ? (
-          <div className="form__actions">
-            {isPublic ? (
-              <button
-                className="button button--secondary"
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  setProblem(null)
-                  setAnnouncement(null)
-                  setConfirming({ kind: 'unpublish' })
-                }}
-                data-testid="unpublish"
-              >
-                Make private…
-              </button>
-            ) : (
-              <button
-                className="button"
-                type="button"
-                disabled={busy}
-                onClick={() => void askToPublish()}
-                data-testid="publish"
-              >
-                Publish…
-              </button>
-            )}
-          </div>
-        ) : null}
+          {confirming?.kind === 'unpublish' ? (
+            <div
+              className="publication__confirm"
+              role="group"
+              aria-labelledby="unpublish-confirm-title"
+              tabIndex={-1}
+              ref={panel}
+              data-testid="unpublish-confirm"
+            >
+              <h3 className="publication__confirmtitle" id="unpublish-confirm-title">
+                Make <bdi>{state.name}</bdi> private?
+              </h3>
+              <p className="settings__note">
+                Its public page and its place in Explore stop being available straight away. Its
+                public details stay here, and its address is kept for when you publish it again.
+              </p>
+              <div className="form__actions">
+                <button
+                  className="button"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void unpublish()}
+                  data-testid="confirm-unpublish"
+                >
+                  {busy ? 'Making private' : 'Make private'}
+                </button>
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setConfirming(null)}
+                >
+                  Keep public
+                </button>
+              </div>
+            </div>
+          ) : null}
 
-        {!isPublic && missing.length === 0 && !detailsDirty && !confirming ? (
-          <p className="field__hint">Everything a public card needs is here.</p>
-        ) : null}
-      </section>
+          {confirming === null ? (
+            <div className="form__actions">
+              {isPublic ? (
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setProblem(null)
+                    setAnnouncement(null)
+                    setConfirming({ kind: 'unpublish' })
+                  }}
+                  data-testid="unpublish"
+                >
+                  Make private…
+                </button>
+              ) : (
+                <button
+                  className="button"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void askToPublish()}
+                  data-testid="publish"
+                >
+                  Publish…
+                </button>
+              )}
+            </div>
+          ) : null}
 
-      <Section id="publish-details" title="Public details">
-        <PublicDetailsForm
-          universeId={universeId}
-          state={state}
-          onSaved={setState}
-          onDirtyChange={setDetailsDirty}
-        />
-      </Section>
+          {!isPublic && missing.length === 0 && !detailsDirty && !confirming ? (
+            <p className="field__hint">Everything a public card needs is here.</p>
+          ) : null}
+        </section>
 
-      <Section id="publish-artwork" title="Artwork">
-        <UniverseArtworkField
-          universeId={universeId}
-          artwork={state.artwork}
-          isPublic={isPublic}
-          onChanged={() => void load()}
-        />
-      </Section>
+        <Section id="publish-details" title="Public details">
+          <PublicDetailsForm
+            universeId={universeId}
+            state={state}
+            onSaved={setState}
+            onDirtyChange={setDetailsDirty}
+          />
+        </Section>
 
-      <Section id="publish-author" title="Author">
-        {state.authorDisplayName ? (
-          <p className="settings__note" data-testid="publication-author">
-            Published as <bdi>{state.authorDisplayName}</bdi>.{' '}
-            <Link to="/app/profile">Change your public name</Link>
+        <Section id="publish-artwork" title="Artwork">
+          <UniverseArtworkField
+            universeId={universeId}
+            artwork={state.artwork}
+            isPublic={isPublic}
+            onChanged={() => void load()}
+          />
+        </Section>
+
+        <Section id="publish-author" title="Author">
+          {state.authorDisplayName ? (
+            <p className="settings__note" data-testid="publication-author">
+              Published as <bdi>{state.authorDisplayName}</bdi>.{' '}
+              <Link to="/app/profile">Change your public name</Link>
+            </p>
+          ) : (
+            <p className="settings__note" data-testid="publication-author">
+              You have no public name yet. <Link to="/app/profile">Choose one on your profile</Link>{' '}
+              - it is shown as the author of what you publish; your username and email never are.
+            </p>
+          )}
+        </Section>
+
+        <Section id="publish-content" title="Published content">
+          <p className="settings__note">
+            Publishing this universe does not publish its lore entries or stories: each is published
+            from its own page, and is seen only while this universe is public.
           </p>
-        ) : (
-          <p className="settings__note" data-testid="publication-author">
-            You have no public name yet. <Link to="/app/profile">Choose one on your profile</Link> -
-            it is shown as the author of what you publish; your username and email never are.
-          </p>
-        )}
-      </Section>
-
-      <Section id="publish-content" title="Published content">
-        <p className="settings__note">
-          Publishing this universe does not publish its lore entries or stories: each is published
-          from its own page, and is seen only while this universe is public.
-        </p>
-        <ul className="publish__content" data-testid="published-content">
-          <li>
-            <ActionIcon icon={Library} />
-            <span className="publish__contentname">Lore</span>
-            <span className="publish__contentcount" data-testid="published-lore">
-              {published ? `${published.lore} public` : null}
-            </span>
-            <Link className="button button--secondary button--sm" to={`${base}/lore`}>
-              View lore
-            </Link>
-          </li>
-          <li>
-            <ActionIcon icon={Feather} />
-            <span className="publish__contentname">Stories</span>
-            <span className="publish__contentcount" data-testid="published-stories">
-              {published ? `${published.stories} public` : null}
-            </span>
-            <Link className="button button--secondary button--sm" to={`${base}/stories`}>
-              View stories
-            </Link>
-          </li>
-        </ul>
-      </Section>
+          <ul className="publish__content" data-testid="published-content">
+            <li>
+              <ActionIcon icon={Library} />
+              <span className="publish__contentname">Lore</span>
+              <span className="publish__contentcount" data-testid="published-lore">
+                {published ? `${published.lore} public` : null}
+              </span>
+              <Link className="button button--secondary button--sm" to={`${base}/lore`}>
+                View lore
+              </Link>
+            </li>
+            <li>
+              <ActionIcon icon={Feather} />
+              <span className="publish__contentname">Stories</span>
+              <span className="publish__contentcount" data-testid="published-stories">
+                {published ? `${published.stories} public` : null}
+              </span>
+              <Link className="button button--secondary button--sm" to={`${base}/stories`}>
+                View stories
+              </Link>
+            </li>
+          </ul>
+        </Section>
+      </div>
     </article>
   )
 }
