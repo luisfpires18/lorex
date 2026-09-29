@@ -6,7 +6,13 @@ import { EmptyState } from '../components/EmptyState'
 import { EntityCard } from '../components/EntityCard'
 import { PageHeader } from '../components/PageHeader'
 import { TypeSwitcher } from '../components/TypeSwitcher'
-import { listEntities, listEntityTypes } from '../lore/api'
+import {
+  LORE_PAGE_SIZES,
+  listEntities,
+  listEntityTypes,
+  readLorePageSize,
+  saveLorePageSize,
+} from '../lore/api'
 import {
   CANON_LABELS,
   CANON_ORDER,
@@ -54,6 +60,9 @@ export default function LorePage() {
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
   const [reads, setReads] = useState(0)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  // Entries per page: the author's own preference in this browser, never in the address - a link someone shares opens at
+  // their reader's size, not the sender's.
+  const [pageSize, setPageSize] = useState(readLorePageSize)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -92,7 +101,7 @@ export default function LorePage() {
     const timer = setTimeout(() => {
       listEntities(
         universe.id,
-        { search, entityTypeId, canonStatus, tag: null, page },
+        { search, entityTypeId, canonStatus, tag: null, page, pageSize },
         controller.signal,
       )
         .then((result) => setState({ kind: 'ready', page: result }))
@@ -105,7 +114,7 @@ export default function LorePage() {
       clearTimeout(timer)
       controller.abort()
     }
-  }, [universe.id, search, entityTypeId, canonStatus, page, reads])
+  }, [universe.id, search, entityTypeId, canonStatus, page, pageSize, reads])
 
   /** The address with these changes, always back on the first page unless a page is given. */
   function changed(from: URLSearchParams, changes: Record<string, string | null>) {
@@ -136,6 +145,33 @@ export default function LorePage() {
   }
 
   const result = state.kind === 'ready' ? state.page : null
+
+  // A page past the last one - a hand-edited address, or entries gone since - lands on the last page there is, in place.
+  const pastTheEnd = result !== null && result.totalPages > 0 && page > result.totalPages
+  const lastPage = result?.totalPages ?? 1
+  useEffect(() => {
+    if (!pastTheEnd) return
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current)
+        if (lastPage > 1) next.set('page', String(lastPage))
+        else next.delete('page')
+        return next
+      },
+      { replace: true },
+    )
+  }, [pastTheEnd, lastPage, setParams])
+
+  /** A new size is a new way of cutting the list: back to its first page, as a filter change is. */
+  function changePageSize(next: number) {
+    saveLorePageSize(next)
+    setPageSize(next)
+    update({}, true)
+  }
+
+  // Offered once there is more than the smallest page to cut, or once the author has chosen a size.
+  const offerPageSize =
+    (result?.totalCount ?? 0) > LORE_PAGE_SIZES[0] || pageSize !== LORE_PAGE_SIZES[0]
   const isFiltered = search.trim().length > 0 || canonStatus !== null
   const activeFilters = (search.trim() ? 1 : 0) + (canonStatus !== null ? 1 : 0)
   const createTo = selectedType ? `new?type=${selectedType.id}` : 'new'
@@ -224,6 +260,27 @@ export default function LorePage() {
             </button>
           ))}
         </div>
+
+        {offerPageSize ? (
+          <div className="lore__pagesize">
+            <label className="lore__pagesizelabel" htmlFor="lore-page-size">
+              Items per page
+            </label>
+            <select
+              id="lore-page-size"
+              className="field__input lore__pagesizeselect"
+              value={pageSize}
+              onChange={(event) => changePageSize(Number(event.target.value))}
+              data-testid="lore-page-size"
+            >
+              {LORE_PAGE_SIZES.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
       </div>
 
       {state.kind === 'loading' ? (
@@ -329,8 +386,8 @@ export default function LorePage() {
           <button
             className="button button--secondary"
             type="button"
-            disabled={result.page <= 1}
-            onClick={() => goToPage(result.page - 1)}
+            disabled={page <= 1}
+            onClick={() => goToPage(page - 1)}
           >
             <ActionIcon icon={ArrowLeft} />
             Previous
@@ -341,8 +398,8 @@ export default function LorePage() {
           <button
             className="button button--secondary"
             type="button"
-            disabled={result.page >= result.totalPages}
-            onClick={() => goToPage(result.page + 1)}
+            disabled={page >= result.totalPages}
+            onClick={() => goToPage(page + 1)}
           >
             Next
             <ActionIcon icon={ArrowRight} />

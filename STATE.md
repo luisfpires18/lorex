@@ -50,6 +50,13 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **One workspace shell, Lore pagination** (`fix/workspace-shell-and-lore-pagination` off `dev` at `bcb3291`, committed,
+  not merged, not pushed). Publish and Settings left their centred column: every universe page now starts at the same
+  place with the same `PageHeader`; Settings' tabs sit in the header's slot, and only their forms keep a 46rem left-aligned
+  column. Lore: the grid's cards are 16.5rem minimum (four columns at 1536, five at 1920); **Items per page** 12/16/20/30/40,
+  kept in the browser, back to page one on change, a page past the end clamped to the last; the shared pager is three
+  fixed slots with the position truly centred. Publish says "LoreX". No API or backend change (the API already clamps to
+  50). Design contract §21.2-21.3.
 - **Workspace page layout consistency** (`fix/workspace-page-layout-consistency` off `dev` at `b50337e`, committed, not
   merged, not pushed). Chronology had kept Settings' centred 46rem column; it now sits in the worldbuilding shell like
   World Rules - `.canvas` + `PageHeader`, title and lede left, **Add era** as the header's primary action (the in-content
@@ -782,7 +789,11 @@ A public, read-only discovery experience beside the workspace, in the same appli
 
 ## Baseline
 
-- **1124 API integration tests, 259 Playwright tests** (layout consistency: +1 in `workspace-settings.spec.ts`; full Playwright
+- **1124 API integration tests, 263 Playwright tests** (shell + pagination: +4 in `lore-pagination.spec.ts`; full Playwright
+  on a fresh database **263/263**, one invocation, two workers, retries 0, 12.7 min; API **1124/1124**. Three earlier
+  complete runs were not green: the first lost `publishing.spec.ts` to its own stale "Lorex portal" wording (updated to
+  "LoreX"); the next two lost one test each to the dev server - a blank `/register`, and Vite failing to serve
+  `TimelinePage.tsx` in a second tab of a test whose first tab had rendered it - both green 3/3 alone). Before it, 1124 / 259 (layout consistency: +1 in `workspace-settings.spec.ts`; full Playwright
   on a fresh database **259/259** first time, one invocation, two workers, retries 0, 12.1 min; API **1124/1124**). Before it, 1124 / 258 (014 follow-up: +2 in `workspace-settings.spec.ts`; specs moved to
   Chronology's own address; API **1124/1124**; full Playwright on a fresh database **258/258** first time, one invocation, two workers, retries 0, 11.8 min). Before it, 1124 / 256 (014: +8 in `workspace-settings.spec.ts`, +1 in `pwa.spec.ts`; no API
   change; API **1124/1124**, Release build clean, no pending model changes; full Playwright on a fresh database **256/256**, one invocation, two workers, retries 0, 11.1 min. The first complete run was

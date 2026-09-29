@@ -12,6 +12,32 @@ import type {
 
 export const ENTITY_PAGE_SIZE = 12
 
+/**
+ * What the Lore browser offers as entries per page. Bounded on purpose - a world may hold thousands of entries, so there is
+ * no "all" - and all within the API's own ceiling of 50, so no request is ever clamped behind the author's back.
+ */
+export const LORE_PAGE_SIZES = [12, 16, 20, 30, 40] as const
+
+const PAGE_SIZE_KEY = 'lorex-lore-page-size'
+
+/** The author's choice in this browser, or the default: a browsing preference, not an account setting. */
+export function readLorePageSize(): number {
+  try {
+    const stored = Number(localStorage.getItem(PAGE_SIZE_KEY))
+    return (LORE_PAGE_SIZES as readonly number[]).includes(stored) ? stored : ENTITY_PAGE_SIZE
+  } catch {
+    return ENTITY_PAGE_SIZE
+  }
+}
+
+export function saveLorePageSize(size: number) {
+  try {
+    localStorage.setItem(PAGE_SIZE_KEY, String(size))
+  } catch {
+    // Private windows and blocked storage: the choice holds for this visit.
+  }
+}
+
 function base(universeId: string) {
   return `/api/universes/${universeId}`
 }
@@ -94,7 +120,7 @@ export function deleteField(universeId: string, typeId: string, fieldId: string)
 export function listEntities(universeId: string, query: EntityQuery, signal?: AbortSignal) {
   const params = new URLSearchParams({
     page: String(query.page),
-    pageSize: String(ENTITY_PAGE_SIZE),
+    pageSize: String(query.pageSize ?? ENTITY_PAGE_SIZE),
   })
   if (query.search.trim()) params.set('search', query.search.trim())
   if (query.entityTypeId) params.set('entityTypeId', query.entityTypeId)

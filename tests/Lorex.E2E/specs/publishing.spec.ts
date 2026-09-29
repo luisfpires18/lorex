@@ -260,7 +260,7 @@ test.describe('publishing a universe', () => {
     await section.getByTestId('publish').click()
     await section.getByTestId('confirm-publish').click()
     await expect(section.getByTestId('publication-status')).toHaveText(
-      'Public This universe is visible on the Lorex portal.',
+      'Public This universe is visible on the LoreX portal.',
     )
     await expect(section.getByTestId('publication-announcement')).toBeVisible()
     const slug = name

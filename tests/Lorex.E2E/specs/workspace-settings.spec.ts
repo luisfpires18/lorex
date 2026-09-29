@@ -3,7 +3,7 @@ import { png } from './support/png'
 
 /**
  * UI refinement 014: the workspace's information architecture. Lorex's brand leads to the portal from everywhere;
- * publishing is a page of its own, Publish, just above Settings; Settings is four tabs in a centred column, with a
+ * publishing is a page of its own, Publish, just above Settings; Settings is four tabs in the one page shell, with a
  * universe's colour the author's own and no palette; and Lorex opens on the portal - signed in or out, whatever was used
  * last - while a deep link still goes where it says.
  */
@@ -209,7 +209,7 @@ test.describe('the sidebar, Chronology and the theme control (014 follow-up)', (
     await expect(page.getByTestId('era')).toHaveCount(1)
   })
 
-  test('Chronology wears the worldbuilding page shell, like World Rules; Settings and Publish keep their centred column', async ({
+  test('every workspace page - Chronology, Settings and Publish included - wears one page shell, like World Rules', async ({
     page,
   }) => {
     // Five widths across eleven pages: the loop is the test, and CI is slower than a desk (Deploy DEV #53).
@@ -250,18 +250,24 @@ test.describe('the sidebar, Chronology and the theme control (014 follow-up)', (
       if (size.width >= 820) expect(chronology.actionsRight).toBe(rules.actionsRight)
       else expect(chronology.actionsLeft).toBe(rules.actionsLeft)
       expect(chronology.overflow).toBeLessThanOrEqual(0)
-      for (const segment of ['lore', 'stories', 'timeline', 'ideas', 'canon', 'types', 'trash']) {
+      // One shell: configuration included, no page starts anywhere else.
+      for (const segment of [
+        'lore',
+        'stories',
+        'timeline',
+        'ideas',
+        'canon',
+        'types',
+        'trash',
+        'publish',
+        'settings',
+      ]) {
         const other = await frame(segment)
         expect({ x: other.x, y: other.y }, `${segment} at ${size.width}`).toEqual({
           x: rules.x,
           y: rules.y,
         })
         expect(other.overflow).toBeLessThanOrEqual(0)
-      }
-      // Configuration is set apart on a wide screen: its column is centred, so its title sits further in.
-      if (size.width >= 1440) {
-        expect((await frame('settings')).x).toBeGreaterThan(rules.x + 40)
-        expect((await frame('publish')).x).toBeGreaterThan(rules.x + 40)
       }
     }
 
@@ -315,7 +321,7 @@ test.describe('the sidebar, Chronology and the theme control (014 follow-up)', (
 })
 
 test.describe('Settings', () => {
-  test('four keyboard tabs in a centred column, each with its own things, and destructive ones in Advanced', async ({
+  test('four keyboard tabs under the page header, forms in a readable column, and destructive ones in Advanced', async ({
     page,
   }) => {
     await signUp(page)
@@ -331,14 +337,15 @@ test.describe('Settings', () => {
     )
     await expect(page.getByRole('tabpanel')).toHaveCount(1)
 
-    // Centred: the column has room on both sides at a wide width.
-    const column = (await page.locator('.settings--tabbed').boundingBox())!
-    const canvas = (await page.locator('.settings--tabbed').evaluate((node) => {
-      const box = node.parentElement!.getBoundingClientRect()
-      return { x: box.x, width: box.width }
-    }))!
-    expect(column.x - canvas.x).toBeGreaterThan(40)
-    expect(canvas.x + canvas.width - (column.x + column.width)).toBeGreaterThan(40)
+    // The page starts where every page starts; the tabs sit in its header; only the forms keep a readable column,
+    // left-aligned under the title rather than centred away from it.
+    const title = (await page.getByRole('heading', { level: 1 }).boundingBox())!
+    const tablist = (await page.getByRole('tablist').boundingBox())!
+    const body = (await page.locator('.settings__body').boundingBox())!
+    expect(Math.abs(tablist.x - title.x)).toBeLessThanOrEqual(1)
+    expect(Math.abs(body.x - title.x)).toBeLessThanOrEqual(1)
+    expect(body.width).toBeLessThan(800)
+    expect(await page.locator('.pageheader').getByRole('tablist').count()).toBe(1)
 
     // Arrows move and choose; the address says which, and replacing it means Back leaves Settings.
     await page.getByRole('tab', { name: 'General' }).focus()
