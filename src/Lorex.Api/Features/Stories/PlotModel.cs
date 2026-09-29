@@ -53,6 +53,13 @@ public sealed class PlotArc
     /// </summary>
     public DateTime? DeletedAt { get; set; }
 
+    /// <summary>
+    /// Whether the author published this arc to the story's public page: its title, its description, and its live
+    /// beats' titles and descriptions - never notes or links (ADR 0039). Plot is planning and often spoils the story, so
+    /// nothing publishes it but this arc's own publish route; read only while the story is public.
+    /// </summary>
+    public Publishing.ContentVisibility Visibility { get; set; }
+
     public ICollection<PlotBeat> Beats { get; } = [];
 }
 

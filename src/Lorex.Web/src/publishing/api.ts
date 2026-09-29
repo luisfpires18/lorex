@@ -7,6 +7,8 @@ import type {
   PublicationDetails,
   PublicationState,
   PublicAuthorSettings,
+  StoryPartKind,
+  StoryPartPublicationState,
   UniverseArtworkRef,
 } from './types'
 
@@ -129,4 +131,27 @@ export function setPublicAuthorPhoto(isPublic: boolean) {
     method: 'PUT',
     body: JSON.stringify({ isPublic }),
   })
+}
+
+/** The route that selects a story part for the story's public page, or takes it back (ADR 0039). */
+function partRoute(universeId: string, storyId: string, kind: StoryPartKind, id: string) {
+  const story = `${base(universeId)}/stories/${storyId}`
+  return kind === 'arc'
+    ? `${story}/plot-arcs/${id}`
+    : kind === 'manuscript'
+      ? `${story}/scenes/${id}/manuscript`
+      : `${story}/scenes/${id}`
+}
+
+export function setStoryPartPublication(
+  universeId: string,
+  storyId: string,
+  kind: StoryPartKind,
+  id: string,
+  publish: boolean,
+) {
+  return apiFetch<StoryPartPublicationState>(
+    `${partRoute(universeId, storyId, kind, id)}/${publish ? 'publish' : 'unpublish'}`,
+    { method: 'POST' },
+  )
 }

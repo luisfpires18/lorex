@@ -10,6 +10,9 @@ import { categoryLabel, genreKey, genreLabel } from '../publishing/types'
  * author's 16:10 frame, whole - the panel grows around it rather than cropping it. If it cannot be shown, the card keeps
  * its shape with the Lorex mark rather than borrowing anyone's art.
  *
+ * A world based on someone else's work (ADR 0039) names that work's creator on a line of its own above the byline - plain
+ * text, never a link - and its Lorex author as "curated by". The full attribution is on the world's page.
+ *
  * Two links and no nesting (Task 011): the world's name is the card's link, stretched over the whole panel so the card
  * is still one target, and the author's name - on Explore - is a second link laid above it, to their author page. On an
  * author's own page the name is plain text: it would only link to where the reader already is.
@@ -57,9 +60,23 @@ export function WorldCard({
               </li>
             ))}
           </ul>
+          {world.originalCreator ? (
+            <p
+              className="worldcard__original"
+              dir="auto"
+              title={`Based on works by ${world.originalCreator}`}
+              data-testid="worldcard-original"
+            >
+              Based on works by <bdi>{world.originalCreator}</bdi>
+            </p>
+          ) : null}
           <p className="worldcard__byline">
-            <span className="worldcard__author" dir="auto" title={`by ${world.authorDisplayName}`}>
-              by{' '}
+            <span
+              className="worldcard__author"
+              dir="auto"
+              title={`${world.originalCreator ? 'curated by' : 'by'} ${world.authorDisplayName}`}
+            >
+              {world.originalCreator ? 'curated by' : 'by'}{' '}
               {linkAuthor ? (
                 <Link
                   className="worldcard__authorlink"

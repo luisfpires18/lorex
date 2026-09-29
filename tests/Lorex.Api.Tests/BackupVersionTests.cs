@@ -37,6 +37,7 @@ public sealed class BackupVersionTests(LorexApiFactory factory) : IClassFixture<
     [InlineData(14)]
     [InlineData(15)]
     [InlineData(16)]
+    [InlineData(17)]
     public async Task A_backup_of_every_version_restores_with_what_that_version_carried(int version)
     {
         var client = await SignedIn(_factory, $"version-{version}");

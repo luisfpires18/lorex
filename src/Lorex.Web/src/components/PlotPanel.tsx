@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Plus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ActionIcon } from './ActionIcon'
@@ -30,6 +30,8 @@ interface PlotPanelProps {
   onReload: () => void
   /** Says what just happened, through the story page's one live region. */
   announce: (message: string) => void
+  /** Each arc's publication control, built by the story page, which knows whether the story is public. */
+  arcPublication?: (arc: PlotArc) => ReactNode
 }
 
 /**
@@ -50,6 +52,7 @@ export function PlotPanel({
   onArcsChange,
   onReload,
   announce,
+  arcPublication,
 }: PlotPanelProps) {
   const [arcForm, setArcForm] = useState<ArcFormState>({ mode: 'closed' })
   const [beatForm, setBeatForm] = useState<BeatFormState>({ mode: 'closed' })
@@ -261,6 +264,7 @@ export function PlotPanel({
           onAddBeat={(target) => setBeatForm({ mode: 'new', arcId: target.id })}
           onEdit={(target, at) => setArcForm({ mode: 'edit', arc: target, index: at })}
           onDelete={(target, at) => void removeArc(target, at)}
+          publication={arcPublication?.(arc)}
         >
           <ol className="beats" data-testid="plot-arc-beats">
             {arc.beats.map((beat, beatIndex) => (

@@ -53,6 +53,20 @@ public static class ContentPublicationEndpoints
         stories.MapPost("/publish", PublishStoryAsync).WithName("PublishStory");
         stories.MapPost("/unpublish", UnpublishStoryAsync).WithName("UnpublishStory");
 
+        // A story's parts (ADR 0039): each selected on its own, next to where it is written, and read only while the story is.
+        stories.MapPost("/scenes/{sceneId:guid}/publish", (Guid universeId, Guid storyId, Guid sceneId, ClaimsPrincipal principal, LorexDbContext db, CancellationToken cancellationToken) =>
+            SetSceneAsync(db, universeId, storyId, sceneId, principal, manuscript: false, ContentVisibility.Public, cancellationToken)).WithName("PublishScene");
+        stories.MapPost("/scenes/{sceneId:guid}/unpublish", (Guid universeId, Guid storyId, Guid sceneId, ClaimsPrincipal principal, LorexDbContext db, CancellationToken cancellationToken) =>
+            SetSceneAsync(db, universeId, storyId, sceneId, principal, manuscript: false, ContentVisibility.Private, cancellationToken)).WithName("UnpublishScene");
+        stories.MapPost("/scenes/{sceneId:guid}/manuscript/publish", (Guid universeId, Guid storyId, Guid sceneId, ClaimsPrincipal principal, LorexDbContext db, CancellationToken cancellationToken) =>
+            SetSceneAsync(db, universeId, storyId, sceneId, principal, manuscript: true, ContentVisibility.Public, cancellationToken)).WithName("PublishSceneManuscript");
+        stories.MapPost("/scenes/{sceneId:guid}/manuscript/unpublish", (Guid universeId, Guid storyId, Guid sceneId, ClaimsPrincipal principal, LorexDbContext db, CancellationToken cancellationToken) =>
+            SetSceneAsync(db, universeId, storyId, sceneId, principal, manuscript: true, ContentVisibility.Private, cancellationToken)).WithName("UnpublishSceneManuscript");
+        stories.MapPost("/plot-arcs/{plotArcId:guid}/publish", (Guid universeId, Guid storyId, Guid plotArcId, ClaimsPrincipal principal, LorexDbContext db, CancellationToken cancellationToken) =>
+            SetArcAsync(db, universeId, storyId, plotArcId, principal, ContentVisibility.Public, cancellationToken)).WithName("PublishPlotArc");
+        stories.MapPost("/plot-arcs/{plotArcId:guid}/unpublish", (Guid universeId, Guid storyId, Guid plotArcId, ClaimsPrincipal principal, LorexDbContext db, CancellationToken cancellationToken) =>
+            SetArcAsync(db, universeId, storyId, plotArcId, principal, ContentVisibility.Private, cancellationToken)).WithName("UnpublishPlotArc");
+
         return endpoints;
     }
 
@@ -165,6 +179,72 @@ public static class ContentPublicationEndpoints
     private static Task<IResult> UnpublishStoryAsync(
         Guid universeId, Guid storyId, ClaimsPrincipal principal, LorexDbContext db, CancellationToken cancellationToken) =>
         TransitionAsync(db, universeId, principal, () => StoryEndpoints.FindAsync(db, universeId, storyId, cancellationToken), ContentVisibility.Private, mint: null, cancellationToken);
+
+    // ---------- A story's parts (ADR 0039) ----------
+
+    /// <summary>
+    /// Selects a scene's outline, or its manuscript, for the story's public page, or takes it back. Idempotent; owner-scoped
+    /// like the story routes - ownership, then the live story, then the live scene in it, so another account's scene, one of
+    /// another story and one in the Trash are all 404. Nothing is minted - a part is read on its story's page - and, like
+    /// every selection, it is not an edit: no <c>UpdatedAt</c>, history or search change.
+    /// </summary>
+    private static async Task<IResult> SetSceneAsync(
+        LorexDbContext db,
+        Guid universeId,
+        Guid storyId,
+        Guid sceneId,
+        ClaimsPrincipal principal,
+        bool manuscript,
+        ContentVisibility to,
+        CancellationToken cancellationToken)
+    {
+        if (!await StoryEndpoints.OwnsStoryAsync(db, universeId, storyId, principal, cancellationToken)
+            || await db.Scenes.FirstOrDefaultAsync(
+                scene => scene.Id == sceneId && scene.StoryId == storyId && scene.DeletedAt == null,
+                cancellationToken) is not { } scene)
+        {
+            return Results.NotFound();
+        }
+
+        if (manuscript)
+        {
+            scene.ManuscriptVisibility = to;
+        }
+        else
+        {
+            scene.Visibility = to;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return Results.Ok(await PartStateAsync(db, storyId, to, cancellationToken));
+    }
+
+    /// <summary>A plot arc's selection, as a scene's. Plot is published only by this, on purpose, never by anything around it.</summary>
+    private static async Task<IResult> SetArcAsync(
+        LorexDbContext db,
+        Guid universeId,
+        Guid storyId,
+        Guid plotArcId,
+        ClaimsPrincipal principal,
+        ContentVisibility to,
+        CancellationToken cancellationToken)
+    {
+        if (!await StoryEndpoints.OwnsStoryAsync(db, universeId, storyId, principal, cancellationToken)
+            || await db.PlotArcs.FirstOrDefaultAsync(
+                arc => arc.Id == plotArcId && arc.StoryId == storyId && arc.DeletedAt == null,
+                cancellationToken) is not { } arc)
+        {
+            return Results.NotFound();
+        }
+
+        arc.Visibility = to;
+        await db.SaveChangesAsync(cancellationToken);
+        return Results.Ok(await PartStateAsync(db, storyId, to, cancellationToken));
+    }
+
+    private static async Task<StoryPartPublicationState> PartStateAsync(
+        LorexDbContext db, Guid storyId, ContentVisibility visibility, CancellationToken cancellationToken) =>
+        new(visibility, await PublicationRules.PublicStories(db).AnyAsync(story => story.Id == storyId, cancellationToken));
 
     // ---------- Shared ----------
 

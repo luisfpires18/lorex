@@ -1,5 +1,6 @@
 import type { ChronologyValue } from '../chronology/types'
 import type { EntityImageRef } from '../lore/types'
+import type { VisibilityValue } from '../publishing/types'
 
 /** Mirrors the backend enum. How far along the telling is - never whether any of it is true. */
 export const StoryStatus = {
@@ -85,6 +86,10 @@ export interface Scene {
   entities: SceneLoreReference[]
   createdAt: string
   updatedAt: string
+  /** Whether the author selected the scene's outline - title and summary - for the story's public page (ADR 0039). */
+  visibility: VisibilityValue
+  /** Whether the author selected the scene's prose for the story's public page, under its title. */
+  manuscriptVisibility: VisibilityValue
 }
 
 /**
@@ -221,6 +226,8 @@ export interface PlotArc {
   beats: PlotBeat[]
   createdAt: string
   updatedAt: string
+  /** Whether the author published the arc - its title, description and beats - on the story's public page (ADR 0039). */
+  visibility: VisibilityValue
 }
 
 /** Everything a client may set on an arc. No number and no order. */

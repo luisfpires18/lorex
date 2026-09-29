@@ -375,6 +375,7 @@ public static class PlotArcEndpoints
                 arc.Notes,
                 arc.CreatedAt,
                 arc.UpdatedAt,
+                arc.Visibility,
             })
             .ToListAsync(cancellationToken);
 
@@ -397,7 +398,8 @@ public static class PlotArcEndpoints
                 arc.Notes,
                 [.. beatsByArc[arc.Id]],
                 arc.CreatedAt,
-                arc.UpdatedAt)),
+                arc.UpdatedAt,
+                arc.Visibility)),
         ];
     }
 }

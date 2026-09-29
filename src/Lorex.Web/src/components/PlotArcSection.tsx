@@ -16,6 +16,8 @@ interface PlotArcSectionProps {
   onDelete: (arc: PlotArc, index: number) => void
   /** The arc's beats, already drawn. */
   children: ReactNode
+  /** The arc's publication control (ADR 0039), drawn first among its tools. */
+  publication?: ReactNode
 }
 
 /**
@@ -34,6 +36,7 @@ export function PlotArcSection({
   onEdit,
   onDelete,
   children,
+  publication,
 }: PlotArcSectionProps) {
   const headingId = useId()
   const beatCount = arc.beats.length
@@ -64,6 +67,7 @@ export function PlotArcSection({
         </div>
 
         <div className="plotarc__tools rowtools">
+          {publication}
           <button
             className="button button--text"
             type="button"

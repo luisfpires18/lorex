@@ -40,14 +40,16 @@ can be replaced.
 ## 5. What a public universe exposes
 
 Exactly `PublicUniverse`: `slug`, `name`, `publicSummary`, `category`, `genres`, `authorDisplayName`, `authorSlug`
-(the author's page, ADR 0037), `cardImageUrl`, `publishedAt` (first publication). None is ever null.
+(the author's page, ADR 0037), `cardImageUrl`, `publishedAt` (first publication) - none ever null - and, since 015,
+`originalCreator` and `originalWork`, null for a world of its author's own (section 22).
 
 ## 6. What stays private
 
 Everything else: the description, colour, archive state, ids, owner, username, email, audit dates, storage keys, the
-original artwork, and all content - except the listing metadata of lore entries and stories their author published one
-by one (section 15). Articles, fields, relationships, family trees, chapters, scenes, manuscripts, plot, timeline,
-ideas, world rules, Canon, the Trash, history and drafts stay private whatever is published.
+original artwork, and all content - except what its author published one by one: lore entries and stories (section 15),
+and inside a published story its scene outlines, scene prose and plot arcs (section 22). Fields, relationships, family
+trees, chapters, notes, timeline, ideas, world rules, Canon, the Trash, history and drafts stay private whatever is
+published.
 
 ## 7. Category taxonomy
 
@@ -100,7 +102,7 @@ renames and unpublishing keep it. No manual editing yet.
 | `GET /api/public/universes/{slug}/lore/{loreSlug}/thumbnail/{thumbnailId}` | A published entry's current square thumbnail (WebP), as the card route. |
 | `GET /api/public/universes/{slug}/stories?page=&pageSize=` | Its published stories (010), as the lore listing. |
 | `GET /api/public/universes/{slug}/lore/{loreSlug}` | One published entry's page (011): `PublicLoreDetail`. 404 alike for private, trashed and missing. |
-| `GET /api/public/universes/{slug}/stories/{storySlug}` | One published story's page (011): `PublicStory`. Same 404. |
+| `GET /api/public/universes/{slug}/stories/{storySlug}` | One published story's page: `PublicStoryDetail` (011; its published scenes, prose and plot arcs since 015). Same 404. |
 | `GET /api/public/authors/{slug}` | An author (011): `PublicAuthor`, only while they have a public universe; otherwise 404. |
 | `GET /api/public/authors/{slug}/avatar/{thumbnailId}` | Their photo's current square, only if they chose to show it; as the card route. |
 
@@ -114,7 +116,7 @@ allow-list.
 | --- | --- |
 | `category` | One category key: `original`, `movies-and-tv`, `games`, `books`, `comics`, `tabletop-and-rpg`, `audio`, `other`. Absent is all. |
 | `genre` | One genre key: `fantasy`, `science-fiction`, `adventure`, `horror`, `mystery`, `historical`, `romance`, `thriller`, `supernatural`, `post-apocalyptic`, `contemporary`, `other`. Matches a universe listing it among its genres. |
-| `q` | Trimmed; a parameterized `LIKE` substring of the name, the public summary or the author's public name - never the description, username, email, ids or content. Case-insensitive for ASCII only (SQLite `LIKE`); wildcards are literal. At most 100 characters. Blank is no search. |
+| `q` | Trimmed; a parameterized `LIKE` substring of the name, the public summary, the author's public name, or (015) the original creator or work - never the description, username, email, ids or content. Case-insensitive for ASCII only (SQLite `LIKE`); wildcards are literal. At most 100 characters. Blank is no search. |
 | `sort` | `recent` (default): first publication, most recent first; republishing does not move a universe. `az`: name, `NOCASE`. The slug breaks every tie, so pages never repeat or skip. |
 | `page`, `pageSize` | Clamped to 1+ and 1-48, as every Lorex list is. |
 
@@ -274,8 +276,7 @@ author, when it was first published, and the world it is set in. **Public summar
 300, written in the story's publication panel ("Write public summary…", a guarded drawer - "Shown to readers on the
 public portal. Your premise stays private."), saved on its own route, required to publish and not removable while the
 story is selected; never taken from the premise. A story selected in 010 without one stays selected and hidden, and its
-panel says "needs a public summary before readers can see it". Publishing a story's prose needs a decision about
-chapters and scenes; it is not made here.
+panel says "needs a public summary before readers can see it". What a story's page reads beyond this is section 22.
 
 **An author** (`/authors/{slug}`, ADR 0037). Their public name, their photo's square only if they chose to show it -
 otherwise their initial in a ring - "Creator on Lorex", how many public worlds, and those worlds as the Explore cards (the
@@ -410,3 +411,54 @@ in both.
   say, `/app/...` by the sign-in rules. A device check is in the DEV runbook ("The installed app's front door").
 - **Publishing moved** from Settings to its own workspace page, Publish (`/app/universes/{id}/publish`), just above
   Settings. Same API, same rules, same confirmations (section 14's "Settings' Public portal section" is now this page).
+
+## 22. Story content and attribution (Product refinement 015, ADR 0039)
+
+**What inside a story can be published.** Three selections on the units the Story domain already has; nothing new is
+modelled and no chapter is invented.
+
+| Part | Selected on | Readers see | Never |
+| --- | --- | --- | --- |
+| Scene outline | the scene's row (Scenes view) | its title and summary | notes, point of view, date, lore, beats |
+| Scene prose | the manuscript's save bar | the scene's prose under its title | summary, notes, saved versions |
+| Plot arc | the arc's heading (Plot view) | its title, description, and its live beats' titles and descriptions | notes, links to scenes or lore |
+
+Each is `Private` by default and after the upgrade. Plot is published only on purpose: nothing around an arc publishes it.
+Chapters, premise, status and notes are never published.
+
+**Effective visibility.** A part is read only while its universe is public, its story is public (selected, with its public
+summary, out of the Trash) and the part is selected and out of the Trash. Making the story or universe private hides every
+part and clears nothing; publishing again brings back exactly the selection.
+
+**Controls.** The same pill and panel as an entry's or story's, beside what it publishes, each saying *Private*,
+*Selected* (chosen, but the story is not public) or *Public* in words, and naming what is and is not published. The story
+page reads the story's own state once, so publishing the story turns every selected part Public at once. The prose pill
+lives in the save bar - where the prose is kept - so it never pushes the text box down on a phone; its panel opens upward.
+
+**The reader.** `/worlds/{slug}/stories/{storySlug}` is one reading page, no child routes and no new addresses: title,
+attribution, public summary, then Manuscript (a contents list when there is more than one part; prose in a 40rem serif
+column, a blank line a paragraph, a line break kept), Scenes (an ordered outline) and Plot (arcs with their beats), then
+the world it is set in. Only sections with something in them are drawn, with a way to each when there are several; a story
+with nothing published inside shows its summary alone and hints at nothing. Reading order is the workspace's -
+Unchaptered, then each chapter in order, each by its own order - with no chapter heading or number. One `h1`, `h2` per
+section, `h3` per part, scene or arc.
+
+**Attribution.** On Publish, under Public details: *This universe is based on someone else's work*, then *Original creator
+or source* (required, 120) and *Original work (optional)* (200). Unticked, both are cleared. The portal then credits:
+
+- Universe and story pages: "Based on works by **J.R.R. Tolkien** · *The Lord of the Rings*", "Curated on LoreX by
+  Unreally", and a quiet "Unofficial fan or reference project. Not affiliated with or endorsed by the original creator."
+- Explore card: "Based on works by …" on its own line, then "curated by Unreally" with the category.
+- An original world keeps "by Unreally".
+
+The original creator is text only - never a link, account or author page; only the Lorex author links, to their own page.
+No claim is made about whether a project is permitted.
+
+**Publish page.** The one visibility action is the page header's: *Publish world* (primary) while private, *Make private*
+(danger ink, beside *View public world*) while public. Both open the confirmation under Status; publishing while something
+is missing shows what and takes the focus there. The Status section and checklist stay.
+
+**Backup.** Format 17 carries the attribution; no version carries any selection, so every restored part is private.
+
+**Not done:** chapter headings publicly, a per-scene reader address, and a Trash restore question for a selected scene or
+arc (ADR 0039).

@@ -215,6 +215,19 @@ public sealed class Scene
     /// </summary>
     public DateTime? DeletedAt { get; set; }
 
+    /// <summary>
+    /// Whether the author selected this scene for the story's public outline - its title and summary, and nothing else
+    /// of it (ADR 0039). Read only while its story is public (<see cref="Publishing.PublicationRules.PublicScenes"/>), and
+    /// changed only by the scene's publish and unpublish routes. Independent of <see cref="ManuscriptVisibility"/>.
+    /// </summary>
+    public Publishing.ContentVisibility Visibility { get; set; }
+
+    /// <summary>
+    /// Whether the author selected this scene's prose for the story's public manuscript, read under the scene's title
+    /// (ADR 0039). Read only while its story is public; changed only by the manuscript's publish and unpublish routes.
+    /// </summary>
+    public Publishing.ContentVisibility ManuscriptVisibility { get; set; }
+
     public ICollection<SceneEntityLink> EntityLinks { get; } = [];
 }
 

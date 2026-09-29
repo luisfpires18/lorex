@@ -114,7 +114,7 @@ public sealed class PlotArcEndpointTests(LorexApiFactory factory) : IClassFixtur
         var raw = await client.GetStringAsync(Arc(universe.Id, story, a.Id));
         using var document = JsonDocument.Parse(raw);
         Assert.Equal(
-            ["beats", "createdAt", "description", "id", "notes", "sortOrder", "storyId", "title", "updatedAt"],
+            ["beats", "createdAt", "description", "id", "notes", "sortOrder", "storyId", "title", "updatedAt", "visibility"],
             document.RootElement.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal));
     }
 

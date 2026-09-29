@@ -20,7 +20,10 @@ import { PlotPanel } from '../components/PlotPanel'
 import { SceneCard, type MoveTarget } from '../components/SceneCard'
 import { SceneForm } from '../components/SceneForm'
 import { StoryForm } from '../components/StoryForm'
+import { StoryPartPublication } from '../components/StoryPartPublication'
 import { ApiError } from '../lib/api'
+import { getContentPublication } from '../publishing/api'
+import { Visibility, type ContentPublicationState, type VisibilityValue } from '../publishing/types'
 import {
   deleteChapter,
   deleteScene,
@@ -135,6 +138,27 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
 
   const isMoving = useRef(false)
   const pendingFocus = useRef<string | null>(null)
+
+  // The story's own publication, read once for the page: its pill shows it, and every part's pill needs to know whether
+  // the story is public to say Selected or Public (ADR 0039). Held with the story it was read for.
+  const [publication, setPublication] = useState<{
+    storyId: string
+    state: ContentPublicationState | null
+  } | null>(null)
+
+  useEffect(() => {
+    if (!storyId) return
+    const controller = new AbortController()
+    getContentPublication(universe.id, 'story', storyId, controller.signal)
+      .then((state) => setPublication({ storyId, state }))
+      .catch(() => {
+        // The story's pill reads it again itself and says so if it cannot; the parts only never claim Public.
+        if (!controller.signal.aborted) setPublication({ storyId, state: null })
+      })
+    return () => {
+      controller.abort()
+    }
+  }, [universe.id, storyId])
 
   useEffect(() => {
     if (!storyId) return
@@ -261,6 +285,41 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
 
   function showStory(next: StoryDetail) {
     setState((current) => (current.kind === 'ready' ? { ...current, story: next } : current))
+  }
+
+  /** Whether anyone can read the story now; null until known, when no part claims to be public. */
+  const storyPublication = publication?.storyId === story.id ? publication : null
+  const storyIsPublic = storyPublication?.state
+    ? storyPublication.state.visibility === Visibility.Public &&
+      storyPublication.state.universeIsPublic &&
+      storyPublication.state.publicSummary !== null
+    : null
+
+  function patchScene(id: string, patch: Partial<Scene>) {
+    setState((current) =>
+      current.kind === 'ready'
+        ? {
+            ...current,
+            story: {
+              ...current.story,
+              scenes: current.story.scenes.map((scene) =>
+                scene.id === id ? { ...scene, ...patch } : scene,
+              ),
+            },
+          }
+        : current,
+    )
+  }
+
+  function patchArc(id: string, visibility: VisibilityValue) {
+    setState((current) =>
+      current.kind === 'ready'
+        ? {
+            ...current,
+            arcs: current.arcs.map((arc) => (arc.id === id ? { ...arc, visibility } : arc)),
+          }
+        : current,
+    )
   }
 
   function showArcs(next: PlotArc[]) {
@@ -497,6 +556,18 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
         onMoveTo={(target, chapterId) => void moveTo(target, chapterId)}
         onEdit={(target) => setSceneForm({ mode: 'edit', scene: target })}
         onDelete={(target) => void removeScene(target)}
+        publication={
+          <StoryPartPublication
+            universeId={universe.id}
+            storyId={story.id}
+            kind="scene"
+            id={scene.id}
+            name={scene.title}
+            visibility={scene.visibility}
+            storyIsPublic={storyIsPublic}
+            onChange={(visibility) => patchScene(scene.id, { visibility })}
+          />
+        }
       />
     ))
   }
@@ -550,14 +621,18 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
                 <span data-testid="story-chapter-count">{chapterCountLabel(chapters.length)}</span>
               ) : null}
               <span>{sceneCountLabel(scenes.length)}</span>
-              <ContentPublication
-                key={story.id}
-                universeId={universe.id}
-                kind="story"
-                id={story.id}
-                name={story.title}
-                placement="line"
-              />
+              {storyPublication ? (
+                <ContentPublication
+                  key={story.id}
+                  universeId={universe.id}
+                  kind="story"
+                  id={story.id}
+                  name={story.title}
+                  placement="line"
+                  initialState={storyPublication.state ?? undefined}
+                  onChange={(state) => setPublication({ storyId: story.id, state })}
+                />
+              ) : null}
             </div>
           )
         }
@@ -624,6 +699,18 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
           onArcsChange={showArcs}
           onReload={reload}
           announce={setAnnouncement}
+          arcPublication={(arc) => (
+            <StoryPartPublication
+              universeId={universe.id}
+              storyId={story.id}
+              kind="arc"
+              id={arc.id}
+              name={arc.title}
+              visibility={arc.visibility}
+              storyIsPublic={storyIsPublic}
+              onChange={(visibility) => patchArc(arc.id, visibility)}
+            />
+          )}
         />
       ) : view === 'manuscript' ? (
         <ManuscriptPanel
@@ -633,6 +720,18 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
           chronology={chronology}
           sceneId={sceneId}
           onEditScene={(scene) => setSceneForm({ mode: 'edit', scene })}
+          manuscriptPublication={(scene) => (
+            <StoryPartPublication
+              universeId={universe.id}
+              storyId={story.id}
+              kind="manuscript"
+              id={scene.id}
+              name={scene.title}
+              visibility={scene.manuscriptVisibility}
+              storyIsPublic={storyIsPublic}
+              onChange={(manuscriptVisibility) => patchScene(scene.id, { manuscriptVisibility })}
+            />
+          )}
         />
       ) : (
         <section className="story__scenes" aria-labelledby="story-scenes-heading">

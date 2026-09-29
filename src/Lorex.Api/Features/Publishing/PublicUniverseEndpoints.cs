@@ -182,7 +182,9 @@ public static partial class PublicUniverseEndpoints
             query = query.Where(universe =>
                 EF.Functions.Like(universe.Name, pattern, "\\")
                 || EF.Functions.Like(universe.PublicSummary!, pattern, "\\")
-                || EF.Functions.Like(universe.Owner!.PublicDisplayName!, pattern, "\\"));
+                || EF.Functions.Like(universe.Owner!.PublicDisplayName!, pattern, "\\")
+                || EF.Functions.Like(universe.OriginalCreator!, pattern, "\\")
+                || EF.Functions.Like(universe.OriginalWork!, pattern, "\\"));
         }
 
         var totalCount = await query.CountAsync(cancellationToken);
@@ -307,7 +309,9 @@ public static partial class PublicUniverseEndpoints
             universe.Owner!.PublicDisplayName!,
             universe.Owner.PublicAuthorSlug!,
             db.UniverseArtworks.Where(artwork => artwork.UniverseId == universe.Id).Select(artwork => artwork.CardId).FirstOrDefault(),
-            universe.PublishedAt!.Value));
+            universe.PublishedAt!.Value,
+            universe.OriginalCreator,
+            universe.OriginalWork));
 
     private static PublicUniverse Public(PublicRow row) => new(
         row.Slug,
@@ -318,7 +322,9 @@ public static partial class PublicUniverseEndpoints
         row.AuthorDisplayName,
         row.AuthorSlug,
         CardUrl(row.Slug, row.CardId),
-        row.PublishedAt);
+        row.PublishedAt,
+        row.OriginalCreator,
+        row.OriginalCreator is null ? null : row.OriginalWork);
 
     internal static string CardUrl(string slug, Guid cardId) =>
         string.Create(CultureInfo.InvariantCulture, $"/api/public/universes/{slug}/artwork/card/{cardId:D}");
@@ -332,7 +338,9 @@ public static partial class PublicUniverseEndpoints
         string AuthorDisplayName,
         string AuthorSlug,
         Guid CardId,
-        DateTime PublishedAt);
+        DateTime PublishedAt,
+        string? OriginalCreator,
+        string? OriginalWork);
 
     /// <summary>Only what <see cref="PublicSlugs"/> can mint; anything else is not an address and costs no query.</summary>
     [GeneratedRegex("^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$")]

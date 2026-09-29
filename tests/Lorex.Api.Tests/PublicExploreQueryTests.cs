@@ -158,7 +158,7 @@ public sealed class PublicExploreQueryTests(PublicExploreQueryTests.Worlds world
     [Fact]
     public async Task The_response_under_every_filter_is_exactly_the_allow_list()
     {
-        string[] allowed = ["authorDisplayName", "authorSlug", "cardImageUrl", "category", "genres", "name", "publicSummary", "publishedAt", "slug"];
+        string[] allowed = ["authorDisplayName", "authorSlug", "cardImageUrl", "category", "genres", "name", "originalCreator", "originalWork", "publicSummary", "publishedAt", "slug"];
 
         foreach (var query in new[] { "q=oren", "category=games&sort=az", "genre=fantasy" })
         {

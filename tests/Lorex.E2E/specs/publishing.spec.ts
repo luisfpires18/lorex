@@ -21,6 +21,8 @@ const ALLOWED = [
   'category',
   'genres',
   'name',
+  'originalCreator',
+  'originalWork',
   'publicSummary',
   'publishedAt',
   'slug',
@@ -250,7 +252,7 @@ test.describe('publishing a universe', () => {
     await expect(confirm.locator('dl')).toContainText('GenresFantasy, Adventure')
     await expect(confirm.locator('dl')).toContainText(`Author${author}`)
     await expect(confirm).toContainText(
-      'Not published: Any lore entry or story you have not published on its own page, notes, ideas, the timeline, world rules, relationships, Canon, the Trash',
+      'Not published: Any lore entry, story, scene, scene prose or plot arc you have not published where it is written, notes, ideas, the timeline, world rules, relationships, Canon, the Trash',
     )
 
     // Keeping it private changes nothing.

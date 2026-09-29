@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react'
+import { useId, useRef, useState, type ReactNode } from 'react'
 import { Link, Navigate, NavLink } from 'react-router-dom'
 import { ContainerName } from './ContainerName'
 import { ManuscriptEditor } from './ManuscriptEditor'
@@ -19,6 +19,8 @@ interface ManuscriptPanelProps {
   sceneId: string | undefined
   /** Opens a scene's own form, the same drawer the Scenes view uses. */
   onEditScene: (scene: Scene) => void
+  /** The open scene's prose publication control (ADR 0039), built by the story page. */
+  manuscriptPublication?: (scene: Scene) => ReactNode
 }
 
 /** Where a scene is told: its chapter or Unchaptered - none in a story without chapters - and "Scene 1 of 3" inside it. */
@@ -53,6 +55,7 @@ export function ManuscriptPanel({
   chronology,
   sceneId,
   onEditScene,
+  manuscriptPublication,
 }: ManuscriptPanelProps) {
   const listId = useId()
   const toggle = useRef<HTMLButtonElement>(null)
@@ -203,6 +206,7 @@ export function ManuscriptPanel({
               where={whereOf(chapters, scenes, selected)}
               beats={beatsByScene(arcs).get(selected.id) ?? []}
               onEditScene={onEditScene}
+              publication={manuscriptPublication?.(selected)}
             />
           ) : (
             <EmptyState

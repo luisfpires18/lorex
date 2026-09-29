@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, type ReactNode } from 'react'
 import { ArrowDown, ArrowRightLeft, ArrowUp, PenLine, Pencil, Trash } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ActionIcon } from './ActionIcon'
@@ -35,6 +35,8 @@ interface SceneCardProps {
   onMoveTo: (scene: Scene, chapterId: string | null) => void
   onEdit: (scene: Scene) => void
   onDelete: (scene: Scene) => void
+  /** The scene outline's publication control (ADR 0039), drawn first among the scene's tools. */
+  publication?: ReactNode
 }
 
 /**
@@ -67,6 +69,7 @@ export function SceneCard({
   onMoveTo,
   onEdit,
   onDelete,
+  publication,
 }: SceneCardProps) {
   const titleId = useId()
   const Title = titleLevel === 4 ? 'h4' : 'h3'
@@ -98,6 +101,7 @@ export function SceneCard({
       </div>
 
       <div className="scene__tools rowtools">
+        {publication}
         <Link
           className="button button--text"
           to={`/app/universes/${universeId}/stories/${scene.storyId}/manuscript/${scene.id}`}

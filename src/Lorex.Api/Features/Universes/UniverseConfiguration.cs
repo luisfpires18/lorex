@@ -37,6 +37,8 @@ public sealed class UniverseConfiguration : IEntityTypeConfiguration<Universe>
         // address. Nulls - every universe never published - do not collide.
         builder.Property(universe => universe.PublicSummary).HasMaxLength(PublicationLimits.SummaryMaxLength);
         builder.Property(universe => universe.PublicSlug).HasMaxLength(PublicationLimits.SlugMaxLength);
+        builder.Property(universe => universe.OriginalCreator).HasMaxLength(PublicationLimits.OriginalCreatorMaxLength);
+        builder.Property(universe => universe.OriginalWork).HasMaxLength(PublicationLimits.OriginalWorkMaxLength);
         builder.HasIndex(universe => universe.PublicSlug).IsUnique();
 
         // The public listing reads public universes, most recently published first.

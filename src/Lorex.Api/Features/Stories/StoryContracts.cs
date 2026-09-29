@@ -116,7 +116,9 @@ public sealed record SceneResponse(
     ChronologyValue? Chronology,
     IReadOnlyList<SceneLoreReference> Entities,
     DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    Publishing.ContentVisibility Visibility = Publishing.ContentVisibility.Private,
+    Publishing.ContentVisibility ManuscriptVisibility = Publishing.ContentVisibility.Private);
 
 /// <summary>
 /// One container's whole narrative order: every scene id in the chapter named by

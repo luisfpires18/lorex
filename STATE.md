@@ -50,6 +50,27 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **Product refinement 015 - public story reading and attribution** (`feat/public-story-reading` off `dev` at `9c403ff`,
+  committed, not merged, not pushed). ADR 0039; `PUBLIC_PORTAL.md` section 22. Migration `AddStoryContentPublication`;
+  backup format **17**.
+  - A story's parts are published one by one, beside where they are written, on the units that exist: a scene's outline
+    (title + summary, `Scenes.Visibility`), a scene's prose (`Scenes.ManuscriptVisibility`, pill in the manuscript save bar)
+    and a plot arc with its beats (`PlotArcs.Visibility`, on purpose only). All Private by default and after the upgrade.
+    Pills say Private / Selected / Public against the story's own state; owner routes `.../scenes/{id}/publish`,
+    `.../scenes/{id}/manuscript/publish`, `.../plot-arcs/{id}/publish` (and `unpublish`).
+  - Readable only while universe, story and part are public (`PublicScenes`, `PublicManuscripts`, `PublicPlotArcs`, each
+    holding `PublicStories`); a private parent hides and clears nothing. Trash hides; restore brings the selection back.
+  - `/worlds/{w}/stories/{s}` is a reader: `PublicStoryDetail` (manuscript, scenes, plot) in the workspace's reading order,
+    only non-empty sections, no chapter titles or numbers, no ids, notes, counts or premise. No new routes or slugs.
+  - Publish page: *Publish world* / *Make private* (danger ink) is the `PageHeader` action; the Status section keeps the
+    checklist and confirmations; publishing while incomplete shows and focuses what is missing.
+  - Attribution: "This universe is based on someone else's work" -> `Universes.OriginalCreator` (required, 120) and
+    `OriginalWork` (200), cleared when unticked. Portal: "Based on works by X · Work", "Curated on LoreX by <author>", an
+    unofficial note; Explore card "Based on works by X" + "curated by". The creator is never a link or a profile. Explore's
+    `q` matches creator and work. Backup 17 carries it; v1-16 restore as original worlds; no version carries any selection.
+  - LOTR pilot fixture (`lorex-lotr-fellowship-pilot.zip`, v16, untracked, not committed) restored cleanly on a scratch
+    database and used for manual QA only. Its data has "NazgÃ»l" double-encoded - in the fixture, not Lorex.
+  - Not done: public chapter headings, a per-scene reader address, a Trash restore question for a selected scene or arc.
 - **One workspace shell, Lore pagination** (`fix/workspace-shell-and-lore-pagination` off `dev` at `bcb3291`, committed,
   not merged, not pushed). Publish and Settings left their centred column: every universe page now starts at the same
   place with the same `PageHeader`; Settings' tabs sit in the header's slot, and only their forms keep a 46rem left-aligned
@@ -766,7 +787,7 @@ A public, read-only discovery experience beside the workspace, in the same appli
   - Owner bridge: `GET /api/universes/by-address/{slug}?lore=&story=`, owner-only; "Edit this world" and "Edit in
     workspace" for the owner alone. Explore cards: the name stretched over the card, the author a second link.
   - Front door: manifest `start_url` `/explore` (`id` stays `/app`). Migration `AddPublicReading`; backup format 16.
-  - Not built: owner preview of a private universe; public story prose (needs a chapter/scene publication decision).
+  - Not built: owner preview of a private universe. Public story prose: built in 015 (ADR 0039).
 
 - **012 - Final polish and hardening** (`feat/final-product-polish` off `dev` at `181941c`, committed, not merged, not
   pushed). ADR 0038 new; `PUBLIC_PORTAL.md` section 19. No migration, no backup change.
@@ -785,11 +806,15 @@ A public, read-only discovery experience beside the workspace, in the same appli
   - Explore hero delivered as WebP 250,016 bytes (PNG 2,370,934 kept untouched as fallback).
   - Service worker unchanged: it already refuses `/api`, navigations, non-`GET` and cross-origin.
   - Open, not blocking: "Show more" pages not in the address; public hero sharpness bounded by the 960 card; no owner
-    preview of a private universe; public story prose undecided; account-wide search.
+    preview of a private universe; account-wide search.
 
 ## Baseline
 
-- **1124 API integration tests, 263 Playwright tests** (shell + pagination: +4 in `lore-pagination.spec.ts`; full Playwright
+- **1137 API integration tests, 268 Playwright tests** (015: +13 API - 6 `StoryContentPublicationTests`, 5
+  `UniverseAttributionTests`, 1 `StoryContentPublicationMigrationTests`, 1 version-17 case - and +5 in
+  `story-publishing.spec.ts`; format pins moved 16 -> 17, allow-lists gained the attribution and the arc's `visibility`, three
+  copy pins updated. API **1137/1137** (run 1 was 1136/1137: `PlotArcEndpointTests` pinned the arc's keys, updated). Full Playwright on a fresh database **268/268** first time, one invocation, two workers, retries 0, 13.1 min.
+  Release build clean, no pending model changes. Before it, 1124 / 263 (shell + pagination: +4 in `lore-pagination.spec.ts`; full Playwright
   on a fresh database **263/263**, one invocation, two workers, retries 0, 12.7 min; API **1124/1124**. Three earlier
   complete runs were not green: the first lost `publishing.spec.ts` to its own stale "Lorex portal" wording (updated to
   "LoreX"); the next two lost one test each to the dev server - a blank `/register`, and Vite failing to serve
@@ -856,7 +881,9 @@ A public, read-only discovery experience beside the workspace, in the same appli
     fails as a failure instead of telling the author a free name is taken.
 - Under a full parallel Playwright run, `auth.spec.ts` "rejects a wrong password" intermittently
   times out (it navigates to `/login` without awaiting sign-out).
-- 34 migrations, latest `AddPublicReading` - additive: `Stories.PublicSummary`, `ProfileImages.IsPublic` (false),
+- 35 migrations, latest `AddStoryContentPublication` - additive: `Scenes.Visibility`, `Scenes.ManuscriptVisibility`,
+  `PlotArcs.Visibility` (0, Private), `Universes.OriginalCreator`/`OriginalWork` (null); nothing public after the upgrade;
+  native `DROP COLUMN` rollback; `StoryContentPublicationMigrationTests` walks it on a file. Before it, `AddPublicReading` - additive: `Stories.PublicSummary`, `ProfileImages.IsPublic` (false),
   `AspNetUsers.PublicAuthorSlug` with a unique index; nothing copied or made public; native `DROP COLUMN` rollback;
   `PublicReadingMigrationTests` walks it on a file and through the startup backfill. Before it, `AddContentPublication` -
   additive: three columns each on `Entities` and `Stories`

@@ -87,16 +87,12 @@ public static class PublicNameEndpoints
             return $"Keep your public name under {PublicationLimits.DisplayNameMaxLength} characters.";
         }
 
-        foreach (var character in name)
-        {
-            if (char.IsControl(character) || character is >= '‪' and <= '‮' or >= '⁦' and <= '⁩')
-            {
-                return "Your public name cannot contain invisible control characters.";
-            }
-        }
-
-        return null;
+        return HasInvisibleControls(name) ? "Your public name cannot contain invisible control characters." : null;
     }
+
+    /// <summary>Control characters, and the direction overrides and isolates that make a name display as something else.</summary>
+    internal static bool HasInvisibleControls(string text) =>
+        text.Any(character => char.IsControl(character) || character is >= '‪' and <= '‮' or >= '⁦' and <= '⁩');
 
     private static IResult Invalid(string message) =>
         Results.ValidationProblem(new Dictionary<string, string[]> { [PublicationRules.PublicDisplayName] = [message] });
