@@ -1819,13 +1819,25 @@ a.button--danger:visited {
 }
 
 /* Three slots across the list's own width: Previous at the start, the position truly centred, Next at the end. Both
-   buttons always render - disabled at the ends - so the position never moves with them or their labels. */
+   buttons always render - disabled at the ends - so the position never moves with them or their labels.
+
+   The side tracks are `minmax(0, 1fr)`, not `1fr`: a bare `1fr` has an `auto` minimum, so a button wider than its half
+   grows its own track and pushes the position off centre. It did on CI's Linux fonts at 360px - "Previous" in DejaVu is
+   117px against a 109px half, 8.5px off. Equal tracks make the centre exact whatever the labels, fonts or theme; the
+   container query keeps the buttons inside their halves by dropping the decorative arrows where the pager is narrow. */
 .pager {
   margin-top: 2.5rem;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: var(--space-3);
+  container-type: inline-size;
+}
+
+@container (max-width: 22rem) {
+  .pager .button__icon {
+    display: none;
+  }
 }
 
 .pager > :first-child {
