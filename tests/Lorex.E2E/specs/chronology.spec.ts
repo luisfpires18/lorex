@@ -136,15 +136,14 @@ function scrollsSideways(page: Page) {
 }
 
 test.describe('chronology', () => {
-  test('eras are named and ordered in Settings, and every timeline date is written and ordered by them', async ({
+  test('eras are named and ordered in Chronology, and every timeline date is written and ordered by them', async ({
     page,
   }) => {
     await signUp(page)
     const universeId = await newUniverse(page, unique('Fallen Reach '))
 
-    await page.getByTestId('workspace-settings').click()
-    await page.waitForURL(/\/settings$/)
-    await page.getByTestId('settings-tab-chronology').click()
+    await page.getByTestId('workspace-chronology').click()
+    await page.waitForURL(/\/chronology$/)
 
     const settings = page.getByTestId('chronology-settings')
     await expect(settings).toContainText('Years here are plain numbers')
@@ -221,9 +220,8 @@ test.describe('chronology', () => {
     await expect(page.getByTestId('moment-form')).toHaveCount(0)
 
     // Relabelling an era rewords every date written in it and moves none of them.
-    await page.getByTestId('workspace-settings').click()
-    await page.waitForURL(/\/settings$/)
-    await page.getByTestId('settings-tab-chronology').click()
+    await page.getByTestId('workspace-chronology').click()
+    await page.waitForURL(/\/chronology$/)
 
     const before = page.getByTestId('era').nth(0)
     await expect(before).toContainText('Dates 3 moments')
@@ -340,7 +338,7 @@ test.describe('chronology', () => {
     for (const width of [390, 768, 1440, 1920]) {
       await page.setViewportSize({ width, height: 900 })
 
-      await page.goto(`/app/universes/${universeId}/settings?tab=chronology`)
+      await page.goto(`/app/universes/${universeId}/chronology`)
       await expect(page.getByTestId('era')).toHaveCount(4)
 
       // Every era's controls are on screen and reachable, not pushed off the right-hand edge.

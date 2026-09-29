@@ -38,6 +38,7 @@ const RegisterPage = lazy(() => import('./pages/RegisterPage'))
 const StoriesPage = lazy(() => import('./pages/StoriesPage'))
 const StoryPage = lazy(() => import('./pages/StoryPage'))
 const TimelinePage = lazy(() => import('./pages/TimelinePage'))
+const ChronologyPage = lazy(() => import('./pages/ChronologyPage'))
 const UniversePublish = lazy(() => import('./pages/UniversePublish'))
 const UniverseSettings = lazy(() => import('./pages/UniverseSettings'))
 const UniverseTrash = lazy(() => import('./pages/UniverseTrash'))
@@ -147,6 +148,7 @@ function Root() {
               />
               <Route path="timeline" element={asSection('timeline', <TimelinePage />)} />
               <Route path="world-rules" element={asSection('world-rules', <WorldRulesPage />)} />
+              <Route path="chronology" element={asSection('chronology', <ChronologyPage />)} />
               <Route path="world-rules/new" element={asSection('rule', <WorldRulePage isNew />)} />
               <Route path="world-rules/:ruleId" element={asSection('rule', <WorldRulePage />)} />
               <Route path="stories" element={asSection('stories', <StoriesPage />)} />

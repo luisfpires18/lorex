@@ -7,7 +7,7 @@ import { UniverseSearch } from '../components/UniverseSearch'
 import { getChronology } from '../chronology/api'
 import type { Chronology } from '../chronology/types'
 import { getUniverse } from '../universes/api'
-import { SECTION_GROUPS } from '../universes/sections'
+import { SECTION_GROUPS, UPKEEP } from '../universes/sections'
 import type { UniverseDetail } from '../universes/types'
 import { EmptyState } from '../components/EmptyState'
 
@@ -221,7 +221,13 @@ export default function UniverseWorkspace() {
         <nav aria-label="Universe sections">
           <ul className="sidebar__nav">
             {SECTION_GROUPS.map((group) => (
-              <li className="sidebar__group" key={group[0].segment}>
+              <li
+                className={
+                  group === UPKEEP ? 'sidebar__group sidebar__group--upkeep' : 'sidebar__group'
+                }
+                key={group[0].segment}
+                data-testid={group === UPKEEP ? 'sidebar-upkeep' : undefined}
+              >
                 <ul className="sidebar__links">
                   {group.map(({ segment, label, testId, icon: Icon }) => (
                     <li key={label}>

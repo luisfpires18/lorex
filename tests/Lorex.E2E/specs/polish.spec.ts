@@ -77,7 +77,7 @@ test.describe('product-wide polish', () => {
   }) => {
     await signUp(page)
     const universeId = await newUniverse(page)
-    const settingsUrl = `/app/universes/${universeId}/settings?tab=chronology`
+    const settingsUrl = `/app/universes/${universeId}/chronology`
     const LEAVE = 'The chronology has unsaved changes. Leave without saving them?'
     const { asked, answer } = dialogs(page)
 
@@ -87,9 +87,8 @@ test.describe('product-wide polish', () => {
     // Untouched, leaving asks nothing.
     await page.getByTestId('workspace-timeline').click()
     await page.waitForURL(/\/timeline$/)
-    await page.getByTestId('workspace-settings').click()
-    await page.waitForURL(/\/settings$/)
-    await page.getByTestId('settings-tab-chronology').click()
+    await page.getByTestId('workspace-chronology').click()
+    await page.waitForURL(/\/chronology$/)
     expect(asked).toEqual([])
 
     // An era being named is unsaved work: a link asks, and staying keeps it.
@@ -97,14 +96,14 @@ test.describe('product-wide polish', () => {
     await page.getByTestId('era-name').fill('After the Fall')
     await page.getByTestId('workspace-timeline').click()
     expect(asked).toEqual([LEAVE])
-    await expect(page).toHaveURL(/\/settings\?tab=chronology$/)
+    await expect(page).toHaveURL(/\/chronology$/)
     await expect(page.getByTestId('era-name')).toHaveValue('After the Fall')
 
     // Back asks too, once, and staying keeps the address and the draft.
     await page.goBack()
     await expect.poll(() => asked.length).toBe(2)
     expect(asked).toEqual([LEAVE, LEAVE])
-    await expect(page).toHaveURL(/\/settings\?tab=chronology$/)
+    await expect(page).toHaveURL(/\/chronology$/)
     await expect(page.getByTestId('era-name')).toHaveValue('After the Fall')
 
     // Leaving the page itself is the browser's own question.
@@ -132,7 +131,7 @@ test.describe('product-wide polish', () => {
     await expect(page.getByTestId('chronology-error')).toBeVisible()
     await page.getByTestId('workspace-lore').click()
     expect(asked.at(-1)).toBe(LEAVE)
-    await expect(page).toHaveURL(/\/settings\?tab=chronology$/)
+    await expect(page).toHaveURL(/\/chronology$/)
 
     await page.getByTestId('era-name').fill('After the Fall')
     await page.getByTestId('save-chronology').click()

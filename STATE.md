@@ -50,14 +50,24 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **014 follow-up - sidebar grouping, Chronology, theme control** (`feat/workspace-ia-follow-up` off `dev` at `e9fa972`,
+  committed, not merged, not pushed). Presentation and routing only; no backend, no migration.
+  - The sidebar is worldbuilding - Overview; Lore, Family Tree, Timeline, World Rules, Chronology; Stories, Ideas; Canon,
+    Types - then, under a rule, upkeep: Trash, Publish, Settings (a full-width row at the foot of the phone's sheet).
+  - **Chronology** left Settings for a section of its own at `/app/universes/{id}/chronology`, after World Rules: the same
+    editor (`ChronologyEditor`, renamed from `ChronologySettings`), save, preview, refusals and leave guard, under the
+    page's own heading. Settings is four tabs: General, Appearance, Data, Advanced. `?tab=chronology` is not redirected -
+    it existed for a day on DEV only, and an unknown tab opens General.
+  - The account menu's **theme control** is one segmented control of two equal halves on a faint ink-tint track, the
+    chosen half lifted and ringed; no dark well, no layout shift when pressed.
 - **UI refinement 014 - workspace navigation, Settings and Publish, PWA front door** (`feat/workspace-navigation-settings`
-  off `dev` at `9908b83`, committed, not merged, not pushed). No backend change, no migration.
+  off `dev` at `9908b83`; merged into `dev` at `e9fa972`). No backend change, no migration.
   - **Brand -> `/explore`** everywhere it is drawn (portal bar, rail "L", universes/ideas/profile headers, sign-in plate).
     "All universes" is now also at the head of the phone's Sections sheet, since the rail's L no longer goes there.
   - **Publish** is its own page at `/app/universes/{id}/publish`, in the sidebar just above Settings: status, checklist,
     publish / make private with their confirmations, public details, artwork, author (shown, edited on the Profile), and
     how many entries and stories readers can see (the public listings' own totals). Settings no longer holds any of it.
-  - **Settings** is five tabs - General, Appearance, Chronology, Data, Advanced - in a centred 46rem column; `?tab=`
+  - **Settings** was five tabs - General, Appearance, Chronology, Data, Advanced (four since the follow-up) - in a centred 46rem column; `?tab=`
     replaced, not pushed; panels mounted and hidden so drafts and leave guards survive. Archive and delete in Advanced;
     the 012 archive-while-public warning intact, now pointing at Publish.
   - **A universe's colour** is the author's own: picker + `#rrggbb`, or none. The palette is gone; stored colours kept.
@@ -766,7 +776,8 @@ A public, read-only discovery experience beside the workspace, in the same appli
 
 ## Baseline
 
-- **1124 API integration tests, 256 Playwright tests** (014: +8 in `workspace-settings.spec.ts`, +1 in `pwa.spec.ts`; no API
+- **1124 API integration tests, 258 Playwright tests** (014 follow-up: +2 in `workspace-settings.spec.ts`; specs moved to
+  Chronology's own address; API **1124/1124**; full Playwright on a fresh database **258/258** first time, one invocation, two workers, retries 0, 11.8 min). Before it, 1124 / 256 (014: +8 in `workspace-settings.spec.ts`, +1 in `pwa.spec.ts`; no API
   change; API **1124/1124**, Release build clean, no pending model changes; full Playwright on a fresh database **256/256**, one invocation, two workers, retries 0, 11.1 min. The first complete run was
   253/256, all three caused by 014 and fixed in the tests: two `lore.spec.ts` steps clicked the first link named like
   "Lore" - now the rail's brand, "Lorex - explore worlds" - and are exact now; `explore.spec.ts`'s forged-return test

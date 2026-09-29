@@ -1,6 +1,7 @@
 import {
   BadgeCheck,
   Blocks,
+  CalendarRange,
   Compass,
   Feather,
   Globe,
@@ -23,109 +24,133 @@ export interface Section {
   purpose: string
 }
 
+/** The front page. */
+export const FRONT: readonly Section[] = [
+  {
+    segment: '',
+    label: 'Overview',
+    testId: 'workspace-overview',
+    icon: Compass,
+    purpose: 'This universe at a glance.',
+  },
+]
+
+/** The world itself: what is true in it, when, and how it works. */
+export const WORLD: readonly Section[] = [
+  {
+    segment: 'lore',
+    label: 'Lore',
+    testId: 'workspace-lore',
+    icon: Library,
+    purpose: 'Every entry: people, places, things and ideas.',
+  },
+  {
+    segment: 'family-tree',
+    label: 'Family Tree',
+    testId: 'workspace-family-tree',
+    icon: Network,
+    purpose: 'Families worked out from recorded connections.',
+  },
+  {
+    segment: 'timeline',
+    label: 'Timeline',
+    testId: 'workspace-timeline',
+    icon: Hourglass,
+    purpose: 'What happened, in the order it happened.',
+  },
+  {
+    segment: 'world-rules',
+    label: 'World Rules',
+    testId: 'workspace-world-rules',
+    icon: Scale,
+    purpose: 'How this universe works, stated plainly.',
+  },
+  {
+    segment: 'chronology',
+    label: 'Chronology',
+    testId: 'workspace-chronology',
+    icon: CalendarRange,
+    purpose: 'The eras its dates are counted and ordered in.',
+  },
+]
+
+/** The writing done with it. */
+export const WRITING: readonly Section[] = [
+  {
+    segment: 'stories',
+    label: 'Stories',
+    testId: 'workspace-stories',
+    icon: Feather,
+    purpose: 'Narratives told with this world, scene by scene.',
+  },
+  {
+    segment: 'ideas',
+    label: 'Ideas',
+    testId: 'workspace-ideas',
+    icon: StickyNote,
+    purpose: 'Possibilities, kept apart from the lore.',
+  },
+]
+
+/** Keeping the world consistent and shaped. */
+export const KEEPING: readonly Section[] = [
+  {
+    segment: 'canon',
+    label: 'Canon',
+    testId: 'workspace-canon',
+    icon: BadgeCheck,
+    purpose: 'What this world says twice, and differently.',
+  },
+  {
+    segment: 'types',
+    label: 'Types',
+    testId: 'workspace-types',
+    icon: Blocks,
+    purpose: 'The kinds of entry and relation this world uses.',
+  },
+]
+
 /**
- * The sections a universe has, in the order the sidebar lists them, grouped as the sidebar spaces
- * them: the front page; the world itself; the writing done with it; its upkeep; its settings. The
- * groups carry no labels - the spacing says it. Held as data rather than as markup because the
- * narrow layout needs the same list twice: once as the list of links, and once to name the
- * section the author is currently in.
+ * Upkeep, apart from the worldbuilding above it: recovery, the public presentation, configuration. The sidebar sets it
+ * off under a rule, and a phone's Sections sheet gives it a row of its own at the foot.
+ */
+export const UPKEEP: readonly Section[] = [
+  {
+    segment: 'trash',
+    label: 'Trash',
+    testId: 'workspace-trash',
+    icon: Trash2,
+    purpose: 'What was removed, waiting to be restored.',
+  },
+  {
+    segment: 'publish',
+    label: 'Publish',
+    testId: 'workspace-publish',
+    icon: Globe,
+    purpose: 'How this universe appears on the public portal.',
+  },
+  {
+    segment: 'settings',
+    label: 'Settings',
+    testId: 'workspace-settings',
+    icon: Settings,
+    purpose: 'Name, colour, backups and archive.',
+  },
+]
+
+/**
+ * The sections a universe has, in the order the sidebar lists them, grouped as the sidebar spaces them: the front page;
+ * the world itself; the writing done with it; keeping it consistent; and, set apart, its upkeep. The worldbuilding groups
+ * carry no labels - the spacing says it. Held as data rather than as markup because the narrow layout needs the same list
+ * twice: once as the list of links, and once to name the section the author is currently in.
  *
- * One icon per section, none shared with an entry type's, each decorative: the label names the
- * destination and is what a screen reader reads.
+ * One icon per section, none shared with an entry type's, each decorative: the label names the destination and is what a
+ * screen reader reads.
  */
 export const SECTION_GROUPS: readonly (readonly Section[])[] = [
-  [
-    {
-      segment: '',
-      label: 'Overview',
-      testId: 'workspace-overview',
-      icon: Compass,
-      purpose: 'This universe at a glance.',
-    },
-  ],
-  [
-    {
-      segment: 'lore',
-      label: 'Lore',
-      testId: 'workspace-lore',
-      icon: Library,
-      purpose: 'Every entry: people, places, things and ideas.',
-    },
-    {
-      segment: 'family-tree',
-      label: 'Family Tree',
-      testId: 'workspace-family-tree',
-      icon: Network,
-      purpose: 'Families worked out from recorded connections.',
-    },
-    {
-      segment: 'timeline',
-      label: 'Timeline',
-      testId: 'workspace-timeline',
-      icon: Hourglass,
-      purpose: 'What happened, in the order it happened.',
-    },
-    {
-      segment: 'world-rules',
-      label: 'World Rules',
-      testId: 'workspace-world-rules',
-      icon: Scale,
-      purpose: 'How this universe works, stated plainly.',
-    },
-  ],
-  [
-    {
-      segment: 'stories',
-      label: 'Stories',
-      testId: 'workspace-stories',
-      icon: Feather,
-      purpose: 'Narratives told with this world, scene by scene.',
-    },
-    {
-      segment: 'ideas',
-      label: 'Ideas',
-      testId: 'workspace-ideas',
-      icon: StickyNote,
-      purpose: 'Possibilities, kept apart from the lore.',
-    },
-  ],
-  [
-    {
-      segment: 'canon',
-      label: 'Canon',
-      testId: 'workspace-canon',
-      icon: BadgeCheck,
-      purpose: 'What this world says twice, and differently.',
-    },
-    {
-      segment: 'types',
-      label: 'Types',
-      testId: 'workspace-types',
-      icon: Blocks,
-      purpose: 'The kinds of entry and relation this world uses.',
-    },
-    {
-      segment: 'trash',
-      label: 'Trash',
-      testId: 'workspace-trash',
-      icon: Trash2,
-      purpose: 'What was removed, waiting to be restored.',
-    },
-  ],
-  [
-    {
-      segment: 'publish',
-      label: 'Publish',
-      testId: 'workspace-publish',
-      icon: Globe,
-      purpose: 'How this universe appears on the public portal.',
-    },
-    {
-      segment: 'settings',
-      label: 'Settings',
-      testId: 'workspace-settings',
-      icon: Settings,
-      purpose: 'Name, colour, chronology, backups and archive.',
-    },
-  ],
+  FRONT,
+  WORLD,
+  WRITING,
+  KEEPING,
+  UPKEEP,
 ]
