@@ -1,6 +1,5 @@
 import { useOutletContext } from 'react-router-dom'
 import { ChronologyEditor } from '../components/ChronologyEditor'
-import { PageHeader } from '../components/PageHeader'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
 /**
@@ -13,11 +12,7 @@ export default function ChronologyPage() {
   const { universe, chronology, setChronology } = useOutletContext<WorkspaceContext>()
 
   return (
-    <article className="chronologypage">
-      <PageHeader
-        title="Chronology"
-        lede={<p>The eras this universe’s dates are written and ordered in.</p>}
-      />
+    <article className="chronologypage" data-testid="chronology-page">
       <ChronologyEditor universeId={universe.id} chronology={chronology} onSaved={setChronology} />
     </article>
   )

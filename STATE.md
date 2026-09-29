@@ -50,6 +50,12 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **Workspace page layout consistency** (`fix/workspace-page-layout-consistency` off `dev` at `b50337e`, committed, not
+  merged, not pushed). Chronology had kept Settings' centred 46rem column; it now sits in the worldbuilding shell like
+  World Rules - `.canvas` + `PageHeader`, title and lede left, **Add era** as the header's primary action (the in-content
+  button removed; the new era's name takes the focus), the editor and Save below. Save shows only when there is something
+  to save or eras exist. Audit: every other section already shared the shell; Publish and Settings keep their column on
+  purpose. Design contract §21.2. No logic, backend or migration change.
 - **014 follow-up - sidebar grouping, Chronology, theme control** (`feat/workspace-ia-follow-up` off `dev` at `e9fa972`,
   committed, not merged, not pushed). Presentation and routing only; no backend, no migration.
   - The sidebar is worldbuilding - Overview; Lore, Family Tree, Timeline, World Rules, Chronology; Stories, Ideas; Canon,
@@ -776,7 +782,8 @@ A public, read-only discovery experience beside the workspace, in the same appli
 
 ## Baseline
 
-- **1124 API integration tests, 258 Playwright tests** (014 follow-up: +2 in `workspace-settings.spec.ts`; specs moved to
+- **1124 API integration tests, 259 Playwright tests** (layout consistency: +1 in `workspace-settings.spec.ts`; full Playwright
+  on a fresh database **259/259** first time, one invocation, two workers, retries 0, 12.1 min; API **1124/1124**). Before it, 1124 / 258 (014 follow-up: +2 in `workspace-settings.spec.ts`; specs moved to
   Chronology's own address; API **1124/1124**; full Playwright on a fresh database **258/258** first time, one invocation, two workers, retries 0, 11.8 min). Before it, 1124 / 256 (014: +8 in `workspace-settings.spec.ts`, +1 in `pwa.spec.ts`; no API
   change; API **1124/1124**, Release build clean, no pending model changes; full Playwright on a fresh database **256/256**, one invocation, two workers, retries 0, 11.1 min. The first complete run was
   253/256, all three caused by 014 and fixed in the tests: two `lore.spec.ts` steps clicked the first link named like

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { Plus } from 'lucide-react'
+import { ActionIcon } from './ActionIcon'
 import { CanonBlockNotice } from './CanonBlockNotice'
 import { blockingFindingsOf } from '../canon/blocked'
 import type { CanonBlockingFinding } from '../canon/types'
@@ -14,6 +16,7 @@ import {
 } from '../chronology/types'
 import { ApiError } from '../lib/api'
 import { useLeaveGuard } from '../lib/leaveGuard'
+import { PageHeader } from './PageHeader'
 
 /** One era as it is being edited. Text stays text until it is sent; counts ride along for display. */
 interface EraDraft {
@@ -74,8 +77,11 @@ interface ChronologyEditorProps {
 }
 
 /**
- * Where a universe's eras are named, ordered and turned the right way round - the Chronology section's editor, under the
- * page's own heading.
+ * Where a universe's eras are named, ordered and turned the right way round - the Chronology section, head and body.
+ *
+ * It draws the page's own `PageHeader`, as every worldbuilding section does, because the header's primary action - Add
+ * era - is this editor's: the drafts live here. A new era's name takes the focus, since the button that made it sits at
+ * the head of the page and the row appears below.
  *
  * The whole list is saved at once, so reordering two eras is one change rather than a moment
  * where both sit in the same place. An era something is dated in cannot be removed here - the
@@ -90,6 +96,8 @@ export function ChronologyEditor({ universeId, chronology, onSaved }: Chronology
   const [blocked, setBlocked] = useState<CanonBlockingFinding[] | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  // The era just added, whose name takes the focus once it is drawn.
+  const focusNew = useRef<string | null>(null)
   const touched = useRef(false)
   const created = useRef(0)
 
@@ -127,6 +135,12 @@ export function ChronologyEditor({ universeId, chronology, onSaved }: Chronology
     change(drafts.map((era, position) => (position === index ? { ...era, ...part } : era)))
   }
 
+  useEffect(() => {
+    if (!focusNew.current) return
+    document.getElementById(focusNew.current)?.focus()
+    focusNew.current = null
+  }, [drafts])
+
   function move(index: number, by: -1 | 1) {
     const next = [...drafts]
     const [era] = next.splice(index, 1)
@@ -136,6 +150,7 @@ export function ChronologyEditor({ universeId, chronology, onSaved }: Chronology
 
   function add() {
     created.current += 1
+    focusNew.current = `era-new-${created.current}-name`
     change([
       ...drafts,
       {
@@ -216,212 +231,219 @@ export function ChronologyEditor({ universeId, chronology, onSaved }: Chronology
   const storedNamesEras = stored.eras.length > 0
 
   return (
-    <section className="chronology" aria-label="Eras" data-testid="chronology-settings">
-      <p className="settings__note">
-        {drafts.length === 0
-          ? 'Years here are plain numbers. They count up, and below zero when a story needs them to. Name this world’s eras to write and order its dates by them instead.'
-          : 'Eras run in the order listed, earliest first. Each one’s years count up from 1, or down to 1 as it nears the next era, and every date in this universe is ordered by them.'}
-      </p>
-
-      {drafts.length > 0 && unplacedTotal > 0 ? (
-        <p className="callout callout--warning settings__caution" data-testid="chronology-unplaced">
-          {storedNamesEras
-            ? `${unplacedParts.join(' and ')} ${unplacedTotal === 1 ? 'was' : 'were'} written before these eras and ${unplacedTotal === 1 ? 'has' : 'have'} none yet. Until each is given one, it sits apart on the timeline and Canon Integrity does not compare it.`
-            : `Once saved, ${unplacedParts.join(' and ')} written as plain years will each need an era. Until then they sit apart on the timeline and Canon Integrity does not compare them.`}
-        </p>
-      ) : null}
-
-      {drafts.length > 0 ? (
-        <ol className="eras" data-testid="eras">
-          {drafts.map((era, index) => {
-            const prefix = `eras[${index}]`
-            const base = `era-${era.key}`
-            const label = era.abbreviation.trim() || era.name.trim() || 'Era'
-            const usage = usageOf(era)
-            const inUse = usage !== null
-
-            return (
-              <li className="era" key={era.key} data-testid="era">
-                <div className="era__fields">
-                  <div className="field">
-                    <label className="field__label" htmlFor={`${base}-name`}>
-                      Name
-                    </label>
-                    <input
-                      id={`${base}-name`}
-                      className="field__input"
-                      placeholder="After the Fall"
-                      value={era.name}
-                      onChange={(event) => update(index, { name: event.target.value })}
-                      aria-invalid={fieldErrors[`${prefix}.name`] ? true : undefined}
-                      data-testid="era-name"
-                    />
-                    {fieldErrors[`${prefix}.name`] ? (
-                      <p className="field__error">{fieldErrors[`${prefix}.name`]}</p>
-                    ) : null}
-                  </div>
-
-                  <div className="field">
-                    <label className="field__label" htmlFor={`${base}-abbreviation`}>
-                      Short label
-                    </label>
-                    <input
-                      id={`${base}-abbreviation`}
-                      className="field__input"
-                      placeholder="Optional"
-                      value={era.abbreviation}
-                      onChange={(event) => update(index, { abbreviation: event.target.value })}
-                      aria-invalid={fieldErrors[`${prefix}.abbreviation`] ? true : undefined}
-                      data-testid="era-abbreviation"
-                    />
-                    {fieldErrors[`${prefix}.abbreviation`] ? (
-                      <p className="field__error">{fieldErrors[`${prefix}.abbreviation`]}</p>
-                    ) : null}
-                  </div>
-
-                  <div className="field">
-                    <label className="field__label" htmlFor={`${base}-direction`}>
-                      Years
-                    </label>
-                    <select
-                      id={`${base}-direction`}
-                      className="field__input field__input--select"
-                      value={era.direction}
-                      onChange={(event) =>
-                        update(index, {
-                          direction: Number(event.target.value) as EraDirectionValue,
-                        })
-                      }
-                      data-testid="era-direction"
-                    >
-                      <option value={EraDirection.Ascending}>Count up from 1</option>
-                      <option value={EraDirection.Descending}>Count down to 1</option>
-                    </select>
-                  </div>
-
-                  <div className="field">
-                    <label className="field__label" htmlFor={`${base}-position`}>
-                      Written as
-                    </label>
-                    <select
-                      id={`${base}-position`}
-                      className="field__input field__input--select"
-                      value={era.labelPosition}
-                      onChange={(event) =>
-                        update(index, {
-                          labelPosition: Number(event.target.value) as EraLabelPositionValue,
-                        })
-                      }
-                      data-testid="era-position"
-                    >
-                      <option value={EraLabelPosition.BeforeYear}>{label} 10</option>
-                      <option value={EraLabelPosition.AfterYear}>10 {label}</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="era__foot">
-                  <p className="era__use">
-                    {usage ?? (era.id ? 'Nothing dated in it yet' : 'New era')}
-                  </p>
-                  <div className="era__tools">
-                    <button
-                      className="button button--secondary button--sm"
-                      type="button"
-                      onClick={() => move(index, -1)}
-                      disabled={index === 0}
-                      aria-label={`Move ${label} earlier`}
-                      data-testid="era-earlier"
-                    >
-                      Earlier
-                    </button>
-                    <button
-                      className="button button--secondary button--sm"
-                      type="button"
-                      onClick={() => move(index, 1)}
-                      disabled={index === drafts.length - 1}
-                      aria-label={`Move ${label} later`}
-                      data-testid="era-later"
-                    >
-                      Later
-                    </button>
-                    <button
-                      className="button button--secondary button--sm"
-                      type="button"
-                      onClick={() => change(drafts.filter((_, position) => position !== index))}
-                      disabled={inUse}
-                      title={
-                        inUse ? 'Move what is dated in this era to another one first.' : undefined
-                      }
-                      aria-label={`Remove ${label}`}
-                      data-testid="era-remove"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              </li>
-            )
-          })}
-        </ol>
-      ) : null}
-
-      {fieldErrors.eras ? <p className="field__error">{fieldErrors.eras}</p> : null}
-
-      <div className="form__actions">
-        <button
-          className="button button--secondary"
-          type="button"
-          onClick={add}
-          data-testid="add-era"
-        >
-          Add era
-        </button>
-      </div>
-
-      {preview.length > 0 ? (
-        <div className="eras__preview">
-          <p className="field__label">In order, earliest first</p>
-          <ol className="eras__line" data-testid="era-preview">
-            {preview.map((year, index) => (
-              <li key={`${year}-${index}`}>{year}</li>
-            ))}
-          </ol>
-        </div>
-      ) : null}
-
-      {blocked ? (
-        <CanonBlockNotice universeId={universeId} findings={blocked} linkSubjects />
-      ) : null}
-
-      {message ? (
-        <p className="form__message" role="alert" data-testid="chronology-error">
-          {message}
-        </p>
-      ) : null}
-
-      {saved ? (
-        <p className="settings__saved" role="status" data-testid="chronology-saved">
-          Chronology saved.
-        </p>
-      ) : null}
-
-      <div className="form__actions eras__actions">
-        <button
-          className="button"
-          type="button"
-          onClick={() => void save()}
-          disabled={saving || !dirty}
-          data-testid="save-chronology"
-        >
-          {saving ? 'Saving' : 'Save chronology'}
-        </button>
-        {dirty ? (
-          <button className="button button--secondary" type="button" onClick={discard}>
-            Discard changes
+    <>
+      <PageHeader
+        title="Chronology"
+        lede={<p>The eras this universe’s dates are written and ordered in.</p>}
+        actions={
+          <button className="button" type="button" onClick={add} data-testid="add-era">
+            <ActionIcon icon={Plus} />
+            Add era
           </button>
+        }
+      />
+      <section className="chronology" aria-label="Eras" data-testid="chronology-settings">
+        <p className="settings__note">
+          {drafts.length === 0
+            ? 'Years here are plain numbers. They count up, and below zero when a story needs them to. Name this world’s eras to write and order its dates by them instead.'
+            : 'Eras run in the order listed, earliest first. Each one’s years count up from 1, or down to 1 as it nears the next era, and every date in this universe is ordered by them.'}
+        </p>
+
+        {drafts.length > 0 && unplacedTotal > 0 ? (
+          <p
+            className="callout callout--warning settings__caution"
+            data-testid="chronology-unplaced"
+          >
+            {storedNamesEras
+              ? `${unplacedParts.join(' and ')} ${unplacedTotal === 1 ? 'was' : 'were'} written before these eras and ${unplacedTotal === 1 ? 'has' : 'have'} none yet. Until each is given one, it sits apart on the timeline and Canon Integrity does not compare it.`
+              : `Once saved, ${unplacedParts.join(' and ')} written as plain years will each need an era. Until then they sit apart on the timeline and Canon Integrity does not compare them.`}
+          </p>
         ) : null}
-      </div>
-    </section>
+
+        {drafts.length > 0 ? (
+          <ol className="eras" data-testid="eras">
+            {drafts.map((era, index) => {
+              const prefix = `eras[${index}]`
+              const base = `era-${era.key}`
+              const label = era.abbreviation.trim() || era.name.trim() || 'Era'
+              const usage = usageOf(era)
+              const inUse = usage !== null
+
+              return (
+                <li className="era" key={era.key} data-testid="era">
+                  <div className="era__fields">
+                    <div className="field">
+                      <label className="field__label" htmlFor={`${base}-name`}>
+                        Name
+                      </label>
+                      <input
+                        id={`${base}-name`}
+                        className="field__input"
+                        placeholder="After the Fall"
+                        value={era.name}
+                        onChange={(event) => update(index, { name: event.target.value })}
+                        aria-invalid={fieldErrors[`${prefix}.name`] ? true : undefined}
+                        data-testid="era-name"
+                      />
+                      {fieldErrors[`${prefix}.name`] ? (
+                        <p className="field__error">{fieldErrors[`${prefix}.name`]}</p>
+                      ) : null}
+                    </div>
+
+                    <div className="field">
+                      <label className="field__label" htmlFor={`${base}-abbreviation`}>
+                        Short label
+                      </label>
+                      <input
+                        id={`${base}-abbreviation`}
+                        className="field__input"
+                        placeholder="Optional"
+                        value={era.abbreviation}
+                        onChange={(event) => update(index, { abbreviation: event.target.value })}
+                        aria-invalid={fieldErrors[`${prefix}.abbreviation`] ? true : undefined}
+                        data-testid="era-abbreviation"
+                      />
+                      {fieldErrors[`${prefix}.abbreviation`] ? (
+                        <p className="field__error">{fieldErrors[`${prefix}.abbreviation`]}</p>
+                      ) : null}
+                    </div>
+
+                    <div className="field">
+                      <label className="field__label" htmlFor={`${base}-direction`}>
+                        Years
+                      </label>
+                      <select
+                        id={`${base}-direction`}
+                        className="field__input field__input--select"
+                        value={era.direction}
+                        onChange={(event) =>
+                          update(index, {
+                            direction: Number(event.target.value) as EraDirectionValue,
+                          })
+                        }
+                        data-testid="era-direction"
+                      >
+                        <option value={EraDirection.Ascending}>Count up from 1</option>
+                        <option value={EraDirection.Descending}>Count down to 1</option>
+                      </select>
+                    </div>
+
+                    <div className="field">
+                      <label className="field__label" htmlFor={`${base}-position`}>
+                        Written as
+                      </label>
+                      <select
+                        id={`${base}-position`}
+                        className="field__input field__input--select"
+                        value={era.labelPosition}
+                        onChange={(event) =>
+                          update(index, {
+                            labelPosition: Number(event.target.value) as EraLabelPositionValue,
+                          })
+                        }
+                        data-testid="era-position"
+                      >
+                        <option value={EraLabelPosition.BeforeYear}>{label} 10</option>
+                        <option value={EraLabelPosition.AfterYear}>10 {label}</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="era__foot">
+                    <p className="era__use">
+                      {usage ?? (era.id ? 'Nothing dated in it yet' : 'New era')}
+                    </p>
+                    <div className="era__tools">
+                      <button
+                        className="button button--secondary button--sm"
+                        type="button"
+                        onClick={() => move(index, -1)}
+                        disabled={index === 0}
+                        aria-label={`Move ${label} earlier`}
+                        data-testid="era-earlier"
+                      >
+                        Earlier
+                      </button>
+                      <button
+                        className="button button--secondary button--sm"
+                        type="button"
+                        onClick={() => move(index, 1)}
+                        disabled={index === drafts.length - 1}
+                        aria-label={`Move ${label} later`}
+                        data-testid="era-later"
+                      >
+                        Later
+                      </button>
+                      <button
+                        className="button button--secondary button--sm"
+                        type="button"
+                        onClick={() => change(drafts.filter((_, position) => position !== index))}
+                        disabled={inUse}
+                        title={
+                          inUse ? 'Move what is dated in this era to another one first.' : undefined
+                        }
+                        aria-label={`Remove ${label}`}
+                        data-testid="era-remove"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
+        ) : null}
+
+        {fieldErrors.eras ? <p className="field__error">{fieldErrors.eras}</p> : null}
+
+        {preview.length > 0 ? (
+          <div className="eras__preview">
+            <p className="field__label">In order, earliest first</p>
+            <ol className="eras__line" data-testid="era-preview">
+              {preview.map((year, index) => (
+                <li key={`${year}-${index}`}>{year}</li>
+              ))}
+            </ol>
+          </div>
+        ) : null}
+
+        {blocked ? (
+          <CanonBlockNotice universeId={universeId} findings={blocked} linkSubjects />
+        ) : null}
+
+        {message ? (
+          <p className="form__message" role="alert" data-testid="chronology-error">
+            {message}
+          </p>
+        ) : null}
+
+        {saved ? (
+          <p className="settings__saved" role="status" data-testid="chronology-saved">
+            Chronology saved.
+          </p>
+        ) : null}
+
+        {/* Nothing to save and no eras to save: no lone disabled button under the note. */}
+        {dirty || drafts.length > 0 ? (
+          <div className="form__actions eras__actions">
+            <button
+              className="button"
+              type="button"
+              onClick={() => void save()}
+              disabled={saving || !dirty}
+              data-testid="save-chronology"
+            >
+              {saving ? 'Saving' : 'Save chronology'}
+            </button>
+            {dirty ? (
+              <button className="button button--secondary" type="button" onClick={discard}>
+                Discard changes
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
+    </>
   )
 }

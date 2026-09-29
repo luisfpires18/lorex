@@ -2340,8 +2340,7 @@ a.button--danger:visited {
    sidebar with the rest of the canvas empty. The column is the page's, not the text's: labels and fields stay left-
    aligned inside it. Narrower than the column, they simply take the width there is. */
 .settings--tabbed,
-.publish,
-.chronologypage {
+.publish {
   width: 100%;
   max-width: 46rem;
   margin-inline: auto;
@@ -2351,8 +2350,11 @@ a.button--danger:visited {
   max-width: none;
 }
 
-.chronology {
-  padding: 0;
+/* Chronology is a worldbuilding section in the workspace's own frame, full width like World Rules; only its prose keeps
+   a reading measure. */
+.chronology > .settings__note,
+.chronology > .settings__caution {
+  max-width: 70ch;
 }
 
 /* The tab row: words under a hairline, the chosen one inked and underlined - never colour alone. On a phone the row
