@@ -1,14 +1,14 @@
 import { Link, useOutletContext } from 'react-router-dom'
 import { PageHeader } from '../components/PageHeader'
 import { formatDate } from '../lib/dates'
-import { SECTION_GROUPS } from '../universes/sections'
+import { KEEPING, WORLD, WRITING } from '../universes/sections'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
-/** The contents page's three parts: the sidebar's groups between the front page and Settings. */
+/** The contents page's three parts: the sidebar's worldbuilding groups, between the front page and the upkeep. */
 const CONTENTS = [
-  { heading: 'World', sections: SECTION_GROUPS[1] },
-  { heading: 'Writing', sections: SECTION_GROUPS[2] },
-  { heading: 'Keeping', sections: SECTION_GROUPS[3] },
+  { heading: 'World', sections: WORLD },
+  { heading: 'Writing', sections: WRITING },
+  { heading: 'Keeping', sections: KEEPING },
 ]
 
 /**

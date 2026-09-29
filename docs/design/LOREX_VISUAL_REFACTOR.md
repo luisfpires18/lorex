@@ -1385,3 +1385,11 @@ buttons with `aria-pressed`, a decorative icon beside each word.
 - **A universe's colour** is `[picker] [#rrggbb]` with "No colour"; the swatch palette (Lapis, Verdigris, Rust,
   Amethyst, Brass, Slate) is retired and its `.swatch` styles deleted. Colours chosen from it are ordinary values.
 - The brand links to `/explore` wherever it is drawn.
+
+### 21.1 Follow-up: grouping, Chronology, the theme control
+
+- **Sidebar:** worldbuilding groups spaced as before, then **upkeep** (Trash, Publish, Settings) under a hairline -
+  `.sidebar__group--upkeep`; on a phone it spans the sheet as one row of three.
+- **Chronology** is a section page (centred column, `PageHeader` with its own `h1`), no longer a Settings tab.
+- **Theme control:** `.themeswitch__track` - two equal grid halves on a 5% ink tint with a hairline, the chosen half on
+  `--raised` ringed with `--border-control`; the label on its own line above; weight constant so nothing shifts.

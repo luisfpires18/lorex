@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
-import { ChronologySettings } from '../components/ChronologySettings'
 import { UniverseForm } from '../components/UniverseForm'
 import { downloadUniverseBackup } from '../export/api'
 import { discardUniverseDrafts } from '../lib/localDrafts'
@@ -14,7 +13,6 @@ import type { WorkspaceContext } from './UniverseWorkspace'
 const TABS = [
   { id: 'general', label: 'General' },
   { id: 'appearance', label: 'Appearance' },
-  { id: 'chronology', label: 'Chronology' },
   { id: 'data', label: 'Data' },
   { id: 'advanced', label: 'Advanced' },
 ] as const
@@ -24,11 +22,11 @@ type TabId = (typeof TABS)[number]['id']
 const isTab = (value: string | null): value is TabId => TABS.some((tab) => tab.id === value)
 
 /**
- * A universe's Settings (UI refinement 014): five tabs in a centred column rather than one long page, and publishing no
- * longer here - it has a page of its own, Publish.
+ * A universe's Settings (UI refinement 014): four tabs in a centred column rather than one long page. Publishing has a
+ * page of its own, Publish, and the chronology is worldbuilding, not configuration - it is its own section, Chronology.
  *
  * General is the universe's name and description; Appearance its colour (the author's own, no palette; Lorex's Light and
- * Dark theme is the account's, not a universe's); Chronology its eras; Data its backup and restore; Advanced its archive
+ * Dark theme is the account's, not a universe's); Data its backup and restore; Advanced its archive
  * and, once archived, delete - the one thing that cannot be taken back, set apart in the danger panel.
  *
  * Every panel stays mounted and is only hidden, so an unsaved form keeps its text and its leave guard across tab
@@ -36,7 +34,7 @@ const isTab = (value: string | null): value is TabId => TABS.some((tab) => tab.i
  * but switching replaces rather than adds a history entry: Back leaves Settings, as it always has.
  */
 export default function UniverseSettings() {
-  const { universe, refresh, chronology, setChronology } = useOutletContext<WorkspaceContext>()
+  const { universe, refresh } = useOutletContext<WorkspaceContext>()
   const { user } = useAuth()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
@@ -305,14 +303,6 @@ export default function UniverseSettings() {
             }}
           />
         </section>
-      </Panel>
-
-      <Panel id="chronology" tab={tab}>
-        <ChronologySettings
-          universeId={universe.id}
-          chronology={chronology}
-          onSaved={setChronology}
-        />
       </Panel>
 
       <Panel id="data" tab={tab}>

@@ -68,8 +68,8 @@ test.describe('the shell', () => {
     const base = await newUniverse(page)
 
     const sections = page.getByRole('navigation', { name: 'Universe sections' })
-    // Twelve since Publish joined Settings at the foot (014).
-    await expect(sections.getByRole('link')).toHaveCount(12)
+    // Thirteen: Publish joined the foot in 014, and Chronology left Settings for a section of its own.
+    await expect(sections.getByRole('link')).toHaveCount(13)
 
     // One h1 per screen, and it is the screen's title - the universe name in the sidebar is not it.
     await page.goto(`${base}/timeline`)
@@ -180,13 +180,20 @@ test.describe('the shell', () => {
       expect(Math.abs(lore.x - overview.x)).toBeLessThanOrEqual(1)
       expect(lore.y).toBeGreaterThan(overview.y)
       expect(Math.abs(rules.x - overview.x)).toBeLessThanOrEqual(1)
-      // Groups stay whole: the writing pair shares a column, and the foot (Publish, Settings) sits in the second.
+      // Groups stay whole: the writing pair shares a column. The upkeep - Trash, Publish, Settings - is one row
+      // across the sheet's foot, under everything else.
       const ideas = await at('workspace-ideas')
+      const types = await at('workspace-types')
+      const chronology = await at('workspace-chronology')
+      const trash = await at('workspace-trash')
       const publish = await at('workspace-publish')
       const settings = await at('workspace-settings')
       expect(Math.abs(ideas.x - stories.x)).toBeLessThanOrEqual(1)
-      expect(publish.x).toBeGreaterThan(overview.x + overview.width / 2)
-      expect(Math.abs(settings.x - publish.x)).toBeLessThanOrEqual(1)
+      expect(Math.abs(publish.y - trash.y)).toBeLessThanOrEqual(1)
+      expect(Math.abs(settings.y - trash.y)).toBeLessThanOrEqual(1)
+      expect(trash.x).toBeLessThan(publish.x)
+      expect(publish.x).toBeLessThan(settings.x)
+      expect(trash.y).toBeGreaterThan(Math.max(types.y, chronology.y))
 
       // Every row is a target a thumb can hit.
       for (const id of ['workspace-overview', 'workspace-trash', 'workspace-settings']) {

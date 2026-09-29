@@ -955,29 +955,84 @@ a.button--danger:visited {
   line-height: 0;
 }
 
-/* The theme choice (013): its word, then the shared segmented track. In a menu it sits under a hairline, apart from
-   the links. */
+/* The theme choice (013; redrawn in the 014 follow-up): its word on a line of its own, then one segmented control of two
+   equal halves across the whole width. The track is a faint tint of the ink over whatever surface holds it - a menu, a
+   page, light or dark - never a dark well; the chosen half is lifted onto the raised surface and ringed with the control
+   border, so the choice is a shape as well as a shade. Font weight never changes, so nothing shifts when it is pressed. */
 .themeswitch {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2) var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+  max-width: 18rem;
+}
+
+.themeswitch--menu {
+  max-width: none;
 }
 
 .themeswitch__label {
-  font-size: var(--text-ui);
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 
-.themeswitch .segmented {
-  align-self: auto;
+.themeswitch__track {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
 }
 
 .themeswitch__option {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: calc(var(--control-sm) - 2px);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: calc(var(--radius-sm) - 2px);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--text-ui);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-1) var(--ease),
+    color var(--duration-1) var(--ease),
+    box-shadow var(--duration-1) var(--ease);
+}
+
+.themeswitch__option:hover {
+  color: var(--ink);
+}
+
+.themeswitch__option[aria-pressed='true'] {
+  background: var(--raised);
+  color: var(--ink);
+  box-shadow:
+    0 0 0 1px var(--border-control),
+    var(--shadow-1);
+}
+
+.themeswitch__option:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.themeswitch__icon {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+}
+
+@media (pointer: coarse) {
+  .themeswitch__option {
+    min-height: calc(var(--control-touch) - 6px);
+  }
 }
 
 .actionmenu__section {
@@ -1898,6 +1953,13 @@ a.button--danger:visited {
   margin-top: var(--space-6);
 }
 
+/* Upkeep - Trash, Publish, Settings - is not worldbuilding: a hairline and a little more space set it apart. */
+.sidebar__group--upkeep {
+  margin-top: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--rule);
+}
+
 .sidebar__links {
   display: flex;
   flex-direction: column;
@@ -2278,7 +2340,8 @@ a.button--danger:visited {
    sidebar with the rest of the canvas empty. The column is the page's, not the text's: labels and fields stay left-
    aligned inside it. Narrower than the column, they simply take the width there is. */
 .settings--tabbed,
-.publish {
+.publish,
+.chronologypage {
   width: 100%;
   max-width: 46rem;
   margin-inline: auto;
@@ -2286,6 +2349,10 @@ a.button--danger:visited {
 
 .settings--tabbed .settings__section {
   max-width: none;
+}
+
+.chronology {
+  padding: 0;
 }
 
 /* The tab row: words under a hairline, the chosen one inked and underlined - never colour alone. On a phone the row
@@ -5247,6 +5314,20 @@ html:has(.viewer[open]) {
   .sidebar__group {
     break-inside: avoid;
     padding-bottom: var(--space-3);
+  }
+
+  /* The upkeep row spans the sheet under a rule, its three links side by side. */
+  .sidebar__group--upkeep {
+    column-span: all;
+    margin-top: 0;
+    padding-top: var(--space-3);
+    padding-bottom: 0;
+  }
+
+  .sidebar__group--upkeep .sidebar__links {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-1);
   }
 
   .sidebar__link {

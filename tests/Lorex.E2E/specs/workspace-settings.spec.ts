@@ -3,7 +3,7 @@ import { png } from './support/png'
 
 /**
  * UI refinement 014: the workspace's information architecture. Lorex's brand leads to the portal from everywhere;
- * publishing is a page of its own, Publish, just above Settings; Settings is five tabs in a centred column, with a
+ * publishing is a page of its own, Publish, just above Settings; Settings is four tabs in a centred column, with a
  * universe's colour the author's own and no palette; and Lorex opens on the portal - signed in or out, whatever was used
  * last - while a deep link still goes where it says.
  */
@@ -110,7 +110,7 @@ test.describe('Publish', () => {
     await page.goto(`/app/universes/${w.id}`)
 
     const sections = page.getByRole('navigation', { name: 'Universe sections' })
-    await expect(sections.getByRole('link')).toHaveCount(12)
+    await expect(sections.getByRole('link')).toHaveCount(13)
     const links = (await sections.getByRole('link').allTextContents()).map((text) => text.trim())
     expect(links.indexOf('Publish')).toBe(links.indexOf('Settings') - 1)
 
@@ -154,8 +154,98 @@ test.describe('Publish', () => {
   })
 })
 
+test.describe('the sidebar, Chronology and the theme control (014 follow-up)', () => {
+  test('worldbuilding above, upkeep apart below; Chronology a section after World Rules, not a Settings tab', async ({
+    page,
+  }) => {
+    await signUp(page)
+    const w = await universe(page)
+    await page.goto(`/app/universes/${w.id}`)
+
+    const sections = page.getByRole('navigation', { name: 'Universe sections' })
+    await expect(sections.getByRole('link')).toHaveCount(13)
+    const links = (await sections.getByRole('link').allTextContents()).map((text) => text.trim())
+    expect(links).toEqual([
+      'Overview',
+      'Lore',
+      'Family Tree',
+      'Timeline',
+      'World Rules',
+      'Chronology',
+      'Stories',
+      'Ideas',
+      'Canon',
+      'Types',
+      'Trash',
+      'Publish',
+      'Settings',
+    ])
+    const upkeep = page.getByTestId('sidebar-upkeep')
+    await expect(upkeep.getByRole('link')).toHaveText(['Trash', 'Publish', 'Settings'])
+
+    // Chronology is a page of its own, with its editor, and Settings has no trace of it.
+    await page.getByTestId('workspace-chronology').click()
+    await page.waitForURL(`/app/universes/${w.id}/chronology`)
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Chronology')
+    await expect(sections.getByRole('link', { name: 'Chronology' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    await expect(page.getByTestId('chronology-settings')).toContainText(
+      'Years here are plain numbers',
+    )
+    await page.getByTestId('add-era').click()
+    await page.getByTestId('era-name').fill('Before the Flood')
+    await page.getByTestId('save-chronology').click()
+    await expect(page.getByTestId('chronology-saved')).toBeVisible()
+
+    await page.getByTestId('workspace-settings').click()
+    await expect(page.getByRole('tab')).toHaveText(['General', 'Appearance', 'Data', 'Advanced'])
+    await expect(page.getByTestId('chronology-settings')).toHaveCount(0)
+
+    // Browser history moves between the two pages as it does between any sections.
+    await page.goBack()
+    await expect(page).toHaveURL(`/app/universes/${w.id}/chronology`)
+    await expect(page.getByTestId('era')).toHaveCount(1)
+  })
+
+  test('the theme control is one segmented control of two equal halves, worked from the keyboard', async ({
+    page,
+  }) => {
+    await signUp(page)
+    await page.evaluate(() => localStorage.setItem('lorex-theme', 'light'))
+    await page.goto('/app')
+    await page.getByTestId('account-menu-trigger').click()
+
+    const track = page.getByTestId('account-menu-panel').getByRole('group', { name: 'Theme' })
+    const light = track.getByRole('button', { name: 'Light' })
+    const dark = track.getByRole('button', { name: 'Dark' })
+    const [l, d, t] = [
+      (await light.boundingBox())!,
+      (await dark.boundingBox())!,
+      (await track.boundingBox())!,
+    ]
+    expect(Math.abs(l.width - d.width)).toBeLessThanOrEqual(1)
+    expect(Math.abs(l.y - d.y)).toBeLessThanOrEqual(1)
+    // The two halves fill the menu's width between them.
+    expect(l.width + d.width).toBeGreaterThan(t.width - 12)
+
+    await expect(light).toHaveAttribute('aria-pressed', 'true')
+    await light.focus()
+    await page.keyboard.press('ArrowDown')
+    await expect(dark).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(dark).toHaveAttribute('aria-pressed', 'true')
+    await expect(light).toHaveAttribute('aria-pressed', 'false')
+    expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark')
+    // The menu stays open, and pressing the chosen half does not change its size.
+    await expect(page.getByTestId('account-menu-panel')).toBeVisible()
+    expect(Math.abs((await dark.boundingBox())!.width - d.width)).toBeLessThanOrEqual(1)
+  })
+})
+
 test.describe('Settings', () => {
-  test('five keyboard tabs in a centred column, each with its own things, and destructive ones in Advanced', async ({
+  test('four keyboard tabs in a centred column, each with its own things, and destructive ones in Advanced', async ({
     page,
   }) => {
     await signUp(page)
@@ -164,7 +254,7 @@ test.describe('Settings', () => {
     await page.goto(`/app/universes/${w.id}/settings`)
 
     const tabs = page.getByRole('tab')
-    await expect(tabs).toHaveText(['General', 'Appearance', 'Chronology', 'Data', 'Advanced'])
+    await expect(tabs).toHaveText(['General', 'Appearance', 'Data', 'Advanced'])
     await expect(page.getByRole('tab', { name: 'General' })).toHaveAttribute(
       'aria-selected',
       'true',
@@ -206,7 +296,7 @@ test.describe('Settings', () => {
     await page.getByRole('tab', { name: 'Advanced' }).click()
     await advanced.getByTestId('toggle-archive').click()
     await expect(advanced.getByTestId('danger-section')).toBeVisible()
-    for (const other of ['General', 'Appearance', 'Chronology', 'Data']) {
+    for (const other of ['General', 'Appearance', 'Data']) {
       await expect(
         page
           .getByRole('tabpanel', { name: other, includeHidden: true })
@@ -338,11 +428,15 @@ test.describe('Settings', () => {
         })
         await context.addInitScript((t) => localStorage.setItem('lorex-theme', t), theme)
         const page = await context.newPage()
+        await page.goto(`/app/universes/${w.id}/chronology`)
+        await expect(page.getByRole('heading', { level: 1 })).toHaveText('Chronology')
+        expect(await noSideways(page), `${theme} ${size.width} chronology`).toBeLessThanOrEqual(0)
+
         await page.goto(`/app/universes/${w.id}/publish`)
         await expect(page.getByRole('heading', { level: 1 })).toHaveText('Publish')
         expect(await noSideways(page), `${theme} ${size.width} publish`).toBeLessThanOrEqual(0)
 
-        for (const tab of ['general', 'appearance', 'chronology', 'data', 'advanced']) {
+        for (const tab of ['general', 'appearance', 'data', 'advanced']) {
           await page.goto(`/app/universes/${w.id}/settings?tab=${tab}`)
           const chosen = page.getByTestId(`settings-tab-${tab}`)
           await expect(chosen).toHaveAttribute('aria-selected', 'true')

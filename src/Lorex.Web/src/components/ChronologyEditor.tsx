@@ -67,21 +67,22 @@ function usageOf(era: EraDraft) {
   return parts.length === 0 ? null : `Dates ${parts.join(' and ')}`
 }
 
-interface ChronologySettingsProps {
+interface ChronologyEditorProps {
   universeId: string
   chronology: Chronology
   onSaved: (next: Chronology) => void
 }
 
 /**
- * Where a universe's eras are named, ordered and turned the right way round.
+ * Where a universe's eras are named, ordered and turned the right way round - the Chronology section's editor, under the
+ * page's own heading.
  *
  * The whole list is saved at once, so reordering two eras is one change rather than a moment
  * where both sit in the same place. An era something is dated in cannot be removed here - the
  * button says so rather than letting the API refuse it - and a change that would make settled
  * canon contradict itself comes back as the same refusal every gated form shows.
  */
-export function ChronologySettings({ universeId, chronology, onSaved }: ChronologySettingsProps) {
+export function ChronologyEditor({ universeId, chronology, onSaved }: ChronologyEditorProps) {
   const [stored, setStored] = useState(chronology)
   const [drafts, setDrafts] = useState(() => draftsFrom(chronology))
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -215,8 +216,7 @@ export function ChronologySettings({ universeId, chronology, onSaved }: Chronolo
   const storedNamesEras = stored.eras.length > 0
 
   return (
-    <section className="settings__section" data-testid="chronology-settings">
-      <h2 className="settings__heading">Chronology</h2>
+    <section className="chronology" aria-label="Eras" data-testid="chronology-settings">
       <p className="settings__note">
         {drafts.length === 0
           ? 'Years here are plain numbers. They count up, and below zero when a story needs them to. Name this world’s eras to write and order its dates by them instead.'
