@@ -50,6 +50,17 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **Lore pager centred on CI's 360px** (`fix/lore-pagination-ci-centering` off `dev` at `9c403ff`, committed, not merged,
+  not pushed). Deploy DEV #58 failed E2E only, identically on all three attempts: `lore-pagination.spec.ts`, light 360
+  page 1, centre 8.47px off. **The UI was wrong, not the test**: the pager's `1fr auto 1fr` side tracks have an `auto`
+  minimum, and in CI's DejaVu "Previous" with its arrow is 117px against a 109px half, so its track grew and the position
+  moved right. Reproduced to the digit in Playwright's Linux image with DejaVu (`tests/Lorex.E2E/README.md`). Fixed in
+  CSS: `minmax(0, 1fr) auto minmax(0, 1fr)` makes the halves equal by construction, and a container query (pager at most
+  22rem) drops the decorative arrows so the words stay inside their halves - Lore's is the only pager with arrows; every
+  pager gets the equal tracks. Spec now also checks 1536, 1024, 820 and a middle page, and that neither button reaches the
+  position. Measured after, Linux/DejaVu and Windows: 0px at 390 and 360, both themes, pages 1, 2, 4. Full Playwright on a
+  fresh database, two workers, retries 0: run 1 262/263 - `canon.spec.ts` review test met a wholly blank entry page (the
+  known dev-server blank, no app shell mounted; green 3/3 alone); run 2 **263/263**, 12.8 min. Test count unchanged.
 - **One workspace shell, Lore pagination** (`fix/workspace-shell-and-lore-pagination` off `dev` at `bcb3291`, committed,
   not merged, not pushed). Publish and Settings left their centred column: every universe page now starts at the same
   place with the same `PageHeader`; Settings' tabs sit in the header's slot, and only their forms keep a 46rem left-aligned

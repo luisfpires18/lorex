@@ -70,7 +70,11 @@ async function pagerGeometry(page: Page) {
       gridRight: grid.right,
       gridCentre: grid.left + grid.width / 2,
       previousLeft: previous.left,
+      previousRight: previous.right,
+      nextLeft: next.left,
       nextRight: next.right,
+      positionLeft: position.left,
+      positionRight: position.right,
       positionCentre: position.left + position.width / 2,
       positionTop: position.top,
       previousTop: previous.top,
@@ -156,24 +160,27 @@ test.describe('Lore pages', () => {
     await expect(cards(page)).toHaveCount(10)
   })
 
-  test('the pager is three fixed slots across the grid: start, true centre, end - on the first page and the last', async ({
+  test('the pager is three fixed slots across the grid: start, true centre, end - on the first page, a middle one and the last', async ({
     page,
     browser,
   }) => {
-    test.setTimeout(180_000)
+    test.setTimeout(240_000)
     await signUp(page)
     const w = await world(page)
 
     for (const theme of ['light', 'dark']) {
       for (const viewport of [
         { width: 1920, height: 1080 },
+        { width: 1536, height: 864 },
         { width: 1440, height: 900 },
+        { width: 1024, height: 768 },
+        { width: 820, height: 1180 },
         { width: 390, height: 844 },
         { width: 360, height: 780 },
       ]) {
         const { context, page: tab } = await signedIn(browser, page, { viewport })
         await context.addInitScript((t) => localStorage.setItem('lorex-theme', t), theme)
-        for (const at of [1, 4]) {
+        for (const at of [1, 2, 4]) {
           await tab.goto(`/app/universes/${w.id}/lore${at > 1 ? `?page=${at}` : ''}`)
           await expect(tab.locator('.pager__position')).toHaveText(`Page ${at} of 4`)
           const g = await pagerGeometry(tab)
@@ -181,6 +188,9 @@ test.describe('Lore pages', () => {
           expect(Math.abs(g.previousLeft - g.gridLeft), where).toBeLessThanOrEqual(2)
           expect(Math.abs(g.nextRight - g.gridRight), where).toBeLessThanOrEqual(2)
           expect(Math.abs(g.positionCentre - g.gridCentre), where).toBeLessThanOrEqual(2)
+          // Each button stays inside its own half: never over the position, however wide its label draws.
+          expect(g.previousRight, where).toBeLessThanOrEqual(g.positionLeft)
+          expect(g.nextLeft, where).toBeGreaterThanOrEqual(g.positionRight)
           // One row: the three parts share a line.
           expect(Math.abs(g.previousTop - g.nextTop), where).toBeLessThanOrEqual(12)
           // The end that goes nowhere stays in its place, disabled, so the centre never moves.
