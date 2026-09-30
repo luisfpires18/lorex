@@ -4,9 +4,10 @@ import { expect, test, type Page } from '@playwright/test'
  * A universe's own chronology, end to end. Each test registers its own account and builds its
  * own universe, so nothing depends on data another test left behind.
  *
- * The invariant under test throughout: the order comes from the eras the author configured -
+ * The invariant under test throughout: the order comes from the date periods the author configured -
  * their order and which way their years run - and every date on screen is written the way that
- * configuration says, never assembled by hand and never sorted as text.
+ * configuration says, never assembled by hand and never sorted as text. Authors see "date periods";
+ * the API, and so these helpers and test ids, still say era (ADR 0022, amended by refinement 018).
  */
 const PASSWORD = 'Test-password-123!'
 
@@ -63,7 +64,7 @@ async function seedEras(page: Page, universeId: string, eras: EraSeed[]) {
   return (await response.json()).eras as { id: string; name: string }[]
 }
 
-/** Fills one era card on the Settings screen. */
+/** Fills one date period card on the Chronology screen. */
 async function fillEra(page: Page, index: number, era: Partial<EraSeed> & { name: string }) {
   const card = page.getByTestId('era').nth(index)
   await card.getByTestId('era-name').fill(era.name)
@@ -71,10 +72,10 @@ async function fillEra(page: Page, index: number, era: Partial<EraSeed> & { name
     await card.getByTestId('era-abbreviation').fill(era.abbreviation ?? '')
   }
   if (era.direction) {
-    await card.getByTestId('era-direction').selectOption(String(Direction[era.direction]))
+    await card.getByTestId(`era-direction-${era.direction}`).click()
   }
   if (era.position) {
-    await card.getByTestId('era-position').selectOption(String(Position[era.position]))
+    await card.getByTestId(`era-position-${era.position}`).click()
   }
 }
 
@@ -136,7 +137,7 @@ function scrollsSideways(page: Page) {
 }
 
 test.describe('chronology', () => {
-  test('eras are named and ordered in Chronology, and every timeline date is written and ordered by them', async ({
+  test('date periods are named and ordered in Chronology, and every timeline date is written and ordered by them', async ({
     page,
   }) => {
     await signUp(page)
@@ -146,7 +147,7 @@ test.describe('chronology', () => {
     await page.waitForURL(/\/chronology$/)
 
     const settings = page.getByTestId('chronology-settings')
-    await expect(settings).toContainText('Years here are plain numbers')
+    await expect(settings).toContainText('This universe uses plain numbered years.')
 
     // Written in the wrong order on purpose, then put right.
     await page.getByTestId('add-era').click()
@@ -158,18 +159,17 @@ test.describe('chronology', () => {
       'Before the Fall',
     )
 
-    // The preview is the configuration's meaning, before anything is saved.
-    await expect(page.getByTestId('era-preview').locator('li')).toHaveText([
-      'BF 120',
-      'BF 1',
-      'AF 1',
-      'AF 120',
+    // The order line is the configuration's meaning, before anything is saved - names, never a range.
+    await expect(page.getByTestId('era-order').locator('li')).toHaveText([
+      'Before the Fall',
+      'After the Fall',
     ])
+    await expect(page.getByTestId('era-preview')).toHaveCount(0)
 
     await page.getByTestId('save-chronology').click()
     await expect(page.getByTestId('chronology-status')).toHaveText('Saved')
 
-    // The timeline now asks for an era beside every year.
+    // The timeline now asks for a date period beside every year.
     await page.getByTestId('workspace-timeline').click()
     await page.waitForURL(/\/timeline$/)
 
@@ -204,22 +204,22 @@ test.describe('chronology', () => {
       'Before the Fall',
     )
 
-    // Named eras are ordered, so there is nothing to caution about.
+    // Date periods are ordered, so there is nothing to caution about.
     await expect(page.getByTestId('chron-eras')).toHaveCount(0)
 
-    // A year with no era is not a date on this universe's line.
+    // A year with no date period is not a date on this universe's line.
     await page.getByTestId('new-moment').click()
     await page.getByTestId('moment-title').fill('Somewhen')
     await page.getByTestId('moment-startYear').fill('4')
     await page.getByTestId('save-moment').click()
     await expect(page.getByTestId('moment-form')).toContainText(
-      'Choose the era this year is counted in.',
+      'Choose the date period this year is counted in.',
     )
     page.once('dialog', (dialog) => void dialog.accept())
     await page.getByTestId('cancel-moment').click()
     await expect(page.getByTestId('moment-form')).toHaveCount(0)
 
-    // Relabelling an era rewords every date written in it and moves none of them.
+    // Relabelling a date period rewords every date written in it and moves none of them.
     await page.getByTestId('workspace-chronology').click()
     await page.waitForURL(/\/chronology$/)
 
@@ -251,7 +251,7 @@ test.describe('chronology', () => {
       .toEqual(['120 B.F.', '5 B.F.', '1 B.F.', 'AF 1', 'AF 10'])
   })
 
-  test('a birth year is written in an era and read back the way the universe writes it', async ({
+  test('a birth year is written in a date period and read back the way the universe writes it', async ({
     page,
   }) => {
     await signUp(page)
@@ -313,17 +313,17 @@ test.describe('chronology', () => {
     await page.goto(`/app/universes/${universeId}/lore/${entityId}`)
     await expect(page.getByTestId('entry-fields')).toContainText('BF 5')
 
-    // Moved into the other era through the form.
+    // Moved into the other date period through the form.
     await page.getByTestId('edit-entity').click()
-    await expect(page.getByLabel('Born: era')).toHaveValue(eras[0].id)
-    await page.getByLabel('Born: era').selectOption({ label: 'After the Fall (AF)' })
+    await expect(page.getByLabel('Born: date period')).toHaveValue(eras[0].id)
+    await page.getByLabel('Born: date period').selectOption({ label: 'After the Fall (AF)' })
     await page.getByLabel('Born', { exact: true }).fill('7')
     await page.getByTestId('save-entity').click()
 
     await expect(page.getByTestId('entry-fields')).toContainText('AF 7')
   })
 
-  test('the chronology settings and the era form stay usable from a phone to a wide desktop', async ({
+  test('the chronology settings and the date period row stay usable from a phone to a wide desktop', async ({
     page,
   }) => {
     await signUp(page)
@@ -341,17 +341,23 @@ test.describe('chronology', () => {
       await page.goto(`/app/universes/${universeId}/chronology`)
       await expect(page.getByTestId('era')).toHaveCount(4)
 
-      // Every era's controls are on screen and reachable, not pushed off the right-hand edge.
+      // Every period's controls are on screen and reachable, not pushed off the right-hand edge.
       const last = page.getByTestId('era').nth(3)
       await last.scrollIntoViewIfNeeded()
-      for (const control of ['era-name', 'era-direction', 'era-position', 'era-later']) {
+      for (const control of [
+        'era-name',
+        'era-direction-down',
+        'era-position-after',
+        'era-later',
+        'era-remove',
+      ]) {
         const box = await last.getByTestId(control).boundingBox()
         expect(box, `${control} at ${width}px`).not.toBeNull()
         expect(box!.x + box!.width, `${control} at ${width}px`).toBeLessThanOrEqual(width)
       }
       expect(await scrollsSideways(page), `settings at ${width}px`).toBe(false)
 
-      // The drawer's era row folds rather than running wide.
+      // The drawer's date period row folds rather than running wide.
       await page.goto(`/app/universes/${universeId}/timeline`)
       await page.getByTestId('new-moment').click()
       const era = page.getByTestId('moment-startEraId')

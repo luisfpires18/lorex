@@ -22,18 +22,19 @@ interface ChronologyPointFieldsProps {
 }
 
 /**
- * One point on a universe's line as a row of inputs: the era first when the universe names its
- * eras, then the year, month and day.
+ * One point on a universe's line as a row of inputs: the date period first when the universe has
+ * them, then the year, month and day.
  *
- * The one era picker in Lorex. A timeline moment's start and end and a scene's position all come
- * through here, so the eras are offered, labelled and ruled the same way everywhere - a year inside
- * an era counts from 1, a plain year is signed. On a universe that names no eras there is no era to
- * choose and the row is the year, month and day it always was.
+ * The one date period picker in Lorex. A timeline moment's start and end and a scene's position all
+ * come through here, so the periods (stored as eras) are offered, labelled and ruled the same way
+ * everywhere - a year inside a period counts from 1 with no upper bound, a plain year is signed. On a
+ * universe with no date periods there is nothing to choose and the row is the year, month and day it
+ * always was.
  */
 export function ChronologyPointFields({
   chronology,
   ids,
-  eraLabel = 'Era',
+  eraLabel = 'Date period',
   yearLabel = 'Year',
   value,
   onChange,
@@ -58,7 +59,7 @@ export function ChronologyPointFields({
             aria-invalid={errors.eraId ? true : undefined}
             data-testid={ids.eraId}
           >
-            <option value="">Choose an era</option>
+            <option value="">Choose a date period</option>
             {chronology.eras.map((option) => (
               <option key={option.id} value={option.id}>
                 {option.abbreviation ? `${option.name} (${option.abbreviation})` : option.name}

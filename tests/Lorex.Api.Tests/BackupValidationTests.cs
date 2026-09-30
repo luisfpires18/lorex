@@ -123,7 +123,7 @@ public sealed class BackupValidationTests(LorexApiFactory factory) : IClassFixtu
         await AssertIssue(client, Rewrite(archive, root => Payload(root)["relationships"]![0]!["targetEntityId"] = nowhere), BackupIssueCodes.MissingReference, "relationship");
         await AssertIssue(client, Rewrite(archive, root => SceneTitled(root, "The Council")["chapterId"] = nowhere), BackupIssueCodes.MissingReference, "chapter");
         await AssertIssue(client, Rewrite(archive, root => SceneTitled(root, "Cold Open")["povEntityId"] = nowhere), BackupIssueCodes.MissingReference, "point of view");
-        await AssertIssue(client, Rewrite(archive, root => Payload(root)["timelineEntries"]![0]!["startEraId"] = nowhere), BackupIssueCodes.MissingReference, "era");
+        await AssertIssue(client, Rewrite(archive, root => Payload(root)["timelineEntries"]![0]!["startEraId"] = nowhere), BackupIssueCodes.MissingReference, "date period");
         await AssertIssue(
             client,
             Rewrite(archive, root => StoryTitled(root, "The Long Winter")["plotArcs"]![0]!["beats"]!.AsArray()

@@ -1,6 +1,6 @@
 # ADR 0022 - A universe keeps its own chronology: ordered eras, compared as structured points
 
-Status: accepted (2026-09-13)
+Status: accepted (2026-09-13), amended 2026-09-30 (authors see "date periods"; nothing is bounded - refinement 018)
 
 ## Context
 
@@ -99,3 +99,33 @@ of them.
 - Years written before the eras must be given one by hand, one entry at a time. There is no bulk
   assignment yet, and no reassignment tool for moving everything out of an era before removing it.
 - A backup carries the eras and every era reference, which makes it format version 4 (ADR 0014).
+
+## Amendment - authors see "date periods" (2026-09-30, refinement 018)
+
+The decision above is written, and stays written, in terms of eras. Real authoring (a Lord of the
+Rings pilot) showed the word and one screen misleading people, so the product language changed.
+The model did not.
+
+- **Product term: date period.** A date period is a named part of a world's timeline with its own
+  year numbering - an Age, an era, a reign, a dynasty, before or after an event. Every author-facing
+  surface says "date period" (plural "date periods"): the Chronology page, the timeline, scene and
+  lore year pickers, validation and in-use messages, restore problems. The author's own names
+  ("Third Age") are never rewritten.
+- **Internal names stay.** `ChronologyEras`, `ChronologyEra`, `ChronologyEraDirection`, `EraId`,
+  `StartEraId`/`EndEraId`, the `eras` member of the API and of the backup, and the machine code
+  `chronology_era_in_use` are unchanged, for compatibility. No migration, no backup format change,
+  no API contract change. An era in code is a date period on screen.
+- **A period is unbounded.** It has no first or last year. Counting up runs 1, 2, 3 and on; counting
+  down runs on toward 1, the year nearest the next period. `TA 3018` and `TA 100000` are ordinary.
+- **The old 120 was never a boundary.** The editor's preview called `previewYears(eras, [120, 1])`
+  and drew "BF 120, BF 1, AF 1, AF 120" from that hard-coded sample. It was display only - never
+  stored, never validated, never an API rule - but it read as a 120-year range. It is gone. The
+  editor now shows the order as a line of period names, each period's run as `1 → 2 → 3 → …` (no set
+  end) or `… → 3 → 2 → 1`, and the date format as a choice between two examples of year 10
+  (`TA 10` / `10 TA`), labelled as a format, never a range.
+- **Still optional.** No periods is plain numbered years, and the Chronology page says so; there is
+  still no stored mode. A plain-year timeline moment's free-text label is called "Year label" and
+  says it orders nothing.
+- **Unchanged:** ordering (period order, direction, year, month, day), year 1 with no year 0 inside a
+  period, the gated chronology write, the in-use refusal, and dates written before any period stay
+  kept and unguessed - now said in those words.

@@ -63,7 +63,7 @@ export const WORLD: readonly Section[] = [
     label: 'Chronology',
     testId: 'workspace-chronology',
     icon: CalendarRange,
-    purpose: 'The eras its dates are counted and ordered in.',
+    purpose: 'How its dates are written and ordered: plain years, or named date periods.',
   },
   {
     segment: 'world-rules',

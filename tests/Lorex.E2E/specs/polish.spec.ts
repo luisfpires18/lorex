@@ -72,7 +72,7 @@ function dialogs(page: Page) {
 }
 
 test.describe('product-wide polish', () => {
-  test("a universe's eras ask before unsaved changes are left, put back read clean, and a save lets them go", async ({
+  test("a universe's date periods ask before unsaved changes are left, put back read clean, and a save lets them go", async ({
     page,
   }) => {
     await signUp(page)

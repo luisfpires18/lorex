@@ -312,7 +312,7 @@ public static class RevisionEndpoints
             .Where(value => value.EraId is { } id && !liveEraIds.Contains(id))
             .DistinctBy(value => value.EraId))
         {
-            missing.Add($"the era \"{value.EraLabel ?? value.FieldName}\"");
+            missing.Add($"the date period \"{value.EraLabel ?? value.FieldName}\"");
         }
 
         return missing;

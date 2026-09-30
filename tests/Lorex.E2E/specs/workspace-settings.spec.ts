@@ -192,7 +192,7 @@ test.describe('the sidebar, Chronology and the theme control (014 follow-up)', (
       'page',
     )
     await expect(page.getByTestId('chronology-settings')).toContainText(
-      'Years here are plain numbers',
+      'This universe uses plain numbered years.',
     )
     await page.getByTestId('add-era').click()
     await page.getByTestId('era-name').fill('Before the Flood')
@@ -271,7 +271,7 @@ test.describe('the sidebar, Chronology and the theme control (014 follow-up)', (
       }
     }
 
-    // Add era is the header's primary action; the new era's name takes the focus, and Save sits with the editor.
+    // Add date period is the header's primary action; the new period's name takes the focus, and Save sits with the editor.
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto(`/app/universes/${w.id}/chronology`)
     await expect(page.getByTestId('save-chronology')).toHaveCount(0)

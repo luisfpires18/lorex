@@ -907,20 +907,20 @@ public static class EntityEndpoints
             var isYear = definition.Semantic is EntityFieldSemantic.BirthYear or EntityFieldSemantic.DeathYear;
 
             return isYear && chronology.NamesEras
-                ? $"Choose the era {definition.Name} is counted in."
+                ? $"Choose the date period {definition.Name} is counted in."
                 : null;
         }
 
         if (chronology.Era(eraId) is null)
         {
             return chronology.NamesEras
-                ? $"{definition.Name} must use an era this universe names."
-                : $"{definition.Name} cannot name an era, because this universe does not name any.";
+                ? $"{definition.Name} must use one of this universe's date periods."
+                : $"{definition.Name} cannot have a date period, because this universe has none.";
         }
 
         return ChronologyPoint.IsEraYear(number)
             ? null
-            : $"{definition.Name} is a year inside an era, so it is a whole number from 1.";
+            : $"{definition.Name} is a year inside a date period, so it is a whole number from 1.";
     }
 
     // ---------- Reading ----------

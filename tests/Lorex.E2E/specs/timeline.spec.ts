@@ -815,7 +815,7 @@ test.describe('timeline', () => {
       eraLabel: 'Second Age',
     })
 
-    // One era only, so far: no caution.
+    // One year label only, so far: no caution.
     await expect(page.getByTestId('chron-eras')).toHaveCount(0)
     await expect(moment(page, 'The One Ring is made')).toBeVisible()
     await expect(page.locator('.chron__era')).toHaveText('Second Age')
@@ -829,7 +829,9 @@ test.describe('timeline', () => {
 
     // Two reckonings on one page, and the page admits what its order is worth.
     await expect(page.getByTestId('chron-eras')).toBeVisible()
-    await expect(page.getByTestId('chron-eras')).toContainText('More than one reckoning')
+    await expect(page.getByTestId('chron-eras')).toContainText('More than one year label')
+    // And points at what does order them (018): date periods in Chronology.
+    await expect(page.getByTestId('chron-eras')).toContainText('Date periods in Chronology')
 
     // The era is shown beside the year rather than folded into it, and the raw year
     // numbers still decide the order. This is the known cross-era limitation, held here

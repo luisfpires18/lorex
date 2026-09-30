@@ -94,7 +94,7 @@ public static class ChronologyEndpoints
         {
             if (wanted[index].Id is { } id && !byId.ContainsKey(id))
             {
-                foreign[$"eras[{index}].id"] = ["Choose eras from this universe."];
+                foreign[$"eras[{index}].id"] = ["Choose date periods from this universe."];
             }
         }
 
@@ -161,7 +161,7 @@ public static class ChronologyEndpoints
             // was dated in an era between that check and the delete, and the foreign key held.
             return Results.Problem(
                 title: "Chronology changed",
-                detail: "Something was dated in one of these eras while this was being saved. "
+                detail: "Something was dated in one of these date periods while this was being saved. "
                     + "Reload the chronology and try again.",
                 statusCode: StatusCodes.Status409Conflict,
                 extensions: new Dictionary<string, object?> { ["code"] = EraInUseCode });
@@ -247,9 +247,9 @@ public static class ChronologyEndpoints
         });
 
         return Results.Problem(
-            title: inUse.Count == 1 ? "Era is in use" : "Eras are in use",
+            title: inUse.Count == 1 ? "Date period is in use" : "Date periods are in use",
             detail: $"{string.Join("; ", sentences)}, counting anything in the Trash. "
-                + "Move them to another era before removing it.",
+                + "Move them to another date period before removing it.",
             statusCode: StatusCodes.Status409Conflict,
             extensions: new Dictionary<string, object?>
             {
