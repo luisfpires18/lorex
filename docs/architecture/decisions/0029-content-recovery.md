@@ -112,7 +112,8 @@ hand and stays small next to that cost. Restores are typed routes, never a guess
 each answering `{ kind, id, storyId }`. Story content passes no Canon gate (ADR 0024). Every route is owner-gated through the
 universe and finds its row only through that universe, so another world's id - or another account's - is a 404.
 
-**Still no permanent delete.** Only deleting the universe removes story content for good. An era a scene in the Trash is dated
+**Still no permanent delete.** Only deleting the universe removes story content for good. *(Superseded 2026-09-30 -
+see the amendment on permanent deletion.)* An era a scene in the Trash is dated
 in stays in use, as the chronology refusal already says ("counting anything in the Trash").
 
 ### Recovered drafts
@@ -145,6 +146,8 @@ device's, not Lorex's.
 - Leaving the page itself - reload, close, a typed address - keeps the copy. The browser's own prompt cannot say what was
   answered, and a closed tab is exactly what a copy is for.
 - Deleting a universe from Settings drops that account's copies in it.
+- Deleting from the Trash permanently (amendment below) drops the copies of exactly what was erased, once the server has
+  answered: an entry's article, a scene's manuscript, and the manuscript of every scene an erased story held.
 
 **Amendment (ADR 0030): ideas.** The idea editor is a third writer of recovery copies (`kind: 'idea'`), with the lifecycle
 above. An idea belongs to an account, not a universe, so `universeId` in a copy's key is now nullable: an existing idea's
@@ -191,7 +194,7 @@ and numbers and never applies one. Recovered drafts are not in a backup: they we
 
 ## Deliberately unsupported
 
-- Permanent deletion of anything in the Trash, and emptying it (historical task 023, still last).
+- Emptying the Trash, bulk permanent deletion and retention. (Permanent deletion of one row exists since 2026-09-30.)
 - Saved versions for stories, chapters, scenes' planning, arcs and beats; versions of structure (orders, moves, links).
 - Recovered drafts for the entry, story, chapter, scene, arc and beat forms.
 - Syncing recovered drafts between devices or browsers, offline editing, or a list of every draft on a device.
@@ -214,3 +217,32 @@ World rules (ADR 0033) join the matrix as short text in a form: no saved version
 for deletion - a seventh kind of row, `WorldRule`, restored on its own typed route (`.../trash/world-rules/{id}/restore`). A rule
 sits in nothing but its universe, so it never waits for anything, and its restore passes no Canon gate because a rule contributes
 no facts. Still no permanent delete: only deleting the universe removes a rule for good.
+
+## Amendment - deleting story content permanently (2026-09-30, Product refinement 021)
+
+Every row in the Trash can be deleted for good on its kind's own route - `DELETE .../trash/stories|chapters|scenes|plot-arcs|plot-beats/{id}`
+- found only through its universe and only while marked; a live, missing or other world's id is a 404. One `DELETE` statement
+on the row, atomic, and the schema's cascades take what it owns in that statement, the search index following through its
+delete triggers:
+
+- **A story** takes its chapters, scenes (their manuscripts, versions and lore links), arcs and beats (their links) and every
+  idea reference to any of them - including rows of it that sit in the Trash on their own, which disappear from the list with
+  it. Owned descendants are never preserved outside their owner.
+- **A chapter** takes only itself: its scenes left it for Unchaptered when it was binned (above), so none goes, including a
+  scene binned while it was in the chapter.
+- **A scene** takes its manuscript and every version, its lore links, beat links and idea references. The beats stay.
+- **An arc** takes its beats, including one binned before it. **A beat** takes its links. A row whose restore is blocked by its
+  story or arc can still be erased on its own.
+
+**A story's delete answers what it took.** It is the one route that erases scenes the client cannot name: it answers 200
+with `TrashErasedStory` - `{ id, erasedSceneIds }`, every scene of the story, live or in the Trash on its own, read in the delete's
+own transaction. Every other permanent delete answers 204. After a successful delete the Trash screen lets go of this device's
+recovery copies for exactly those scenes (and for an erased scene or entry, its own), by their draft scope, never a whole
+universe's: another story's manuscripts, articles and ideas are untouched. Nothing is let go before the server answers, so a
+failed delete keeps every copy. Letting go is best effort like every recovery-copy write: a storage failure never undoes or
+hides the delete, and a copy it could not drop is never offered, since nothing can open the scene it names.
+
+No Canon: story content contributes no facts (ADR 0024). The Trash screen offers **Delete permanently…** after Restore on every
+row, quiet text rather than a second loud button; it asks once, in the row - kind, name, what goes with it, "This cannot be
+undone." - and its final button says Delete permanently. The lede now says everything can be restored until the author
+deletes it permanently.

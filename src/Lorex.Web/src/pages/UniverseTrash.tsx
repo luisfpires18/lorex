@@ -10,15 +10,18 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { Link, useOutletContext } from 'react-router-dom'
+import { useAuth } from '../auth/useAuth'
 import { ActionIcon } from '../components/ActionIcon'
 import { blockingFindingsOf } from '../canon/blocked'
 import type { CanonBlockingFinding } from '../canon/types'
 import { CanonBlockNotice } from '../components/CanonBlockNotice'
 import { Quoted } from '../components/NameList'
+import { ApiError } from '../lib/api'
 import { formatDateTime } from '../lib/dates'
+import { discardDraft } from '../lib/localDrafts'
 import { unpublishContent } from '../publishing/api'
 import { CANON_LABELS } from '../lore/types'
-import { listTrash, restoredPath, restoreFromTrash } from '../trash/api'
+import { deleteFromTrash, listTrash, restoredPath, restoreFromTrash } from '../trash/api'
 import {
   TRASH_KIND_LABELS,
   TrashBlock,
@@ -132,6 +135,29 @@ function backText(item: TrashItem) {
 }
 
 /**
+ * What deleting a row permanently takes with it, in the author's words. Only what the row owns: a chapter's scenes went
+ * to Unchaptered when it was put in the Trash, so they are not among it.
+ */
+function eraseText(item: TrashItem) {
+  switch (item.kind) {
+    case TrashKind.Entry:
+      return 'Its article, fields, picture and saved versions go with it, and links and references to it in your lore, timeline, stories and ideas are removed.'
+    case TrashKind.Story:
+      return 'Everything in it goes with it: its chapters, its scenes with their writing and saved versions, and its plot arcs and beats, including any of them that are in the Trash on their own.'
+    case TrashKind.Chapter:
+      return 'Only the chapter goes: its title, summary and notes. The scenes it held moved to Unchaptered when it was put in the Trash, and they stay there.'
+    case TrashKind.Scene:
+      return 'Its writing and every saved version of it go with it, and its links to lore, beats and ideas are removed.'
+    case TrashKind.PlotArc:
+      return 'Every beat in it goes with it, including any of its beats that are in the Trash on their own.'
+    case TrashKind.PlotBeat:
+      return 'Its links to scenes, lore and ideas are removed.'
+    case TrashKind.WorldRule:
+      return 'Its check goes with it, if it has one.'
+  }
+}
+
+/**
  * What this universe has thrown away, and the one thing to do about each of it.
  *
  * A list, not a dashboard. Nothing is counted, charted or summarised here: the question the screen answers is "what did I
@@ -140,10 +166,13 @@ function backText(item: TrashItem) {
  *
  * A row whose story or arc is in the Trash too says so and waits: it is never put somewhere else instead.
  *
- * There is no permanent delete, on purpose (ADR 0015, ADR 0029): the only way out of this screen is back into the world.
+ * Every row can also be deleted permanently (ADR 0015, 0029 and 0033, amended): a quiet second action that asks first, in
+ * the row, naming what goes with it. Never the loud one - Restore is. A row that must wait to be restored can still be
+ * deleted.
  */
 export default function UniverseTrash() {
   const { universe } = useOutletContext<WorkspaceContext>()
+  const { user } = useAuth()
 
   const [page, setPage] = useState(1)
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
@@ -156,8 +185,16 @@ export default function UniverseTrash() {
   const confirmRef = useRef<HTMLDivElement>(null)
   const restoreButtons = useRef(new Map<string, HTMLButtonElement>())
 
-  // Cancelling hands the focus back to the row's Restore - once it is enabled again, so after the render.
+  // Deleting permanently asks first too, in the row; while it asks or works, nothing else in the list can start.
+  const [erasing, setErasing] = useState<TrashItem | null>(null)
+  const [eraseBusy, setEraseBusy] = useState(false)
+  const [eraseError, setEraseError] = useState<ReactNode>(null)
+  const eraseRef = useRef<HTMLDivElement>(null)
+  const eraseButtons = useRef(new Map<string, HTMLButtonElement>())
+
+  // Cancelling hands the focus back to the button that asked - once it is enabled again, so after the render.
   const returnFocusTo = useRef<string | null>(null)
+  const returnEraseFocusTo = useRef<string | null>(null)
 
   useEffect(() => {
     if (confirming) {
@@ -168,6 +205,29 @@ export default function UniverseTrash() {
     }
   }, [confirming])
 
+  useEffect(() => {
+    if (erasing) {
+      eraseRef.current?.focus()
+    } else if (returnEraseFocusTo.current) {
+      eraseButtons.current.get(returnEraseFocusTo.current)?.focus()
+      returnEraseFocusTo.current = null
+    }
+  }, [erasing])
+
+  function askToErase(item: TrashItem) {
+    setBlocked(null)
+    setOutcome(null)
+    setEraseError(null)
+    setErasing(item)
+  }
+
+  function cancelErasing() {
+    if (eraseBusy) return
+    returnEraseFocusTo.current = erasing?.id ?? null
+    setEraseError(null)
+    setErasing(null)
+  }
+
   function cancelConfirming() {
     returnFocusTo.current = confirming?.id ?? null
     setConfirming(null)
@@ -176,7 +236,15 @@ export default function UniverseTrash() {
   const load = useCallback(
     (signal?: AbortSignal) => {
       listTrash(universe.id, page, signal)
-        .then((result) => setState({ kind: 'ready', page: result }))
+        .then((result) => {
+          // A restore or a delete - which can take a story's or arc's own rows with it - can empty the page it was on:
+          // step back to the last page there is rather than show an empty page that used to have something on it.
+          if (result.items.length === 0 && result.page > 1) {
+            setPage(Math.max(1, result.totalPages))
+            return
+          }
+          setState({ kind: 'ready', page: result })
+        })
         .catch((error: unknown) => {
           if (signal?.aborted) return
           setState({
@@ -253,14 +321,7 @@ export default function UniverseTrash() {
         },
       })
 
-      // A restore empties the last row of a page as often as not, so step back rather than
-      // leave the author looking at an empty page that used to have something on it.
-      const remaining = state.kind === 'ready' ? state.page.items.length - 1 : 0
-      if (remaining === 0 && page > 1) {
-        setPage((current) => current - 1)
-      } else {
-        load()
-      }
+      load()
     } catch (error: unknown) {
       // Nothing moved either way: a refused restore writes nothing, so the row is still in the list below and can be
       // tried again once the objection is dealt with.
@@ -286,7 +347,72 @@ export default function UniverseTrash() {
     }
   }
 
+  /** Deletes the row the author confirmed, once. A failure leaves the row, and the question, where they were. */
+  async function erase(item: TrashItem) {
+    if (eraseBusy) return
+    setEraseBusy(true)
+    setEraseError(null)
+
+    let erasedSceneIds: string[]
+    try {
+      erasedSceneIds = await deleteFromTrash(universe.id, item)
+    } catch (error: unknown) {
+      if (error instanceof ApiError && error.status === 404) {
+        // Restored or deleted somewhere else meanwhile: there is nothing left here to delete.
+        setErasing(null)
+        setOutcome({
+          text: (
+            <>
+              <Quoted text={item.name} /> is no longer in the Trash, so nothing was deleted.
+            </>
+          ),
+          link: null,
+        })
+        load()
+      } else {
+        setEraseError(
+          <>
+            <Quoted text={item.name} /> could not be deleted just now. Try again.
+          </>,
+        )
+      }
+      setEraseBusy(false)
+      return
+    }
+
+    // Only now that the server has erased it: the recovery copies of unsaved writing this device kept for what went - an
+    // entry's article, a scene's manuscript, every scene of a story - have nothing left to recover into. Scoped by id, so
+    // no other copy is touched. Best effort, like every recovery-copy write: storage that fails never undoes the delete,
+    // and a copy it could not drop is never offered, because nothing can open the scene or entry it names.
+    if (user) {
+      const scopes = [
+        ...(item.kind === TrashKind.Entry
+          ? [{ kind: 'article' as const, contentId: item.id }]
+          : []),
+        ...erasedSceneIds.map((contentId) => ({ kind: 'manuscript' as const, contentId })),
+      ]
+      for (const scope of scopes) {
+        void discardDraft({ accountId: user.id, universeId: universe.id, ...scope }).catch(
+          () => undefined,
+        )
+      }
+    }
+
+    setEraseBusy(false)
+    setErasing(null)
+    setOutcome({
+      text: (
+        <>
+          <Quoted text={item.name} /> was permanently deleted.
+        </>
+      ),
+      link: null,
+    })
+    load()
+  }
+
   const result = state.kind === 'ready' ? state.page : null
+  const busy = restoring !== null || confirming !== null || erasing !== null
 
   return (
     <article className="trash">
@@ -295,8 +421,8 @@ export default function UniverseTrash() {
         lede={
           <>
             <p>
-              What you removed from your lore, your stories and your world rules. Nothing here has
-              been erased: restoring puts each thing back with everything it held.
+              What you removed from your lore, your stories and your world rules. Everything here
+              can be restored with everything it held, until you choose to delete it permanently.
             </p>
             <p data-testid="trash-ideas-pointer">
               Deleted ideas are not here: they belong to your account, and wait in{' '}
@@ -385,22 +511,38 @@ export default function UniverseTrash() {
                     </p>
                   ) : null}
                 </div>
-                <button
-                  ref={(node) => {
-                    if (node) restoreButtons.current.set(item.id, node)
-                    else restoreButtons.current.delete(item.id)
-                  }}
-                  className="button button--secondary"
-                  type="button"
-                  disabled={restoring !== null || waiting !== null || confirming !== null}
-                  aria-label={`Restore ${kind.toLowerCase()} “${item.name}”`}
-                  aria-describedby={waiting ? waitingId : undefined}
-                  onClick={() => askToRestore(item)}
-                  data-testid={`restore-${item.name}`}
-                >
-                  <ActionIcon icon={ArchiveRestore} />
-                  {restoring === item.id ? 'Restoring…' : 'Restore'}
-                </button>
+                <div className="trash__actions">
+                  <button
+                    ref={(node) => {
+                      if (node) restoreButtons.current.set(item.id, node)
+                      else restoreButtons.current.delete(item.id)
+                    }}
+                    className="button button--secondary"
+                    type="button"
+                    disabled={busy || waiting !== null}
+                    aria-label={`Restore ${kind.toLowerCase()} “${item.name}”`}
+                    aria-describedby={waiting ? waitingId : undefined}
+                    onClick={() => askToRestore(item)}
+                    data-testid={`restore-${item.name}`}
+                  >
+                    <ActionIcon icon={ArchiveRestore} />
+                    {restoring === item.id ? 'Restoring…' : 'Restore'}
+                  </button>
+                  <button
+                    ref={(node) => {
+                      if (node) eraseButtons.current.set(item.id, node)
+                      else eraseButtons.current.delete(item.id)
+                    }}
+                    className="button button--text trash__erase"
+                    type="button"
+                    disabled={busy}
+                    aria-label={`Delete permanently: ${kind.toLowerCase()} “${item.name}”`}
+                    onClick={() => askToErase(item)}
+                    data-testid={`erase-${item.name}`}
+                  >
+                    Delete permanently…
+                  </button>
+                </div>
                 {confirming?.id === item.id && confirming.kind === item.kind ? (
                   <RestorePublicConfirm
                     item={item}
@@ -408,6 +550,16 @@ export default function UniverseTrash() {
                     onRestore={() => void restore(item)}
                     onRestorePrivate={() => void restore(item, true)}
                     onCancel={cancelConfirming}
+                  />
+                ) : null}
+                {erasing?.id === item.id && erasing.kind === item.kind ? (
+                  <EraseConfirm
+                    item={item}
+                    panelRef={eraseRef}
+                    busy={eraseBusy}
+                    error={eraseError}
+                    onErase={() => void erase(item)}
+                    onCancel={cancelErasing}
                   />
                 ) : null}
               </li>
@@ -531,6 +683,80 @@ function RestorePublicConfirm({
           type="button"
           onClick={onCancel}
           data-testid="trash-confirm-cancel"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The one question before something is erased for good: what it is, what goes with it, and that it cannot be undone. One
+ * deliberate confirmation - nothing to type - in the row it is about, as the universe's own deletion asks in Settings.
+ */
+function EraseConfirm({
+  item,
+  panelRef,
+  busy,
+  error,
+  onErase,
+  onCancel,
+}: {
+  item: TrashItem
+  panelRef: React.RefObject<HTMLDivElement | null>
+  busy: boolean
+  error: ReactNode
+  onErase: () => void
+  onCancel: () => void
+}) {
+  const titleId = `trash-erase-title-${item.id}`
+  const textId = `trash-erase-text-${item.id}`
+
+  return (
+    <div
+      className="trash__confirm"
+      role="group"
+      aria-labelledby={titleId}
+      aria-describedby={textId}
+      tabIndex={-1}
+      ref={panelRef}
+      data-testid="trash-erase-confirm"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.stopPropagation()
+          onCancel()
+        }
+      }}
+    >
+      <p className="trash__confirmtitle" id={titleId}>
+        Permanently delete the {TRASH_KIND_LABELS[item.kind].toLowerCase()}{' '}
+        <Quoted text={item.name} />?
+      </p>
+      <p className="trash__confirmtext" id={textId} data-testid="trash-erase-text">
+        {eraseText(item)} <strong className="trash__final">This cannot be undone.</strong>
+      </p>
+      {error ? (
+        <p className="trash__confirmerror" role="alert" data-testid="trash-erase-error">
+          {error}
+        </p>
+      ) : null}
+      <div className="form__actions">
+        <button
+          className="button button--danger"
+          type="button"
+          aria-disabled={busy || undefined}
+          onClick={onErase}
+          data-testid="trash-erase-delete"
+        >
+          {busy ? 'Deleting…' : 'Delete permanently'}
+        </button>
+        <button
+          className="button button--secondary"
+          type="button"
+          aria-disabled={busy || undefined}
+          onClick={onCancel}
+          data-testid="trash-erase-cancel"
         >
           Cancel
         </button>

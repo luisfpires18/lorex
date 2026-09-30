@@ -120,7 +120,7 @@ exactly what it is here: text. Prose is never parsed into a pattern, and no patt
 - Reading a rule's words for meaning, by code or by AI; a generic rule DSL, scripting, formulas or visual programming;
   simulation, an economy or an RPG rules engine.
 - Priorities, order, categories, folders, tags, severities, custom fields, statuses or groups of rules.
-- Saved versions of a rule, recovered drafts of one, and permanent deletion.
+- Saved versions of a rule and recovered drafts of one. (Permanent deletion, from the Trash only, since 2026-09-30.)
 - Rules outside a universe or shared between universes; collaboration.
 
 ## Consequences
@@ -145,3 +145,11 @@ rule without a check is still exactly the text described above.
 - The editor gains "Check against the timeline" below the description; the list lede and the editor lede now say that only a check
   is ever counted. The screens mention validation for exactly that reason.
 - `CanonSubjectKind` gains `WorldRule`: a finding may now be about a rule.
+
+## Amendment - deleting a rule permanently (2026-09-30, Product refinement 021)
+
+A rule in the Trash can be deleted for good: `DELETE .../trash/world-rules/{id}`, found through its universe and only while
+marked. Its check (`WorldRuleValidations`) cascades; the event kinds and methods it named are the universe's vocabulary and
+stay, as do the moments' details. Every recorded finding naming the rule is forgotten in the same transaction. A rule in the
+Trash is not checked, so erasing it changes no live finding and nothing is reconciled. The search index follows through its
+delete trigger. Move to Trash is still the only delete on the World Rules screen.

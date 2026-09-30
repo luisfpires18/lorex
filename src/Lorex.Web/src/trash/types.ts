@@ -79,3 +79,9 @@ export interface TrashPage {
   totalCount: number
   totalPages: number
 }
+
+/** What erasing a story answers: every scene that went with it, live or in the Trash on its own. */
+export interface TrashErasedStory {
+  id: string
+  erasedSceneIds: string[]
+}

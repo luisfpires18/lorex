@@ -671,7 +671,7 @@ public static partial class EntityImageEndpoints
     // ---------- Shared ----------
 
     /// <summary>Deletes objects nothing points at any more, together. See MediaObjectWrites.</summary>
-    private static Task SweepAsync(IMediaObjectStore store, ILogger logger, params string[] keys) =>
+    internal static Task SweepAsync(IMediaObjectStore store, ILogger logger, params string[] keys) =>
         MediaObjectWrites.SweepAsync(store, logger, LogOrphanedObject, keys);
 
     [LoggerMessage(

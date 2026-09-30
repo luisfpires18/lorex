@@ -11,7 +11,8 @@ using Microsoft.EntityFrameworkCore;
 namespace Lorex.Api.Features.Trash;
 
 /// <summary>
-/// The Trash of one universe: what the author threw away, and the one action that brings each thing back.
+/// The Trash of one universe: what the author threw away, the action that brings each thing back, and the deliberate one
+/// that erases it for good (<see cref="TrashPermanentDelete"/>).
 ///
 /// Two kinds of authored work are trashable, each where its removal used to destroy a large amount of writing at once. A
 /// lore entry, whose deletion took its article, values, aliases, history and every relationship and timeline appearance
@@ -50,6 +51,18 @@ public static class TrashEndpoints
             .WithName("RestoreTrashedPlotBeat");
         group.MapPost("/world-rules/{worldRuleId:guid}/restore", WorldRuleEndpoints.RestoreAsync)
             .WithName("RestoreTrashedWorldRule");
+
+        group.MapDelete("/{entityId:guid}", TrashPermanentDelete.DeleteEntryAsync).WithName("DeleteTrashedEntity");
+        group.MapDelete("/stories/{storyId:guid}", TrashPermanentDelete.DeleteStoryAsync).WithName("DeleteTrashedStory");
+        group.MapDelete("/chapters/{chapterId:guid}", TrashPermanentDelete.DeleteChapterAsync)
+            .WithName("DeleteTrashedChapter");
+        group.MapDelete("/scenes/{sceneId:guid}", TrashPermanentDelete.DeleteSceneAsync).WithName("DeleteTrashedScene");
+        group.MapDelete("/plot-arcs/{plotArcId:guid}", TrashPermanentDelete.DeletePlotArcAsync)
+            .WithName("DeleteTrashedPlotArc");
+        group.MapDelete("/plot-beats/{plotBeatId:guid}", TrashPermanentDelete.DeletePlotBeatAsync)
+            .WithName("DeleteTrashedPlotBeat");
+        group.MapDelete("/world-rules/{worldRuleId:guid}", TrashPermanentDelete.DeleteWorldRuleAsync)
+            .WithName("DeleteTrashedWorldRule");
 
         return endpoints;
     }
