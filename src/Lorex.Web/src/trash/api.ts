@@ -1,5 +1,5 @@
 import { apiFetch } from '../lib/api'
-import { TrashKind, type TrashItem, type TrashPage } from './types'
+import { TrashKind, type TrashErasedStory, type TrashItem, type TrashPage } from './types'
 
 /** The same page size the lore browser uses, so the two screens read at the same rhythm. */
 export const TRASH_PAGE_SIZE = 12
@@ -16,7 +16,7 @@ export function listTrash(universeId: string, page: number, signal?: AbortSignal
   return apiFetch<TrashPage>(`${base(universeId)}?${params.toString()}`, { signal })
 }
 
-/** Each kind's own restore route, so what is restored is never a guess at what an id is. */
+/** Each kind's own route, so what is restored or erased is never a guess at what an id is. */
 const ROUTES: Record<Exclude<TrashItem['kind'], typeof TrashKind.Entry>, string> = {
   [TrashKind.Story]: 'stories',
   [TrashKind.Chapter]: 'chapters',
@@ -39,6 +39,29 @@ export function restoreFromTrash(universeId: string, item: TrashItem) {
       ? `${base(universeId)}/${item.id}/restore`
       : `${base(universeId)}/${ROUTES[item.kind]}/${item.id}/restore`
   return apiFetch<unknown>(path, { method: 'POST' })
+}
+
+/**
+ * Erases one row for good, on its kind's own route. Only something in the Trash can be: a live, missing or other world's id
+ * is a 404, and nothing is written. What the row owns goes with it - a story's everything, an arc's beats - including owned
+ * rows listed in the Trash on their own, so the list must be read again afterwards.
+ *
+ * Answers the ids of the scenes that went: a story's route says which (every scene it held); a scene's is its own; any
+ * other kind erases none. Only ever read after the server has answered, so a failed delete names nothing.
+ */
+export async function deleteFromTrash(universeId: string, item: TrashItem): Promise<string[]> {
+  const path =
+    item.kind === TrashKind.Entry
+      ? `${base(universeId)}/${item.id}`
+      : `${base(universeId)}/${ROUTES[item.kind]}/${item.id}`
+
+  if (item.kind === TrashKind.Story) {
+    const erased = await apiFetch<TrashErasedStory>(path, { method: 'DELETE' })
+    return erased.erasedSceneIds
+  }
+
+  await apiFetch<unknown>(path, { method: 'DELETE' })
+  return item.kind === TrashKind.Scene ? [item.id] : []
 }
 
 /** Where a restored row lives, so the Trash can offer the way to it. */

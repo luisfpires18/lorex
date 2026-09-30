@@ -8107,8 +8107,39 @@ a.lorechip--pov:focus-visible .lorechip__name {
   overflow-wrap: anywhere;
 }
 
-.trash__row > .button {
+/* Restore, the way back, is the row's button; Delete permanently sits after it as quiet text in the muted ink every other
+   row tool uses, so a page of rows reads as a recovery list, not a wall of red. It says what it does in words, and only
+   turns to the danger ink under the pointer or the focus - never colour alone. The red is kept for the last step. */
+.trash__actions {
   flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.trash__erase:hover:not(:disabled),
+.trash__erase:focus-visible {
+  color: var(--danger);
+}
+
+.trash__final {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.trash__confirmerror {
+  margin: 0 0 var(--space-3);
+  color: var(--danger);
+  font-size: var(--text-ui);
+  overflow-wrap: anywhere;
+}
+
+/* Deleting… keeps the focus where it was (`aria-disabled`), so it cannot be sent twice nor lose its place. */
+.trash__confirm .button[aria-disabled='true'] {
+  cursor: progress;
+  opacity: 0.7;
+  transform: none;
 }
 
 .trash__outcome {
@@ -8132,7 +8163,7 @@ a.lorechip--pov:focus-visible .lorechip__name {
     flex-basis: calc(100% - 2.5rem - var(--space-3));
   }
 
-  .trash__row > .button {
+  .trash__actions {
     margin-left: calc(2.5rem + var(--space-3));
   }
 }

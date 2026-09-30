@@ -89,7 +89,7 @@ universe - the index on `(UniverseId, Name)` is not unique and never was - so a 
 while an entry sat in the Trash cannot collide with it. Both stand.
 
 **No permanent delete.** Deferred, on the reading that a recovery phase should not ship the
-thing it is recovering from. `DELETE` keeps its route and its 204 and now means "move to Trash";
+thing it is recovering from. *Superseded 2026-09-30: permanent deletion exists, from the Trash only - see the amendment below.* `DELETE` keeps its route and its 204 and now means "move to Trash";
 the wording throughout the client says recovery is available.
 
 **A backup carries the Trash.** Trashed entries are authored lore the owner has not thrown away
@@ -133,3 +133,31 @@ another universe's and already-trashed ids refused alike, keyed by position, so 
 through the same `TrashCoreAsync` inside one Canon `RecordAsync`, reconciled once. A failure on any row leaves every entry
 in Lore. Nothing about the marker changes: no row erased, every entry restores on its own, and a type used only by entries
 in the Trash still cannot be deleted.
+
+## Amendment - deleting permanently, from the Trash only (2026-09-30, Product refinement 021)
+
+The deferred permanent delete now exists, and only here. **Move to Trash is not Delete permanently.** `DELETE .../entities/{id}`
+(and `bulk-trash`) still only set the marker; `DELETE /api/universes/{universeId}/trash/{entityId}` erases, and finds its entry
+only through its universe *with the marker set* - a live, missing or other world's id is a 404 and nothing is written. The
+same typed-route rule as restore: nothing guesses what an id is. 204 on success.
+
+What goes is what the schema already says the entry owns - its aliases, tag links, values, article and article versions,
+entry versions and their rows, image row, relationships at either end, timeline participation, scene and beat links and idea
+references cascade; a scene's point of view is cleared. Three things are done explicitly, because a cascade would leave them
+in a state no write produces: another entry's reference value pointing at it is **removed** (a write never stores an empty
+reference, so the field reads empty and a required one asks to be filled on its next save); a moment's validation details
+naming it as their only part are removed, as clearing all three on a save does; and every recorded Canon finding naming it -
+or a relationship that went with it - is forgotten, whatever its status. No placeholder or tombstone is kept. A tag stays
+universe vocabulary, as when an edit drops it. Saved versions of *other* entries keep the id and name they recorded, as they
+do for a deleted option or era; restoring such a version names the missing entry, exactly as before.
+
+It runs inside `CanonPromotionGate.RecordAsync` - reconciled, never gated: a trashed entry contributes no facts, so erasing it
+cannot add a finding, but it rewrites live rows the rules read and the conflict table must describe what is left, in the same
+transaction. The image's object keys are read first; the original and thumbnail are swept after the commit through the
+existing media sweep, and a sweep that fails is logged as orphaned media, never a reason to undo (ADR 0019). A failed database
+delete sweeps nothing.
+
+The consequence recorded above is closed: once the last entry using a type, field or option is erased, the ordinary reference
+counts fall to zero and the type, field or option can be deleted - no special case. No migration, no backup format change: a
+backup made afterwards simply does not hold what was erased; importing an older one is a backup restore, not a Trash restore.
+Emptying the Trash, bulk permanent deletion and retention are still not offered.

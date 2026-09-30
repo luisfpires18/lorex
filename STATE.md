@@ -50,8 +50,37 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **Product refinement 021 - permanent Trash deletion** (`feat/trash-permanent-delete` off `dev` at `7988e88`, committed,
+  not merged, not pushed). No migration, no backup format change. ADR 0015, 0029 and 0033 amended. **Move to Trash is not
+  Delete permanently**: every ordinary delete (and `bulk-trash`) still only marks; erasing exists only for a row already in the
+  Trash.
+  - Typed routes, as for restore: `DELETE .../trash/{entityId}` and `.../trash/stories|chapters|scenes|plot-arcs|plot-beats|world-rules/{id}`,
+    204 - except a story's, 200 `TrashErasedStory { id, erasedSceneIds }` (every scene it held, live or binned alone). Owner first, row through its universe, `DeletedAt != null` required; live, missing, other universe's or account's id
+    = 404, nothing written. `Features/Trash/TrashPermanentDelete.cs`.
+  - The schema's cascades are the ownership graph: one `DELETE` on the row. Story takes chapters, scenes, manuscripts and
+    versions, arcs, beats, links and idea references - including its own rows listed in the Trash separately; arc takes its
+    beats (a separately binned one too); chapter takes no scene (they went to Unchaptered when it was binned). FTS indexes
+    follow by their delete triggers (fire on cascades - tested).
+  - Entry, explicitly: other entries' reference values to it removed (never left empty), moment details whose only part it
+    was removed, every Canon finding naming it or its relationships forgotten; inside `RecordAsync` (reconciled, not gated).
+    Image keys read first, objects swept after commit via `EntityImageEndpoints.SweepAsync`; a failed sweep is logged orphaned
+    media, a failed DB delete sweeps nothing. A type/field used only by the erased entry becomes deletable naturally.
+  - Rule: its check cascades; findings naming it forgotten; no reconcile (a binned rule is not checked).
+  - Trash UI: Restore, then quiet text **Delete permanently…** (danger ink only on hover/focus). Asks in the row, as Settings'
+    universe delete does: "Permanently delete the <kind> “<name>”?", kind-specific consequence, "This cannot be undone.",
+    red **Delete permanently** + Cancel. Focus to the panel; Esc/Cancel back to the trigger; success removes the row(s),
+    "“X” was permanently deleted." focused; failure keeps row and panel with a plain error; one request however many clicks;
+    nothing else in the list can start meanwhile. A restore-blocked row can still be deleted. Emptied page steps back (in
+    `load`, for restore too). After the server answers, this device's recovery copies of exactly what went are dropped by
+    scope - an entry's article, a scene's manuscript, every erased story scene's manuscript; nothing else, never before
+    success, best effort (a storage failure never undoes the delete).
+  - Lede: "Everything here can be restored with everything it held, until you choose to delete it permanently."
+  - Not done (owner decisions): Empty Trash, bulk permanent delete, Trash multi-select, retention. Other entries' saved
+    versions keep the erased entry's id and name, as for a deleted option or era.
+  - Tests: API 1200 -> 1217 (`TrashPermanentDeleteTests`, 17). Playwright 309 -> 316 (`trash-permanent-delete.spec.ts`, 7). Full run
+    315/315 before the story-draft follow-up; that follow-up ran focused and neighbouring specs only.
 - **Product refinement 020 - type management, the deletion fix, bulk Trash** (`feat/type-management-and-bulk-delete` off
-  `dev` at `1165f67`, committed, not merged, not pushed). No migration, no backup format change. ADR 0007 and 0015 amended.
+  `dev` at `1165f67`, merged into `dev` at `7988e88`). No migration, no backup format change. ADR 0007 and 0015 amended.
   - **The deletion bug** was the reseed: every read of the type list filled in any missing starter *name*, so deleting an
     emptied Location succeeded (204) and the refresh put a new, empty Location back - no error to show. The entry's move to
     Kingdom was clean (type id changed, Location's field values replaced). Now the starters are written once, at universe

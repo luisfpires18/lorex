@@ -84,3 +84,9 @@ public sealed record TrashPage(
 
 /// <summary>What a restore of story content put back, and the story it is in: enough for a client to open it.</summary>
 public sealed record TrashRestored(TrashItemKind Kind, Guid Id, Guid StoryId);
+
+/// <summary>
+/// What erasing a story from the Trash took with it that a client may hold something of: every scene of the story, live or
+/// in the Trash on its own. Every other permanent delete answers 204, because a client already knows the one id it erased.
+/// </summary>
+public sealed record TrashErasedStory(Guid Id, IReadOnlyList<Guid> ErasedSceneIds);
