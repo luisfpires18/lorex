@@ -8163,8 +8163,14 @@ a.lorechip--pov:focus-visible .lorechip__name {
     flex-basis: calc(100% - 2.5rem - var(--space-3));
   }
 
+  /* A line of its own, as wide as the row and never wider: the indent that lines the buttons up under the name is padding
+     inside that width rather than a margin outside it, so the buttons wrap within what is left - Delete permanently…
+     under Restore when both do not fit - whatever the fonts measure. */
   .trash__actions {
-    margin-left: calc(2.5rem + var(--space-3));
+    flex: 1 1 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding-left: calc(2.5rem + var(--space-3));
   }
 }
 
