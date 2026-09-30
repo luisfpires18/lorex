@@ -28,6 +28,13 @@ public static class EntityEndpoints
     public const int MassCreateMaxEntries = 100;
 
     /// <summary>
+    /// The most entries one bulk move to the Trash takes. The Lore browser selects within one page, at most 40, so this is
+    /// headroom for the API rather than a screen's limit; it matches mass create, and a batch of trashes is cheaper than a
+    /// batch of creates - one column set per entry and one reconciliation - under the same single writer.
+    /// </summary>
+    public const int BulkTrashMaxEntries = 100;
+
+    /// <summary>
     /// The machine-readable marker on the 400 an entry write gets when it still carries the article - a client from before
     /// the article moved to its own route (ADR 0028).
     /// </summary>
@@ -81,6 +88,7 @@ public static class EntityEndpoints
         group.MapGet("/", ListAsync).WithName("ListEntities");
         group.MapPost("/", CreateAsync).WithName("CreateEntity");
         group.MapPost("/bulk", BulkCreateAsync).WithName("BulkCreateEntities");
+        group.MapPost("/bulk-trash", BulkTrashAsync).WithName("BulkTrashEntities");
         group.MapGet("/{entityId:guid}", GetAsync).WithName("GetEntity");
         group.MapPut("/{entityId:guid}", UpdateAsync).WithName("UpdateEntity");
         group.MapDelete("/{entityId:guid}", DeleteAsync).WithName("DeleteEntity");
@@ -665,6 +673,87 @@ public static class EntityEndpoints
             token => TrashCoreAsync(universeId, entityId, db, token),
             cancellationToken);
     }
+
+    /// <summary>
+    /// Moves many entries to the Trash at once, all or nothing: exactly what <see cref="DeleteAsync"/> does to one, for
+    /// each of them, inside one transaction and one Canon reconciliation. Nothing is erased - every entry keeps its
+    /// article, fields, relationships, history and type, and restores from the Trash on its own, as ever.
+    ///
+    /// Checked whole before anything is written. An id that is not a live entry of this universe - unknown, another
+    /// universe's, or already in the Trash - refuses the whole request in the same words, so it confirms nothing about
+    /// what exists elsewhere, and a request naming one twice is refused rather than read loosely.
+    /// </summary>
+    private static async Task<IResult> BulkTrashAsync(
+        Guid universeId,
+        [FromBody] BulkTrashRequest request,
+        ClaimsPrincipal principal,
+        LorexDbContext db,
+        CanonPromotionGate canon,
+        CancellationToken cancellationToken)
+    {
+        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        {
+            return Results.NotFound();
+        }
+
+        var ids = request.EntityIds;
+
+        if (ids is not { Count: > 0 })
+        {
+            return EntityIdsProblem("Choose at least one entry.");
+        }
+
+        if (ids.Count > BulkTrashMaxEntries)
+        {
+            return EntityIdsProblem($"Move up to {BulkTrashMaxEntries} entries at a time. This has {ids.Count}.");
+        }
+
+        if (ids.Distinct().Count() != ids.Count)
+        {
+            return EntityIdsProblem("The same entry is listed more than once.");
+        }
+
+        var live = (await db.Entities.AsNoTracking()
+                .Where(entity => entity.UniverseId == universeId && entity.DeletedAt == null && ids.Contains(entity.Id))
+                .Select(entity => entity.Id)
+                .ToListAsync(cancellationToken))
+            .ToHashSet();
+
+        var errors = new Dictionary<string, string[]>();
+        for (var index = 0; index < ids.Count; index++)
+        {
+            if (!live.Contains(ids[index]))
+            {
+                errors[$"entityIds[{index}]"] = ["This entry is not in Lore any more. It may already be in the Trash."];
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        return await canon.RecordAsync(
+            universeId,
+            async token =>
+            {
+                foreach (var id in ids)
+                {
+                    // Unreachable once checked, short of the entry being trashed under this request; the transaction
+                    // then takes every earlier one back with it.
+                    if (await TrashCoreAsync(universeId, id, db, token) is IStatusCodeHttpResult { StatusCode: 404 } missing)
+                    {
+                        return (IResult)missing;
+                    }
+                }
+
+                return Results.Ok(new BulkTrashResponse(ids.Count));
+            },
+            cancellationToken);
+    }
+
+    private static IResult EntityIdsProblem(string message) =>
+        Results.ValidationProblem(new Dictionary<string, string[]> { ["entityIds"] = [message] });
 
     /// <summary>
     /// Marks one live entry as trashed. An entry already in the Trash answers 404 rather than

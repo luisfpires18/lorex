@@ -192,8 +192,8 @@ async function addFieldTo(
 async function addLifespanType(page: Page, universeId: string, typeName: string) {
   await page.goto(`/app/universes/${universeId}/types`)
   await page.getByTestId('new-type').click()
-  await page.getByTestId('new-type-name').fill(typeName)
-  await page.getByTestId('create-type').click()
+  await page.getByTestId('type-name').fill(typeName)
+  await page.getByTestId('save-type').click()
   await expect(page.locator(`[data-type-name="${typeName}"]`)).toBeVisible()
 
   await openFields(page, universeId, typeName)

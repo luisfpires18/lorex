@@ -50,8 +50,31 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
-- **Product refinement 019 - mass create lore** (`feat/mass-create-lore` off `dev` at `b4c9380`, committed, not merged, not
-  pushed). "I have 40 names. Put them in Lorex." No migration, no backup format change. ADR 0012 amended (a batch is one
+- **Product refinement 020 - type management, the deletion fix, bulk Trash** (`feat/type-management-and-bulk-delete` off
+  `dev` at `1165f67`, committed, not merged, not pushed). No migration, no backup format change. ADR 0007 and 0015 amended.
+  - **The deletion bug** was the reseed: every read of the type list filled in any missing starter *name*, so deleting an
+    emptied Location succeeded (204) and the refresh put a new, empty Location back - no error to show. The entry's move to
+    Kingdom was clean (type id changed, Location's field values replaced). Now the starters are written once, at universe
+    creation, and a read never writes: a deleted or renamed starter, or every type deleted, stays that way (a new entry in a
+    typeless world says so). The read-time fill dated from Phase 004, for Phase 003 universes; no backfill owed. A type any entry uses, in Lore or only in the Trash, is still refused, now in
+    words: "Location can't be deleted because 2 entries still use it, 1 of them in the Trash. ..." (409
+    `entity_type_in_use`, with counts; the list carries `trashedEntityCount`).
+  - Types rows: picture, name, "N entries, M in the Trash", **Edit**, **Fields**, and ⋯ **Delete type**. No permanent
+    Family Tree switch or Icon button. Delete of an unused type asks (`window.confirm`); of a used one explains under the
+    row with "Show its entries in Lore" / "Open the Trash", no confirmation, nothing sent.
+  - One drawer for New type (name, icon, Family Tree) and Edit type (name and icon only - Family Tree is the first of a
+    type's constraints, which wait for their own surface). An edit sends back description, colour, order and Family Tree as
+    stored; renames keep the id. The Family Tree page no longer points at a switch the Types screen does not offer.
+  - Icon picker: every choice is a chip with its picture and its name on screen; chosen by edge, weight and a tick; radios.
+    31 keys (+14: tree, flame, skull, scroll, star, moon, globe, landmark, house, swords, coins, flask, wand, languages), none
+    renamed. Uploaded icons deferred.
+  - Lore's types wrap onto rows above 640px - no sideways scroll, fades or scroll-into-view code; the phone keeps its Type menu.
+  - Lore **Select**: cards become their checkbox's label; Select page, Clear selection, count, **Move N to Trash** (asks,
+    says nothing is erased, names up to five), Done. Page-scoped: another page, filter, type or size drops the selection
+    for good. `POST .../entities/bulk-trash` (`{ entityIds }`, 1-100): checked whole, then `TrashCoreAsync` per entry in one
+    Canon `RecordAsync`; a failure moves none. "N entries moved to the Trash." with a link; an emptied page falls back.
+- **Product refinement 019 - mass create lore** (`feat/mass-create-lore` off `dev` at `b4c9380`, merged into `dev` at
+  `1165f67`). "I have 40 names. Put them in Lorex." No migration, no backup format change. ADR 0012 amended (a batch is one
   candidate).
   - Lore's header: **Mass create** (secondary, icon-only on a phone) beside **New entry** (primary). One page inside the
     workspace, `lore/mass-create?type=<id>`: Default type (the type Lore was on, else the first; a type with required fields
@@ -883,7 +906,15 @@ A public, read-only discovery experience beside the workspace, in the same appli
 
 ## Baseline
 
-- **1176 API integration tests, 299 Playwright tests** (019: +19 in `MassCreateTests`, +1 in `CanonPromotionGateTests`
+- **1200 API integration tests, 309 Playwright tests** (020 correction: seeding moved out of the read, Family Tree off Edit -
+  +5 API (creation seeds; a deleted starter and every type deleted stay gone; Family Tree kept through an edit, true and
+  false), -1 (the empty-universe reseed test), +1 Playwright (every type deleted); API **1200/1200**; affected specs 60/61,
+  the one loss `canon.spec.ts` review screen timing out on an untouched Relations step, green 3/3 alone; no second full run.
+  020: +11 `TypeManagementTests`, +8 `BulkTrashTests`, +1 gate test
+  (a bulk move resolves its conflict); +9 in `types-and-trash.spec.ts`; `type-filter`, `family-tree-semantics`, `canon` and
+  `lore` specs moved to the Types editor, the wrapped types row and the new dialog ids; two API wording pins moved to the new
+  refusal. API **1196/1196**. Full Playwright on a fresh database, two workers, retries 0, one run: **308/308**, 14.3 min.
+  Release build clean apart from the existing CA1859, no pending model changes.) Before it, 1176 / 299 (019: +19 in `MassCreateTests`, +1 in `CanonPromotionGateTests`
   (a batch beside a High conflict); +12 in `mass-create.spec.ts`, pasting through the real clipboard. API **1176/1176**. Full
   Playwright on a fresh database, two workers, retries 0, one run: **299/299**, 14.8 min; a two-line hardening edit landed
   during it (a send guard, a 400 fallback message), so `mass-create.spec.ts` was rerun alone after it, 12/12. Release build

@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import {
   Link,
   useLocation,
@@ -7,14 +7,25 @@ import {
   useSearchParams,
   type To,
 } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Check, ListFilter, ListPlus, Plus } from 'lucide-react'
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  ListChecks,
+  ListFilter,
+  ListPlus,
+  Plus,
+  Trash2,
+} from 'lucide-react'
 import { ActionIcon } from '../components/ActionIcon'
 import { EmptyState } from '../components/EmptyState'
 import { EntityCard } from '../components/EntityCard'
 import { PageHeader } from '../components/PageHeader'
 import { TypeSwitcher } from '../components/TypeSwitcher'
+import { ApiError } from '../lib/api'
 import {
   LORE_PAGE_SIZES,
+  bulkTrashEntities,
   listEntities,
   listEntityTypes,
   readLorePageSize,
@@ -77,6 +88,19 @@ export default function LorePage() {
   const canonStatus = readStatus(params.get('status'))
   const search = params.get('q') ?? ''
   const page = readPage(params.get('page'))
+
+  // Selecting, to move entries to the Trash together. A mode the author turns on, so ordinary browsing carries no
+  // checkboxes. What is selected belongs to the page on screen: another page, filter, type or size is another list, so
+  // the selection is not carried into it - nothing is ever selected out of sight.
+  const [isSelecting, setIsSelecting] = useState(false)
+  const [selection, setSelection] = useState<{ scope: string; ids: ReadonlySet<string> }>({
+    scope: '',
+    ids: new Set(),
+  })
+  const [isTrashing, setIsTrashing] = useState(false)
+  const trashing = useRef(false)
+  const [trashFailure, setTrashFailure] = useState<string | null>(null)
+  const [trashed, setTrashed] = useState<{ text: string; list: string } | null>(null)
 
   const [types, setTypes] = useState<EntityType[] | null>(null)
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
@@ -168,6 +192,88 @@ export default function LorePage() {
 
   const result = state.kind === 'ready' ? state.page : null
 
+  const scope = [location.search, pageSize].join('|')
+  const listKey = (() => {
+    const next = new URLSearchParams(location.search)
+    next.delete('page')
+    return next.toString()
+  })()
+  // Another page, filter, type or size drops the selection for good - coming back does not bring it back either. Set while
+  // rendering, the way React adjusts state to a changed input, so no frame ever shows the old selection on the new list.
+  if (selection.scope !== scope) setSelection({ scope, ids: new Set() })
+  const selectedIds = selection.scope === scope ? selection.ids : new Set<string>()
+  const pageItems = result?.items ?? []
+  const selected = pageItems.filter((item) => selectedIds.has(item.id))
+
+  function toggle(entityId: string) {
+    setTrashFailure(null)
+    setSelection(() => {
+      const next = new Set(selectedIds)
+      if (next.has(entityId)) next.delete(entityId)
+      else next.add(entityId)
+      return { scope, ids: next }
+    })
+  }
+
+  function selectPage() {
+    setTrashFailure(null)
+    setSelection({ scope, ids: new Set(pageItems.map((item) => item.id)) })
+  }
+
+  function clearSelection() {
+    setTrashFailure(null)
+    setSelection({ scope, ids: new Set() })
+  }
+
+  function stopSelecting() {
+    clearSelection()
+    setIsSelecting(false)
+  }
+
+  /**
+   * Moves what is selected to the Trash, all together or not at all, after one question that says what it means: out of
+   * Lore, not erased, restorable. A failure leaves every entry where it was, still selected.
+   */
+  async function trashSelected() {
+    const count = selected.length
+    if (trashing.current || count === 0) return
+
+    const noun = count === 1 ? 'entry' : 'entries'
+    const names = count <= 5 ? `\n\n${selected.map((item) => `“${item.name}”`).join('\n')}` : ''
+    if (
+      !window.confirm(
+        `Move ${count} ${noun} to the Trash?${names}\n\n` +
+          `${count === 1 ? 'It leaves' : 'They leave'} Lore, search and pickers, but nothing is erased: ` +
+          'articles, fields, history and connections are kept, and each one can be restored from the Trash.',
+      )
+    ) {
+      return
+    }
+
+    trashing.current = true
+    setIsTrashing(true)
+    setTrashFailure(null)
+    try {
+      await bulkTrashEntities(
+        universe.id,
+        selected.map((item) => item.id),
+      )
+      setTrashed({ text: `${count} ${noun} moved to the Trash.`, list: listKey })
+      stopSelecting()
+      setReads((reads) => reads + 1)
+    } catch (error: unknown) {
+      setTrashFailure(
+        `Nothing was moved. ${error instanceof ApiError ? error.message : 'Try again.'}`,
+      )
+    } finally {
+      trashing.current = false
+      setIsTrashing(false)
+    }
+  }
+
+  // Said on the list it happened in, and still said when an emptied page falls back to the last one there is.
+  const trashedNotice = trashed?.list === listKey ? trashed.text : null
+
   // A page past the last one - a hand-edited address, or entries gone since - lands on the last page there is, in place.
   const pastTheEnd = result !== null && result.totalPages > 0 && page > result.totalPages
   const lastPage = result?.totalPages ?? 1
@@ -200,7 +306,7 @@ export default function LorePage() {
   const massCreateTo = selectedType ? `mass-create?type=${selectedType.id}` : 'mass-create'
 
   return (
-    <article className="lore">
+    <article className="lore" data-selecting={isSelecting ? 'true' : undefined}>
       <PageHeader
         crumb={
           selectedType ? (
@@ -238,6 +344,18 @@ export default function LorePage() {
       >
         <div className="lore__nav">
           <TypeSwitcher types={types ?? []} selected={selectedType} hrefFor={hrefFor} />
+          {pageItems.length > 0 || isSelecting ? (
+            <button
+              className="button button--secondary lore__select"
+              type="button"
+              aria-pressed={isSelecting}
+              onClick={() => (isSelecting ? stopSelecting() : setIsSelecting(true))}
+              data-testid="lore-select"
+            >
+              <ActionIcon icon={ListChecks} />
+              Select
+            </button>
+          ) : null}
           <button
             className="button button--secondary lore__filtertoggle"
             type="button"
@@ -318,6 +436,13 @@ export default function LorePage() {
         ) : null}
       </div>
 
+      {trashedNotice ? (
+        <p className="lore__created" role="status" data-testid="lore-trashed">
+          <ActionIcon icon={Check} />
+          {trashedNotice} <Link to={`/app/universes/${universe.id}/trash`}>Open the Trash</Link>
+        </p>
+      ) : null}
+
       {massCreated !== null ? (
         <p className="lore__created" role="status" data-testid="lore-mass-created">
           <ActionIcon icon={Check} />
@@ -364,7 +489,15 @@ export default function LorePage() {
         <ul className="cardgrid lore__grid" data-testid="entity-grid">
           {result.items.map((entity) => (
             <li key={entity.id}>
-              <EntityCard universeId={universe.id} entity={entity} />
+              <EntityCard
+                universeId={universe.id}
+                entity={entity}
+                selection={
+                  isSelecting
+                    ? { checked: selectedIds.has(entity.id), onToggle: () => toggle(entity.id) }
+                    : undefined
+                }
+              />
             </li>
           ))}
         </ul>
@@ -447,6 +580,64 @@ export default function LorePage() {
             <ActionIcon icon={ArrowRight} />
           </button>
         </nav>
+      ) : null}
+
+      {isSelecting ? (
+        <footer className="actionbar lore__selectbar" data-testid="lore-selectbar">
+          <p className="actionbar__status" role="status" data-testid="lore-selected-count">
+            {selected.length === 0
+              ? 'Select entries on this page to move them to the Trash.'
+              : `${selected.length} selected`}
+          </p>
+          <div className="actionbar__actions">
+            <button
+              className="button"
+              type="button"
+              onClick={() => void trashSelected()}
+              disabled={selected.length === 0 || isTrashing}
+              aria-busy={isTrashing || undefined}
+              data-testid="lore-trash-selected"
+            >
+              <ActionIcon icon={Trash2} />
+              {isTrashing
+                ? 'Moving…'
+                : selected.length > 0
+                  ? `Move ${selected.length} to Trash`
+                  : 'Move to Trash'}
+            </button>
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={selectPage}
+              disabled={pageItems.length === 0 || selected.length === pageItems.length}
+              data-testid="lore-select-page"
+            >
+              Select page
+            </button>
+            <button
+              className="button button--text"
+              type="button"
+              onClick={clearSelection}
+              disabled={selected.length === 0}
+              data-testid="lore-clear-selection"
+            >
+              Clear selection
+            </button>
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={stopSelecting}
+              data-testid="lore-select-done"
+            >
+              Done
+            </button>
+          </div>
+          {trashFailure ? (
+            <p className="lore__trashfailure" role="alert" data-testid="lore-trash-failure">
+              {trashFailure}
+            </p>
+          ) : null}
+        </footer>
       ) : null}
     </article>
   )

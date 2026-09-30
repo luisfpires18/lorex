@@ -14,6 +14,33 @@ namespace Lorex.Api.Features.Lore;
 /// </summary>
 public static class EntityTypeEndpoints
 {
+    /// <summary>The machine-readable marker on the 409 a type still used by an entry gets, in Lore or in the Trash.</summary>
+    public const string TypeInUseCode = "entity_type_in_use";
+
+    /// <summary>
+    /// Why a type cannot be deleted, in the author's terms: how many entries still use it and how many of those are in the
+    /// Trash, since an entry there is invisible in Lore and still keeps its type. Mirrored by the Types screen.
+    /// </summary>
+    internal static string InUseDetail(string name, int live, int trashed)
+    {
+        var total = live + trashed;
+        var uses = total == 1 ? "1 entry still uses it" : $"{total} entries still use it";
+        var where = trashed == 0
+            ? string.Empty
+            : trashed == total
+                ? total == 1 ? ", and it is in the Trash" : ", all of them in the Trash"
+                : $", {trashed} of them in the Trash";
+        var fix = (total, trashed) switch
+        {
+            (1, 0) => "Move it to another type first.",
+            (1, _) => "Restore it from the Trash, then move it to another type.",
+            (_, 0) => "Move them to another type first.",
+            _ => "Move them to another type first; an entry in the Trash has to be restored before it can be moved.",
+        };
+
+        return $"{name} can't be deleted because {uses}{where}. {fix}";
+    }
+
     public static IEndpointRouteBuilder MapEntityTypeEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/universes/{universeId:guid}/entity-types")
@@ -43,10 +70,10 @@ public static class EntityTypeEndpoints
             return Results.NotFound();
         }
 
-        // A universe created before this feature existed, or one whose defaults were never
-        // written, gets them on first read. Seeding only fills in missing names.
-        await EntityTypeDefaults.EnsureAsync(db, universeId, cancellationToken);
-
+        // A read only reads. The starter types are written once, when the universe is created (UniverseEndpoints); from
+        // then on a universe's types are its author's, so a starter they deleted or renamed - or every type, deleted - is
+        // never put back here. Reads used to fill missing starter names in, which is what made deleting Location look
+        // like it had silently failed (ADR 0007 amendment).
         return Results.Ok(await LoadTypesAsync(db, universeId, cancellationToken));
     }
 
@@ -179,20 +206,27 @@ public static class EntityTypeEndpoints
         // Entries in the Trash count. The foreign key is Restrict precisely so a type cannot
         // be pulled out from under lore that is still restorable, and an entry that came back
         // to a type that no longer exists would not be the entry the author threw away.
-        var inUse = await db.Entities.CountAsync(
-            entity => entity.EntityTypeId == typeId,
-            cancellationToken);
+        var users = await db.Entities
+            .Where(entity => entity.EntityTypeId == typeId)
+            .GroupBy(entity => entity.DeletedAt == null)
+            .Select(group => new { Live = group.Key, Count = group.Count() })
+            .ToListAsync(cancellationToken);
 
-        if (inUse > 0)
+        var live = users.Where(group => group.Live).Sum(group => group.Count);
+        var trashed = users.Where(group => !group.Live).Sum(group => group.Count);
+
+        if (live + trashed > 0)
         {
             return Results.Problem(
                 title: "Type is in use",
-                detail: inUse == 1
-                    ? "1 entry still uses this type, counting anything in the Trash. "
-                        + "Move it to another type first."
-                    : $"{inUse} entries still use this type, counting anything in the Trash. "
-                        + "Move them to another type first.",
-                statusCode: StatusCodes.Status409Conflict);
+                detail: InUseDetail(entityType.Name, live, trashed),
+                statusCode: StatusCodes.Status409Conflict,
+                extensions: new Dictionary<string, object?>
+                {
+                    ["code"] = TypeInUseCode,
+                    ["liveCount"] = live,
+                    ["trashedCount"] = trashed,
+                });
         }
 
         db.EntityTypes.Remove(entityType);
@@ -536,6 +570,7 @@ public static class EntityTypeEndpoints
                 type.AccentColor,
                 type.DisplayOrder,
                 db.Entities.Count(entity => entity.EntityTypeId == type.Id),
+                db.Entities.Count(entity => entity.EntityTypeId == type.Id && entity.DeletedAt != null),
                 type.Fields
                     .OrderBy(field => field.DisplayOrder)
                     .ThenBy(field => field.Name)

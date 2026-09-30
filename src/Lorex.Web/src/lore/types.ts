@@ -113,7 +113,10 @@ export interface EntityType {
   icon: string | null
   accentColor: string | null
   displayOrder: number
+  /** Every entry of this type, the Trash included: a trashed entry keeps its type and still stops it being deleted. */
   entityCount: number
+  /** How many of those are in the Trash. */
+  trashedEntityCount: number
   fields: FieldDefinition[]
   /** Entries of this type are offered by the Family Tree. Set by the author, never read from the name (ADR 0040). */
   familyTreeEligible: boolean

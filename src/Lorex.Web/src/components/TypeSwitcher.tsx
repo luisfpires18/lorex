@@ -1,4 +1,4 @@
-import { useEffect, useRef, type KeyboardEvent } from 'react'
+import type { KeyboardEvent } from 'react'
 import { Link, type To } from 'react-router-dom'
 import { ChevronDown, LayoutGrid } from 'lucide-react'
 import type { EntityType } from '../lore/types'
@@ -13,10 +13,11 @@ import { TypeIcon } from './TypeIcon'
  * reload and a pasted link all land on it, and the current one carries `aria-current="page"` and
  * the accent wash. Choosing a type keeps the search and status and goes back to the first page.
  *
- * Two presentations of the one list, chosen by CSS alone. From 641px, one row of links that scrolls
- * sideways only when a world has more types than the row has room for, keeping the current one in
- * view. On a phone, a single labelled "Type" button opening every type in an `ActionMenu`, so the
- * first screen is cards rather than rows of chips.
+ * Two presentations of the one list, chosen by CSS alone. From 641px, the links wrap onto as many
+ * rows as the world's types need, in their own order - nothing is scrolled sideways, clipped or
+ * faded, so every type is in sight and none has to be found. On a phone, a single labelled "Type"
+ * button opening every type in an `ActionMenu`, so the first screen is cards rather than rows of
+ * chips.
  */
 export function TypeSwitcher({
   types,
@@ -28,37 +29,6 @@ export function TypeSwitcher({
   /** Where choosing a type (or All, as null) goes. */
   hrefFor: (typeId: string | null) => To
 }) {
-  const row = useRef<HTMLDivElement>(null)
-
-  // The current type is brought into view if it is not - on arrival, and after a choice - and the
-  // row says at which end it has more, which the CSS draws as a fade at that edge.
-  useEffect(() => {
-    const list = row.current
-    if (!list) return
-
-    const current = list.querySelector<HTMLElement>('[aria-current="page"]')
-    if (current) {
-      const start = current.offsetLeft - list.offsetLeft
-      const end = start + current.offsetWidth
-      if (start < list.scrollLeft) list.scrollLeft = start - 8
-      else if (end > list.scrollLeft + list.clientWidth)
-        list.scrollLeft = end - list.clientWidth + 8
-    }
-
-    function mark() {
-      if (!list) return
-      list.dataset.moreBefore = String(list.scrollLeft > 1)
-      list.dataset.moreAfter = String(list.scrollLeft + list.clientWidth < list.scrollWidth - 1)
-    }
-    mark()
-    list.addEventListener('scroll', mark, { passive: true })
-    window.addEventListener('resize', mark)
-    return () => {
-      list.removeEventListener('scroll', mark)
-      window.removeEventListener('resize', mark)
-    }
-  }, [selected, types])
-
   function move(event: KeyboardEvent<HTMLDivElement>) {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
     const links = [...event.currentTarget.querySelectorAll<HTMLAnchorElement>('a')]
@@ -99,7 +69,7 @@ export function TypeSwitcher({
   return (
     <>
       <nav className="typeswitch" aria-label="Lore types">
-        <div className="typeswitch__row" ref={row} onKeyDown={move} data-testid="lore-types">
+        <div className="typeswitch__row" onKeyDown={move} data-testid="lore-types">
           {options.map((option) => {
             const isCurrent = (selected?.id ?? null) === option.id
             return (

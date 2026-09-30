@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
-import { Plus } from 'lucide-react'
+import { Link, useOutletContext } from 'react-router-dom'
+import { Pencil, Plus } from 'lucide-react'
 import { ActionIcon } from '../components/ActionIcon'
+import { ActionMenu } from '../components/ActionMenu'
 import { Field } from '../components/Field'
 import { QueryTabList, TabPanel } from '../components/QueryTabs'
 import { useQueryTab } from '../lib/queryTab'
@@ -70,10 +71,12 @@ export default function UniverseTypes() {
 
   const [types, setTypes] = useState<EntityType[] | null>(null)
   const [message, setMessage] = useState<string | null>(null)
-  const [isCreatingType, setIsCreatingType] = useState(false)
+  // The type editor: a new type, or the existing one being edited. One drawer for both.
+  const [editing, setEditing] = useState<EntityType | 'new' | null>(null)
   const [openTypeId, setOpenTypeId] = useState<string | null>(null)
-  const [iconTypeId, setIconTypeId] = useState<string | null>(null)
-  const [busyTypeId, setBusyTypeId] = useState<string | null>(null)
+  // Why one type cannot be deleted, said under it: counted from the list, or the API's own words if it refused.
+  const [blocked, setBlocked] = useState<{ typeId: string; text: string } | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
   const [fieldName, setFieldName] = useState('')
   const [fieldKind, setFieldKind] = useState<FieldKindValue>(FieldKind.ShortText)
@@ -106,66 +109,46 @@ export default function UniverseTypes() {
   }
 
   /**
-   * Changes one type's icon, and nothing else: the rest of the type is sent back as it stands,
-   * because the route replaces the whole type. Saved on choosing, like a field's meaning.
+   * Deleting a type. A type any entry still uses - in Lore or in the Trash, since an entry there keeps its type - is not
+   * offered a confirmation it could only fail: the author is told, under the type, exactly what uses it and where to
+   * go. An unused type asks once, as every irreversible action in Lorex does, and is gone.
    */
-  async function changeIcon(type: EntityType, icon: string | null) {
+  async function removeType(type: EntityType) {
     setMessage(null)
-    setBusyTypeId(type.id)
-    try {
-      await updateEntityType(universe.id, type.id, {
-        name: type.name,
-        description: type.description,
-        icon,
-        accentColor: type.accentColor,
-        displayOrder: type.displayOrder,
-      })
-      await refresh()
-    } catch (error: unknown) {
-      report(error, 'That icon could not be changed.')
-    } finally {
-      setBusyTypeId(null)
-    }
-  }
+    setNotice(null)
+    setBlocked(null)
 
-  /**
-   * Whether this type's entries take part in the Family Tree. Saved on choosing, like the icon, with the rest of the type
-   * sent back as it stands. A meaning of the type, never of its name (ADR 0040).
-   */
-  async function changeFamilyTree(type: EntityType, familyTreeEligible: boolean) {
-    setMessage(null)
-    setBusyTypeId(type.id)
-    // Shown at once; a refusal puts back what is stored.
-    setTypes(
-      (current) =>
-        current?.map((each) => (each.id === type.id ? { ...each, familyTreeEligible } : each)) ??
-        null,
-    )
-    try {
-      await updateEntityType(universe.id, type.id, {
-        name: type.name,
-        description: type.description,
-        icon: type.icon,
-        accentColor: type.accentColor,
-        displayOrder: type.displayOrder,
-        familyTreeEligible,
+    if (type.entityCount > 0) {
+      setBlocked({
+        typeId: type.id,
+        text: inUseDetail(
+          type.name,
+          type.entityCount - type.trashedEntityCount,
+          type.trashedEntityCount,
+        ),
       })
-      await refresh()
-    } catch (error: unknown) {
-      report(error, 'That could not be changed.')
-      await refresh().catch(() => undefined)
-    } finally {
-      setBusyTypeId(null)
+      return
     }
-  }
 
-  async function removeType(typeId: string) {
-    setMessage(null)
+    if (
+      !window.confirm(`Delete the type “${type.name}”?\n\nNo entry uses it. This cannot be undone.`)
+    ) {
+      return
+    }
+
     try {
-      await deleteEntityType(universe.id, typeId)
+      await deleteEntityType(universe.id, type.id)
+      setNotice(`Deleted the type “${type.name}”.`)
+      if (openTypeId === type.id) setOpenTypeId(null)
       await refresh()
     } catch (error: unknown) {
-      report(error, 'That type could not be deleted.')
+      // Used since the list was read - another tab, or the entry form - so the API's count is the true one.
+      if (error instanceof ApiError && error.status === 409) {
+        setBlocked({ typeId: type.id, text: error.message })
+        await refresh().catch(() => undefined)
+      } else {
+        report(error, 'That type could not be deleted.')
+      }
     }
   }
 
@@ -252,7 +235,7 @@ export default function UniverseTypes() {
             <button
               className="button"
               type="button"
-              onClick={() => setIsCreatingType(true)}
+              onClick={() => setEditing('new')}
               data-testid="new-type"
             >
               <ActionIcon icon={Plus} />
@@ -264,12 +247,18 @@ export default function UniverseTypes() {
         <QueryTabList label="Types" idPrefix="types" tabs={TABS} tab={tab} onChoose={chooseTab} />
       </PageHeader>
 
-      {isCreatingType ? (
-        <NewTypeDialog
+      {editing ? (
+        <TypeDialog
           universeId={universe.id}
-          onClose={() => setIsCreatingType(false)}
-          onCreated={async () => {
-            setIsCreatingType(false)
+          type={editing === 'new' ? null : editing}
+          onClose={() => setEditing(null)}
+          onSaved={async (savedName) => {
+            const wasNew = editing === 'new'
+            setEditing(null)
+            setBlocked(null)
+            setNotice(
+              wasNew ? `Created the type “${savedName}”.` : `Saved the type “${savedName}”.`,
+            )
             await refresh()
           }}
         />
@@ -281,6 +270,10 @@ export default function UniverseTypes() {
             {message}
           </p>
         ) : null}
+
+        <p className="types__notice" role="status" data-testid="types-notice">
+          {notice}
+        </p>
 
         {!types ? (
           <p className="notice" role="status">
@@ -297,63 +290,82 @@ export default function UniverseTypes() {
                   <span className="types__name">
                     <bdi>{type.name}</bdi>
                   </span>
-                  <span className="types__count">
+                  <span className="types__count" data-testid={`type-count-${type.name}`}>
                     {type.entityCount === 1 ? '1 entry' : `${type.entityCount} entries`}
+                    {type.trashedEntityCount > 0 ? (
+                      <span className="types__trashed">
+                        {type.trashedEntityCount === type.entityCount
+                          ? type.entityCount === 1
+                            ? ', in the Trash'
+                            : ', all in the Trash'
+                          : `, ${type.trashedEntityCount} in the Trash`}
+                      </span>
+                    ) : null}
                   </span>
-                  <button
-                    className="button button--secondary button--sm"
-                    type="button"
-                    aria-expanded={iconTypeId === type.id}
-                    onClick={() => setIconTypeId(iconTypeId === type.id ? null : type.id)}
-                    data-testid={`icon-${type.name}`}
-                  >
-                    Icon
-                  </button>
-                  <button
-                    className="button button--secondary button--sm"
-                    type="button"
-                    onClick={() => setOpenTypeId(openTypeId === type.id ? null : type.id)}
-                    data-testid={`fields-${type.name}`}
-                  >
-                    {openTypeId === type.id ? 'Close' : 'Fields'}
-                  </button>
-                  {type.entityCount === 0 ? (
+                  <span className="types__actions">
                     <button
                       className="button button--secondary button--sm"
                       type="button"
-                      onClick={() => removeType(type.id)}
+                      onClick={() => {
+                        setBlocked(null)
+                        setEditing(type)
+                      }}
+                      aria-label={`Edit ${type.name}`}
+                      data-testid={`edit-type-${type.name}`}
                     >
-                      Delete
+                      <ActionIcon icon={Pencil} />
+                      Edit
                     </button>
-                  ) : null}
+                    <button
+                      className="button button--secondary button--sm"
+                      type="button"
+                      aria-expanded={openTypeId === type.id}
+                      aria-label={`Fields of ${type.name}`}
+                      onClick={() => setOpenTypeId(openTypeId === type.id ? null : type.id)}
+                      data-testid={`fields-${type.name}`}
+                    >
+                      Fields
+                      {type.fields.length > 0 ? (
+                        <span className="types__fieldcount">{type.fields.length}</span>
+                      ) : null}
+                    </button>
+                    <ActionMenu
+                      label={`More actions for ${type.name}`}
+                      triggerTestId={`type-actions-${type.name}`}
+                    >
+                      <button
+                        className="actionmenu__item actionmenu__item--danger"
+                        type="button"
+                        onClick={() => void removeType(type)}
+                        data-testid={`delete-type-${type.name}`}
+                      >
+                        Delete type
+                      </button>
+                    </ActionMenu>
+                  </span>
                 </div>
 
                 {type.description ? (
                   <p className="types__description prose">{type.description}</p>
                 ) : null}
 
-                <label className="check types__family">
-                  <input
-                    type="checkbox"
-                    checked={type.familyTreeEligible}
-                    disabled={busyTypeId === type.id}
-                    onChange={(event) => void changeFamilyTree(type, event.target.checked)}
-                    data-testid={`family-eligible-${type.name}`}
-                  />
-                  <span>
-                    <span className="types__familylabel">Family Tree</span>
-                    Entries of this type can appear in Family Tree
-                  </span>
-                </label>
-
-                {iconTypeId === type.id ? (
-                  <div className="types__iconpanel">
-                    <TypeIconPicker
-                      value={type.icon}
-                      disabled={busyTypeId === type.id}
-                      onChange={(icon) => void changeIcon(type, icon)}
-                      testId={`icon-picker-${type.name}`}
-                    />
+                {blocked?.typeId === type.id ? (
+                  <div
+                    className="callout callout--warning types__blocked"
+                    role="alert"
+                    data-testid={`type-blocked-${type.name}`}
+                  >
+                    <p className="types__blockedtext">{blocked.text}</p>
+                    <p className="types__blockedlinks">
+                      {type.entityCount > type.trashedEntityCount ? (
+                        <Link to={`/app/universes/${universe.id}/lore?type=${type.id}`}>
+                          Show its entries in Lore
+                        </Link>
+                      ) : null}
+                      {type.trashedEntityCount > 0 ? (
+                        <Link to={`/app/universes/${universe.id}/trash`}>Open the Trash</Link>
+                      ) : null}
+                    </p>
                   </div>
                 ) : null}
 
@@ -525,33 +537,81 @@ export default function UniverseTypes() {
 }
 
 /**
- * A new Lore Type: its name, its icon, and whether its entries take part in the Family Tree - the only things a type needs
- * before its first entry. Fields are added on the type afterwards. In the drawer every Lorex form uses, so focus goes in,
- * Escape asks before a typed name is lost, and focus returns to "New type".
+ * Why a type cannot be deleted, in the author's terms. The same sentence the API's refusal carries
+ * (`EntityTypeEndpoints.InUseDetail`), said from the list before anything is sent: an entry in the Trash is out of sight in
+ * Lore and still keeps its type, so it is named.
  */
-function NewTypeDialog({
+function inUseDetail(name: string, live: number, trashed: number) {
+  const total = live + trashed
+  const uses = total === 1 ? '1 entry still uses it' : `${total} entries still use it`
+  const where =
+    trashed === 0
+      ? ''
+      : trashed === total
+        ? total === 1
+          ? ', and it is in the Trash'
+          : ', all of them in the Trash'
+        : `, ${trashed} of them in the Trash`
+  const fix =
+    total === 1
+      ? trashed === 0
+        ? 'Move it to another type first.'
+        : 'Restore it from the Trash, then move it to another type.'
+      : trashed === 0
+        ? 'Move them to another type first.'
+        : 'Move them to another type first; an entry in the Trash has to be restored before it can be moved.'
+  return `${name} can't be deleted because ${uses}${where}. ${fix}`
+}
+
+/**
+ * One Lore Type, new or existing. A new type is given its name, its icon, and whether its entries take part in the Family
+ * Tree - the only things a type needs before its first entry. An existing one edits its name and icon only: the Family
+ * Tree choice is the first of a type's constraints, and those get a surface of their own rather than one more checkbox
+ * here, so an edit sends the stored choice back untouched. Fields are managed on the type.
+ * In the drawer every Lorex form uses, so focus goes in, Escape asks before an edit is lost, and focus returns to the
+ * button that opened it.
+ *
+ * An edit changes the type in place, by id: every entry keeps it, and so do Lore's filter and its address. The route
+ * replaces the whole type, so what this form does not edit - the description, the colour, the order, the Family Tree
+ * choice - is sent back exactly as it is stored.
+ */
+function TypeDialog({
   universeId,
+  type,
   onClose,
-  onCreated,
+  onSaved,
 }: {
   universeId: string
+  /** The type being edited, or null for a new one. */
+  type: EntityType | null
   onClose: () => void
-  onCreated: () => Promise<void>
+  onSaved: (name: string) => Promise<void>
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
-  const [name, setName] = useState('')
-  const [icon, setIcon] = useState<string | null>(null)
-  const [familyTreeEligible, setFamilyTreeEligible] = useState(false)
+  const initial = {
+    name: type?.name ?? '',
+    icon: type?.icon ?? null,
+    familyTreeEligible: type?.familyTreeEligible ?? false,
+  }
+  const [name, setName] = useState(initial.name)
+  const [icon, setIcon] = useState<string | null>(initial.icon)
+  const [familyTreeEligible, setFamilyTreeEligible] = useState(initial.familyTreeEligible)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
   const isDirty =
     payloadKey({ name: name.trim(), icon, familyTreeEligible }) !==
-    payloadKey({ name: '', icon: null, familyTreeEligible: false })
+    payloadKey({
+      name: initial.name,
+      icon: initial.icon,
+      familyTreeEligible: initial.familyTreeEligible,
+    })
   const { close, dialogProps } = useDrawerGuard(
     isDirty,
-    'This type has not been created. Leave without saving it?',
+    type
+      ? `Your changes to “${type.name}” have not been saved. Leave without saving them?`
+      : 'This type has not been created. Leave without saving it?',
     onClose,
   )
 
@@ -559,7 +619,7 @@ function NewTypeDialog({
 
   useEffect(() => {
     dialog.current?.showModal()
-    document.getElementById('new-type-name')?.focus()
+    document.getElementById('type-name')?.focus()
   }, [])
 
   async function save() {
@@ -572,25 +632,36 @@ function NewTypeDialog({
 
     setIsSaving(true)
     try {
-      await createEntityType(universeId, {
-        name: name.trim(),
-        description: null,
-        icon,
-        accentColor: null,
-        displayOrder: null,
-        familyTreeEligible,
-      })
-      await onCreated()
+      if (type) {
+        await updateEntityType(universeId, type.id, {
+          name: name.trim(),
+          description: type.description,
+          icon,
+          accentColor: type.accentColor,
+          displayOrder: type.displayOrder,
+          familyTreeEligible: type.familyTreeEligible,
+        })
+      } else {
+        await createEntityType(universeId, {
+          name: name.trim(),
+          description: null,
+          icon,
+          accentColor: null,
+          displayOrder: null,
+          familyTreeEligible,
+        })
+      }
+      await onSaved(name.trim())
     } catch (error: unknown) {
       if (error instanceof ApiError) {
         setFieldErrors(error.fieldErrors)
         setMessage(
           Object.keys(error.fieldErrors).length === 0
             ? error.message
-            : 'Some details need a change before this can be created.',
+            : `Some details need a change before this can be ${type ? 'saved' : 'created'}.`,
         )
       } else {
-        setMessage('That type could not be created.')
+        setMessage(type ? 'That type could not be saved.' : 'That type could not be created.')
       }
     } finally {
       setIsSaving(false)
@@ -601,9 +672,9 @@ function NewTypeDialog({
     <dialog
       className="drawer"
       ref={dialog}
-      aria-labelledby="new-type-heading"
+      aria-labelledby="type-heading"
       {...dialogProps}
-      data-testid="new-type-dialog"
+      data-testid={type ? 'edit-type-dialog' : 'new-type-dialog'}
     >
       <form
         className="drawer__panel"
@@ -614,31 +685,31 @@ function NewTypeDialog({
       >
         <header className="drawer__head">
           <p className="drawer__eyebrow">Lore Types</p>
-          <h2 className="drawer__title" id="new-type-heading">
-            New type
+          <h2 className="drawer__title" id="type-heading">
+            {type ? 'Edit type' : 'New type'}
           </h2>
         </header>
 
         <div className="drawer__body">
           {message ? (
-            <p className="form__message" role="alert" data-testid="new-type-error">
+            <p className="form__message" role="alert" data-testid="type-dialog-error">
               {message}
             </p>
           ) : null}
 
           <Field
             label="Name"
-            name="new-type-name"
-            placeholder="Starship, Language, Ritual…"
+            name="type-name"
+            placeholder={type ? undefined : 'Starship, Language, Ritual…'}
             dir="auto"
             value={name}
             onChange={(event) => setName(event.target.value)}
             error={fieldErrors.name}
-            data-testid="new-type-name"
+            data-testid="type-name"
           />
 
           <div className="field">
-            <TypeIconPicker value={icon} onChange={setIcon} testId="new-type-icon" />
+            <TypeIconPicker value={icon} onChange={setIcon} testId="type-icon" />
             <p className="field__hint">
               Optional, and only a picture: it marks the type on the Lore filter. Nothing is chosen
               for you from the name.
@@ -646,29 +717,31 @@ function NewTypeDialog({
             {fieldErrors.icon ? <p className="field__error">{fieldErrors.icon}</p> : null}
           </div>
 
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={familyTreeEligible}
-              onChange={(event) => setFamilyTreeEligible(event.target.checked)}
-              data-testid="new-type-family"
-            />
-            <span>
-              <span className="types__familylabel">Family Tree</span>
-              Entries of this type can appear in Family Tree
-            </span>
-          </label>
+          {type ? null : (
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={familyTreeEligible}
+                onChange={(event) => setFamilyTreeEligible(event.target.checked)}
+                data-testid="type-family"
+              />
+              <span>
+                <span className="types__familylabel">Family Tree</span>
+                Entries of this type can appear in Family Tree
+              </span>
+            </label>
+          )}
         </div>
 
         <footer className="drawer__actions">
-          <button className="button" type="submit" disabled={isSaving} data-testid="create-type">
-            {isSaving ? 'Creating' : 'Create'}
+          <button className="button" type="submit" disabled={isSaving} data-testid="save-type">
+            {type ? (isSaving ? 'Saving…' : 'Save changes') : isSaving ? 'Creating…' : 'Create'}
           </button>
           <button
             className="button button--secondary"
             type="button"
             onClick={close}
-            data-testid="cancel-new-type"
+            data-testid="cancel-type"
           >
             Cancel
           </button>

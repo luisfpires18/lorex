@@ -82,8 +82,7 @@ public sealed class LoreEndpointTests(LorexApiFactory factory) : IClassFixture<L
 
         // The refusal counts entries in English, not in row counts.
         Assert.Contains(
-            "1 entry still uses this type, counting anything in the Trash. "
-                + "Move it to another type first.",
+            "Starship can't be deleted because 1 entry still uses it. Move it to another type first.",
             await response.Content.ReadAsStringAsync(),
             StringComparison.Ordinal);
     }
@@ -100,8 +99,7 @@ public sealed class LoreEndpointTests(LorexApiFactory factory) : IClassFixture<L
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Contains(
-            "2 entries still use this type, counting anything in the Trash. "
-                + "Move them to another type first.",
+            "Starship can't be deleted because 2 entries still use it. Move them to another type first.",
             await response.Content.ReadAsStringAsync(),
             StringComparison.Ordinal);
     }

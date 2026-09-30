@@ -124,3 +124,12 @@ version; no permanent delete; the backup carries the Trash. What story content a
 only, restores that append, content that waits for its story or arc, and one deliberate difference from the rule above: a
 beat's link to a scene in the Trash is hidden rather than marked, and kept by the server through saves no client could see it
 in. The Trash listing now holds every kind, and each kind restores on its own typed route.
+
+## Amendment - moving entries to the Trash together (2026-09-30, Product refinement 020)
+
+`POST /api/universes/{universeId}/entities/bulk-trash` (`{ entityIds }`, 1-100) is the single move, for each entry, in one
+write that is all or nothing: every id is checked to be a live entry of the universe before anything is written - unknown,
+another universe's and already-trashed ids refused alike, keyed by position, so nothing is disclosed - then each is trashed
+through the same `TrashCoreAsync` inside one Canon `RecordAsync`, reconciled once. A failure on any row leaves every entry
+in Lore. Nothing about the marker changes: no row erased, every entry restores on its own, and a type used only by entries
+in the Trash still cannot be deleted.

@@ -10,7 +10,7 @@ One ADR per durable decision. Rationale lives in the ADR, never here.
 | 0004 | PowerShell launcher instead of a custom executable | [0004-local-launcher.md](0004-local-launcher.md) |
 | 0005 | Cookie sessions over token auth | [0005-cookie-authentication.md](0005-cookie-authentication.md) |
 | 0006 | Universe ownership is enforced in every query | [0006-universe-ownership.md](0006-universe-ownership.md) |
-| 0007 | One generic entity model, with relational custom fields | [0007-generic-entity-model.md](0007-generic-entity-model.md) |
+| 0007 | One generic entity model, with relational custom fields (amended 020: starter types seeded once) | [0007-generic-entity-model.md](0007-generic-entity-model.md) |
 | 0008 | A relationship is one row, read from either end | [0008-relationship-direction.md](0008-relationship-direction.md) |
 | 0009 | Fictional chronology is stored as signed integer components | [0009-fictional-chronology.md](0009-fictional-chronology.md) |
 | 0010 | Canon conflicts are derived findings keyed by a fingerprint | [0010-canon-conflict-lifecycle.md](0010-canon-conflict-lifecycle.md) |
@@ -18,7 +18,7 @@ One ADR per durable decision. Rationale lives in the ADR, never here.
 | 0012 | High conflicts block only the write that introduces them (amended for mass create: a batch is one all-or-nothing candidate) | [0012-canon-promotion-gate.md](0012-canon-promotion-gate.md) |
 | 0013 | An entry's history is a full snapshot per accepted write | [0013-entity-revision-snapshots.md](0013-entity-revision-snapshots.md) |
 | 0014 | A backup is one versioned archive holding a universe's authored data | [0014-universe-backup-format.md](0014-universe-backup-format.md) |
-| 0015 | An entry is trashed by a marker, and nothing that points at it is destroyed | [0015-entity-trash-and-restore.md](0015-entity-trash-and-restore.md) |
+| 0015 | An entry is trashed by a marker, and nothing that points at it is destroyed (amended 020: bulk move, all or nothing) | [0015-entity-trash-and-restore.md](0015-entity-trash-and-restore.md) |
 | 0016 | Lore is searched by a SQLite FTS5 index the write path keeps in step | [0016-sqlite-full-text-search.md](0016-sqlite-full-text-search.md) |
 | 0017 | Lorex installs as an app shell and caches build output only | [0017-pwa-shell-and-caching.md](0017-pwa-shell-and-caching.md) |
 | 0018 | DEV is one App Service serving both halves, with state on the site's own share | [0018-azure-dev-single-app-service.md](0018-azure-dev-single-app-service.md) |

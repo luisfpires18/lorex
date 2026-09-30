@@ -13,7 +13,42 @@ import { CANON_LABELS, type EntitySummary } from '../lore/types'
  * The whole card is one link, so there is nothing interactive inside it. Its accessible name is
  * the entry's name first; the picture beside it is decorative.
  */
-export function EntityCard({ universeId, entity }: { universeId: string; entity: EntitySummary }) {
+export function EntityCard({
+  universeId,
+  entity,
+  selection,
+}: {
+  universeId: string
+  entity: EntitySummary
+  /**
+   * While Lore is selecting, the card is not a link: it is the label of its own checkbox, so pressing anywhere on it -
+   * or Space on the box - selects it, and the box says whether it is.
+   */
+  selection?: { checked: boolean; onToggle: () => void }
+}) {
+  const body = <CardBody universeId={universeId} entity={entity} />
+
+  if (selection) {
+    return (
+      <label
+        className="entitycard entitycard--selectable"
+        data-selected={selection.checked ? 'true' : undefined}
+        data-testid="entity-card"
+        data-entity-name={entity.name}
+      >
+        <input
+          className="entitycard__check"
+          type="checkbox"
+          checked={selection.checked}
+          onChange={selection.onToggle}
+          aria-label={`Select ${entity.name}`}
+          data-testid="entity-select"
+        />
+        {body}
+      </label>
+    )
+  }
+
   return (
     <Link
       className="entitycard"
@@ -21,6 +56,14 @@ export function EntityCard({ universeId, entity }: { universeId: string; entity:
       data-testid="entity-card"
       data-entity-name={entity.name}
     >
+      {body}
+    </Link>
+  )
+}
+
+function CardBody({ universeId, entity }: { universeId: string; entity: EntitySummary }) {
+  return (
+    <>
       <EntityTile
         className="entitycard__tile"
         universeId={universeId}
@@ -82,6 +125,6 @@ export function EntityCard({ universeId, entity }: { universeId: string; entity:
           <span className="entitycard__summary prose">{entity.summary}</span>
         ) : null}
       </span>
-    </Link>
+    </>
   )
 }

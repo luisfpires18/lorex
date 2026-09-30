@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Lorex.Api.Features.Lore;
 
 /// <summary>
-/// The starter set of entity types. Seeding is idempotent: it inserts only the names a
-/// universe is missing, so it is safe to run on a new universe and on one created before
-/// this feature existed.
+/// The starter set of entity types, written once, when a universe is created. Nothing else seeds: a read never does,
+/// so a starter the author deleted or renamed - or every type, deleted - stays that way (ADR 0007 amendment). The
+/// insert only adds names that are missing, which at creation is all of them.
 ///
 /// Each carries an icon key from <see cref="EntityTypeIcons"/>, written here as data. That is the
 /// only way a type gets an icon it was not given by its author: nothing maps a name to one.

@@ -39,3 +39,15 @@ feature existed.
   index or a projection, not a JSON column.
 - An entity reference is deliberately just a field pointing at another entity. Semantic
   relationships, with their own kinds and direction, are a separate model in phase 005.
+
+## Amendment - the starter types are seeded once (2026-09-30, Product refinement 020)
+
+Seeding filled in any missing starter *name* on every read of the type list - added in Phase 004 so universes created in
+Phase 003, before types existed, got them on first use. Once types could be renamed and deleted from the Types screen,
+that read undid the author: deleting Location succeeded and the next read put a new, empty "Location" back, so the delete
+looked like it had failed and said nothing, and a renamed starter came back beside its new name.
+
+Now the starters are written once, when a universe is created, and a read never writes. A universe's types are its
+author's from then on; one whose author deleted every type has none, and says so where an entry would need one. No
+backfill is owed: every universe since Phase 004 was seeded at creation, a restored universe takes the types its backup
+holds, and a Phase 003 universe that was ever opened was seeded then by the old read.

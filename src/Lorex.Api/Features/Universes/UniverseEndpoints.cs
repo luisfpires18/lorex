@@ -159,8 +159,8 @@ public static partial class UniverseEndpoints
             return NameTakenProblem();
         }
 
-        // A universe is useless without somewhere to put things, so it starts with the
-        // default entity types. Seeding is idempotent and only fills in missing names.
+        // A universe starts with the default entity types, written here and only here: after this they are the
+        // author's, and no read puts back one they removed.
         await EntityTypeDefaults.EnsureAsync(db, universe.Id, cancellationToken);
 
         return Results.Created($"/api/universes/{universe.Id}", ToDetail(universe));

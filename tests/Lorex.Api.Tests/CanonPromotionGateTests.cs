@@ -676,6 +676,28 @@ public sealed class CanonPromotionGateTests(LorexApiFactory factory) : IClassFix
         Assert.NotNull(resolved.ResolvedAt);
     }
 
+    /// <summary>
+    /// A bulk move to the Trash is reconciled once, for the whole batch, exactly as one move is: the conflict about lore
+    /// the author threw away stops being reported on the write itself.
+    /// </summary>
+    [Fact]
+    public async Task Moving_entries_to_the_Trash_together_resolves_the_conflict_immediately()
+    {
+        var (client, universe) = await SignedInWithUniverse("recentbulk");
+        var (_, _, settled, draft) = await CanonRelationshipOntoDraft(client, universe.Id);
+        var opened = Assert.Single((await List(client, universe.Id)).Items);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/universes/{universe.Id}/entities/bulk-trash",
+            new BulkTrashRequest([settled.Id, draft.Id]));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var resolved = Assert.Single((await List(client, universe.Id)).Items);
+        Assert.Equal(opened.Id, resolved.Id);
+        Assert.Equal(CanonConflictStatus.Resolved, resolved.Status);
+        Assert.NotNull(resolved.ResolvedAt);
+    }
+
     [Fact]
     public async Task Deleting_a_timeline_entry_resolves_the_conflict_immediately()
     {
