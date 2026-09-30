@@ -228,6 +228,7 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                     type.Description,
                     type.Icon,
                     type.AccentColor,
+                    type.FamilyTreeEligible,
                     type.DisplayOrder,
                     Utc(type.CreatedAt),
                     Utc(type.UpdatedAt),

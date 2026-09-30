@@ -36,7 +36,8 @@ public sealed class CanonFamilyLoopRule : ICanonIntegrityRule
         var rows = await context.Db.Relationships.AsNoTracking()
             .Where(relationship => relationship.UniverseId == context.UniverseId
                 && relationship.RelationshipType!.UniverseId == context.UniverseId
-                && relationship.RelationshipType.FamilySemantic != RelationshipFamilySemantic.None
+                // Ancestry only: a non-structural family link places nobody above anybody, so it closes no circle (ADR 0040).
+                && RelationshipFamilySemantics.Parent.Contains(relationship.RelationshipType.FamilySemantic)
                 && relationship.CanonStatus == CanonStatus.Canon
                 && relationship.SourceEntity!.DeletedAt == null
                 && relationship.SourceEntity.CanonStatus == CanonStatus.Canon

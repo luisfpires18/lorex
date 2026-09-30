@@ -20,23 +20,39 @@ export const AgeOrder = {
 export type AgeOrderValue = (typeof AgeOrder)[keyof typeof AgeOrder]
 
 /**
- * Mirrors `RelationshipFamilySemantic`. What every link of a kind means to a family tree, on the stored
- * direction: the source is the parent, the target is the child. Configured by the author, never inferred
- * from the kind's name.
+ * Mirrors `RelationshipFamilySemantic`. What every link of a kind means to a family tree. The two parent
+ * meanings read the stored direction - the source is the parent, the target the child - and are the only ones
+ * a tree derives relatives from. `NonStructuralFamily` is family that places nobody in the ancestry: "uncle
+ * of", "married to". Configured by the author, never inferred from the kind's name (ADR 0035, ADR 0040).
  */
 export const FamilySemantic = {
   None: 0,
   BiologicalParent: 1,
   AdoptiveParent: 2,
+  NonStructuralFamily: 3,
 } as const
 
 export type FamilySemanticValue = (typeof FamilySemantic)[keyof typeof FamilySemantic]
+
+/** Whether a meaning places the two ends as parent and child. */
+export function isParentSemantic(semantic: FamilySemanticValue) {
+  return semantic === FamilySemantic.BiologicalParent || semantic === FamilySemantic.AdoptiveParent
+}
+
+/** Every meaning, in the order a choice offers them. */
+export const FAMILY_SEMANTIC_ORDER: FamilySemanticValue[] = [
+  FamilySemantic.None,
+  FamilySemantic.NonStructuralFamily,
+  FamilySemantic.BiologicalParent,
+  FamilySemantic.AdoptiveParent,
+]
 
 /** What each meaning is called on screen. No enum name is ever shown. */
 export const FAMILY_SEMANTIC_LABELS: Record<FamilySemanticValue, string> = {
   [FamilySemantic.None]: 'Not a family connection',
   [FamilySemantic.BiologicalParent]: 'Source is the biological parent',
   [FamilySemantic.AdoptiveParent]: 'Source is the adoptive parent',
+  [FamilySemantic.NonStructuralFamily]: 'Family relationship, does not define ancestry',
 }
 
 /** The one word a family tree uses for a link of each meaning. */
@@ -44,6 +60,7 @@ export const FAMILY_SEMANTIC_WORDS: Record<FamilySemanticValue, string> = {
   [FamilySemantic.None]: '',
   [FamilySemantic.BiologicalParent]: 'biological',
   [FamilySemantic.AdoptiveParent]: 'adoptive',
+  [FamilySemantic.NonStructuralFamily]: 'family',
 }
 
 /**

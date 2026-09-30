@@ -901,9 +901,16 @@ internal static partial class BackupValidation
                     Add(BackupIssueCodes.InvalidValue, $"{what} reads the same from both sides, so it cannot name an older side.");
                 }
 
-                if (Defined(type.FamilySemantic, $"{what}'s family meaning") && type.IsSymmetric && type.FamilySemantic != RelationshipFamilySemantic.None)
+                if (Defined(type.FamilySemantic, $"{what}'s family meaning"))
                 {
-                    Add(BackupIssueCodes.InvalidValue, $"{what} reads the same from both sides, so it cannot name a parent side.");
+                    if (version < 18 && type.FamilySemantic == RelationshipFamilySemantic.NonStructuralFamily)
+                    {
+                        Add(BackupIssueCodes.InvalidValue, $"{what}'s family meaning did not exist in format version {version}.");
+                    }
+                    else if (type.IsSymmetric && type.FamilySemantic.IsParent())
+                    {
+                        Add(BackupIssueCodes.InvalidValue, $"{what} reads the same from both sides, so it cannot name a parent side.");
+                    }
                 }
 
                 if (type.MinAgeDifferenceYears is < 0 || type.MaxAgeDifferenceYears is < 0)

@@ -48,7 +48,7 @@ async function newUniverse(page: Page, name: string) {
 }
 
 function typesUrl(universeId: string) {
-  return `/app/universes/${universeId}/types`
+  return `/app/universes/${universeId}/types?tab=relations`
 }
 
 function entryUrl(universeId: string, entityId: string) {

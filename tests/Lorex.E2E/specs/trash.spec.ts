@@ -55,7 +55,7 @@ test.describe('trash', () => {
 
     // A relationship kind, so the entry has something resting on it that a hard delete would
     // have destroyed outright.
-    await page.goto(`/app/universes/${universeId}/types`)
+    await page.goto(`/app/universes/${universeId}/types?tab=relations`)
     await page.getByTestId('add-relationship-type').click()
     await page.getByLabel('Reads as', { exact: true }).fill('keeps')
     await page.getByLabel('Reads as, from the other side').fill('kept by')

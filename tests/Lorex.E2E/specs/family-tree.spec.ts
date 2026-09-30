@@ -46,7 +46,7 @@ async function newUniverse(page: Page, name: string) {
 }
 
 function typesUrl(universeId: string) {
-  return `/app/universes/${universeId}/types`
+  return `/app/universes/${universeId}/types?tab=relations`
 }
 
 function treeUrl(universeId: string, entityId?: string) {
@@ -296,7 +296,7 @@ test.describe('family tree', () => {
     await page.getByTestId('add-family-link').click()
 
     const form = page.getByTestId('family-link-form')
-    await form.getByTestId('family-link-kind').selectOption({ label: 'bore — biological' })
+    await form.getByTestId('family-link-kind').selectOption({ label: 'bore — biological parent' })
     await form.getByTestId('family-link-side').selectOption({ label: 'Lia is the parent' })
     await form.getByTestId('picker-input').click()
     await form.getByTestId('picker-input').fill('Wren')

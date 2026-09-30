@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { Link, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { UniverseForm } from '../components/UniverseForm'
 import { downloadUniverseBackup } from '../export/api'
@@ -8,6 +8,8 @@ import { getPublication } from '../publishing/api'
 import { Visibility } from '../publishing/types'
 import { deleteUniverse, setUniverseArchived, updateUniverse } from '../universes/api'
 import { PageHeader } from '../components/PageHeader'
+import { QueryTabList, TabPanel } from '../components/QueryTabs'
+import { useQueryTab } from '../lib/queryTab'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
 const TABS = [
@@ -18,8 +20,6 @@ const TABS = [
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
-
-const isTab = (value: string | null): value is TabId => TABS.some((tab) => tab.id === value)
 
 /**
  * A universe's Settings (UI refinement 014): four tabs rather than one long page, in the workspace's one page shell - the
@@ -38,53 +38,7 @@ export default function UniverseSettings() {
   const { universe, refresh } = useOutletContext<WorkspaceContext>()
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [params, setParams] = useSearchParams()
-  const asked = params.get('tab')
-  const tab: TabId = isTab(asked) ? asked : 'general'
-  const tabRefs = useRef(new Map<TabId, HTMLButtonElement>())
-  const tabList = useRef<HTMLDivElement>(null)
-
-  // On a phone the tab row scrolls sideways: keep the chosen tab in it, without moving the page.
-  useEffect(() => {
-    const list = tabList.current
-    const chosen = tabRefs.current.get(tab)
-    if (!list || !chosen) return
-    const start = chosen.offsetLeft - list.offsetLeft
-    const end = start + chosen.offsetWidth
-    if (start < list.scrollLeft) list.scrollLeft = start
-    else if (end > list.scrollLeft + list.clientWidth) list.scrollLeft = end - list.clientWidth
-  }, [tab])
-
-  function choose(next: TabId, focus = false) {
-    setParams(
-      (current) => {
-        const copy = new URLSearchParams(current)
-        if (next === 'general') copy.delete('tab')
-        else copy.set('tab', next)
-        return copy
-      },
-      { replace: true },
-    )
-    if (focus) tabRefs.current.get(next)?.focus()
-  }
-
-  // The tab pattern's keys: arrows move and choose, Home and End jump.
-  function onTabKey(event: KeyboardEvent<HTMLDivElement>) {
-    const at = TABS.findIndex((each) => each.id === tab)
-    const to =
-      event.key === 'ArrowRight'
-        ? (at + 1) % TABS.length
-        : event.key === 'ArrowLeft'
-          ? (at - 1 + TABS.length) % TABS.length
-          : event.key === 'Home'
-            ? 0
-            : event.key === 'End'
-              ? TABS.length - 1
-              : -1
-    if (to < 0) return
-    event.preventDefault()
-    choose(TABS[to].id, true)
-  }
+  const [tab, choose] = useQueryTab(TABS)
 
   const [savedDetails, setSavedDetails] = useState(false)
   const [savedColour, setSavedColour] = useState(false)
@@ -210,35 +164,13 @@ export default function UniverseSettings() {
   return (
     <article className="settings settings--tabbed">
       <PageHeader title="Settings" lede={<p>This universe’s name, colour, backups and archive.</p>}>
-        <div
-          ref={tabList}
-          className="tabs"
-          role="tablist"
-          aria-label="Settings"
-          onKeyDown={onTabKey}
-          data-testid="settings-tabs"
-        >
-          {TABS.map((each) => (
-            <button
-              key={each.id}
-              ref={(node) => {
-                if (node) tabRefs.current.set(each.id, node)
-                else tabRefs.current.delete(each.id)
-              }}
-              className="tabs__tab"
-              type="button"
-              role="tab"
-              id={`settings-tab-${each.id}`}
-              aria-selected={tab === each.id}
-              aria-controls={`settings-panel-${each.id}`}
-              tabIndex={tab === each.id ? 0 : -1}
-              onClick={() => choose(each.id)}
-              data-testid={`settings-tab-${each.id}`}
-            >
-              {each.label}
-            </button>
-          ))}
-        </div>
+        <QueryTabList
+          label="Settings"
+          idPrefix="settings"
+          tabs={TABS}
+          tab={tab}
+          onChoose={choose}
+        />
       </PageHeader>
 
       {/* One outer shell for every workspace page; only the forms keep a readable column. */}
@@ -515,16 +447,8 @@ export default function UniverseSettings() {
 /** One tab's panel: always mounted, hidden unless chosen, so what is typed in it is kept. */
 function Panel({ id, tab, children }: { id: TabId; tab: TabId; children: ReactNode }) {
   return (
-    <div
-      className="tabs__panel"
-      role="tabpanel"
-      id={`settings-panel-${id}`}
-      aria-labelledby={`settings-tab-${id}`}
-      hidden={tab !== id}
-      tabIndex={0}
-      data-testid={`settings-panel-${id}`}
-    >
+    <TabPanel idPrefix="settings" id={id} tab={tab}>
       {children}
-    </div>
+    </TabPanel>
   )
 }

@@ -1,6 +1,6 @@
 # ADR 0035 - A relation kind may carry an explicit family meaning, and a family tree derives the rest
 
-Status: accepted (2026-09-16)
+Status: accepted (2026-09-16); two statements superseded by ADR 0040 (2026-09-30), marked below
 
 ## Context
 
@@ -74,8 +74,10 @@ Lia, biological for Tam*. What is deliberately absent is any word for how much o
 **no full or half sibling**. One recorded parent proves nothing about a parent nobody wrote down, and missing
 data is unknown rather than false.
 
-**Entry types mean nothing here.** There is no "Character" and no personhood test: any entry may hold family
-links, because the author is the one who recorded them. A location with a parent is the author's business.
+~~**Entry types mean nothing here.** There is no "Character" and no personhood test: any entry may hold family
+links, because the author is the one who recorded them. A location with a parent is the author's business.~~
+*Superseded 2026-09-30 by ADR 0040: a type now says, explicitly, whether its entries are offered by the Family Tree.
+Still no personhood test and nothing read from a name, and any entry keeps the family links already recorded on it.*
 
 **Circles are reported, never resolved.** Parent links can be written in a circle - A bore B, B bore A - which
 no ancestry can be derived from. Three answers were considered, and two are taken:
@@ -125,8 +127,9 @@ EF Core's table rebuild, so nothing that points at `RelationshipTypes` is droppe
 **The workspace is a section of the universe.** `Family Tree` sits in the sidebar after Lore, at
 `/app/universes/{universeId}/family-tree/{entityId}` - the entry in focus is in the address, so a reload, the
 browser's Back and Forward and a shared link all land on the same family. With no entry chosen, the page is an
-entry picker and an empty state. Every entry's page offers "Family tree", because family is what an author
-recorded, not something Lorex decides an entry is eligible for.
+entry picker and an empty state. ~~Every entry's page offers "Family tree", because family is what an author
+recorded, not something Lorex decides an entry is eligible for.~~ *Superseded 2026-09-30 by ADR 0040: an entry's page
+offers it when its type is enabled for the Family Tree, or when a family link already touches it.*
 
 **The drawing is generations, not a graph.** Rows of cards - grandparents, parents, the focal entry with its
 siblings, children, grandchildren - in plain React and CSS, with the connecting lines measured from the cards
@@ -168,3 +171,19 @@ edge anywhere.
   Integrity if its links are Canon. Both are honest about what they read.
 - The backup bump means a Lorex that predates this release refuses a new backup outright rather than
   restoring a world whose families have quietly vanished.
+
+## Amendment - explicit type eligibility and family without ancestry (2026-09-30, ADR 0040)
+
+Two statements above no longer hold, and are struck through where they stand rather than rewritten:
+
+1. *Entry types mean nothing to the Family Tree.* A type now carries `FamilyTreeEligible`, set by its author and seeded
+   only on the starter Character; the tree's picker and an entry's Family tree action follow it. Legacy family data stays
+   reachable: the tree answers for any live entry, names an ineligible type on screen, and an entry already holding a
+   family link keeps its action.
+2. *Family meanings are only parent meanings.* `NonStructuralFamily` joins `BiologicalParent` and `AdoptiveParent`: a
+   kind like "uncle of" or "married to" is listed with the focal entry as authored family, and derives nothing. Parent
+   meanings alone still place entries, derive every relative, draw every line and feed `CANON-FAMILY-001`. A symmetric
+   kind may carry the non-structural meaning; it still may not carry a parent one.
+
+Everything else in this decision - ids only, the stored direction, the bounded five-query read, circles reported and
+never resolved, the Trash, ownership, ordinary relationships and no second family table - is unchanged.

@@ -370,3 +370,12 @@ Authored, so a version 15 reader would lose it: a bump. As in version 15, whethe
 its date are never in a backup, and every restored story is private. A file at version 15 or earlier has no public summary
 on a story, and one it carries is ignored; nothing is ever taken from the premise. An account's author address and its
 photo's public choice (ADR 0037) belong to the account and are not in a universe backup.
+
+## Amendment: version 18, Family Tree eligibility and family without ancestry (2026-09-30)
+
+`entityTypes[].familyTreeEligible` carries whether a type's entries are offered by the Family Tree, and
+`relationshipTypes[].familySemantic` may now be `NonStructuralFamily` (ADR 0040). A bump: a version 17 reader does not know
+the new meaning and must never read it as a parent link, and the capability is an authored choice. A file at version 17 or
+earlier reads each type as eligible only when it is the untouched starter Character - the rule the migration applied - even
+if the file carries a value, and a file at version 17 or earlier carrying `NonStructuralFamily` is refused, never
+reinterpreted.

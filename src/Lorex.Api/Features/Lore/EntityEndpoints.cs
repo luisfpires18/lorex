@@ -3,6 +3,7 @@ using System.Security.Claims;
 using Lorex.Api.Data;
 using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Chronology;
+using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.Universes;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -94,6 +95,7 @@ public static class EntityEndpoints
         [FromQuery] CanonStatus? canonStatus = null,
         [FromQuery] string? tag = null,
         [FromQuery] bool includeArchived = false,
+        [FromQuery] bool familyTreeEligible = false,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = DefaultPageSize)
     {
@@ -125,6 +127,12 @@ public static class EntityEndpoints
         if (canonStatus is { } status)
         {
             query = query.Where(entity => entity.CanonStatus == status);
+        }
+
+        // The Family Tree's pickers: only entries whose type the author made eligible, never by what the type is called.
+        if (familyTreeEligible)
+        {
+            query = query.Where(entity => entity.EntityType!.FamilyTreeEligible);
         }
 
         if (!string.IsNullOrWhiteSpace(tag))
@@ -986,6 +994,12 @@ public static class EntityEndpoints
                                 candidate.Image.CropHeight!.Value)),
                 candidate.CreatedAt,
                 candidate.UpdatedAt,
+                // Whatever its type, an entry that already holds a live family link keeps its way into the Family Tree (ADR 0040).
+                HasFamilyConnections = db.Relationships.Any(relationship =>
+                    relationship.UniverseId == universeId
+                    && relationship.RelationshipType!.FamilySemantic != RelationshipFamilySemantic.None
+                    && ((relationship.SourceEntityId == candidate.Id && relationship.TargetEntity!.DeletedAt == null)
+                        || (relationship.TargetEntityId == candidate.Id && relationship.SourceEntity!.DeletedAt == null))),
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -1031,6 +1045,7 @@ public static class EntityEndpoints
             fields,
             entity.Image,
             entity.CreatedAt,
-            entity.UpdatedAt);
+            entity.UpdatedAt,
+            entity.HasFamilyConnections);
     }
 }

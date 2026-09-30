@@ -47,10 +47,11 @@ public sealed class RelationshipType
     public int? MaxAgeDifferenceYears { get; set; }
 
     /// <summary>
-    /// What every relationship of this type means to a family tree, as the author configured it, on the stored direction:
-    /// the source is the parent and the target the child. Never read out of <see cref="Name"/> - "mother of" means nothing
-    /// to a family tree until someone says it does. Independent of the Canon constraints above. See
-    /// <c>docs/architecture/decisions/0035-family-trees.md</c>.
+    /// What every relationship of this type means to a family tree, as the author configured it. A parent meaning reads the
+    /// stored direction - the source is the parent and the target the child - and places both ends in the ancestry; a
+    /// non-structural family meaning places neither. Never read out of <see cref="Name"/> - "mother of" means nothing to a
+    /// family tree until someone says it does. Independent of the Canon constraints above. See
+    /// <c>docs/architecture/decisions/0035-family-trees.md</c> and <c>0040-family-tree-type-semantics.md</c>.
     /// </summary>
     public RelationshipFamilySemantic FamilySemantic { get; set; }
 
@@ -77,7 +78,8 @@ public enum RelationshipAgeOrder
 
 /// <summary>
 /// What a <see cref="RelationshipType"/> means to a family tree. A closed set, configured by the author and never inferred;
-/// only a family tree reads it (ADR 0035). Both parent meanings point the same way: source parent, target child.
+/// only a family tree reads it (ADR 0035, ADR 0040). Both parent meanings point the same way: source parent, target child, and
+/// only they place anyone in an ancestry. <see cref="NonStructuralFamily"/> is family the tree lists and never derives from.
 /// </summary>
 public enum RelationshipFamilySemantic
 {
@@ -89,6 +91,24 @@ public enum RelationshipFamilySemantic
 
     /// <summary>The source is an adoptive parent of the target.</summary>
     AdoptiveParent = 2,
+
+    /// <summary>
+    /// Family, but not ancestry: "uncle of", "married to", "guardian of". Shown on the Family Tree as the authored link it is,
+    /// in the kind's own readings, and never walked: it makes nobody a parent, sibling, grandparent or grandchild, and closes no
+    /// circle (ADR 0040). The one family meaning a symmetric kind may carry.
+    /// </summary>
+    NonStructuralFamily = 3,
+}
+
+/// <summary>The family meanings that place entries in an ancestry. Everything that derives relatives reads only these.</summary>
+public static class RelationshipFamilySemantics
+{
+    /// <summary>For queries: <c>Parent.Contains(type.FamilySemantic)</c> translates to SQL.</summary>
+    public static readonly RelationshipFamilySemantic[] Parent =
+        [RelationshipFamilySemantic.BiologicalParent, RelationshipFamilySemantic.AdoptiveParent];
+
+    public static bool IsParent(this RelationshipFamilySemantic semantic) =>
+        semantic is RelationshipFamilySemantic.BiologicalParent or RelationshipFamilySemantic.AdoptiveParent;
 }
 
 /// <summary>

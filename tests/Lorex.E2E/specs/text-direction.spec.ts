@@ -62,6 +62,8 @@ async function seedType(page: Page, universeId: string, name: string) {
       icon: null,
       accentColor: null,
       displayOrder: null,
+      // A person type, so its entries keep the Family tree action the header tests measure.
+      familyTreeEligible: true,
     })
   ).id
 }
@@ -541,7 +543,9 @@ test.describe('text direction', () => {
     )
     // Next to its icon, not pushed across the row to the count: the gap is the row's own, a few pixels.
     expect(typeNameLeft - iconLeft).toBeLessThan(60)
+    await page.getByTestId('types-tab-relations').click()
     await expectIsolated(page.locator('[data-reltype-name="أنجب"] .types__name'), 'أنجب')
+    await page.getByTestId('types-tab-events').click()
     await expectIsolated(
       page.locator('[data-term-name="تتويج (Coronation)"] .types__name'),
       'تتويج (Coronation)',

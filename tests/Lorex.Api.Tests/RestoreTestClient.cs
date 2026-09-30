@@ -471,6 +471,15 @@ internal static partial class RestoreTestClient
             }
         }
 
+        if (version < 18)
+        {
+            // A type's Family Tree eligibility arrived in version 18.
+            foreach (var type in payload["entityTypes"]!.AsArray())
+            {
+                Drop(type, "familyTreeEligible");
+            }
+        }
+
         if (version < 17)
         {
             // A universe's attribution arrived in version 17.
@@ -790,7 +799,7 @@ internal static partial class RestoreTestClient
 
         foreach (var type in payload.EntityTypes.OrderBy(type => type.Name, StringComparer.Ordinal))
         {
-            lines.Add($"type {type.Name} description={type.Description} icon={type.Icon} accent={type.AccentColor} order={type.DisplayOrder} {T(type.CreatedAt)} {T(type.UpdatedAt)}");
+            lines.Add($"type {type.Name} description={type.Description} icon={type.Icon} accent={type.AccentColor} familyTree={type.FamilyTreeEligible} order={type.DisplayOrder} {T(type.CreatedAt)} {T(type.UpdatedAt)}");
 
             foreach (var field in type.Fields.OrderBy(field => field.Name, StringComparer.Ordinal))
             {

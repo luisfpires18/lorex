@@ -4538,8 +4538,20 @@ html:has(.viewer[open]) {
   background: var(--paper);
 }
 
-.types__new .types__iconhint {
-  margin: -0.5rem 0 0;
+/* A type's one capability: whether its entries take part in the Family Tree (ADR 0040). */
+.types__family {
+  margin-top: 0.6rem;
+  align-items: flex-start;
+  font-size: 0.875rem;
+}
+
+.types__family input {
+  margin-top: 0.2rem;
+}
+
+.types__familylabel {
+  display: block;
+  font-weight: 600;
 }
 
 /* ---------- Type icon picker ---------- */
@@ -8566,6 +8578,58 @@ a.idearef__name {
   color: var(--muted);
   font-size: 0.85rem;
   max-width: 62ch;
+}
+
+.family__nokinds {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  max-width: 62rem;
+}
+
+.family__nokinds p {
+  margin: 0;
+}
+
+/* The focal entry's authored family that defines no ancestry: a list of sentences apart from the tree. */
+.family__others {
+  max-width: 62rem;
+  margin: 1.5rem 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--rule);
+}
+
+.family__otherlist {
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.family__otherlist li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+.family__otherlabel {
+  color: var(--muted);
+}
+
+.family__otherlink {
+  padding: 0;
+  min-height: 0;
+  font-weight: 600;
+}
+
+.familylink__newkind {
+  align-self: flex-start;
+  margin-top: 0.35rem;
 }
 
 .familytree {

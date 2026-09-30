@@ -3,12 +3,16 @@ import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom
 import { Plus } from 'lucide-react'
 import { ActionIcon } from '../components/ActionIcon'
 import { EntityPicker, type EntityChoice } from '../components/EntityPicker'
+import { FamilyKindDialog } from '../components/FamilyKindDialog'
 import { FamilyLinkForm } from '../components/FamilyLinkForm'
 import { FamilyTreeView } from '../components/FamilyTreeView'
+import { StatusBadge } from '../components/StatusBadge'
 import { getFamilyTree } from '../familyTree/api'
 import { confirmLeaving } from '../lib/leaveGuard'
 import { linkSentence } from '../familyTree/reading'
 import type { FamilyTree } from '../familyTree/types'
+import { listEntityTypes } from '../lore/api'
+import { CANON_LABELS, CanonStatus } from '../lore/types'
 import { listRelationshipTypes } from '../relationships/api'
 import { FamilySemantic, type RelationshipType } from '../relationships/types'
 import { PageHeader } from '../components/PageHeader'
@@ -30,7 +34,11 @@ type LoadState =
  *
  * The entry in focus is in the address, so a reload, the browser's Back and a link from elsewhere all land on
  * the same family. Nothing here is stored: every relative on screen is derived from explicit links whose kind
- * an author gave a family meaning, and this page reads them rather than being a second place to keep them.
+ * an author gave a parent meaning, and this page reads them rather than being a second place to keep them.
+ *
+ * Since ADR 0040 the picker offers only entries of a type the author enabled for the Family Tree, and the focal
+ * entry's other family - "uncle of", "married to" - is listed apart, as the authored links they are. An entry of
+ * a type not enabled still opens here by its address, with a note that says so: nothing recorded is hidden.
  */
 export default function FamilyTreePage() {
   const { universe } = useOutletContext<WorkspaceContext>()
@@ -40,8 +48,25 @@ export default function FamilyTreePage() {
 
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
   const [kinds, setKinds] = useState<RelationshipType[] | null>(null)
+  const [hasEligibleType, setHasEligibleType] = useState<boolean | null>(null)
   const [addingFor, setAddingFor] = useState<string | null>(null)
+  const [isCreatingKind, setIsCreatingKind] = useState(false)
   const [reads, setReads] = useState(0)
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    listEntityTypes(universe.id, controller.signal)
+      .then((types) => setHasEligibleType(types.some((type) => type.familyTreeEligible)))
+      .catch(() => {
+        // Unknown is not "none": say nothing rather than send the author to Types for no reason.
+        if (!controller.signal.aborted) setHasEligibleType(true)
+      })
+
+    return () => {
+      controller.abort()
+    }
+  }, [universe.id])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -100,6 +125,12 @@ export default function FamilyTreePage() {
   )
   const isAdding = !!entityId && addingFor === entityId
   const typesPath = `/app/universes/${universe.id}/types`
+  const relationKindsPath = `${typesPath}?tab=relations`
+
+  /** A kind made here joins the list at once: no reload, and the form that asked for it chooses it. */
+  function addKind(created: RelationshipType) {
+    setKinds((current) => [...(current ?? []), created])
+  }
 
   /** Another entry's family. A button rather than a link, so it asks the leave question itself: an unsaved connection
    *  being added here goes with the family it belonged to. */
@@ -122,16 +153,47 @@ export default function FamilyTreePage() {
           universeId={universe.id}
           value={focal ? { id: focal.entityId, name: focal.name } : null}
           onChange={show}
+          familyTreeOnly
           placeholder="Search this universe"
         />
       </div>
 
-      {kinds !== null && familyKinds.length === 0 ? (
-        <p className="notice" data-testid="family-no-kinds">
-          No relation kind has a family meaning yet. Give one to a kind under{' '}
-          <Link to={typesPath}>Types</Link> — a kind called “parent of” means nothing until you say
-          it does.
+      {hasEligibleType === false ? (
+        <p className="notice" data-testid="family-no-types">
+          No Lore Type is enabled for Family Tree yet. Turn it on for the types whose entries have
+          families under <Link to={typesPath}>Types → Lore Types</Link>.
         </p>
+      ) : null}
+
+      {hasEligibleType && kinds !== null && familyKinds.length === 0 ? (
+        <div className="notice family__nokinds" data-testid="family-no-kinds">
+          <p>
+            Family Tree needs a family relation kind: “parent of”, “uncle of”, “married to”. A kind
+            means nothing to the tree until you give it a family meaning, whatever it is called.
+            Create one here, or give a meaning to an existing kind under{' '}
+            <Link to={relationKindsPath}>Types → Relation Kinds</Link>.
+          </p>
+          <button
+            className="button button--secondary"
+            type="button"
+            onClick={() => setIsCreatingKind(true)}
+            data-testid="family-new-kind"
+          >
+            <ActionIcon icon={Plus} />
+            New family relationship kind
+          </button>
+        </div>
+      ) : null}
+
+      {isCreatingKind ? (
+        <FamilyKindDialog
+          universeId={universe.id}
+          onClose={() => setIsCreatingKind(false)}
+          onCreated={(created) => {
+            addKind(created)
+            setIsCreatingKind(false)
+          }}
+        />
       ) : null}
 
       {view.kind === 'idle' ? (
@@ -140,8 +202,8 @@ export default function FamilyTreePage() {
           title="Choose an entry to see its family."
           hint={
             <>
-              Any entry can have one: Lorex never decides which of them are people. Record a
-              connection of a kind that means “parent”, and the tree grows from it.
+              Only entries of a type enabled for Family Tree are offered. Record a connection of a
+              kind that means “parent”, and the tree grows from it.
             </>
           }
         />
@@ -184,6 +246,14 @@ export default function FamilyTreePage() {
 
       {tree && focal ? (
         <>
+          {focal.entityTypeFamilyTreeEligible ? null : (
+            <p className="notice" data-testid="family-type-not-enabled">
+              This entry&rsquo;s type, <bdi>{focal.entityTypeName}</bdi>, is not currently enabled
+              for Family Tree. Its recorded family is still shown here.{' '}
+              <Link to={typesPath}>Change it under Lore Types</Link>
+            </p>
+          )}
+
           {tree.loops.length > 0 ? (
             <div className="callout callout--warning family__loopnote" data-testid="family-loop">
               <p className="callout__title">These connections go round in a circle</p>
@@ -218,12 +288,55 @@ export default function FamilyTreePage() {
             shared parent that somebody wrote down — no more than that.
           </p>
 
+          {tree.connections.length > 0 ? (
+            <section
+              className="family__others"
+              aria-labelledby={`${headingId}-others`}
+              data-testid="family-other-connections"
+            >
+              <h2 className="settings__heading" id={`${headingId}-others`}>
+                Other family connections
+              </h2>
+              <p className="settings__note">
+                Recorded as you wrote them. They place nobody in the tree above, and imply no other
+                relative.
+              </p>
+              <ul className="family__otherlist">
+                {tree.connections.map((connection) => {
+                  const other = nodes.get(connection.relatedEntityId)
+                  return (
+                    <li key={connection.relationshipId} data-testid="family-other-connection">
+                      <bdi className="family__othername">{focal.name}</bdi>{' '}
+                      <bdi className="family__otherlabel">{connection.label}</bdi>{' '}
+                      {other ? (
+                        <button
+                          className="button button--text family__otherlink"
+                          type="button"
+                          onClick={() => show({ id: other.entityId, name: other.name })}
+                        >
+                          <bdi>{other.name}</bdi>
+                        </button>
+                      ) : null}
+                      {connection.canonStatus === CanonStatus.Canon ? null : (
+                        <StatusBadge
+                          step={connection.canonStatus}
+                          label={`${CANON_LABELS[connection.canonStatus]} connection`}
+                        />
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+          ) : null}
+
           {familyKinds.length > 0 ? (
             isAdding ? (
               <FamilyLinkForm
                 universeId={universe.id}
                 focal={{ id: focal.entityId, name: focal.name }}
                 kinds={familyKinds}
+                onKindCreated={addKind}
                 onSaved={() => {
                   setAddingFor(null)
                   setReads((current) => current + 1)

@@ -65,8 +65,9 @@ test.describe('lore', () => {
     await expect(page.getByTestId('types-error')).toHaveCount(0)
 
     // Add a custom type with two structured fields.
-    await page.getByLabel('New type').fill('Starship')
-    await page.getByTestId('add-type').click()
+    await page.getByTestId('new-type').click()
+    await page.getByTestId('new-type-name').fill('Starship')
+    await page.getByTestId('create-type').click()
     await expect(page.locator('[data-type-name="Starship"]')).toBeVisible()
 
     await page.getByTestId('fields-Starship').click()

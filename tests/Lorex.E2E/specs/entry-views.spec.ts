@@ -393,7 +393,7 @@ test.describe('entry views', () => {
 
     await page.getByTestId('add-family-link').click()
     const form = page.getByTestId('family-link-form')
-    await form.getByTestId('family-link-kind').selectOption({ label: 'bore — biological' })
+    await form.getByTestId('family-link-kind').selectOption({ label: 'bore — biological parent' })
     await form.getByTestId('family-link-side').selectOption({ label: 'Akron Wright is the parent' })
     await form.getByTestId('picker-input').click()
     await form.getByTestId('picker-input').fill('Aaron')

@@ -90,6 +90,7 @@ public static class EntityTypeEndpoints
             Description = LoreValidation.Normalize(request.Description),
             Icon = LoreValidation.Normalize(request.Icon),
             AccentColor = LoreValidation.NormalizeAccent(request.AccentColor),
+            FamilyTreeEligible = request.FamilyTreeEligible ?? false,
             DisplayOrder = order,
             CreatedAt = now,
             UpdatedAt = now,
@@ -145,6 +146,7 @@ public static class EntityTypeEndpoints
         entityType.Description = LoreValidation.Normalize(request.Description);
         entityType.Icon = LoreValidation.Normalize(request.Icon);
         entityType.AccentColor = LoreValidation.NormalizeAccent(request.AccentColor);
+        entityType.FamilyTreeEligible = request.FamilyTreeEligible ?? entityType.FamilyTreeEligible;
         entityType.DisplayOrder = request.DisplayOrder ?? entityType.DisplayOrder;
         entityType.UpdatedAt = DateTime.UtcNow;
 
@@ -549,7 +551,8 @@ public static class EntityTypeEndpoints
                             .Select(option => new FieldOptionResponse(option.Id, option.Value, option.DisplayOrder))
                             .ToList(),
                         field.Semantic))
-                    .ToList()))
+                    .ToList(),
+                type.FamilyTreeEligible))
             .ToListAsync(cancellationToken);
 
     private static IResult NameTaken() =>

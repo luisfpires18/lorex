@@ -161,8 +161,17 @@ public sealed record UniverseBackup(
     /// file at version 16 or earlier has neither; each reads as null, an original world. What a story's scenes, manuscripts
     /// and plot arcs were selected for is not in the format either, as for entries and stories: every restored part is
     /// private.
+    ///
+    /// 18 - A type may be enabled for the Family Tree, and a relation kind may carry a family meaning that is not ancestry
+    /// (ADR 0040). <see cref="BackupEntityType.FamilyTreeEligible"/> is the type's authored capability, and
+    /// <see cref="BackupRelationshipType.FamilySemantic"/> may now be <c>NonStructuralFamily</c> - "uncle of", "married to".
+    /// Not ignorable: a version 17 reader does not know the new meaning and must never read it as a parent link, and the
+    /// capability is an authored choice nothing derives again. A file at version 17 or earlier has no
+    /// <c>familyTreeEligible</c>; each type reads as eligible only when it is the untouched starter Character, the rule the
+    /// migration applied to a live database, and no older file may carry <c>NonStructuralFamily</c> - one that does was not
+    /// written by Lorex and is refused.
     /// </summary>
-    public const int CurrentVersion = 17;
+    public const int CurrentVersion = 18;
 
     public static UniverseBackup Of(UniverseBackupPayload payload, DateTime generatedAt) =>
         new(FormatName, CurrentVersion, generatedAt, payload);
@@ -261,12 +270,14 @@ public sealed record BackupChronologyEra(
     ChronologyEraDirection Direction,
     ChronologyLabelPosition LabelPosition);
 
+/// <summary><paramref name="FamilyTreeEligible"/> was added in version 18 (see <see cref="UniverseBackup.CurrentVersion"/>).</summary>
 public sealed record BackupEntityType(
     Guid Id,
     string Name,
     string? Description,
     string? Icon,
     string? AccentColor,
+    bool FamilyTreeEligible,
     int DisplayOrder,
     DateTime CreatedAt,
     DateTime UpdatedAt,
@@ -487,7 +498,8 @@ public sealed record BackupRevisionFieldValue(
 /// where all three are absent - means exactly that.
 ///
 /// <paramref name="FamilySemantic"/> was added in version 14, as a bump (see <see cref="UniverseBackup.CurrentVersion"/>). Written by
-/// name, <c>None</c> for a kind with no family meaning; absent, in any earlier file, it means <c>None</c>.
+/// name, <c>None</c> for a kind with no family meaning; absent, in any earlier file, it means <c>None</c>. <c>NonStructuralFamily</c>
+/// exists from version 18.
 /// </summary>
 public sealed record BackupRelationshipType(
     Guid Id,
