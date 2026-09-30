@@ -471,6 +471,12 @@ internal static partial class RestoreTestClient
             }
         }
 
+        if (version < 17)
+        {
+            // A universe's attribution arrived in version 17.
+            Drop(payload["universe"], "originalCreator", "originalWork");
+        }
+
         if (version < 16)
         {
             // A story's public summary arrived in version 16.

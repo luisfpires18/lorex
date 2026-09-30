@@ -17,7 +17,8 @@ public enum UniverseVisibility
 }
 
 /// <summary>
-/// Whether one lore entry or one story is selected for the public portal (ADR 0036, Task 010). Set only by that
+/// Whether one lore entry, story, scene, scene manuscript or plot arc is selected for the public portal (ADR 0036, Task
+/// 010; the story's parts since Product refinement 015, ADR 0039). Set only by that
 /// item's publish and unpublish routes - never by a save, a restore or a migration.
 ///
 /// Its own type rather than <see cref="UniverseVisibility"/>, because it promises less: <c>Public</c> here is the
@@ -111,6 +112,11 @@ public static class PublicationLimits
     public const int SlugMaxLength = 80;
 
     public const int DisplayNameMaxLength = 60;
+
+    /// <summary>An original creator's name, or a studio's: a byline, not a biography.</summary>
+    public const int OriginalCreatorMaxLength = 120;
+
+    public const int OriginalWorkMaxLength = 200;
 }
 
 /// <summary>

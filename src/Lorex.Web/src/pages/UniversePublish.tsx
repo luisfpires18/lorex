@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
-import { ArrowUpRight, Feather, Library } from 'lucide-react'
+import { ArrowUpRight, Feather, Globe, Library, Lock } from 'lucide-react'
 import { ActionIcon } from '../components/ActionIcon'
 import { PageHeader } from '../components/PageHeader'
 import { PublicDetailsForm } from '../components/PublicDetailsForm'
@@ -19,7 +19,7 @@ import type { WorkspaceContext } from './UniverseWorkspace'
 
 /** What the everything-else list names, so an author knows exactly what publishing leaves private. */
 const STAYS_PRIVATE =
-  'Any lore entry or story you have not published on its own page, notes, ideas, the timeline, world rules, relationships, Canon, the Trash, and everything else you edit in the workspace.'
+  'Any lore entry, story, scene, scene prose or plot arc you have not published where it is written, notes, ideas, the timeline, world rules, relationships, Canon, the Trash, and everything else you edit in the workspace.'
 
 type Confirming = { kind: 'publish'; state: PublicationState } | { kind: 'unpublish' }
 
@@ -109,24 +109,17 @@ export default function UniversePublish() {
     if (problem) problemRef.current?.focus()
   }, [problem])
 
-  const header = (
+  // The one control that changes who can see this universe lives at the head of the page (Product refinement 015):
+  // Publish world, the page's primary action, while it is private; Make private, visible but in danger ink, while it is
+  // public. Both open the confirmation in Status below rather than acting at once.
+  const pageHeader = (actions: ReactNode) => (
     <PageHeader
       title="Publish"
       lede={<p>Control how this universe appears on the public LoreX portal.</p>}
-      actions={
-        isPublic && slug ? (
-          <Link
-            className="button button--secondary"
-            to={worldPath(slug)}
-            data-testid="view-public-page"
-          >
-            View public world
-            <ActionIcon icon={ArrowUpRight} />
-          </Link>
-        ) : null
-      }
+      actions={actions}
     />
   )
+  const header = pageHeader(null)
 
   if (loadError) {
     return (
@@ -223,7 +216,47 @@ export default function UniversePublish() {
 
   return (
     <article className="publish" data-testid="public-portal">
-      {header}
+      {pageHeader(
+        isPublic ? (
+          <>
+            {slug ? (
+              <Link
+                className="button button--secondary"
+                to={worldPath(slug)}
+                data-testid="view-public-page"
+              >
+                View public world
+                <ActionIcon icon={ArrowUpRight} />
+              </Link>
+            ) : null}
+            <button
+              className="button button--secondary button--danger-quiet"
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                setProblem(null)
+                setAnnouncement(null)
+                setConfirming({ kind: 'unpublish' })
+              }}
+              data-testid="unpublish"
+            >
+              <ActionIcon icon={Lock} />
+              Make private
+            </button>
+          </>
+        ) : (
+          <button
+            className="button"
+            type="button"
+            disabled={busy}
+            onClick={() => void askToPublish()}
+            data-testid="publish"
+          >
+            <ActionIcon icon={Globe} />
+            Publish world
+          </button>
+        ),
+      )}
 
       {/* One outer shell for every workspace page; only the form keeps a readable column. */}
       <div className="publish__body">
@@ -332,12 +365,35 @@ export default function UniversePublish() {
                   <dt>Genres</dt>
                   <dd>{confirming.state.genres.map(genreLabel).join(', ')}</dd>
                 </div>
-                <div>
-                  <dt>Author</dt>
-                  <dd>
-                    <bdi>{confirming.state.authorDisplayName}</bdi>
-                  </dd>
-                </div>
+                {confirming.state.originalCreator ? (
+                  <>
+                    <div>
+                      <dt>Based on works by</dt>
+                      <dd>
+                        <bdi>{confirming.state.originalCreator}</bdi>
+                        {confirming.state.originalWork ? (
+                          <>
+                            {' '}
+                            (<bdi>{confirming.state.originalWork}</bdi>)
+                          </>
+                        ) : null}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Curated on LoreX by</dt>
+                      <dd>
+                        <bdi>{confirming.state.authorDisplayName}</bdi>
+                      </dd>
+                    </div>
+                  </>
+                ) : (
+                  <div>
+                    <dt>Author</dt>
+                    <dd>
+                      <bdi>{confirming.state.authorDisplayName}</bdi>
+                    </dd>
+                  </div>
+                )}
               </dl>
               <p className="settings__note">
                 <strong>Not published:</strong> {STAYS_PRIVATE}
@@ -350,7 +406,7 @@ export default function UniversePublish() {
                   onClick={() => void publish()}
                   data-testid="confirm-publish"
                 >
-                  {busy ? 'Publishing' : 'Publish universe'}
+                  {busy ? 'Publishing' : 'Publish world'}
                 </button>
                 <button
                   className="button button--secondary"
@@ -402,38 +458,11 @@ export default function UniversePublish() {
             </div>
           ) : null}
 
-          {confirming === null ? (
-            <div className="form__actions">
-              {isPublic ? (
-                <button
-                  className="button button--secondary"
-                  type="button"
-                  disabled={busy}
-                  onClick={() => {
-                    setProblem(null)
-                    setAnnouncement(null)
-                    setConfirming({ kind: 'unpublish' })
-                  }}
-                  data-testid="unpublish"
-                >
-                  Make private…
-                </button>
-              ) : (
-                <button
-                  className="button"
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void askToPublish()}
-                  data-testid="publish"
-                >
-                  Publish…
-                </button>
-              )}
-            </div>
-          ) : null}
-
           {!isPublic && missing.length === 0 && !detailsDirty && !confirming ? (
-            <p className="field__hint">Everything a public card needs is here.</p>
+            <p className="field__hint" data-testid="publication-ready">
+              Everything a public card needs is here. Publish world, at the top of the page, makes
+              it public.
+            </p>
           ) : null}
         </section>
 
@@ -458,7 +487,16 @@ export default function UniversePublish() {
         <Section id="publish-author" title="Author">
           {state.authorDisplayName ? (
             <p className="settings__note" data-testid="publication-author">
-              Published as <bdi>{state.authorDisplayName}</bdi>.{' '}
+              {state.originalCreator ? (
+                <>
+                  Curated on LoreX by <bdi>{state.authorDisplayName}</bdi>, based on works by{' '}
+                  <bdi>{state.originalCreator}</bdi>.{' '}
+                </>
+              ) : (
+                <>
+                  Published as <bdi>{state.authorDisplayName}</bdi>.{' '}
+                </>
+              )}
               <Link to="/app/profile">Change your public name</Link>
             </p>
           ) : (

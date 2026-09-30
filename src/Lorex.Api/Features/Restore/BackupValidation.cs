@@ -394,6 +394,14 @@ internal static partial class BackupValidation
             // Its public details (version 15). Only their shape: nothing here decides anything is public.
             Text(universe.PublicSummary, PublicationLimits.SummaryMaxLength, "The universe's public summary");
 
+            // Its attribution (version 17): a work is only ever named beside the creator it is by.
+            Text(universe.OriginalCreator, PublicationLimits.OriginalCreatorMaxLength, "The universe's original creator");
+            Text(universe.OriginalWork, PublicationLimits.OriginalWorkMaxLength, "The universe's original work");
+            if (string.IsNullOrWhiteSpace(universe.OriginalCreator) && !string.IsNullOrWhiteSpace(universe.OriginalWork))
+            {
+                Add(BackupIssueCodes.InvalidValue, "The universe names an original work without its original creator.");
+            }
+
             if (universe.Category is { } category)
             {
                 Defined(category, "The universe's category");

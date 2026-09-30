@@ -163,6 +163,31 @@ public static class PublicationEndpoints
             errors[PublicationRules.Genres] = [$"Choose at most {PublicationLimits.MaxGenres} genres."];
         }
 
+        // Attribution (ADR 0039): checked like every other public text - trimmed, bounded, no invisible controls.
+        var creator = Trimmed(request.OriginalCreator);
+        var work = Trimmed(request.OriginalWork);
+        if (request.BasedOnExternalWork is true)
+        {
+            if (creator is null)
+            {
+                errors[PublicationRules.OriginalCreator] = ["Name the original creator or source this universe is based on."];
+            }
+            else if (AttributionProblem(creator, PublicationLimits.OriginalCreatorMaxLength, "the original creator") is { } problem)
+            {
+                errors[PublicationRules.OriginalCreator] = [problem];
+            }
+
+            if (work is not null && AttributionProblem(work, PublicationLimits.OriginalWorkMaxLength, "the original work") is { } workProblem)
+            {
+                errors[PublicationRules.OriginalWork] = [workProblem];
+            }
+        }
+        else if (request.BasedOnExternalWork is false)
+        {
+            // The author's own world: nothing of an earlier attribution is kept to reappear later.
+            (creator, work) = (null, null);
+        }
+
         if (errors.Count > 0)
         {
             return Results.ValidationProblem(errors);
@@ -210,11 +235,19 @@ public static class PublicationEndpoints
             }
         }
 
-        if (universe.PublicSummary != summary || universe.Category != request.Category || universe.Genres != genres)
+        if (request.BasedOnExternalWork is null)
+        {
+            (creator, work) = (universe.OriginalCreator, universe.OriginalWork);
+        }
+
+        if (universe.PublicSummary != summary || universe.Category != request.Category || universe.Genres != genres
+            || universe.OriginalCreator != creator || universe.OriginalWork != work)
         {
             universe.PublicSummary = summary;
             universe.Category = request.Category;
             universe.Genres = genres;
+            universe.OriginalCreator = creator;
+            universe.OriginalWork = work;
             universe.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
         }
@@ -223,6 +256,16 @@ public static class PublicationEndpoints
 
         return Results.Ok(await ReadStateAsync(db, universeId, ownerId, cancellationToken));
     }
+
+    private static string? Trimmed(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+
+    /// <summary>Why an attribution cannot be published, or null: too long, or holding the invisible controls a public name may not.</summary>
+    private static string? AttributionProblem(string text, int maxLength, string what) =>
+        text.Length > maxLength
+            ? $"Keep {what} under {maxLength} characters."
+            : PublicNameEndpoints.HasInvisibleControls(text)
+                ? $"The name of {what} cannot contain invisible control characters."
+                : null;
 
     /// <summary>
     /// Private to public, once everything it needs is there. The slug is minted the first time and
@@ -344,6 +387,8 @@ public static class PublicationEndpoints
                 candidate.PublicSlug,
                 candidate.PublishedAt,
                 Author = candidate.Owner!.PublicDisplayName,
+                candidate.OriginalCreator,
+                candidate.OriginalWork,
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -366,6 +411,8 @@ public static class PublicationEndpoints
             universe.Author,
             artwork is null ? null : UniverseArtworkRef.Of(artwork),
             PublicationRules.Missing(
-                universe.PublicSummary, universe.Category, universe.Genres, artwork is not null, universe.Author));
+                universe.PublicSummary, universe.Category, universe.Genres, artwork is not null, universe.Author),
+            universe.OriginalCreator,
+            universe.OriginalWork);
     }
 }

@@ -19,9 +19,10 @@ namespace Lorex.Api.Features.Publishing;
 /// page, never a hint of what is private.</para>
 ///
 /// <para><b>Allow-lists, projected.</b> <see cref="PublicLoreEntry"/> and <see cref="PublicStory"/> are built member
-/// by member from the columns they name, and so are <see cref="PublicLoreDetail"/> and a story's page. No entry, story or
-/// workspace response is serialised: no ids, fields, relationships, Canon, history, chapters, scenes, manuscript, plot
-/// or notes. An entry's article is on its own page only, with its workspace links removed.</para>
+/// by member from the columns they name, and so are <see cref="PublicLoreDetail"/> and <see cref="PublicStoryDetail"/>. No
+/// entry, story or workspace response is serialised: no ids, fields, relationships, Canon, history, chapters or notes. An
+/// entry's article is on its own page only, with its workspace links removed; a story's published scenes, prose and plot
+/// arcs are on its own page only (ADR 0039).</para>
 ///
 /// <para><b>Order.</b> Neither kind has an order an author sets for a whole universe, so both read the way the
 /// workspace lists them - by name or title, case aside - with the address breaking ties, so pages never repeat or
@@ -155,7 +156,13 @@ public static class PublicContentEndpoints
                 row.PublishedAt));
     }
 
-    /// <summary>One published story, as its listing shows it. Same predicate, same 404.</summary>
+    /// <summary>
+    /// One published story's page (ADR 0039): its listing's members, and what its author published inside it - scene prose,
+    /// scene outlines and plot arcs, each through its own predicate, which holds the story's inside it. Same 404 as the
+    /// listing for a private universe, a private or trashed story and an address nobody holds. Five queries whatever the
+    /// story holds. Reading order is the workspace's: Unchaptered first, then chapter by chapter, each in its own order;
+    /// no chapter title or number is read, since no chapter is published.
+    /// </summary>
     private static async Task<IResult> GetStoryAsync(
         string slug,
         string storySlug,
@@ -169,11 +176,65 @@ public static class PublicContentEndpoints
 
         var story = await PublicationRules.PublicStories(db).AsNoTracking()
             .Where(candidate => candidate.PublicSlug == storySlug && candidate.Universe!.PublicSlug == slug)
-            .Select(candidate => new PublicStory(candidate.PublicSlug!, candidate.Title, candidate.PublicSummary!, candidate.PublishedAt!.Value))
+            .Select(candidate => new { candidate.Id, Listing = new PublicStory(candidate.PublicSlug!, candidate.Title, candidate.PublicSummary!, candidate.PublishedAt!.Value) })
             .FirstOrDefaultAsync(cancellationToken);
 
-        return story is null ? Results.NotFound() : Results.Ok(story);
+        if (story is null)
+        {
+            return Results.NotFound();
+        }
+
+        var manuscript = await InReadingOrder(PublicationRules.PublicManuscripts(db).AsNoTracking().Where(scene => scene.StoryId == story.Id))
+            .Select(scene => new
+            {
+                scene.Title,
+                Text = db.SceneManuscripts.Where(prose => prose.SceneId == scene.Id).Select(prose => prose.Content).FirstOrDefault(),
+            })
+            .ToListAsync(cancellationToken);
+
+        var scenes = await InReadingOrder(PublicationRules.PublicScenes(db).AsNoTracking().Where(scene => scene.StoryId == story.Id))
+            .Select(scene => new PublicStoryScene(scene.Title, scene.Summary))
+            .ToListAsync(cancellationToken);
+
+        var arcs = await PublicationRules.PublicPlotArcs(db).AsNoTracking()
+            .Where(arc => arc.StoryId == story.Id)
+            .OrderBy(arc => arc.SortOrder)
+            .ThenBy(arc => arc.Id)
+            .Select(arc => new { arc.Id, arc.Title, arc.Description })
+            .ToListAsync(cancellationToken);
+
+        var arcIds = arcs.Select(arc => arc.Id).ToList();
+        var beats = arcIds.Count == 0
+            ? []
+            : (await db.PlotBeats.AsNoTracking()
+                .Where(beat => arcIds.Contains(beat.PlotArcId) && beat.DeletedAt == null)
+                .OrderBy(beat => beat.SortOrder)
+                .ThenBy(beat => beat.Id)
+                .Select(beat => new { beat.PlotArcId, beat.Title, beat.Description })
+                .ToListAsync(cancellationToken));
+        var beatsByArc = beats.ToLookup(beat => beat.PlotArcId);
+
+        var listing = story.Listing;
+        return Results.Ok(new PublicStoryDetail(
+            listing.Slug,
+            listing.Title,
+            listing.PublicSummary,
+            listing.PublishedAt,
+            // Published prose with nothing in it is not a part a reader can read, so it is left out rather than shown empty.
+            [.. manuscript.Where(part => !string.IsNullOrWhiteSpace(part.Text)).Select(part => new PublicManuscriptPart(part.Title, part.Text!))],
+            scenes,
+            [.. arcs.Select(arc => new PublicPlotArc(
+                arc.Title,
+                arc.Description,
+                [.. beatsByArc[arc.Id].Select(beat => new PublicPlotBeat(beat.Title, beat.Description))]))]));
     }
+
+    /// <summary>The workspace's reading order (<see cref="Stories.SceneEndpoints.LoadScenesAsync"/>): Unchaptered, then each chapter in order.</summary>
+    private static IOrderedQueryable<Stories.Scene> InReadingOrder(IQueryable<Stories.Scene> scenes) =>
+        scenes
+            .OrderBy(scene => scene.ChapterId == null ? -1 : scene.Chapter!.SortOrder)
+            .ThenBy(scene => scene.SortOrder)
+            .ThenBy(scene => scene.Id);
 
     /// <summary>
     /// The article as a reader gets it: the stored Tiptap document with every link mark whose address is not an

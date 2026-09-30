@@ -22,7 +22,7 @@ namespace Lorex.Api.Tests;
 public sealed class PublicReadingTests(LorexApiFactory factory) : IClassFixture<LorexApiFactory>
 {
     private static readonly string[] LoreDetailKeys = ["article", "name", "publishedAt", "slug", "summary", "thumbnailUrl", "typeName"];
-    private static readonly string[] StoryKeys = ["publicSummary", "publishedAt", "slug", "title"];
+    private static readonly string[] StoryKeys = ["manuscript", "plot", "publicSummary", "publishedAt", "scenes", "slug", "title"];
 
     private readonly LorexApiFactory _factory = factory;
 
@@ -146,9 +146,15 @@ public sealed class PublicReadingTests(LorexApiFactory factory) : IClassFixture<
         {
             Assert.Equal(StoryKeys, Keys(document.RootElement));
             Assert.Equal("A tide that counts the drowned.", document.RootElement.GetProperty("publicSummary").GetString());
+
+            // Nothing inside it was published, so nothing inside it is read - not even that it exists (ADR 0039).
+            foreach (var part in new[] { "manuscript", "scenes", "plot" })
+            {
+                Assert.Equal(0, document.RootElement.GetProperty(part).GetArrayLength());
+            }
         }
 
-        foreach (var secret in new[] { "Premise secret", "Scene secret", story.ToString(), u.ToString(), "drafting", "chapters", "scenes" })
+        foreach (var secret in new[] { "Premise secret", "Scene secret", story.ToString(), u.ToString(), "drafting", "chapters" })
         {
             Assert.DoesNotContain(secret, body, StringComparison.OrdinalIgnoreCase);
         }

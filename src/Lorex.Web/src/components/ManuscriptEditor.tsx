@@ -45,6 +45,8 @@ interface ManuscriptEditorProps {
   beats: SceneBeatReference[]
   /** Opens the scene's own form. Its planning is edited there, never here. */
   onEditScene: (scene: Scene) => void
+  /** The prose's publication control (ADR 0039), in the save bar beside Save: where the prose is kept is where it is published. */
+  publication?: ReactNode
 }
 
 /**
@@ -77,6 +79,7 @@ export function ManuscriptEditor({
   where,
   beats,
   onEditScene,
+  publication,
 }: ManuscriptEditorProps) {
   const sceneId = scene.id
   const titleId = useId()
@@ -544,6 +547,7 @@ export function ManuscriptEditor({
                 This device could not keep a recovery copy of these changes. Save to keep them.
               </p>
             ) : null}
+            {publication ? <div className="manuscript__publication">{publication}</div> : null}
             <button
               className="button"
               type="button"

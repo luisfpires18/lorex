@@ -20,8 +20,9 @@ const WORDS = {
   },
   story: {
     noun: 'story',
-    listed: 'Readers see its title and its public summary.',
-    kept: 'Its premise, chapters, scenes, manuscript, plot and notes are not published.',
+    listed:
+      'Readers see its title, its public summary, and the scenes, prose and plot arcs you publish from them.',
+    kept: 'Its premise, chapters and notes are not published, nor any scene, prose or arc you have not published.',
     needsSummary:
       'This story is selected for publication but needs a public summary before readers can see it.',
     noSummary: 'A story needs a public summary, written for readers, before it can be published.',
@@ -72,26 +73,39 @@ export function ContentPublication({
   id,
   name,
   placement,
+  initialState,
+  onChange,
 }: {
   universeId: string
   kind: ContentKind
   id: string
   name: string
   placement: 'bar' | 'line'
+  /** Already read by the page, which then owns the answer too; the control reads it itself otherwise. */
+  initialState?: ContentPublicationState
+  /** Every state this control arrives at, so a page can follow it - a story's parts follow the story's (ADR 0039). */
+  onChange?: (state: ContentPublicationState) => void
 }) {
   const noteId = useId()
-  const [state, setState] = useState<ContentPublicationState | null>(null)
+  const [state, setStateOnly] = useState<ContentPublicationState | null>(initialState ?? null)
   const [failed, setFailed] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [announcement, setAnnouncement] = useState('')
   const [editingSummary, setEditingSummary] = useState(false)
   const words = WORDS[kind]
 
+  function setState(next: ContentPublicationState) {
+    setStateOnly(next)
+    onChange?.(next)
+  }
+
+  const known = initialState !== undefined
   useEffect(() => {
+    if (known) return
     const controller = new AbortController()
     getContentPublication(universeId, kind, id, controller.signal)
       .then((loaded) => {
-        setState(loaded)
+        setStateOnly(loaded)
         setFailed(null)
       })
       .catch(() => {
@@ -100,7 +114,7 @@ export function ContentPublication({
     return () => {
       controller.abort()
     }
-  }, [universeId, kind, id])
+  }, [universeId, kind, id, known])
 
   if (!state) {
     return failed ? (

@@ -7,12 +7,20 @@ namespace Lorex.Api.Features.Publishing;
 /// <summary>
 /// The public details an owner saves. Visibility is deliberately not here - it changes only through
 /// publish and unpublish - and neither is the slug, which Lorex mints. A body carrying either has it
-/// ignored, because these three members are all that is bound.
+/// ignored, because these members are all that is bound.
+///
+/// Attribution (ADR 0039): <paramref name="BasedOnExternalWork"/> true says the universe is based on someone else's work,
+/// and then <paramref name="OriginalCreator"/> is required and <paramref name="OriginalWork"/> optional; false says it is
+/// its author's own and clears both. Left out (null), the stored attribution is kept - a client that predates it cannot
+/// erase it.
 /// </summary>
 public sealed record PublicationDetailsRequest(
     string? PublicSummary,
     UniverseCategory? Category,
-    IReadOnlyList<UniverseGenres>? Genres);
+    IReadOnlyList<UniverseGenres>? Genres,
+    bool? BasedOnExternalWork = null,
+    string? OriginalCreator = null,
+    string? OriginalWork = null);
 
 /// <summary>
 /// One universe's public face as its owner sees it in Settings: what is saved, whether it is public,
@@ -29,7 +37,9 @@ public sealed record PublicationState(
     DateTime? PublishedAt,
     string? AuthorDisplayName,
     UniverseArtworkRef? Artwork,
-    IReadOnlyDictionary<string, string[]> Missing);
+    IReadOnlyDictionary<string, string[]> Missing,
+    string? OriginalCreator = null,
+    string? OriginalWork = null);
 
 /// <summary>
 /// The artwork as its owner's client needs it: ids to compose the owner-only addresses of the
@@ -77,6 +87,14 @@ public sealed record ContentPublicationState(
     string? PublicSummary = null);
 
 /// <summary>
+/// One part of a story - a scene's outline, a scene's manuscript or a plot arc - as its owner sees its publication (ADR
+/// 0039): whether they selected it, and whether its story is public to anyone now (story selected, with its public summary,
+/// in a public universe). The part is public exactly when both are. Parts have no address of their own: they are read on
+/// their story's page.
+/// </summary>
+public sealed record StoryPartPublicationState(ContentVisibility Visibility, bool StoryIsPublic);
+
+/// <summary>
 /// A story's public summary as its owner saves it, on its publication route and nowhere else. Visibility, address and
 /// date are not here: a body carrying them has them ignored.
 /// </summary>
@@ -98,7 +116,11 @@ public sealed record WorkspaceLink(Guid UniverseId, Guid? EntityId, Guid? StoryI
 /// id, no owner, no username or email, no description, no colour, no audit dates, no object key.
 /// <see cref="AuthorSlug"/> is the author's public address (ADR 0037), never an account id.
 ///
-/// None of these is ever null: the public query only returns universes that have all of them.
+/// <see cref="OriginalCreator"/> and <see cref="OriginalWork"/> (ADR 0039) are the only nullable members: set when the author
+/// says the universe is based on someone else's work, and then the author is that work's curator on Lorex, not its creator.
+/// The original creator is a name, never a Lorex account, and nothing links it to one.
+///
+/// Every other member is never null: the public query only returns universes that have all of them.
 /// <see cref="Genres"/> are in their one fixed order. <see cref="CardImageUrl"/> is a same-origin
 /// path that answers only while the universe is public. <see cref="PublishedAt"/> is when it was first
 /// published.
@@ -112,7 +134,9 @@ public sealed record PublicUniverse(
     string AuthorDisplayName,
     string AuthorSlug,
     string CardImageUrl,
-    DateTime PublishedAt);
+    DateTime PublishedAt,
+    string? OriginalCreator,
+    string? OriginalWork);
 
 /// <summary>One page of the public listing, most recently published first.</summary>
 public sealed record PublicUniversePage(
@@ -149,6 +173,35 @@ public sealed record PublicStory(
     string Title,
     string PublicSummary,
     DateTime PublishedAt);
+
+/// <summary>
+/// A published story's own page (Task 011; its content since Product refinement 015, ADR 0039): what
+/// <see cref="PublicStory"/> lists, plus exactly what its author published inside it, in the author's order. Each list
+/// holds only what is effectively public and says nothing of what is not - no count, no gap, no placeholder.
+/// <see cref="Manuscript"/> is the prose of the scenes whose manuscript was published, in reading order, empty prose left
+/// out; <see cref="Scenes"/> the outlines of the scenes published as such, in reading order; <see cref="Plot"/> the arcs
+/// published on purpose, in arc order, each with its live beats. No ids, notes, chapters, points of view, dates, lore links,
+/// scene or beat links, premise or status.
+/// </summary>
+public sealed record PublicStoryDetail(
+    string Slug,
+    string Title,
+    string PublicSummary,
+    DateTime PublishedAt,
+    IReadOnlyList<PublicManuscriptPart> Manuscript,
+    IReadOnlyList<PublicStoryScene> Scenes,
+    IReadOnlyList<PublicPlotArc> Plot);
+
+/// <summary>One scene's published prose, under the scene's title. Plain text, exactly as written.</summary>
+public sealed record PublicManuscriptPart(string Title, string Text);
+
+/// <summary>One scene's published outline: its title and summary (null when it has none).</summary>
+public sealed record PublicStoryScene(string Title, string? Summary);
+
+/// <summary>One published plot arc: its title, description, and its live beats in order. Never notes or links.</summary>
+public sealed record PublicPlotArc(string Title, string? Description, IReadOnlyList<PublicPlotBeat> Beats);
+
+public sealed record PublicPlotBeat(string Title, string? Description);
 
 /// <summary>
 /// A published lore entry's own page (Task 011): what <see cref="PublicLoreEntry"/> lists, plus its article.

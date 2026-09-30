@@ -19,6 +19,8 @@ internal static class PublicationRules
     public const string Genres = "genres";
     public const string Artwork = "artwork";
     public const string PublicDisplayName = "publicDisplayName";
+    public const string OriginalCreator = "originalCreator";
+    public const string OriginalWork = "originalWork";
 
     /// <summary>
     /// What is still missing for this universe to be published, in words an author acts on, keyed as
@@ -113,6 +115,43 @@ internal static class PublicationRules
             && story.PublishedAt != null
             && story.PublicSummary != null
             && universes.Any(universe => universe.Id == story.UniverseId));
+    }
+
+    /// <summary>
+    /// Every scene whose outline - title and summary - the public portal may read (ADR 0039): selected by its author, not
+    /// in the Trash, inside a story <see cref="PublicStories"/> answers. Three levels in one predicate, so a private story
+    /// or universe hides every scene in it and keeps what was selected.
+    /// </summary>
+    public static IQueryable<Scene> PublicScenes(LorexDbContext db)
+    {
+        var stories = PublicStories(db);
+        return db.Scenes.Where(scene => scene.Visibility == ContentVisibility.Public
+            && scene.DeletedAt == null
+            && stories.Any(story => story.Id == scene.StoryId));
+    }
+
+    /// <summary>
+    /// Every scene whose prose the public portal may read (ADR 0039): its manuscript selected, the scene out of the Trash,
+    /// inside a public story. Independent of the scene's own outline selection.
+    /// </summary>
+    public static IQueryable<Scene> PublicManuscripts(LorexDbContext db)
+    {
+        var stories = PublicStories(db);
+        return db.Scenes.Where(scene => scene.ManuscriptVisibility == ContentVisibility.Public
+            && scene.DeletedAt == null
+            && stories.Any(story => story.Id == scene.StoryId));
+    }
+
+    /// <summary>
+    /// Every plot arc the public portal may read (ADR 0039): selected by its author on purpose - nothing else publishes
+    /// plot - out of the Trash, inside a public story. Its beats follow it, live ones only.
+    /// </summary>
+    public static IQueryable<PlotArc> PublicPlotArcs(LorexDbContext db)
+    {
+        var stories = PublicStories(db);
+        return db.PlotArcs.Where(arc => arc.Visibility == ContentVisibility.Public
+            && arc.DeletedAt == null
+            && stories.Any(story => story.Id == arc.StoryId));
     }
 
     /// <summary>Every genre in <paramref name="genres"/>, in the one order they are always listed in.</summary>

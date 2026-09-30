@@ -18,7 +18,8 @@ public sealed record PlotArcResponse(
     string? Notes,
     IReadOnlyList<PlotBeatResponse> Beats,
     DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    Publishing.ContentVisibility Visibility = Publishing.ContentVisibility.Private);
 
 /// <summary>The story's whole arc order: every arc id in the story, each exactly once, first first.</summary>
 public sealed record PlotArcOrderRequest(IReadOnlyList<Guid>? PlotArcIds);

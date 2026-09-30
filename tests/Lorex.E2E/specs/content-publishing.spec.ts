@@ -209,7 +209,7 @@ test.describe('publishing lore and stories', () => {
       'A story needs a public summary, written for readers, before it can be published.',
     )
     await expect(panel).toContainText(
-      'Its premise, chapters, scenes, manuscript, plot and notes are not published.',
+      'Its premise, chapters and notes are not published, nor any scene, prose or arc you have not published.',
     )
     await expect(page.getByTestId('publish-story')).toBeDisabled()
     await page.getByTestId('edit-story-public-summary').click()

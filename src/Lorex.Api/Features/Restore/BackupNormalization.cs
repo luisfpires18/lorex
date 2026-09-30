@@ -42,6 +42,9 @@ namespace Lorex.Api.Features.Restore;
 /// ADR 0036). In every version the restored universe is private: no version of the format can say otherwise.</item>
 /// <item>Versions 1-15: no story has a public summary, even when the file carries one, and none is ever taken from a
 /// premise (<c>AddPublicReading</c>, Task 011). In every version every restored entry and story is private.</item>
+/// <item>Versions 1-16: the universe is its author's own - no original creator or work, even when the file carries them
+/// (<c>AddStoryContentPublication</c>, ADR 0039). In every version every restored scene, manuscript and plot arc is
+/// private: no version of the format carries a selection.</item>
 /// </list>
 ///
 /// One thing is normalized for every version: the live rows of each ordered collection are numbered
@@ -56,9 +59,13 @@ internal static class BackupNormalization
 
     public static UniverseBackupPayload Project(UniverseBackupPayload payload, int version) => payload with
     {
-        Universe = version >= 15 || payload.Universe is null
+        Universe = payload.Universe is null
             ? payload.Universe!
-            : payload.Universe with { PublicSummary = null, Category = null, Genres = null, Artwork = null },
+            : version >= 17
+                ? payload.Universe
+                : version >= 15
+                    ? payload.Universe with { OriginalCreator = null, OriginalWork = null }
+                    : payload.Universe with { PublicSummary = null, Category = null, Genres = null, Artwork = null, OriginalCreator = null, OriginalWork = null },
         ChronologyEras = version >= 4 ? payload.ChronologyEras : null,
         Entities = payload.Entities is null ? null! : [.. payload.Entities.Select(entity => entity is null ? null! : ProjectEntity(entity, version))],
         RelationshipTypes = version >= 14 || payload.RelationshipTypes is null

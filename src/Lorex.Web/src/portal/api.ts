@@ -17,6 +17,12 @@ export interface PublicUniverse {
   /** Same-origin, and answered only while the universe is public. */
   cardImageUrl: string
   publishedAt: string
+  /**
+   * Who created the work this world is based on (ADR 0039), or null for a world of its author's own. Only a name: never a
+   * Lorex account, never linked. When set, the author is the world's curator on Lorex.
+   */
+  originalCreator: string | null
+  originalWork: string | null
 }
 
 export interface PublicUniversePage {
@@ -92,12 +98,26 @@ export interface PublicLoreDetail extends PublicLoreEntry {
   article: string | null
 }
 
-/** A published story, in a listing and on its page alike: never its premise or anything inside it. */
+/** A published story, in a listing: never its premise or anything inside it. */
 export interface PublicStory {
   slug: string
   title: string
   publicSummary: string
   publishedAt: string
+}
+
+/**
+ * A published story's own page (ADR 0039): its listing plus exactly what its author published inside it, in the author's
+ * order - scene prose, scene outlines, plot arcs. Nothing here says what is not published.
+ */
+export interface PublicStoryDetail extends PublicStory {
+  manuscript: { title: string; text: string }[]
+  scenes: { title: string; summary: string | null }[]
+  plot: {
+    title: string
+    description: string | null
+    beats: { title: string; description: string | null }[]
+  }[]
 }
 
 export interface PublicContentPage<T> {
@@ -130,7 +150,9 @@ export function getPublicLore(world: string, lore: string, signal?: AbortSignal)
 }
 
 export function getPublicStory(world: string, story: string, signal?: AbortSignal) {
-  return apiFetch<PublicStory>(`${at(world)}/stories/${encodeURIComponent(story)}`, { signal })
+  return apiFetch<PublicStoryDetail>(`${at(world)}/stories/${encodeURIComponent(story)}`, {
+    signal,
+  })
 }
 
 export function getPublicAuthor(author: string, signal?: AbortSignal) {

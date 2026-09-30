@@ -87,6 +87,8 @@ export function genreLabel(value: GenreValue) {
 export const PUBLIC_SUMMARY_MAX = 300
 export const MAX_GENRES = 3
 export const PUBLIC_NAME_MAX = 60
+export const ORIGINAL_CREATOR_MAX = 120
+export const ORIGINAL_WORK_MAX = 200
 
 /**
  * What publishing needs, in the order Settings lists it, keyed as the API reports a missing one. The words
@@ -125,12 +127,22 @@ export interface PublicationState {
   artwork: UniverseArtworkRef | null
   /** What publishing still needs, keyed as `REQUIREMENTS`. Empty when it may be published. */
   missing: Record<string, string[]>
+  /**
+   * Who created the work this universe is based on (ADR 0039), or null for a world of the author's own. The author is
+   * then its curator on Lorex, never its creator.
+   */
+  originalCreator: string | null
+  originalWork: string | null
 }
 
 export interface PublicationDetails {
   publicSummary: string | null
   category: CategoryValue | null
   genres: GenreValue[]
+  /** True: based on someone else's work, and `originalCreator` is required. False: the author's own; both cleared. */
+  basedOnExternalWork: boolean
+  originalCreator: string | null
+  originalWork: string | null
 }
 
 /** The ratio the card is framed at, 16:10 - the server's `ImageFrame.Card`. */
@@ -155,6 +167,18 @@ export interface ContentPublicationState {
 
 /** Which kind of item a publication control is for - they share one control and one set of routes. */
 export type ContentKind = 'entry' | 'story'
+
+/**
+ * One part of a story - a scene's outline, a scene's prose, a plot arc - as its owner sees its publication (ADR 0039). It
+ * is public to anyone exactly when `visibility` is `Public` and its story is public (selected, summarised, in a public
+ * universe). A part has no address: it is read on its story's page.
+ */
+export interface StoryPartPublicationState {
+  visibility: VisibilityValue
+  storyIsPublic: boolean
+}
+
+export type StoryPartKind = 'scene' | 'manuscript' | 'arc'
 
 /** The signed-in account's public author page, as its owner manages it (ADR 0037). */
 export interface PublicAuthorSettings {

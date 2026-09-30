@@ -606,7 +606,9 @@ public static class SceneEndpoints
         int? Day,
         List<Guid> EntityIds,
         DateTime CreatedAt,
-        DateTime UpdatedAt);
+        DateTime UpdatedAt,
+        Publishing.ContentVisibility Visibility,
+        Publishing.ContentVisibility ManuscriptVisibility);
 
     private static async Task<SceneResponse?> LoadSceneAsync(
         LorexDbContext db,
@@ -658,7 +660,9 @@ public static class SceneEndpoints
                 scene.Day,
                 scene.EntityLinks.Select(link => link.EntityId).ToList(),
                 scene.CreatedAt,
-                scene.UpdatedAt))
+                scene.UpdatedAt,
+                scene.Visibility,
+                scene.ManuscriptVisibility))
             .ToListAsync(cancellationToken);
 
         var referenced = rows
@@ -682,7 +686,9 @@ public static class SceneEndpoints
                 row.Year is null ? null : new ChronologyValue(row.EraId, row.Year, row.Month, row.Day),
                 StoryLoreReferences.Listed(row.EntityIds, references),
                 row.CreatedAt,
-                row.UpdatedAt)),
+                row.UpdatedAt,
+                row.Visibility,
+                row.ManuscriptVisibility)),
         ];
     }
 }

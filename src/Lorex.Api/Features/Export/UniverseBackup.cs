@@ -154,8 +154,15 @@ public sealed record UniverseBackup(
     /// version 15 reader would lose silently. As in 15, whether the story was published is not in the format, nor its
     /// address or date: every restored story is private. A file at version 15 or earlier has no <c>publicSummary</c> on
     /// a story; it reads as null, and nothing is ever filled from the premise.
+    ///
+    /// 17 - A universe may say it is based on someone else's work (ADR 0039): <see cref="BackupUniverse.OriginalCreator"/>
+    /// and <see cref="BackupUniverse.OriginalWork"/>, the attribution its author wrote. Not ignorable - it is authored text,
+    /// and a version 16 reader would restore a fan or reference world as its new owner's own creation, crediting nobody. A
+    /// file at version 16 or earlier has neither; each reads as null, an original world. What a story's scenes, manuscripts
+    /// and plot arcs were selected for is not in the format either, as for entries and stories: every restored part is
+    /// private.
     /// </summary>
-    public const int CurrentVersion = 16;
+    public const int CurrentVersion = 17;
 
     public static UniverseBackup Of(UniverseBackupPayload payload, DateTime generatedAt) =>
         new(FormatName, CurrentVersion, generatedAt, payload);
@@ -205,7 +212,8 @@ public sealed record UniverseBackupPayload(
 /// Since version 15, its public details: <paramref name="PublicSummary"/>, <paramref name="Category"/> and
 /// <paramref name="Genres"/> (by name, in their fixed order), and <paramref name="Artwork"/>. Visibility, the
 /// public address and the publication date are never here, and neither is the author's public name, which is
-/// the account's - see <see cref="UniverseBackup.CurrentVersion"/>.
+/// the account's - see <see cref="UniverseBackup.CurrentVersion"/>. Since version 17, its attribution:
+/// <paramref name="OriginalCreator"/> and <paramref name="OriginalWork"/> (ADR 0039).
 /// </summary>
 public sealed record BackupUniverse(
     Guid Id,
@@ -218,7 +226,9 @@ public sealed record BackupUniverse(
     string? PublicSummary = null,
     UniverseCategory? Category = null,
     IReadOnlyList<UniverseGenres>? Genres = null,
-    BackupUniverseArtwork? Artwork = null);
+    BackupUniverseArtwork? Artwork = null,
+    string? OriginalCreator = null,
+    string? OriginalWork = null);
 
 /// <summary>
 /// The universe's artwork, as <see cref="BackupEntityImage"/> describes an entry's picture: the original's

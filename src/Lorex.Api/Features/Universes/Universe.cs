@@ -49,6 +49,17 @@ public sealed class Universe
     public UniverseGenres Genres { get; set; }
 
     /// <summary>
+    /// Who created the work this universe is based on, when its author says it is based on someone else's work - a
+    /// novelist, a studio, a game - and null for a world of its author's own (Product refinement 015, ADR 0039). Shown
+    /// publicly as the original creator, with this universe's author as its curator on Lorex; never a Lorex account and
+    /// never linked to one. Saved with the public details and cleared when the author says the world is their own.
+    /// </summary>
+    public string? OriginalCreator { get; set; }
+
+    /// <summary>The title of the work it is based on, if the author names one. Only ever set beside <see cref="OriginalCreator"/>.</summary>
+    public string? OriginalWork { get; set; }
+
+    /// <summary>
     /// Its public address, minted from the name the first time it is published and never changed
     /// after - not by a rename, and not by unpublishing - so a link to it keeps working.
     /// </summary>

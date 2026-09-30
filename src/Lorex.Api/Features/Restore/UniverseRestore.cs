@@ -444,6 +444,8 @@ internal sealed partial class UniverseRestore(
             PublicSummary = string.IsNullOrWhiteSpace(source.PublicSummary) ? null : source.PublicSummary,
             Category = source.Category,
             Genres = (source.Genres ?? []).Aggregate(UniverseGenres.None, (all, genre) => all | genre),
+            OriginalCreator = string.IsNullOrWhiteSpace(source.OriginalCreator) ? null : source.OriginalCreator,
+            OriginalWork = string.IsNullOrWhiteSpace(source.OriginalCreator) || string.IsNullOrWhiteSpace(source.OriginalWork) ? null : source.OriginalWork,
         };
 
         var detectChanges = db.ChangeTracker.AutoDetectChangesEnabled;

@@ -3,8 +3,8 @@ import { Link, useParams } from 'react-router-dom'
 import { ArrowUpRight, BookOpen, ScrollText } from 'lucide-react'
 import { BrandMark } from '../components/BrandMark'
 import { PortalError, PortalMissing } from '../components/PortalMissing'
+import { WorldAttribution } from '../components/WorldAttribution'
 import {
-  authorPath,
   getPublicUniverse,
   listPublicLore,
   listPublicStories,
@@ -107,16 +107,7 @@ function World({ world }: { world: PublicUniverse }) {
             <h1 className="pworld-hero__title" dir="auto">
               <bdi>{world.name}</bdi>
             </h1>
-            <p className="pworld-hero__byline">
-              by{' '}
-              <Link
-                className="plink"
-                to={authorPath(world.authorSlug)}
-                data-testid="public-world-author"
-              >
-                <bdi>{world.authorDisplayName}</bdi>
-              </Link>
-            </p>
+            <WorldAttribution world={world} className="pworld-hero__byline" testId="public-world" />
             <ul className="worldcard__genres pworld-hero__genres" aria-label="Genres">
               {world.genres.map((genre) => (
                 <li className="genrechip" data-genre={genreKey(genre)} key={genre}>
