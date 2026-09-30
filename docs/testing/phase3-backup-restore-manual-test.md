@@ -5,7 +5,7 @@ follows one author through recovering a world, not every edge case: those are in
 (`BackupRoundTripTests`, `BackupRestoreTests`, `BackupValidationTests`, `BackupArchiveSafetyTests`, `BackupVersionTests`).
 
 About 25 minutes. Use a universe that holds a bit of everything: entries (one with an article you have saved more than once and a
-picture), a relationship, eras and a dated moment, a story with chapters and scenes, some prose saved twice, an arc with a
+picture), a relationship, date periods (eras) and a dated moment, a story with chapters and scenes, some prose saved twice, an arc with a
 beat, an idea about the universe, a Canon conflict you dismissed, and something of each kind in the Trash. Keep an idea with no
 universe for step 9 and a second account for step 11. An old backup file, if you have one from before today, is useful at step 12.
 
@@ -39,7 +39,7 @@ Tick each when it behaves as written. Note anything that surprised you, even if 
    universe. All universes now lists it beside the original, which is exactly as it was.
 6. **Lore came back.** Open the entry with the picture: the picture and its square thumbnail are the ones you chose. Its article
    reads as saved; Article history holds every version, and restoring an older one works. Entry history holds the same versions
-   as the original. Values, aliases, tags, relationships, eras and the moment's date read as in the original. Types show their
+   as the original. Values, aliases, tags, relationships, date periods and the moment's date read as in the original. Types show their
    icons and fields.
 7. **The story came back.** Chapters and scenes are in the same order, each scene in its chapter or Unchaptered, with its point of
    view, date and linked lore. The prose reads as saved, with its saved versions. The plot's arcs and beats are in order and still

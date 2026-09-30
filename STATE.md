@@ -50,6 +50,20 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **Product refinement 018 - chronology date periods** (`feat/chronology-date-periods` off `dev` at `cb3b084`, committed, not
+  merged, not pushed). Product language and editor UX only: no migration, no backup format change, no API contract change.
+  ADR 0022 amended.
+  - Authors see **date periods** (a named stretch of a world's timeline with its own year numbers); code, tables, API, backup
+    and `chronology_era_in_use` keep "era". Chronology page: "Choose how dates are written and ordered in this universe", a
+    Date periods `h2`, plain numbered years as the empty state with its own Add date period; per period Name, Short label
+    (optional), Years count Up from 1 / Down to 1 with its run (`1 → 2 → 3 → …` no set end, `… → 3 → 2 → 1`), Write dates as
+    `TA 10` / `10 TA`; the order as a line of names; Earlier/Later keep focus (`aria-disabled`) and announce the move; an
+    in-use Remove stays focusable and says why; unplaced dates are said to be kept and unguessed, with a timeline link.
+  - The old `previewYears(eras, [120, 1])` ("BF 120 … AF 120") was a hard-coded display sample, never stored or validated,
+    and read as a 120-year limit. Removed; nothing draws a range. Periods are unbounded (TA 3018, TA 100000 tested).
+  - Pickers say Date period / Starts in period / Ends in period / Choose a date period (timeline, scene, lore year); the
+    plain-year moment label is "Year label" and says it orders nothing; API, Canon-free validation, restore and revision
+    messages say date period.
 - **Product refinement 017 - workspace editing flow** (`fix/workspace-editing-flow` off `dev` at `ea7af47`, committed, not
   merged, not pushed). Frontend only: no API, schema, migration or backup change.
   - A new idea, once created, returns to its list (`replace`, so Back never reopens the finished form) with "Created “…”" in
@@ -848,7 +862,12 @@ A public, read-only discovery experience beside the workspace, in the same appli
 
 ## Baseline
 
-- **1150 API integration tests, 283 Playwright tests** (017: +7 in `editing-flow.spec.ts`, idea specs moved to create -> list,
+- **1156 API integration tests, 287 Playwright tests** (018: +6 API in `TimelineChronologyTests` - unbounded period years,
+  rename, reorder, turn-around, year 0 worded - plus in-use wording/code pins; +4 in `chronology-date-periods.spec.ts`; era
+  wording pins moved to date periods. API **1156/1156**. Full Playwright on a fresh database, two workers, retries 0, one run:
+  **286/287**, 14.3 min - `timeline.spec.ts` "an edit moves a moment…" met "Lorex could not be reached" on its listing fetch
+  (API/dev-server contention; plain years, no period code), green 3/3 alone; no second full run. Release build clean apart
+  from the existing CA1859 in `StoryContentPublicationTests.cs`, no pending model changes.) Before it, 1150 / 283 (017: +7 in `editing-flow.spec.ts`, idea specs moved to create -> list,
   one announcer pin moved to the save status; no API change, API suite not rerun. Full Playwright on a fresh database, two
   workers, retries 0: runs 1-3 each lost one or two tests to Vite failing to serve a lazy page ("Failed to fetch dynamically
   imported module" - `IdeaPage.tsx` once, `TimelinePage.tsx` three times), each green 3/3 alone; run 4 **283/283**, 14.1 min.)
@@ -995,11 +1014,11 @@ tool has changed the picture.
   `docs/deployment/azure-dev.md`, `docs/deployment/cloudflare-r2.md`.
 - **Full security audit.** Relationships, timeline and Canon Integrity each had a focused check
   backed by tests. Outstanding: rate limiting, header/cookie hardening, dependency review, auth.
-- **Era tooling.** Cross-era order is solved only for a universe that names its eras; free-text
-  labels on the plain reckoning still order nothing and still stand the rules down. Years written
-  before eras are given one entry by entry - no bulk assignment - and removing an era needs its
-  dates moved first, with no reassignment tool. Month names, calendars and conversion: not started.
-  ADR 0022.
+- **Date period tooling** (eras in code). Cross-period order is solved only for a universe with date periods;
+  free-text year labels on plain years still order nothing and still stand the rules down. Years written
+  before periods are given one entry by entry - no bulk assignment - and removing a period needs its
+  dates moved first, with no reassignment tool. Finite period ranges, month names, calendars and conversion:
+  not started. ADR 0022 (amended 018).
 - **`Age`** is declarable but read by nothing until a structured reference year exists. ADR 0011.
 - **Story work deferred past Phase 2** - later work, not Phase 2 gaps: acts and volumes, rich text, saved versions of
   anything in a story but its manuscript, drag-and-drop, collaboration, manuscript export, and AI. Also: collapsing chapters, bulk scene moves, Story-vs-Lore checks, pre-era scene years in Settings; a plot

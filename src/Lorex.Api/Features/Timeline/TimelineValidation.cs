@@ -40,7 +40,7 @@ public static class TimelineValidation
 
         if (request.EraLabel?.Trim() is { Length: > TimelineLimits.EraLabelMaxLength })
         {
-            errors["eraLabel"] = [$"Keep the era under {TimelineLimits.EraLabelMaxLength} characters."];
+            errors["eraLabel"] = [$"Keep the year label under {TimelineLimits.EraLabelMaxLength} characters."];
         }
 
         if (!Enum.IsDefined(request.CanonStatus))
@@ -133,7 +133,7 @@ public static class TimelineValidation
                     // the plain reckoning's refusal reads exactly as it did before eras existed.
                     errors["dateKind"] = request.StartEraId is null && request.EndEraId is null
                         ? ["An unknown date carries no year, month or day. Clear them or pick a kind."]
-                        : ["An unknown date carries no year, month, day or era. Clear them or pick a kind."];
+                        : ["An unknown date carries no year, month, day or date period. Clear them or pick a kind."];
                 }
 
                 break;
@@ -174,7 +174,7 @@ public static class TimelineValidation
             if (Normalize(request.EraLabel) is not null)
             {
                 errors["eraLabel"] =
-                    ["This universe names its eras. Choose one of those rather than writing a label."];
+                    ["This universe has date periods. Choose one of those rather than writing a label."];
             }
 
             ChronologyPointValidation.ValidateEraYear(

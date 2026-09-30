@@ -27,7 +27,7 @@ public sealed record ChronologyPointKeys(string Year, string Month, string Day, 
 public static class ChronologyPointValidation
 {
     public const string NoErasMessage =
-        "This universe does not name any eras. Add them in Settings, or leave the era out.";
+        "This universe has no date periods. Add them in Chronology, or leave the date period out.";
 
     /// <summary>
     /// Shape of the components on their own. Years are signed on purpose; only months and days are
@@ -79,18 +79,18 @@ public static class ChronologyPointValidation
 
         if (eraId is null)
         {
-            errors.TryAdd(keys.Era, ["Choose the era this year is counted in."]);
+            errors.TryAdd(keys.Era, ["Choose the date period this year is counted in."]);
         }
         else if (chronology.Era(eraId) is null)
         {
             // Said the same way for an id that is not an era at all and for one from another
             // universe, so the answer discloses nothing about the second.
-            errors.TryAdd(keys.Era, ["Choose an era this universe names."]);
+            errors.TryAdd(keys.Era, ["Choose one of this universe's date periods."]);
         }
 
         if (!ChronologyPoint.IsEraYear(value))
         {
-            errors.TryAdd(keys.Year, ["Years inside an era count up from 1."]);
+            errors.TryAdd(keys.Year, ["Years inside a date period start at 1. There is no year 0."]);
         }
     }
 

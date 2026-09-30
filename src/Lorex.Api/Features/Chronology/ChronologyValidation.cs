@@ -12,13 +12,13 @@ public static class ChronologyValidation
 
         if (request.Eras is not { } eras)
         {
-            errors["eras"] = ["Send the whole list of eras, even when it is empty."];
+            errors["eras"] = ["Send the whole list of date periods, even when it is empty."];
             return errors;
         }
 
         if (eras.Count > ChronologyLimits.MaxEras)
         {
-            errors["eras"] = [$"A universe can name at most {ChronologyLimits.MaxEras} eras."];
+            errors["eras"] = [$"A universe can have at most {ChronologyLimits.MaxEras} date periods."];
             return errors;
         }
 
@@ -33,7 +33,7 @@ public static class ChronologyValidation
 
             if (era.Id is { } id && !ids.Add(id))
             {
-                errors[$"{key}.id"] = ["The same era is listed twice."];
+                errors[$"{key}.id"] = ["The same date period is listed twice."];
             }
 
             var name = Normalize(era.Name);
@@ -41,15 +41,15 @@ public static class ChronologyValidation
 
             if (name is null)
             {
-                errors[$"{key}.name"] = ["Give the era a name, like \"After the Fall\"."];
+                errors[$"{key}.name"] = ["Give the date period a name, like \"Third Age\" or \"After the Fall\"."];
             }
             else if (name.Length > ChronologyLimits.NameMaxLength)
             {
-                errors[$"{key}.name"] = [$"Keep an era's name under {ChronologyLimits.NameMaxLength} characters."];
+                errors[$"{key}.name"] = [$"Keep a date period's name under {ChronologyLimits.NameMaxLength} characters."];
             }
             else if (!names.Add(name))
             {
-                errors[$"{key}.name"] = ["Another era already has this name."];
+                errors[$"{key}.name"] = ["Another date period already has this name."];
             }
 
             if (abbreviation is { Length: > ChronologyLimits.AbbreviationMaxLength })
@@ -62,7 +62,7 @@ public static class ChronologyValidation
                 // What is written beside a year has to say which era it is, so two eras may not
                 // read the same even when their full names differ.
                 errors[abbreviation is null ? $"{key}.name" : $"{key}.abbreviation"] =
-                    [$"Another era is already written as \"{label}\". Give each era a label of its own."];
+                    [$"Another date period is already written as \"{label}\". Give each period a label of its own."];
             }
 
             if (!Enum.IsDefined(era.Direction))

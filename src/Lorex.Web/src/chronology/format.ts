@@ -1,20 +1,21 @@
 import {
-  EraDirection,
   EraLabelPosition,
   type Chronology,
   type ChronologyEra,
-  type EraDirectionValue,
   type EraLabelPositionValue,
   type EraWriting,
 } from './types'
 
 /**
  * The one place the client writes a year out. Timeline stamps and headings, a birth year on an
- * entry, an old version in its history and the Settings preview all come through here, so a
- * universe's dates read the same way everywhere and "{year} {era}" is never assembled by hand.
+ * entry and an old version in its history all come through here, so a universe's dates read the
+ * same way everywhere and "{year} {period}" is never assembled by hand.
  *
- * It follows the API's `UniverseChronology.FormatYear`: the era's short label, or its name when
- * there is none, on the side of the year the era asks for. Nothing here orders anything - the
+ * Authors see "date periods"; the code and the API keep the original name, era (ADR 0022, amended
+ * by refinement 018). One is the other: a named stretch of the timeline with its own year numbers.
+ *
+ * It follows the API's `UniverseChronology.FormatYear`: the period's short label, or its name when
+ * there is none, on the side of the year the period asks for. Nothing here orders anything - the
  * API sorts, and the client never compares formatted dates.
  */
 
@@ -95,24 +96,4 @@ export function formatChronologyPoint(chronology: Chronology, point: ChronologyP
 
   const era = findEra(chronology, point.eraId)
   return era ? withEraLabel(text, eraLabel(era), era.labelPosition) : text
-}
-
-/** The eras a preview is drawn for: what they are called, and how their years run. */
-export interface PreviewEra extends Pick<EraWriting, 'name' | 'abbreviation' | 'labelPosition'> {
-  direction: EraDirectionValue
-}
-
-/**
- * A handful of years in order, earliest first, exactly as the configured eras would place and
- * write them: "BF 120, BF 1, AF 1, AF 120". Built from the order and the directions alone, so it
- * shows the author what their configuration means before any of it is saved.
- */
-export function previewYears(eras: PreviewEra[], sample: [number, number] = [120, 1]) {
-  const [far, near] = sample
-
-  return eras.flatMap((era) => {
-    const label = eraLabel(era).trim() || 'Era'
-    const years = era.direction === EraDirection.Descending ? [far, near] : [near, far]
-    return years.map((year) => withEraLabel(String(year), label, era.labelPosition))
-  })
 }

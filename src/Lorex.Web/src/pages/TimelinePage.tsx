@@ -320,8 +320,9 @@ export default function TimelinePage() {
 
       {mixedEras ? (
         <p className="chron__caution" data-testid="chron-eras">
-          More than one reckoning is on this page. Lorex orders by the year number alone, so a
-          moment under a different era may not sit where its story puts it.
+          More than one year label is on this page. Lorex orders by the year number alone, so a
+          moment with a different label may not sit where its story puts it. Date periods in
+          Chronology order them properly.
         </p>
       ) : null}
 
@@ -384,12 +385,13 @@ export default function TimelinePage() {
             <section className="chron__group chron__group--unplaced" data-testid="chron-unreckoned">
               <h2 className="chron__year">
                 <span className="chron__yearnum chron__yearnum--none">?</span>
-                <span className="chron__era">No era yet</span>
+                <span className="chron__era">No date period yet</span>
               </h2>
               <div>
                 <p className="chron__aside">
-                  Dated before this universe named its eras. Edit each one to choose the era its
-                  year is counted in; until then it is not placed among them.
+                  Dated before this universe had date periods. Still saved; Lorex doesn’t guess.
+                  Edit each one to choose the period its year is counted in; until then it is not
+                  placed among them.
                 </p>
                 <ul className="chron__moments chron__moments--unplaced">
                   {unreckoned.map((entry) => moment(entry))}

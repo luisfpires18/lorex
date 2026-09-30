@@ -369,6 +369,113 @@ public sealed class TimelineChronologyTests(LorexApiFactory factory) : IClassFix
         Assert.Equal(expected, await Titles(client, universe.Id));
     }
 
+    // ---------- Date periods have no set length (refinement 018) ----------
+    //
+    // Authors call an era a date period. Nothing bounds its years: the editor's old preview drew
+    // "BF 120 ... AF 120" from a hard-coded sample and read as a limit, but there never was one.
+
+    [Fact]
+    public async Task A_date_period_has_no_upper_bound_on_its_years()
+    {
+        var (client, universe) = await SignedInWithUniverse("tlperiodages");
+        var ages = await SaveEras(
+            client,
+            universe.Id,
+            Era("First Age", "FA", ChronologyEraDirection.Ascending),
+            Era("Second Age", "SA", ChronologyEraDirection.Ascending),
+            Era("Third Age", "TA", ChronologyEraDirection.Ascending));
+
+        var council = await Create(client, universe.Id, InEra("TA 3018", ages[2].Id, 3018, 10, 25));
+        await Create(client, universe.Id, InEra("TA 121", ages[2].Id, 121));
+        await Create(client, universe.Id, InEra("SA 3441", ages[1].Id, 3441));
+        await Create(client, universe.Id, InEra("TA 1", ages[2].Id, 1));
+        await Create(client, universe.Id, InEra("FA 590", ages[0].Id, 590));
+        await Create(client, universe.Id, InEra("TA 120", ages[2].Id, 120));
+        await Create(client, universe.Id, InEra("TA 100000", ages[2].Id, 100000));
+
+        Assert.Equal(3018, council.Date.StartYear);
+        Assert.Equal(ages[2].Id, council.Date.StartEraId);
+        Assert.Equal(
+            ["FA 590", "SA 3441", "TA 1", "TA 120", "TA 121", "TA 3018", "TA 100000"],
+            await Titles(client, universe.Id));
+    }
+
+    [Fact]
+    public async Task A_counting_down_period_has_no_bound_on_how_far_back_it_reaches()
+    {
+        var (client, universe, eras) = await WithTheFall("tlperioddown");
+        await Create(client, universe.Id, InEra("BF 1", eras.Before, 1));
+        await Create(client, universe.Id, InEra("BF 5000", eras.Before, 5000));
+        await Create(client, universe.Id, InEra("BF 120", eras.Before, 120));
+        await Create(client, universe.Id, InEra("AF 1", eras.After, 1));
+
+        Assert.Equal(["BF 5000", "BF 120", "BF 1", "AF 1"], await Titles(client, universe.Id));
+    }
+
+    [Fact]
+    public async Task Renaming_a_date_period_moves_no_date()
+    {
+        var (client, universe, eras) = await WithTheFall("tlperiodrename");
+        await Create(client, universe.Id, InEra("BF 10", eras.Before, 10));
+        await Create(client, universe.Id, InEra("AF 3", eras.After, 3));
+        await Create(client, universe.Id, InEra("BF 2", eras.Before, 2));
+        string[] order = ["BF 10", "BF 2", "AF 3"];
+        Assert.Equal(order, await Titles(client, universe.Id));
+
+        await SaveEras(
+            client,
+            universe.Id,
+            new ChronologyEraRequest(eras.Before, "The Long Dark", "LD", ChronologyEraDirection.Descending, ChronologyLabelPosition.AfterYear),
+            new ChronologyEraRequest(eras.After, "The Dawn", "D", ChronologyEraDirection.Ascending, ChronologyLabelPosition.BeforeYear));
+
+        Assert.Equal(order, await Titles(client, universe.Id));
+    }
+
+    [Fact]
+    public async Task Reordering_date_periods_repositions_their_dates()
+    {
+        var (client, universe, eras) = await WithTheFall("tlperiodreorder");
+        await Create(client, universe.Id, InEra("AF 3", eras.After, 3));
+        await Create(client, universe.Id, InEra("BF 10", eras.Before, 10));
+        Assert.Equal(["BF 10", "AF 3"], await Titles(client, universe.Id));
+
+        await SaveEras(
+            client,
+            universe.Id,
+            new ChronologyEraRequest(eras.After, "After the Fall", "AF", ChronologyEraDirection.Ascending, ChronologyLabelPosition.BeforeYear),
+            new ChronologyEraRequest(eras.Before, "Before the Fall", "BF", ChronologyEraDirection.Descending, ChronologyLabelPosition.BeforeYear));
+
+        Assert.Equal(["AF 3", "BF 10"], await Titles(client, universe.Id));
+    }
+
+    [Fact]
+    public async Task Turning_a_date_period_around_repositions_its_dates()
+    {
+        var (client, universe, eras) = await WithTheFall("tlperiodturn");
+        await Create(client, universe.Id, InEra("AF 1", eras.After, 1));
+        await Create(client, universe.Id, InEra("AF 3018", eras.After, 3018));
+        Assert.Equal(["AF 1", "AF 3018"], await Titles(client, universe.Id));
+
+        await SaveEras(
+            client,
+            universe.Id,
+            new ChronologyEraRequest(eras.Before, "Before the Fall", "BF", ChronologyEraDirection.Descending, ChronologyLabelPosition.BeforeYear),
+            new ChronologyEraRequest(eras.After, "After the Fall", "AF", ChronologyEraDirection.Descending, ChronologyLabelPosition.BeforeYear));
+
+        Assert.Equal(["AF 3018", "AF 1"], await Titles(client, universe.Id));
+    }
+
+    [Fact]
+    public async Task Year_zero_is_still_refused_inside_a_date_period_and_worded_as_one()
+    {
+        var (client, universe, eras) = await WithTheFall("tlperiodzero");
+
+        var response = await Post(client, universe.Id, InEra("Year nought", eras.After, 0));
+
+        await AssertRefused(response, "startYear");
+        Assert.Contains("date period", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
     // ---------- Helpers ----------
 
     private sealed record FallEras(Guid Before, Guid After);

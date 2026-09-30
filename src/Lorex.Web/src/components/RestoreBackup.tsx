@@ -424,7 +424,7 @@ function summaryRows(counts: BackupPreviewCounts): [string, string][] {
     plural(counts.entityTypes, 'type', 'types'),
     counts.relationships > 0 ? plural(counts.relationships, 'relationship', 'relationships') : null,
     counts.timelineEntries > 0 ? plural(counts.timelineEntries, 'moment', 'moments') : null,
-    counts.eras > 0 ? plural(counts.eras, 'era', 'eras') : null,
+    counts.eras > 0 ? plural(counts.eras, 'date period', 'date periods') : null,
     counts.articles > 0 ? plural(counts.articles, 'article', 'articles') : null,
   ]
   rows.push(['Lore', lore.filter(Boolean).join(', ')])

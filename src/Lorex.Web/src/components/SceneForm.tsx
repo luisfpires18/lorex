@@ -157,7 +157,7 @@ export function SceneForm({
   const reckonsInEras = namesEras(chronology)
   const hasPoint = Object.values(draft.point).some((part) => part.trim() !== '')
 
-  // A plain year written before the universe named its eras has no era to show in the picker.
+  // A plain year written before the universe had date periods has no period to show in the picker.
   const unreckoned = reckonsInEras && scene?.chronology != null && scene.chronology.eraId === null
 
   const isDirty =
@@ -363,8 +363,8 @@ export function SceneForm({
 
             {unreckoned ? (
               <p className="field__hint" data-testid="scene-unreckoned">
-                Placed as a plain year before this universe named its eras. Choose its era, or clear
-                it.
+                Placed as a plain year before this universe had date periods. Choose its period, or
+                clear it.
               </p>
             ) : null}
 

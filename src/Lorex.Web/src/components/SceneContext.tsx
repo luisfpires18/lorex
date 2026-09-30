@@ -35,7 +35,7 @@ export function SceneStamp({
       {when ? (
         <span className="scene__when" data-testid={`${testId}-when`}>
           {when.text}
-          {when.placed ? null : <span className="scene__unplaced"> · no era yet</span>}
+          {when.placed ? null : <span className="scene__unplaced"> · no date period yet</span>}
         </span>
       ) : null}
       {scene.pov ? (

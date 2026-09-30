@@ -128,6 +128,10 @@ public sealed class ChronologyEndpointTests(LorexApiFactory factory) : IClassFix
         Assert.Contains("1 timeline entry", body, StringComparison.Ordinal);
         Assert.Contains("Before the Fall", body, StringComparison.Ordinal);
 
+        // Authors call it a date period (018); the machine code stays what clients already match on.
+        Assert.Equal("chronology_era_in_use", ChronologyEndpoints.EraInUseCode);
+        Assert.Contains("Date period is in use", body, StringComparison.Ordinal);
+
         Assert.Equal(2, (await Get(client, universe.Id)).Eras.Count);
     }
 

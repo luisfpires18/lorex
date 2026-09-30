@@ -330,7 +330,9 @@ export function TimelineEntryForm({
           month: `moment-${keys.month}`,
           day: `moment-${keys.day}`,
         }}
-        eraLabel={prefix === 'start' ? (isRange ? 'Starts in era' : 'Era') : 'Ends in era'}
+        eraLabel={
+          prefix === 'start' ? (isRange ? 'Starts in period' : 'Date period') : 'Ends in period'
+        }
         yearLabel={yearLabel}
         value={{
           eraId: draft[keys.eraId],
@@ -476,18 +478,18 @@ export function TimelineEntryForm({
           {reckonsInEras ? (
             draft.eraLabel ? (
               <p className="field__hint" data-testid="moment-old-label">
-                Labelled &ldquo;{draft.eraLabel}&rdquo; before this universe named its eras. Choose
-                its era above; the old label is dropped when you save.
+                Labelled &ldquo;<bdi>{draft.eraLabel}</bdi>&rdquo; before this universe had date
+                periods. Choose its period above; the old label is dropped when you save.
               </p>
             ) : null
           ) : (
             <div className="field">
               <label className="field__label" htmlFor="moment-era">
-                Era
+                Year label
               </label>
               <p className="field__hint">
-                A name for the reckoning: Third Age, AC, Before the Flood. Lorex shows it, but does
-                not order by it yet.
+                Optional text shown beside the year: AC, Before the Flood. Lorex does not order by
+                it — to order dates by named periods, add date periods in Chronology.
               </p>
               <input
                 id="moment-era"

@@ -315,7 +315,7 @@ internal static partial class BackupValidation
 
             CheckUniverse(payload.Universe);
 
-            var eras = Required(payload.ChronologyEras, "the list of eras", since: 4);
+            var eras = Required(payload.ChronologyEras, "the list of date periods", since: 4);
             var types = Required(payload.EntityTypes, "the list of entry types");
             var tags = Required(payload.Tags, "the list of tags");
             var entities = Required(payload.Entities, "the list of entries");
@@ -482,7 +482,7 @@ internal static partial class BackupValidation
         {
             if (eras.Count > ChronologyLimits.MaxEras)
             {
-                Add(BackupIssueCodes.InvalidValue, $"The backup names {eras.Count} eras. A universe can name at most {ChronologyLimits.MaxEras}.");
+                Add(BackupIssueCodes.InvalidValue, $"The backup has {eras.Count} date periods. A universe can have at most {ChronologyLimits.MaxEras}.");
             }
 
             var places = new HashSet<int>();
@@ -491,11 +491,11 @@ internal static partial class BackupValidation
             {
                 if (era is null)
                 {
-                    Missing("an era");
+                    Missing("a date period");
                     continue;
                 }
 
-                var what = $"The era {Quote(era.Name)}";
+                var what = $"The date period {Quote(era.Name)}";
                 Register(era.Id, what);
                 _eras.Add(era.Id);
                 Text(era.Name, ChronologyLimits.NameMaxLength, $"{what}'s name", required: true);
@@ -505,7 +505,7 @@ internal static partial class BackupValidation
 
                 if (!places.Add(era.SortOrder))
                 {
-                    Add(BackupIssueCodes.InvalidOrder, $"{what} claims the same place in the reckoning as another era.");
+                    Add(BackupIssueCodes.InvalidOrder, $"{what} claims the same place in the order as another date period.");
                 }
             }
         }
@@ -720,7 +720,7 @@ internal static partial class BackupValidation
 
                 if (value.EraId is { } era)
                 {
-                    Reference(_eras.Contains(era), $"{what} has a year counted in an era the backup does not name.");
+                    Reference(_eras.Contains(era), $"{what} has a year counted in a date period the backup does not have.");
                 }
             }
 
@@ -830,7 +830,7 @@ internal static partial class BackupValidation
                     Text(value.TextValue, LoreLimits.TextValueMaxLength, $"A value in {label.ToLowerInvariant()}");
                     Text(value.OptionValue, LoreLimits.OptionMaxLength, $"An option in {label.ToLowerInvariant()}");
                     Text(value.ReferencedEntityName, LoreLimits.NameMaxLength, $"An entry name in {label.ToLowerInvariant()}");
-                    Text(value.EraLabel, ChronologyLimits.NameMaxLength, $"An era label in {label.ToLowerInvariant()}");
+                    Text(value.EraLabel, ChronologyLimits.NameMaxLength, $"A date period label in {label.ToLowerInvariant()}");
                 }
             }
         }
@@ -962,7 +962,7 @@ internal static partial class BackupValidation
             Register(entry.Id, what);
             Text(entry.Title, TimelineLimits.TitleMaxLength, $"{what}'s title", required: true);
             Text(entry.Description, TimelineLimits.DescriptionMaxLength, $"{what}'s description");
-            Text(entry.EraLabel, TimelineLimits.EraLabelMaxLength, $"{what}'s era label");
+            Text(entry.EraLabel, TimelineLimits.EraLabelMaxLength, $"{what}'s year label");
             Defined(entry.CanonStatus, $"{what}'s Canon status");
             Defined(entry.DateKind, $"{what}'s kind of date");
             Point(entry.StartEraId, entry.StartYear, entry.StartMonth, entry.StartDay, $"{what}'s start");
@@ -1512,11 +1512,11 @@ internal static partial class BackupValidation
         {
             if (eraId is { } era)
             {
-                Reference(_eras.Contains(era), $"{what} is counted in an era the backup does not name.");
+                Reference(_eras.Contains(era), $"{what} is counted in a date period the backup does not have.");
 
                 if (year is { } value && !ChronologyPoint.IsEraYear(value))
                 {
-                    Add(BackupIssueCodes.InvalidValue, $"{what} is a year inside an era that is not counted from 1.");
+                    Add(BackupIssueCodes.InvalidValue, $"{what} is a year inside a date period that is not counted from 1.");
                 }
             }
 

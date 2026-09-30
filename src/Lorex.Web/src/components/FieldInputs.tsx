@@ -23,7 +23,7 @@ interface FieldInputProps {
    */
   retainedReference?: { id: string; label: string } | null
 
-  /** How the universe keeps time, for a number that is a year in one of its eras. */
+  /** How the universe keeps time, for a number that is a year in one of its date periods (eras). */
   chronology: Chronology
   onChange: (next: FieldValueInput) => void
 }
@@ -40,8 +40,8 @@ export function FieldInput({
   const id = `field-${definition.id}`
   const label = definition.isRequired ? `${definition.name} (required)` : definition.name
 
-  // A birth or death year on a universe that names eras is written in one of them, and so is any
-  // number that already carries an era - showing it keeps a save from quietly dropping it.
+  // A birth or death year on a universe with date periods is written in one of them, and so is any
+  // number that already carries one - showing it keeps a save from quietly dropping it.
   const yearMeaning = isYearMeaning(definition.semantic)
   const showsEra = namesEras(chronology) && (yearMeaning || value.eraId !== null)
 
@@ -93,12 +93,12 @@ export function FieldInput({
           <div className="fieldera">
             <select
               className="field__input field__input--select"
-              aria-label={`${definition.name}: era`}
+              aria-label={`${definition.name}: date period`}
               value={value.eraId ?? ''}
               onChange={(event) => patch({ eraId: event.target.value || null })}
               data-testid={`field-era-${definition.id}`}
             >
-              <option value="">{yearMeaning ? 'Choose an era' : 'No era'}</option>
+              <option value="">{yearMeaning ? 'Choose a date period' : 'No date period'}</option>
               {chronology.eras.map((era) => (
                 <option key={era.id} value={era.id}>
                   {era.abbreviation ? `${era.name} (${era.abbreviation})` : era.name}
