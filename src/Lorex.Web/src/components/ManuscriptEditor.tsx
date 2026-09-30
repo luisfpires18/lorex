@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { SaveAction } from './SaveAction'
 import { History, Info, LocateFixed, Pencil } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ActionIcon } from './ActionIcon'
@@ -100,6 +101,7 @@ export function ManuscriptEditor({
   const [stored, setStored] = useState<Stored>({ content: '', updatedAt: null })
   const [draft, setDraft] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [saves, setSaves] = useState(0)
   const [failure, setFailure] = useState<string | null>(null)
   const [conflict, setConflict] = useState<{ updatedAt: string | null } | null>(null)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
@@ -181,6 +183,7 @@ export function ManuscriptEditor({
       // Measured against what was sent, so anything typed while the save was in flight is still unsaved.
       setStored({ content: saved.content, updatedAt: saved.updatedAt })
       setHistoryKey((key) => key + 1)
+      setSaves((count) => count + 1)
     } catch (error: unknown) {
       if (error instanceof ApiError && error.status === 409 && error.code === MANUSCRIPT_CHANGED) {
         setConflict({ updatedAt: storedMomentOf(error.problem) })
@@ -196,8 +199,8 @@ export function ManuscriptEditor({
     } finally {
       inFlight.current = false
       setIsSaving(false)
-      // Save disables itself while it works and again once nothing is unsaved, and a disabled button lets go of the
-      // focus. Rather than leave it nowhere, it goes back to the prose.
+      // Save keeps the focus through a save (it is only aria-disabled). Should the focus have been let go anyway, rather
+      // than leave it nowhere, it goes back to the prose.
       requestAnimationFrame(() => {
         const active = document.activeElement
         if (!active || active === document.body) editor.current?.focus({ preventScroll: true })
@@ -266,14 +269,6 @@ export function ManuscriptEditor({
     scene.pov !== null ||
     scene.entities.length > 0 ||
     beats.length > 0
-
-  const status = isSaving
-    ? { state: 'saving', text: 'Saving…' }
-    : isDirty
-      ? { state: 'dirty', text: 'Unsaved changes' }
-      : stored.updatedAt === null
-        ? { state: 'empty', text: 'Nothing saved yet' }
-        : { state: 'saved', text: 'Saved' }
 
   const describedBy = [statusId, isTooLong ? tooLongId : null, offer ? recoveryId : null]
     .filter(Boolean)
@@ -519,15 +514,6 @@ export function ManuscriptEditor({
           />
 
           <div className="manuscript__bar">
-            <p
-              className="manuscript__status"
-              id={statusId}
-              role="status"
-              data-state={status.state}
-              data-testid="manuscript-status"
-            >
-              {status.text}
-            </p>
             {isTooLong ? (
               <p
                 className="field__error manuscript__toolong"
@@ -548,17 +534,20 @@ export function ManuscriptEditor({
               </p>
             ) : null}
             {publication ? <div className="manuscript__publication">{publication}</div> : null}
-            <button
-              className="button"
+            <SaveAction
+              label="Save changes"
+              isDirty={isDirty}
+              isSaving={isSaving}
+              isBlocked={isTooLong}
+              saves={saves}
+              restingStatus={stored.updatedAt === null ? 'Nothing saved yet' : 'Saved'}
+              statusId={statusId}
+              statusTestId="manuscript-status"
+              testId="manuscript-save"
               type="button"
-              disabled={!isDirty || isSaving || isTooLong}
-              onClick={() => void save(stored.updatedAt)}
-              aria-describedby={statusId}
-              aria-keyshortcuts="Control+S Meta+S"
-              data-testid="manuscript-save"
-            >
-              {isSaving ? 'Saving…' : 'Save'}
-            </button>
+              onSave={() => void save(stored.updatedAt)}
+              keyShortcuts="Control+S Meta+S"
+            />
           </div>
         </>
       ) : null}

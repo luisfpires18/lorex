@@ -517,6 +517,26 @@ a.button:visited {
   cursor: not-allowed;
 }
 
+/* An explicit save (SaveAction): unavailable reads as the same quiet outline, but stays focusable, and the button keeps one
+   width through Save changes, Saving… and Saved. */
+.saveaction {
+  min-width: 8.5rem;
+}
+
+.saveaction[aria-disabled='true'],
+.saveaction[aria-disabled='true']:hover,
+.saveaction[aria-disabled='true']:active {
+  background: var(--raised);
+  border-color: var(--rule-strong);
+  color: var(--muted);
+  cursor: default;
+  transform: none;
+}
+
+.saveaction[data-state='saved'] {
+  color: var(--ink);
+}
+
 .button[aria-busy='true'] {
   cursor: progress;
 }
@@ -6903,17 +6923,6 @@ a.lorechip--pov:focus-visible .lorechip__name {
   padding: 0.75rem 0;
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
   background: var(--raised);
-}
-
-.manuscript__status {
-  margin: 0;
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
-.manuscript__status[data-state='dirty'],
-.manuscript__status[data-state='saving'] {
-  color: var(--ink);
 }
 
 .manuscript__toolong {

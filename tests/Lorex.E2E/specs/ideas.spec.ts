@@ -198,6 +198,24 @@ async function saveWith(page: Page, action: () => Promise<void>) {
   await expect(page.getByTestId('idea-status')).toHaveText('Saved')
 }
 
+/**
+ * Creates through the page: waits for the API to confirm the new idea, then for the list the author is sent back to,
+ * and hands back the new idea's id.
+ */
+async function createWith(page: Page, action: () => Promise<void>) {
+  const [response] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === '/api/ideas' &&
+        response.request().method() === 'POST' &&
+        response.ok(),
+    ),
+    action(),
+  ])
+  await expect(page.getByTestId('idea-editor')).toHaveCount(0)
+  return ((await response.json()) as { id: string }).id
+}
+
 function row(page: Page, title: string) {
   return page.locator(`[data-testid="idea-row"][data-title="${title}"]`)
 }
@@ -243,9 +261,14 @@ test.describe('ideas', () => {
 
     await title.fill('Maybe this city floats')
     await expect(page.getByTestId('idea-title-error')).toHaveCount(0)
-    await saveWith(page, () => page.getByTestId('idea-save').click())
-    await page.waitForURL(/\/app\/ideas\/[0-9a-f-]+$/)
-    const ideaId = page.url().split('/').pop()!
+    // Created, and back among all ideas: the list says so, and holds it.
+    const ideaId = await createWith(page, () => page.getByTestId('idea-save').click())
+    await page.waitForURL('/app/ideas')
+    await expect(page.getByTestId('ideas-created-notice')).toContainText(
+      'Created “Maybe this city floats”',
+    )
+    await row(page, 'Maybe this city floats').getByTestId('idea-open').click()
+    await page.waitForURL(`/app/ideas/${ideaId}`)
     await expect(page.getByTestId('idea-heading')).toHaveText('Maybe this city floats')
 
     // Edited and saved with the keyboard.
@@ -378,13 +401,10 @@ test.describe('ideas', () => {
     await expect(picker).toHaveCount(0)
     await expect(page.getByTestId('idea-add-reference')).toBeFocused()
 
-    await saveWith(page, () => page.getByTestId('idea-save').click())
-    await page.waitForURL(new RegExp(`/app/universes/${worldA}/ideas/[0-9a-f-]+$`))
-    const ideaId = page.url().split('/').pop()!
+    const ideaId = await createWith(page, () => page.getByTestId('idea-save').click())
     expect((await readIdea(page, ideaId)).references.map((one) => one.id)).toEqual([sceneId])
 
-    // Only this universe's ideas here; every idea globally.
-    await page.getByTestId('idea-back').click()
+    // Created, and back in this universe's ideas - only its own here; every idea globally.
     await page.waitForURL(`/app/universes/${worldA}/ideas`)
     await expect(page.getByTestId('idea-row')).toHaveCount(1)
     await expect(row(page, 'What if the council lies?')).toBeVisible()
@@ -420,21 +440,21 @@ test.describe('ideas', () => {
     await expect(page.getByTestId('idea-elsewhere')).toContainText('belongs to no universe')
   })
 
-  test('a universe’s Ideas open only its own ideas: one started there but saved elsewhere opens among all ideas', async ({
+  test('a universe’s Ideas open only its own ideas: one started there but created elsewhere returns to all ideas', async ({
     page,
   }) => {
     await signUp(page)
     const home = await seedUniverse(page, unique('Home World '))
     const other = await seedUniverse(page, unique('Other World '))
 
-    // Started here and kept here: it opens here, as it always has.
+    // Started here and kept here: created, and back in this universe's ideas.
     await page.goto(`/app/universes/${home}/ideas/new`)
     await page.getByTestId('idea-title').fill('A thought that stays')
-    await saveWith(page, () => page.getByTestId('idea-save').click())
-    await page.waitForURL(new RegExp(`/app/universes/${home}/ideas/[0-9a-f-]+$`))
-    await expect(page.getByTestId('idea-heading')).toHaveText('A thought that stays')
+    await createWith(page, () => page.getByTestId('idea-save').click())
+    await page.waitForURL(`/app/universes/${home}/ideas`)
+    await expect(row(page, 'A thought that stays')).toBeVisible()
 
-    // Started here but given no universe, or another one: each opens where it lives, among all ideas.
+    // Started here but given no universe, or another one: back among all ideas, where it lives.
     const moved: [string, string][] = []
     for (const [title, universe] of [
       ['A thought for nowhere', ''],
@@ -443,10 +463,10 @@ test.describe('ideas', () => {
       await page.goto(`/app/universes/${home}/ideas/new`)
       await page.getByTestId('idea-title').fill(title)
       await page.getByTestId('idea-universe').selectOption(universe)
-      await saveWith(page, () => page.getByTestId('idea-save').click())
-      await page.waitForURL(/\/app\/ideas\/[0-9a-f-]+$/)
-      await expect(page.getByTestId('idea-heading')).toHaveText(title)
-      moved.push([page.url().split('/').pop()!, title])
+      const id = await createWith(page, () => page.getByTestId('idea-save').click())
+      await page.waitForURL('/app/ideas')
+      await expect(row(page, title)).toBeVisible()
+      moved.push([id, title])
     }
 
     // Neither opens at this universe's address: nothing of it shows, and a link leads to where it does.
@@ -548,8 +568,8 @@ test.describe('ideas', () => {
     await tab.getByTestId('idea-recovery').getByTestId('idea-recovery-recover').click()
     await expect(tab.getByTestId('idea-title')).toHaveValue('Half a thought')
     await expect(tab.getByTestId('idea-status')).toHaveText('Unsaved changes')
-    await saveWith(tab, () => tab.getByTestId('idea-save').click())
-    await tab.waitForURL(/\/app\/ideas\/[0-9a-f-]+$/)
+    await createWith(tab, () => tab.getByTestId('idea-save').click())
+    await tab.waitForURL('/app/ideas')
     await expect.poll(async () => (await ideaCopies(tab)).length).toBe(0)
 
     // Another unsaved new idea, a dead tab, and a sign-out from a page with nothing unsaved: the copy stays, the first

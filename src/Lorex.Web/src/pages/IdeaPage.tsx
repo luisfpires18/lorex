@@ -38,15 +38,14 @@ export default function IdeaPage({ inUniverse = false, isNew = false }: IdeaPage
           'All ideas'
         )
       }
-      // A new idea opens where it lives: in this universe when it is this universe's, otherwise among all ideas - a universe's
-      // Ideas only open its own.
+      // Creating is finished once it is created: back to the list it was started from - this universe's while the idea is
+      // still this universe's, otherwise all ideas, since a universe's Ideas list only its own. Replacing the finished form
+      // in history, so Back never returns to it; the list says what was created.
       onCreated={(idea) =>
-        void navigate(
-          universe && idea.universe?.id !== universe.id
-            ? `/app/ideas/${idea.id}`
-            : `${listPath}/${idea.id}`,
-          { replace: true },
-        )
+        void navigate(universe && idea.universe?.id !== universe.id ? '/app/ideas' : listPath, {
+          replace: true,
+          state: { created: { id: idea.id, title: idea.title } } satisfies IdeasListNotice,
+        })
       }
       onDeleted={(idea) =>
         void navigate(listPath, { state: { deleted: idea } satisfies IdeasListNotice })

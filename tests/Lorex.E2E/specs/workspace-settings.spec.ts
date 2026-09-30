@@ -170,8 +170,8 @@ test.describe('the sidebar, Chronology and the theme control (014 follow-up)', (
       'Lore',
       'Family Tree',
       'Timeline',
-      'World Rules',
       'Chronology',
+      'World Rules',
       'Stories',
       'Ideas',
       'Canon',
@@ -197,7 +197,7 @@ test.describe('the sidebar, Chronology and the theme control (014 follow-up)', (
     await page.getByTestId('add-era').click()
     await page.getByTestId('era-name').fill('Before the Flood')
     await page.getByTestId('save-chronology').click()
-    await expect(page.getByTestId('chronology-saved')).toBeVisible()
+    await expect(page.getByTestId('chronology-status')).toHaveText('Saved')
 
     await page.getByTestId('workspace-settings').click()
     await expect(page.getByRole('tab')).toHaveText(['General', 'Appearance', 'Data', 'Advanced'])
@@ -281,7 +281,7 @@ test.describe('the sidebar, Chronology and the theme control (014 follow-up)', (
     await page.keyboard.type('Before the Flood')
     const editor = page.getByTestId('chronology-settings')
     await editor.getByTestId('save-chronology').click()
-    await expect(page.getByTestId('chronology-saved')).toBeVisible()
+    await expect(page.getByTestId('chronology-status')).toHaveText('Saved')
     await expect(page.getByTestId('era')).toHaveCount(1)
   })
 

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { SaveAction } from './SaveAction'
 import { Link } from 'react-router-dom'
 import { Trash2 } from 'lucide-react'
 import { ActionIcon } from './ActionIcon'
@@ -132,6 +133,7 @@ export function WorldRuleEditor({
   const [stored, setStored] = useState<Stored>(EMPTY_STORED)
   const [draft, setDraft] = useState<Fields>(fieldsOf(EMPTY_STORED))
   const [isSaving, setIsSaving] = useState(false)
+  const [saves, setSaves] = useState(0)
   const [isDeleting, setIsDeleting] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -243,7 +245,7 @@ export function WorldRuleEditor({
       // What was sent is now saved - its title trimmed. Anything typed while the save was in flight is still unsaved, and
       // stays.
       setDraft((current) => (sameFields(current, sent) ? fieldsOf(next) : current))
-      setAnnouncement('Saved.')
+      setSaves((count) => count + 1)
     } catch (error: unknown) {
       if (error instanceof ApiError && error.status === 409 && error.code === WORLD_RULE_CHANGED) {
         setConflict({ updatedAt: storedMomentOf(error.problem) })
@@ -362,14 +364,6 @@ export function WorldRuleEditor({
       </div>
     )
   }
-
-  const status = isSaving
-    ? { state: 'saving', text: 'Saving…' }
-    : isDirty
-      ? { state: 'dirty', text: 'Unsaved changes' }
-      : stored.updatedAt === null
-        ? { state: 'empty', text: 'Not saved yet' }
-        : { state: 'saved', text: 'Saved' }
 
   const nearLimit = draft.description.length > WORLD_RULE_DESCRIPTION_MAX_LENGTH * 0.9
   const titleErrorId = `${titleId}-error`
@@ -541,26 +535,19 @@ export function WorldRuleEditor({
         />
 
         <div className="manuscript__bar rule__bar">
-          <p
-            className="manuscript__status"
-            id={statusId}
-            role="status"
-            data-state={status.state}
-            data-testid="world-rule-status"
-          >
-            {status.text}
-          </p>
           <div className="rule__actions">
-            <button
-              className="button"
-              type="submit"
-              disabled={!isDirty || isSaving || isTooLong}
-              aria-describedby={statusId}
-              aria-keyshortcuts="Control+S Meta+S"
-              data-testid="world-rule-save"
-            >
-              {isSaving ? 'Saving…' : isNew ? 'Create rule' : 'Save'}
-            </button>
+            <SaveAction
+              label={isNew ? 'Create rule' : 'Save changes'}
+              isDirty={isDirty}
+              isSaving={isSaving}
+              isBlocked={isTooLong}
+              saves={saves}
+              restingStatus={stored.updatedAt === null ? 'Not saved yet' : 'Saved'}
+              statusId={statusId}
+              statusTestId="world-rule-status"
+              testId="world-rule-save"
+              keyShortcuts="Control+S Meta+S"
+            />
           </div>
         </div>
       </form>

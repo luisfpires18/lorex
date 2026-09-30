@@ -135,7 +135,7 @@ test.describe('product-wide polish', () => {
 
     await page.getByTestId('era-name').fill('After the Fall')
     await page.getByTestId('save-chronology').click()
-    await expect(page.getByTestId('chronology-saved')).toBeVisible()
+    await expect(page.getByTestId('chronology-status')).toHaveText('Saved')
     const saved = asked.length
     await page.getByTestId('workspace-lore').click()
     await page.waitForURL(/\/lore$/)
