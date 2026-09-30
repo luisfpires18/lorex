@@ -43,6 +43,22 @@ public static class EntityTypeIcons
             "sparkles",
             "book",
             "ship",
+
+            // Product refinement 020: the common gaps of a worldbuilding list, one picture each.
+            "tree",
+            "flame",
+            "skull",
+            "scroll",
+            "star",
+            "moon",
+            "globe",
+            "landmark",
+            "house",
+            "swords",
+            "coins",
+            "flask",
+            "wand",
+            "languages",
         ],
         StringComparer.Ordinal);
 

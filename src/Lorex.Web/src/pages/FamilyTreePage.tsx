@@ -160,8 +160,8 @@ export default function FamilyTreePage() {
 
       {hasEligibleType === false ? (
         <p className="notice" data-testid="family-no-types">
-          No Lore Type is enabled for Family Tree yet. Turn it on for the types whose entries have
-          families under <Link to={typesPath}>Types → Lore Types</Link>.
+          No Lore Type is enabled for Family Tree yet. A type is enabled for it when it is created,
+          under <Link to={typesPath}>Types → Lore Types</Link>.
         </p>
       ) : null}
 
@@ -249,8 +249,7 @@ export default function FamilyTreePage() {
           {focal.entityTypeFamilyTreeEligible ? null : (
             <p className="notice" data-testid="family-type-not-enabled">
               This entry&rsquo;s type, <bdi>{focal.entityTypeName}</bdi>, is not currently enabled
-              for Family Tree. Its recorded family is still shown here.{' '}
-              <Link to={typesPath}>Change it under Lore Types</Link>
+              for Family Tree. Its recorded family is still shown here.
             </p>
           )}
 

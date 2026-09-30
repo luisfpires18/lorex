@@ -164,6 +164,17 @@ export function updateEntity(universeId: string, entityId: string, input: Entity
   })
 }
 
+/**
+ * Moves these entries to the Trash, every one or none: the same move one entry's Move to Trash makes, for each. A refusal
+ * (400, keyed `entityIds[3]`) or a failure writes nothing.
+ */
+export function bulkTrashEntities(universeId: string, entityIds: string[]) {
+  return apiFetch<{ trashed: number }>(`${base(universeId)}/entities/bulk-trash`, {
+    method: 'POST',
+    body: JSON.stringify({ entityIds }),
+  })
+}
+
 export function deleteEntity(universeId: string, entityId: string) {
   return apiFetch<void>(`${base(universeId)}/entities/${entityId}`, { method: 'DELETE' })
 }

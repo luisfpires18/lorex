@@ -132,28 +132,33 @@ test.describe('lore types', () => {
     await expect(rowIcon(page, 'Character')).toHaveAttribute('data-icon', 'character')
 
     await page.getByTestId('new-type').click()
-    await page.getByTestId('new-type-name').fill('Starship')
-    await page.getByTestId('new-type-icon').getByTitle('Ship').click()
+    await page.getByTestId('type-name').fill('Starship')
+    // Every choice says what it shows, in words on screen.
+    await expect(page.getByTestId('type-icon').getByText('Ship', { exact: true })).toBeVisible()
+    await page.getByTestId('type-icon').getByRole('radio', { name: 'Ship', exact: true }).check()
     await expect(
-      page.getByTestId('new-type-icon').getByRole('radio', { name: 'Ship' }),
+      page.getByTestId('type-icon').getByRole('radio', { name: 'Ship', exact: true }),
     ).toBeChecked()
-    await page.getByTestId('create-type').click()
+    await page.getByTestId('save-type').click()
     await expect(rowIcon(page, 'Starship')).toHaveAttribute('data-icon', 'ship')
 
     // Named like something a crown would suit, and given nothing: it gets the neutral shape.
     await page.getByTestId('new-type').click()
-    await page.getByTestId('new-type-name').fill('Kingdom')
-    await page.getByTestId('create-type').click()
+    await page.getByTestId('type-name').fill('Kingdom')
+    await page.getByTestId('save-type').click()
     await expect(rowIcon(page, 'Kingdom')).toHaveAttribute('data-icon', 'fallback')
 
-    // An icon can be chosen later, and taken away again.
-    await page.getByTestId('icon-Kingdom').click()
-    const picker = page.getByTestId('icon-picker-Kingdom')
-    await picker.getByTitle('Crown').click()
+    // An icon can be chosen later, by editing the type, and taken away again.
+    await page.getByTestId('edit-type-Kingdom').click()
+    const picker = page.getByTestId('type-icon')
+    await picker.getByRole('radio', { name: 'Crown', exact: true }).check()
+    await page.getByTestId('save-type').click()
     await expect(rowIcon(page, 'Kingdom')).toHaveAttribute('data-icon', 'crown')
-    await picker.getByTitle('No icon').click()
+    await page.getByTestId('edit-type-Kingdom').click()
+    await expect(picker.getByRole('radio', { name: 'Crown', exact: true })).toBeChecked()
+    await picker.getByRole('radio', { name: 'No icon' }).check()
+    await page.getByTestId('save-type').click()
     await expect(rowIcon(page, 'Kingdom')).toHaveAttribute('data-icon', 'fallback')
-    await expect(picker.getByRole('radio', { name: 'No icon' })).toBeChecked()
 
     // ---------- A world with entries in several types ----------
 
@@ -355,7 +360,7 @@ test.describe('lore types', () => {
     await expect(page.getByTestId('entry-name')).toHaveText('Tidewatch Keep')
   })
 
-  test('keep to one row on a desktop, scrolling it - not the page - when a world has many', async ({
+  test('wrap onto more rows on a desktop when a world has many - nothing scrolls sideways', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 })
@@ -377,30 +382,32 @@ test.describe('lore types', () => {
     await page.waitForURL(/\/lore$/)
     await expect(page.getByTestId('entity-card')).toHaveCount(2)
 
-    // All, the seven starters and every added type, on one line.
+    // All, the seven starters and every added type, over more than one row, every one inside the row's box.
     const links = typeNav(page).getByRole('link')
     await expect(links).toHaveCount(1 + 7 + MANY_TYPES.length)
     const tops = await links.evaluateAll((all) =>
       all.map((link) => Math.round(link.getBoundingClientRect().top)),
     )
-    expect(new Set(tops).size).toBe(1)
-
-    // The row has more than it shows, and scrolls itself; the page does not.
+    expect(new Set(tops).size).toBeGreaterThan(1)
     const row = page.getByTestId('lore-types')
-    expect(await row.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
+    expect(await row.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+    expect(await row.evaluate((element) => getComputedStyle(element).overflowX)).toBe('visible')
+    const inside = await links.evaluateAll((all) => {
+      const bounds = all[0].parentElement!.getBoundingClientRect()
+      return all.every((link) => {
+        const box = link.getBoundingClientRect()
+        return box.left >= bounds.left - 1 && box.right <= bounds.right + 1
+      })
+    })
+    expect(inside).toBe(true)
     expect(await pageOverflow(page)).toBeLessThanOrEqual(1)
 
-    // A type at the far end, chosen by address, is brought into view.
+    // The last type, chosen by address, is simply there and marked current.
     await page.goto(`/app/universes/${universeId}/lore?type=${ids.get('Rumour of the Tide')}`)
     const last = typeLink(page, 'Rumour of the Tide')
     await expect(last).toHaveAttribute('aria-current', 'page')
+    await expect(last).toBeInViewport()
     await expect(card(page, 'The Tide Vigil')).toBeVisible()
-    const inView = await last.evaluate((element) => {
-      const box = element.getBoundingClientRect()
-      const bounds = element.parentElement!.getBoundingClientRect()
-      return box.left >= bounds.left - 1 && box.right <= bounds.right + 1
-    })
-    expect(inView).toBe(true)
   })
 
   test('fills the workspace column on every screen, and the Lore grid turns that into columns', async ({
@@ -470,7 +477,7 @@ test.describe('lore types', () => {
     expect(first.width).toBeLessThan(narrowest * 2)
 
     // Heading, types, filter and grid share one content area: the same left edge, and the types'
-    // row and the cards end at the same right edge.
+    // row - closed by Select - and the cards end at the same right edge.
     const heading = (await title(page).boundingBox())!
     const filter = (await page.getByLabel('Filter entries').boundingBox())!
     const types = (await page.getByTestId('lore-types').boundingBox())!
@@ -478,7 +485,9 @@ test.describe('lore types', () => {
     for (const left of [heading.x, filter.x, types.x]) {
       expect(Math.abs(left - cards.x)).toBeLessThanOrEqual(3)
     }
-    expect(Math.abs(types.x + types.width - (cards.x + cards.width))).toBeLessThanOrEqual(3)
+    const select = (await page.getByTestId('lore-select').boundingBox())!
+    expect(types.x + types.width).toBeLessThan(select.x)
+    expect(Math.abs(select.x + select.width - (cards.x + cards.width))).toBeLessThanOrEqual(3)
 
     // The primary action still answers to its name with an icon beside it.
     await expect(page.getByRole('link', { name: 'New entry', exact: true })).toBeVisible()

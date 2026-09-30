@@ -22,6 +22,10 @@ public sealed record EntityTypeRequest(
     int? DisplayOrder,
     bool? FamilyTreeEligible = null);
 
+/// <summary>
+/// <paramref name="EntityCount"/> counts every entry of the type, the Trash included, because a trashed entry keeps its type
+/// and still stops it being deleted; <paramref name="TrashedEntityCount"/> is how many of those are in the Trash.
+/// </summary>
 public sealed record EntityTypeResponse(
     Guid Id,
     string Name,
@@ -30,6 +34,7 @@ public sealed record EntityTypeResponse(
     string? AccentColor,
     int DisplayOrder,
     int EntityCount,
+    int TrashedEntityCount,
     IReadOnlyList<FieldDefinitionResponse> Fields,
     bool FamilyTreeEligible);
 
@@ -123,6 +128,11 @@ public sealed record BulkEntityRow(Guid EntityTypeId, string? Name, CanonStatus 
 public sealed record BulkEntityResponse(IReadOnlyList<BulkCreatedEntity> Created);
 
 public sealed record BulkCreatedEntity(Guid Id, string Name, Guid EntityTypeId, CanonStatus CanonStatus);
+
+/// <summary>Moves these live entries of one universe to the Trash, all or none. At most <see cref="EntityEndpoints.BulkTrashMaxEntries"/>.</summary>
+public sealed record BulkTrashRequest(IReadOnlyList<Guid>? EntityIds);
+
+public sealed record BulkTrashResponse(int Trashed);
 
 /// <summary>
 /// <paramref name="ReferencedEntityIsTrashed"/> says the reference still points at real lore

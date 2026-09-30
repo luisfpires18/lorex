@@ -126,6 +126,7 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
 
   const isNew = entityId === undefined
   const [types, setTypes] = useState<EntityType[]>([])
+  const [typesRead, setTypesRead] = useState(false)
   const [candidates, setCandidates] = useState<EntitySummary[]>([])
   const [detail, setDetail] = useState<EntityDetail | null>(null)
   const [editedDraft, setDraft] = useState<Draft | null>(null)
@@ -187,6 +188,7 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
     ])
       .then(([loadedTypes, page]) => {
         setTypes(loadedTypes)
+        setTypesRead(true)
         setCandidates(page.items.filter((item) => item.id !== entityId))
       })
       .catch(() => {
@@ -456,6 +458,23 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
             It may be in the <Link to={`/app/universes/${universe.id}/trash`}>Trash</Link>, where it
             can be restored. <Link to={`/app/universes/${universe.id}/lore`}>Back to the lore</Link>
           </>
+        }
+      />
+    )
+  }
+
+  // Types are the author's, and a world may have none left. A new entry has to be one of them, so say so rather than
+  // waiting for a type that will not come.
+  if (isNew && typesRead && types.length === 0) {
+    return (
+      <EmptyState
+        testId="entity-no-types"
+        title="This world has no types yet."
+        hint="Every entry is one of its world's types. Add one, then write the entry."
+        action={
+          <Link className="button" to={`/app/universes/${universe.id}/types`}>
+            Go to Types
+          </Link>
         }
       />
     )

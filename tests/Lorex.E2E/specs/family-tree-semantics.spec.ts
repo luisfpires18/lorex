@@ -168,9 +168,9 @@ test.describe('family tree semantics', () => {
     )
     await expect(node(page, 'Aragorn')).toContainText('Biological child')
 
-    await page.getByTestId('family-type-not-enabled').getByRole('link').click()
-    await page.waitForURL(/\/types$/)
-    await expect(page.getByTestId('family-eligible-Species')).not.toBeChecked()
+    // No way out to a switch the Types screen does not offer for an existing type.
+    await expect(page.getByTestId('family-type-not-enabled').getByRole('link')).toHaveCount(0)
+    expect((await typeIds(page, universeId)).get('Species')!.familyTreeEligible).toBe(false)
 
     // It is not offered for new connections.
     await page.goto(treeUrl(universeId, aragorn))
@@ -231,20 +231,33 @@ test.describe('family tree semantics', () => {
     // The old always-open creator is gone.
     await expect(page.getByLabel('New type')).toHaveCount(0)
 
-    // ---- The Family Tree switch, saved on choosing and kept by a reload ----
+    // ---- The Family Tree choice: made when a type is created, never on a row or in Edit ----
 
-    await expect(page.getByTestId('family-eligible-Character')).toBeChecked()
-    await expect(page.getByTestId('family-eligible-Species')).not.toBeChecked()
-    await page.getByTestId('family-eligible-Species').check()
-    await expect
-      .poll(async () => (await typeIds(page, universeId)).get('Species')!.familyTreeEligible)
-      .toBe(true)
-    await page.reload()
-    await expect(page.getByTestId('family-eligible-Species')).toBeChecked()
-    await page.getByTestId('family-eligible-Species').uncheck()
-    await expect
-      .poll(async () => (await typeIds(page, universeId)).get('Species')!.familyTreeEligible)
-      .toBe(false)
+    await expect(page.getByText('Entries of this type can appear in Family Tree')).toHaveCount(0)
+    for (const [name, eligible] of [
+      ['Character', true],
+      ['Species', false],
+    ] as const) {
+      await page.getByTestId(`edit-type-${name}`).click()
+      const edit = page.getByTestId('edit-type-dialog')
+      await expect(edit.getByTestId('type-family')).toHaveCount(0)
+      await expect(edit.getByText('Family Tree')).toHaveCount(0)
+      // A new name and icon keep the stored choice, whichever it is.
+      await edit.getByLabel('Name', { exact: true }).fill(`${name} renamed`)
+      await edit.getByRole('radio', { name: 'Star', exact: true }).check()
+      await edit.getByTestId('save-type').click()
+      await expect(edit).toHaveCount(0)
+      await expect
+        .poll(
+          async () => (await typeIds(page, universeId)).get(`${name} renamed`)?.familyTreeEligible,
+        )
+        .toBe(eligible)
+      await page.getByTestId(`edit-type-${name} renamed`).click()
+      await edit.getByLabel('Name', { exact: true }).fill(name)
+      await edit.getByTestId('save-type').click()
+      await expect(page.getByTestId(`edit-type-${name}`)).toBeVisible()
+      expect((await typeIds(page, universeId)).get(name)!.familyTreeEligible).toBe(eligible)
+    }
 
     // ---- New type: a dialog, focus in and back out, and the list updated in place ----
 
@@ -261,14 +274,16 @@ test.describe('family tree semantics', () => {
     await expect(trigger).toBeFocused()
 
     await trigger.click()
-    await dialog.getByTestId('create-type').click()
+    await dialog.getByTestId('save-type').click()
     await expect(dialog.getByText('Give the type a name.')).toBeVisible()
     await dialog.getByLabel('Name', { exact: true }).fill('Hobbit-kin')
-    await dialog.getByTestId('new-type-family').check()
-    await dialog.getByTestId('create-type').click()
+    await dialog.getByTestId('type-family').check()
+    await dialog.getByTestId('save-type').click()
     await expect(dialog).toHaveCount(0)
     await expect(page.locator('[data-type-name="Hobbit-kin"]')).toBeVisible()
-    await expect(page.getByTestId('family-eligible-Hobbit-kin')).toBeChecked()
+    await expect
+      .poll(async () => (await typeIds(page, universeId)).get('Hobbit-kin')!.familyTreeEligible)
+      .toBe(true)
     expect(await page.evaluate(() => (window as unknown as { stayed?: boolean }).stayed)).toBe(true)
     await expect(page).toHaveURL(new RegExp(`${typesPath}$`))
 
@@ -515,7 +530,7 @@ test.describe('family tree semantics', () => {
       await expect(page.getByTestId('types-tab-events')).toBeVisible()
       expect(await scrollsSideways(page), `types at ${at}`).toBe(false)
       await page.getByTestId('new-type').click()
-      await expect(page.getByTestId('create-type')).toBeInViewport()
+      await expect(page.getByTestId('save-type')).toBeInViewport()
       expect(await scrollsSideways(page), `new type at ${at}`).toBe(false)
       await page.keyboard.press('Escape')
 
