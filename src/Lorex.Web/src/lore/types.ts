@@ -260,6 +260,20 @@ export interface EntityInput {
   fields: FieldValueInput[]
 }
 
+/** One row of a mass create: only what an entry's basic shell is. */
+export interface BulkEntityRow {
+  entityTypeId: string
+  name: string
+  canonStatus: CanonStatusValue
+}
+
+export interface BulkCreatedEntity {
+  id: string
+  name: string
+  entityTypeId: string
+  canonStatus: CanonStatusValue
+}
+
 export interface EntityQuery {
   search: string
   entityTypeId: string | null

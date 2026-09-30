@@ -1,5 +1,7 @@
 import { apiFetch } from '../lib/api'
 import type {
+  BulkCreatedEntity,
+  BulkEntityRow,
   EntityDetail,
   EntityInput,
   EntityPage,
@@ -141,6 +143,17 @@ export function createEntity(universeId: string, input: EntityInput) {
   return apiFetch<EntityDetail>(`${base(universeId)}/entities`, {
     method: 'POST',
     body: JSON.stringify(input),
+  })
+}
+
+/**
+ * Mass create: every row or none. A refused batch answers 400 with its problems keyed by row (`entries[3].name`), or
+ * the promotion gate's 409; either way nothing was written.
+ */
+export function bulkCreateEntities(universeId: string, entries: BulkEntityRow[]) {
+  return apiFetch<{ created: BulkCreatedEntity[] }>(`${base(universeId)}/entities/bulk`, {
+    method: 'POST',
+    body: JSON.stringify({ entries }),
   })
 }
 

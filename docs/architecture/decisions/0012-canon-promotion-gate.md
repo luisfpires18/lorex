@@ -142,3 +142,25 @@ validation details in the same write. Reconciled but not gated, each for the rea
 | --- | --- | --- |
 | world rule create, update, delete, restore - only while the rule has or gets a check | A check is the author's configuration, and its rule is Medium. | It opens, rewords or resolves what the check finds. A rule that is words only reconciles nothing (ADR 0033). |
 | validation term rename | A name decides no match. | A finding quotes the term's name, which is not in its fingerprint. |
+
+## Amendment - a batch is one candidate (2026-09-30, mass create)
+
+`POST /api/universes/{universeId}/entities/bulk` creates up to 100 entries' basic shells - type, name, Canon status - in
+one write. It is the first route that writes many independent records at once, and the decision it takes is general:
+
+- **A batch is one candidate.** The whole batch runs inside one `RunAsync`: one baseline, every entry created, one
+  candidate sweep, one reconciliation, one commit. It is never gated entry by entry, and never as many requests.
+- **All or nothing.** The batch is validated whole first, and every problem is reported keyed by row
+  (`entries[3].name`), so an author learns every problem at once and nothing is written. A refusal by the gate, or a
+  database failure on any row, rolls back every entry with its index row and its first version. A partial success is
+  never possible, because a retry after one would duplicate the entries that got through.
+- **Each entry is still its own record.** Every row is created through the same path a single create takes, so each
+  entry is validated, typed inside the universe, indexed for search and given its own Created version. There is no
+  batch record and no batch version.
+- **A batch invents no rule.** Names stay non-unique; required fields stay required, so a type with one cannot take a
+  name-only entry through a batch any more than through a single create.
+
+A basic entry contributes no year, link or moment for a rule to read, so today no batch can introduce a High finding;
+the gate runs regardless, with its difference semantics, so a universe already holding a High conflict still accepts
+one. The cap is the transaction's cost - it holds SQLite's one writer, measured at about 0.6 s for 100 rows in the test
+host - not a pagination size.

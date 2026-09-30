@@ -21,6 +21,13 @@ public static class EntityEndpoints
     private const int MaxPageSize = 50;
 
     /// <summary>
+    /// The most entries one mass create writes. Comfortably over the job it exists for - forty names - and small enough that
+    /// the one transaction holding SQLite's writer (every row indexed and versioned, two rule sweeps) stays well under a
+    /// second, and that a review list in a browser is still something an author reads. Mirrored by the web client.
+    /// </summary>
+    public const int MassCreateMaxEntries = 100;
+
+    /// <summary>
     /// The machine-readable marker on the 400 an entry write gets when it still carries the article - a client from before
     /// the article moved to its own route (ADR 0028).
     /// </summary>
@@ -73,6 +80,7 @@ public static class EntityEndpoints
 
         group.MapGet("/", ListAsync).WithName("ListEntities");
         group.MapPost("/", CreateAsync).WithName("CreateEntity");
+        group.MapPost("/bulk", BulkCreateAsync).WithName("BulkCreateEntities");
         group.MapGet("/{entityId:guid}", GetAsync).WithName("GetEntity");
         group.MapPut("/{entityId:guid}", UpdateAsync).WithName("UpdateEntity");
         group.MapDelete("/{entityId:guid}", DeleteAsync).WithName("DeleteEntity");
@@ -284,9 +292,154 @@ public static class EntityEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (LoreValidation.ValidateEntity(request) is { } errors)
+        var (entity, problem) = await CreateEntryAsync(db, universeId, request, cancellationToken);
+
+        if (problem is not null)
+        {
+            return problem;
+        }
+
+        var detail = await LoadDetailAsync(db, universeId, entity!.Id, cancellationToken);
+        return Results.Created($"/api/universes/{universeId}/entities/{entity.Id}", detail);
+    }
+
+    /// <summary>
+    /// Mass create: the basic shell of many entries - type, name, Canon status - in one write. Everything else an
+    /// entry can hold starts empty, exactly as a single create that sent nothing else would leave it.
+    ///
+    /// All or nothing. The whole batch is checked first, so every row's problem is reported at once and by row; then
+    /// every entry is created through <see cref="CreateEntryAsync"/>, the same path a single create takes, inside one
+    /// run of the promotion gate. The batch is one candidate: it is assessed once, and a refusal or a failure anywhere
+    /// in it takes every entry down with it, so a retry can never duplicate the half that got through. ADR 0012.
+    /// </summary>
+    private static async Task<IResult> BulkCreateAsync(
+        Guid universeId,
+        [FromBody] BulkEntityRequest request,
+        ClaimsPrincipal principal,
+        LorexDbContext db,
+        CanonPromotionGate gate,
+        CancellationToken cancellationToken)
+    {
+        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        {
+            return Results.NotFound();
+        }
+
+        if (await ValidateBatchAsync(db, universeId, request, cancellationToken) is { } errors)
         {
             return Results.ValidationProblem(errors);
+        }
+
+        return await gate.RunAsync(
+            universeId,
+            async token =>
+            {
+                var created = new List<BulkCreatedEntity>(request.Entries!.Count);
+
+                foreach (var row in request.Entries!)
+                {
+                    var (entity, problem) = await CreateEntryAsync(
+                        db,
+                        universeId,
+                        new EntityRequest(row!.EntityTypeId, row.Name, null, row.CanonStatus, null, null, null),
+                        token);
+
+                    // Unreachable once the batch has been checked, short of a type changing under this request. Passed
+                    // out as it is; the gate rolls back every entry created before it.
+                    if (problem is not null)
+                    {
+                        return problem;
+                    }
+
+                    created.Add(new BulkCreatedEntity(entity!.Id, entity.Name, entity.EntityTypeId, entity.CanonStatus));
+                }
+
+                return Results.Created((string?)null, new BulkEntityResponse(created));
+            },
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Every problem in a batch, keyed by row (<c>entries[3].name</c>), or null when there is none. The same checks a
+    /// single create makes - <see cref="LoreValidation.ValidateEntity"/> and a type from this universe - plus the two a
+    /// batch needs: its size, and a type whose required fields a name-only entry cannot fill. Required fields are never
+    /// dropped for a batch; the single create would refuse the same entry.
+    /// </summary>
+    private static async Task<Dictionary<string, string[]>?> ValidateBatchAsync(
+        LorexDbContext db,
+        Guid universeId,
+        BulkEntityRequest request,
+        CancellationToken cancellationToken)
+    {
+        var entries = request.Entries;
+
+        if (entries is not { Count: > 0 })
+        {
+            return new Dictionary<string, string[]> { ["entries"] = ["Add at least one entry."] };
+        }
+
+        if (entries.Count > MassCreateMaxEntries)
+        {
+            return new Dictionary<string, string[]>
+            {
+                ["entries"] = [$"Create up to {MassCreateMaxEntries} entries at a time. This has {entries.Count}."],
+            };
+        }
+
+        // A type from elsewhere is simply absent here, so it is refused exactly like an unknown one and discloses nothing.
+        var types = await db.EntityTypes.AsNoTracking()
+            .Where(type => type.UniverseId == universeId)
+            .Select(type => new { type.Id, type.Name, HasRequiredFields = type.Fields.Any(field => field.IsRequired) })
+            .ToDictionaryAsync(type => type.Id, cancellationToken);
+
+        var errors = new Dictionary<string, string[]>();
+
+        for (var index = 0; index < entries.Count; index++)
+        {
+            var row = entries[index];
+            var at = $"entries[{index}]";
+
+            if (row is null)
+            {
+                errors[at] = ["Send a type, a name and a status for every entry."];
+                continue;
+            }
+
+            var single = new EntityRequest(row.EntityTypeId, row.Name, null, row.CanonStatus, null, null, null);
+            foreach (var (key, messages) in LoreValidation.ValidateEntity(single) ?? [])
+            {
+                errors[$"{at}.{key}"] = messages;
+            }
+
+            if (!types.TryGetValue(row.EntityTypeId, out var type))
+            {
+                errors[$"{at}.entityTypeId"] = ["Choose a type from this universe."];
+            }
+            else if (type.HasRequiredFields)
+            {
+                errors[$"{at}.entityTypeId"] =
+                    [$"{type.Name} has required fields, so its entries are created one at a time."];
+            }
+        }
+
+        return errors.Count == 0 ? null : errors;
+    }
+
+    /// <summary>
+    /// The one way an entry comes into being, for a single create and for every row of a mass create alike: validated,
+    /// its type resolved inside this universe, its aliases, tags and field values written - required fields included -
+    /// then indexed for search and given its Created version. Runs inside the caller's promotion-gate transaction, so a
+    /// refused or failed write takes the entry, its index row and its first version down together.
+    /// </summary>
+    private static async Task<(LoreEntity? Entity, IResult? Problem)> CreateEntryAsync(
+        LorexDbContext db,
+        Guid universeId,
+        EntityRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (LoreValidation.ValidateEntity(request) is { } errors)
+        {
+            return (null, Results.ValidationProblem(errors));
         }
 
         // The type must live in this universe. A type id from elsewhere is treated as
@@ -297,10 +450,10 @@ public static class EntityEndpoints
 
         if (!typeExists)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
+            return (null, Results.ValidationProblem(new Dictionary<string, string[]>
             {
                 ["entityTypeId"] = ["Choose a type from this universe."],
-            });
+            }));
         }
 
         var now = DateTime.UtcNow;
@@ -321,7 +474,7 @@ public static class EntityEndpoints
         if (await ApplyAliasesTagsAndFieldsAsync(db, universeId, entity, request, cancellationToken)
             is { } problem)
         {
-            return problem;
+            return (null, problem);
         }
 
         await db.SaveChangesAsync(cancellationToken);
@@ -335,8 +488,7 @@ public static class EntityEndpoints
         await EntityRevisions.CaptureAsync(
             db, entity.Id, EntityRevisionKind.Created, restoredFromRevisionId: null, cancellationToken);
 
-        var detail = await LoadDetailAsync(db, universeId, entity.Id, cancellationToken);
-        return Results.Created($"/api/universes/{universeId}/entities/{entity.Id}", detail);
+        return (entity, null);
     }
 
     /// <summary>
