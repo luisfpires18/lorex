@@ -1,6 +1,13 @@
 import { useEffect, useId, useState } from 'react'
-import { Link, useOutletContext, useSearchParams, type To } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, ListFilter, Plus } from 'lucide-react'
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useOutletContext,
+  useSearchParams,
+  type To,
+} from 'react-router-dom'
+import { ArrowLeft, ArrowRight, Check, ListFilter, ListPlus, Plus } from 'lucide-react'
 import { ActionIcon } from '../components/ActionIcon'
 import { EmptyState } from '../components/EmptyState'
 import { EntityCard } from '../components/EntityCard'
@@ -20,6 +27,7 @@ import {
   type EntityPage,
   type EntityType,
 } from '../lore/types'
+import type { MassCreatedState } from './MassCreatePage'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
 type LoadState = { kind: 'loading' } | { kind: 'ready'; page: EntityPage } | { kind: 'error' }
@@ -50,6 +58,20 @@ export default function LorePage() {
   const { universe } = useOutletContext<WorkspaceContext>()
   const [params, setParams] = useSearchParams()
   const filtersId = useId()
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  // "Created 40 entries." after a mass create: said where the author landed and gone once they move on, then taken out of
+  // the history entry, so a reload or a return through Back does not say it again.
+  const [arrival] = useState(() => ({
+    count: (location.state as Partial<MassCreatedState> | null)?.massCreated ?? null,
+    search: location.search,
+  }))
+  const massCreated = arrival.search === location.search ? arrival.count : null
+  useEffect(() => {
+    if ((location.state as Partial<MassCreatedState> | null)?.massCreated === undefined) return
+    void navigate({ search: location.search }, { replace: true, state: null })
+  }, [location.state, location.search, navigate])
 
   const typeParam = params.get('type')
   const canonStatus = readStatus(params.get('status'))
@@ -175,6 +197,7 @@ export default function LorePage() {
   const isFiltered = search.trim().length > 0 || canonStatus !== null
   const activeFilters = (search.trim() ? 1 : 0) + (canonStatus !== null ? 1 : 0)
   const createTo = selectedType ? `new?type=${selectedType.id}` : 'new'
+  const massCreateTo = selectedType ? `mass-create?type=${selectedType.id}` : 'mass-create'
 
   return (
     <article className="lore">
@@ -188,17 +211,29 @@ export default function LorePage() {
         }
         title={selectedType ? <bdi>{selectedType.name}</bdi> : 'Lore'}
         actions={
-          <Link
-            className="button lore__create"
-            to={createTo}
-            aria-label={selectedType ? `New ${selectedType.name}` : 'New entry'}
-            data-testid="new-entity"
-          >
-            <ActionIcon icon={Plus} />
-            <span className="lore__createlabel">
-              New {selectedType ? <bdi>{selectedType.name}</bdi> : 'entry'}
-            </span>
-          </Link>
+          <>
+            {/* Many names at once: beside New, never above it - the everyday way in stays the primary one. */}
+            <Link
+              className="button button--secondary lore__masscreate"
+              to={massCreateTo}
+              title="Mass create"
+              data-testid="mass-create"
+            >
+              <ActionIcon icon={ListPlus} />
+              <span className="lore__masscreatelabel">Mass create</span>
+            </Link>
+            <Link
+              className="button lore__create"
+              to={createTo}
+              aria-label={selectedType ? `New ${selectedType.name}` : 'New entry'}
+              data-testid="new-entity"
+            >
+              <ActionIcon icon={Plus} />
+              <span className="lore__createlabel">
+                New {selectedType ? <bdi>{selectedType.name}</bdi> : 'entry'}
+              </span>
+            </Link>
+          </>
         }
       >
         <div className="lore__nav">
@@ -282,6 +317,13 @@ export default function LorePage() {
           </div>
         ) : null}
       </div>
+
+      {massCreated !== null ? (
+        <p className="lore__created" role="status" data-testid="lore-mass-created">
+          <ActionIcon icon={Check} />
+          Created {massCreated} {massCreated === 1 ? 'entry' : 'entries'}.
+        </p>
+      ) : null}
 
       {state.kind === 'loading' ? (
         <div className="lore__loading">

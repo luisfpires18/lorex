@@ -29,6 +29,7 @@ const IdeaPage = lazy(() => import('./pages/IdeaPage'))
 const IdeasPage = lazy(() => import('./pages/IdeasPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const LorePage = lazy(() => import('./pages/LorePage'))
+const MassCreatePage = lazy(() => import('./pages/MassCreatePage'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
 const PublicAuthorPage = lazy(() => import('./pages/PublicAuthorPage'))
 const PublicLorePage = lazy(() => import('./pages/PublicLorePage'))
@@ -132,6 +133,10 @@ function Root() {
               <Route index element={<UniverseOverview />} />
               <Route path="lore" element={asSection('lore', <LorePage />)} />
               <Route path="lore/new" element={asSection('entry', <EntityPage />)} />
+              <Route
+                path="lore/mass-create"
+                element={asSection('mass-create', <MassCreatePage />)}
+              />
               <Route path="lore/:entityId" element={asSection('entry', <EntityPage />)} />
               <Route
                 path="lore/:entityId/relations"

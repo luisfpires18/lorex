@@ -513,6 +513,42 @@ public sealed class CanonPromotionGateTests(LorexApiFactory factory) : IClassFix
     }
 
     /// <summary>
+    /// A mass create is one gated candidate: assessed once for the whole batch, against the difference and never the
+    /// count. Basic entries carry no year, link or moment for a rule to read, so a batch of them introduces nothing - and a
+    /// universe that already holds a High conflict must not refuse them for it, or the freeze this gate avoids would come
+    /// back through the fastest way in. The conflict already on record is left exactly as it was.
+    /// </summary>
+    [Fact]
+    public async Task A_mass_create_beside_a_high_conflict_goes_through_and_leaves_it_on_record()
+    {
+        var (client, universe) = await SignedInWithUniverse("gatebulk");
+        var fields = await LifespanFields(client, universe.Id);
+        await LorePredatingTheGate(client, universe.Id, "Ar-Pharazon", fields, 3118, 3000);
+        await Evaluate(client, universe.Id);
+        var before = Assert.Single((await List(client, universe.Id)).Items);
+        Assert.Equal(CanonConflictSeverity.High, before.Severity);
+
+        var character = await CharacterType(client, universe.Id);
+        var response = await client.PostAsJsonAsync(
+            $"/api/universes/{universe.Id}/entities/bulk",
+            new BulkEntityRequest(
+            [
+                new BulkEntityRow(character.Id, "Elendil", CanonStatus.Canon),
+                new BulkEntityRow(character.Id, "Isildur", CanonStatus.Canon),
+                new BulkEntityRow(character.Id, "Anarion", CanonStatus.Draft),
+            ]));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(3, (await response.Content.ReadFromJsonAsync<BulkEntityResponse>())!.Created.Count);
+
+        var after = Assert.Single((await List(client, universe.Id)).Items);
+        Assert.Equal(before.Id, after.Id);
+        Assert.Equal(before.RuleCode, after.RuleCode);
+        Assert.Equal(CanonConflictStatus.Pending, after.Status);
+        Assert.Equal(before.UpdatedAt, after.UpdatedAt);
+    }
+
+    /// <summary>
     /// Relationships are not behind the gate, because no High rule reads one - see the note on
     /// <c>RelationshipEndpoints</c>. What has to hold is that the path stays fully usable while
     /// the universe carries a High conflict, which is precisely the freeze this phase exists to

@@ -50,8 +50,29 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
-- **Product refinement 018 - chronology date periods** (`feat/chronology-date-periods` off `dev` at `cb3b084`, committed, not
-  merged, not pushed). Product language and editor UX only: no migration, no backup format change, no API contract change.
+- **Product refinement 019 - mass create lore** (`feat/mass-create-lore` off `dev` at `b4c9380`, committed, not merged, not
+  pushed). "I have 40 names. Put them in Lorex." No migration, no backup format change. ADR 0012 amended (a batch is one
+  candidate).
+  - Lore's header: **Mass create** (secondary, icon-only on a phone) beside **New entry** (primary). One page inside the
+    workspace, `lore/mass-create?type=<id>`: Default type (the type Lore was on, else the first; a type with required fields
+    is passed over and says why), Default status (Idea), a paste box, the rows, one sticky **Create N entries**. No wizard.
+  - A paste into the empty box becomes rows at once: one name per line (blank lines skipped, cells trimmed, spelling
+    kept), or tab-separated **Type, Name, Status** from a spreadsheet (header skipped; exact matches ignoring case;
+    unknowns kept and marked on their row, never guessed). Two columns, or mixed shapes, are refused and the paste kept.
+    Commas are part of a name. Typed text: Add to list or Ctrl+Enter.
+  - Rows: Name, Type, Status, Remove; Add row. Defaults apply to new rows only; **Apply to all rows** is the explicit
+    rewrite. Same type + name twice in the batch is a warning, never a refusal - names are not unique, and the universe's
+    entries are not compared. Unready rows make Create `aria-disabled`; pressing it focuses the first problem. At 640px and
+    under each row stacks: name, then type, status, Remove.
+  - `POST .../entities/bulk` - `{ entries: [{ entityTypeId, name, canonStatus }] }`, 1-100 rows, 201 with the created ids.
+    Checked whole first (ownership, name, status, type in this universe, required fields) and refused keyed by row
+    (`entries[3].name`); then one promotion-gate run creates every row through `CreateEntryAsync`, the single create's own
+    path, so each entry is indexed and gets its own Created version. A failure anywhere rolls back every row. Cap 100:
+    ~0.2 s for 40, ~0.6 s for 100 in the test host, all under SQLite's one writer.
+  - Success returns to unfiltered Lore with "Created N entries." (said once). A refused or failed create keeps every row;
+    the leave guard asks while rows or pasted text are unsaved, and not after a create.
+- **Product refinement 018 - chronology date periods** (`feat/chronology-date-periods` off `dev` at `cb3b084`, merged into
+  `dev` at `b4c9380`). Product language and editor UX only: no migration, no backup format change, no API contract change.
   ADR 0022 amended.
   - Authors see **date periods** (a named stretch of a world's timeline with its own year numbers); code, tables, API, backup
     and `chronology_era_in_use` keep "era". Chronology page: "Choose how dates are written and ordered in this universe", a
@@ -64,8 +85,8 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - Pickers say Date period / Starts in period / Ends in period / Choose a date period (timeline, scene, lore year); the
     plain-year moment label is "Year label" and says it orders nothing; API, Canon-free validation, restore and revision
     messages say date period.
-- **Product refinement 017 - workspace editing flow** (`fix/workspace-editing-flow` off `dev` at `ea7af47`, committed, not
-  merged, not pushed). Frontend only: no API, schema, migration or backup change.
+- **Product refinement 017 - workspace editing flow** (`fix/workspace-editing-flow` off `dev` at `ea7af47`, merged into
+  `dev` at `cb3b084`). Frontend only: no API, schema, migration or backup change.
   - A new idea, once created, returns to its list (`replace`, so Back never reopens the finished form) with "Created “…”" in
     the list's notice: `/app/ideas`, or the universe's Ideas while it still belongs there, otherwise `/app/ideas`. A failed
     create stays with everything written. An existing idea still saves in place.
@@ -862,7 +883,11 @@ A public, read-only discovery experience beside the workspace, in the same appli
 
 ## Baseline
 
-- **1156 API integration tests, 287 Playwright tests** (018: +6 API in `TimelineChronologyTests` - unbounded period years,
+- **1176 API integration tests, 299 Playwright tests** (019: +19 in `MassCreateTests`, +1 in `CanonPromotionGateTests`
+  (a batch beside a High conflict); +12 in `mass-create.spec.ts`, pasting through the real clipboard. API **1176/1176**. Full
+  Playwright on a fresh database, two workers, retries 0, one run: **299/299**, 14.8 min; a two-line hardening edit landed
+  during it (a send guard, a 400 fallback message), so `mass-create.spec.ts` was rerun alone after it, 12/12. Release build
+  clean apart from the existing CA1859, no pending model changes.) Before it, 1156 / 287 (018: +6 API in `TimelineChronologyTests` - unbounded period years,
   rename, reorder, turn-around, year 0 worded - plus in-use wording/code pins; +4 in `chronology-date-periods.spec.ts`; era
   wording pins moved to date periods. API **1156/1156**. Full Playwright on a fresh database, two workers, retries 0, one run:
   **286/287**, 14.3 min - `timeline.spec.ts` "an edit moves a moment…" met "Lorex could not be reached" on its listing fetch

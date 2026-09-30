@@ -111,6 +111,20 @@ public sealed record EntityRequest(
 }
 
 /// <summary>
+/// Mass create: many entries' basic shells in one all-or-nothing write. Only what a shell is - a type, a name and a Canon
+/// status - so nothing else an entry holds can arrive this way. At most <see cref="EntityEndpoints.MassCreateMaxEntries"/>.
+/// </summary>
+public sealed record BulkEntityRequest(IReadOnlyList<BulkEntityRow?>? Entries);
+
+/// <summary>One row of a mass create. A missing status is Idea, as a new entry's is.</summary>
+public sealed record BulkEntityRow(Guid EntityTypeId, string? Name, CanonStatus CanonStatus);
+
+/// <summary>Every entry a mass create made, in the order the rows were sent.</summary>
+public sealed record BulkEntityResponse(IReadOnlyList<BulkCreatedEntity> Created);
+
+public sealed record BulkCreatedEntity(Guid Id, string Name, Guid EntityTypeId, CanonStatus CanonStatus);
+
+/// <summary>
 /// <paramref name="ReferencedEntityIsTrashed"/> says the reference still points at real lore
 /// that is currently in the Trash. The id and the name are still reported, deliberately: this
 /// value belongs to the *live* entry holding it, and the client sends its whole field set back
