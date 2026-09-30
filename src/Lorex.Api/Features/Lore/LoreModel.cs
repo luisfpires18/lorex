@@ -59,7 +59,8 @@ public enum EntityFieldSemantic
 
 /// <summary>
 /// A kind of thing a universe contains: Character, Location, whatever the author invents.
-/// Types carry no domain behaviour, only presentation hints and their field definitions.
+/// Types carry presentation hints, their field definitions and one explicit capability,
+/// <see cref="FamilyTreeEligible"/>.
 /// </summary>
 public sealed class EntityType
 {
@@ -80,6 +81,14 @@ public sealed class EntityType
     public string? Icon { get; set; }
 
     public string? AccentColor { get; set; }
+
+    /// <summary>
+    /// Whether entries of this type normally take part in the Family Tree: offered by its picker and given its action.
+    /// Set by the author, and by the starter Character type, and never inferred from <see cref="Name"/> or
+    /// <see cref="Icon"/>. It gates where the tree is offered, never what an entry may hold: an entry of any type keeps the
+    /// family links already recorded on it (ADR 0040).
+    /// </summary>
+    public bool FamilyTreeEligible { get; set; }
 
     public int DisplayOrder { get; set; }
 

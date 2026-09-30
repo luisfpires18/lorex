@@ -56,9 +56,10 @@ public static class RelationshipValidation
     }
 
     /// <summary>
-    /// A family meaning names the source as the parent, so a symmetric type - which says neither end is special - cannot carry
+    /// A parent meaning names the source as the parent, so a symmetric type - which says neither end is special - cannot carry
     /// one, for the reason it cannot carry an age order. A request that sets one, or turns a type symmetric beneath one, is
-    /// refused rather than having the meaning silently dropped (ADR 0035).
+    /// refused rather than having the meaning silently dropped (ADR 0035). A non-structural family meaning names no side, so
+    /// "married to" may carry it (ADR 0040).
     /// </summary>
     private static void ValidateFamilySemantic(
         RelationshipFamilySemantic familySemantic,
@@ -69,7 +70,7 @@ public static class RelationshipValidation
         {
             errors["familySemantic"] = ["That is not a family meaning Lorex knows."];
         }
-        else if (isSymmetric && familySemantic != RelationshipFamilySemantic.None)
+        else if (isSymmetric && familySemantic.IsParent())
         {
             errors["familySemantic"] =
                 ["A kind that reads the same from both sides has no parent side. Remove the family meaning, or make the kind one-way."];

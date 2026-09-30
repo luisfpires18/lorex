@@ -131,17 +131,19 @@ test.describe('lore types', () => {
     // A starter type arrives with the icon it was seeded with.
     await expect(rowIcon(page, 'Character')).toHaveAttribute('data-icon', 'character')
 
-    await page.getByLabel('New type').fill('Starship')
+    await page.getByTestId('new-type').click()
+    await page.getByTestId('new-type-name').fill('Starship')
     await page.getByTestId('new-type-icon').getByTitle('Ship').click()
     await expect(
       page.getByTestId('new-type-icon').getByRole('radio', { name: 'Ship' }),
     ).toBeChecked()
-    await page.getByTestId('add-type').click()
+    await page.getByTestId('create-type').click()
     await expect(rowIcon(page, 'Starship')).toHaveAttribute('data-icon', 'ship')
 
     // Named like something a crown would suit, and given nothing: it gets the neutral shape.
-    await page.getByLabel('New type').fill('Kingdom')
-    await page.getByTestId('add-type').click()
+    await page.getByTestId('new-type').click()
+    await page.getByTestId('new-type-name').fill('Kingdom')
+    await page.getByTestId('create-type').click()
     await expect(rowIcon(page, 'Kingdom')).toHaveAttribute('data-icon', 'fallback')
 
     // An icon can be chosen later, and taken away again.

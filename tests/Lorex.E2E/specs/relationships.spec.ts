@@ -43,7 +43,7 @@ interface KindInput {
 }
 
 async function addRelationKind(page: Page, universeId: string, kind: KindInput) {
-  await page.goto(`/app/universes/${universeId}/types`)
+  await page.goto(`/app/universes/${universeId}/types?tab=relations`)
   await page.getByTestId('add-relationship-type').click()
   await page.getByLabel('Reads as', { exact: true }).fill(kind.name)
 
@@ -242,7 +242,7 @@ test.describe('relationships', () => {
     await expect(relation(page, 'rules')).toContainText('Gondor')
 
     // A kind in use says so, and offers no way to delete it.
-    await page.goto(`/app/universes/${universeId}/types`)
+    await page.goto(`/app/universes/${universeId}/types?tab=relations`)
     await expect(row).toContainText('1 relation')
     await expect(page.getByTestId('delete-reltype-rules')).toHaveCount(0)
 
@@ -265,7 +265,7 @@ test.describe('relationships', () => {
     await page.getByTestId('delete-relationship-Gondor').click()
     await expect(page.getByTestId('relations-empty')).toBeVisible()
 
-    await page.goto(`/app/universes/${universeId}/types`)
+    await page.goto(`/app/universes/${universeId}/types?tab=relations`)
     await expect(row).toContainText('0 relations')
     await page.getByTestId('delete-reltype-rules').click()
     await expect(row).toHaveCount(0)

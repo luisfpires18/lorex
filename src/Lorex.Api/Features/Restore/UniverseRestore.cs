@@ -526,6 +526,7 @@ internal sealed partial class UniverseRestore(
                 Description = type.Description,
                 Icon = type.Icon,
                 AccentColor = type.AccentColor?.ToLowerInvariant(),
+                FamilyTreeEligible = type.FamilyTreeEligible,
                 DisplayOrder = type.DisplayOrder,
                 CreatedAt = type.CreatedAt,
                 UpdatedAt = type.UpdatedAt,

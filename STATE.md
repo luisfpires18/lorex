@@ -50,6 +50,23 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **Product refinement 016 - family tree semantics, type capability, Types tabs** (`feat/family-tree-type-semantics` off
+  `feat/public-story-reading` at `fc42280` - `dev` + 015 - committed, not merged, not pushed). ADR 0040 (0035 amended, two
+  statements superseded; 0014 amended). Migration `AddEntityTypeFamilyTreeEligibility`; backup format **18**.
+  - `EntityTypes.FamilyTreeEligible`, author-set, seeded true only on the starter Character. Migration and pre-18 backups turn
+    it on only for the untouched starter Character (name, description, icon `character`, colour `#4f6bd6` all as seeded);
+    everything else stays off. Never read from a name or icon.
+  - Offered by type: the tree's pickers (`entities?familyTreeEligible=true`) and the entry's Family tree action. Legacy kept:
+    any live entry's tree opens and says when its type is not enabled; `EntityDetail.hasFamilyConnections` keeps the action.
+  - `RelationshipFamilySemantic.NonStructuralFamily` (3): listed as *Other family connections* in the kind's own readings,
+    never walked - no parent, sibling, grandparent, circle or `CANON-FAMILY-001`. Symmetric kinds may carry it; parents only
+    via `RelationshipFamilySemantics.Parent`. Same integer column, same relationships.
+  - Family Tree: *New family relationship kind* dialog (ordinary relation kind route) in the connection form and the no-kinds
+    state; the new kind is chosen at once, no reload. Parent kinds ask which side; other kinds offer their two readings.
+  - Types: three tabs in `?tab=` (`lore`, `relations`, `events`), pushed so Back/Forward walk them (Settings still replaces; shared
+    `QueryTabList`/`useQueryTab`);
+    `+ New type` dialog (name, icon, Family Tree); each type's Family Tree switch saves on choosing.
+  - Not done: Canon constraints from the tree's dialog (set under Relation Kinds), the Relation Kinds tab reusing that dialog.
 - **Product refinement 015 - public story reading and attribution** (`feat/public-story-reading` off `dev` at `9c403ff`,
   committed, not merged, not pushed). ADR 0039; `PUBLIC_PORTAL.md` section 22. Migration `AddStoryContentPublication`;
   backup format **17**.
@@ -821,7 +838,12 @@ A public, read-only discovery experience beside the workspace, in the same appli
 
 ## Baseline
 
-- **1137 API integration tests, 268 Playwright tests** (015: +13 API - 6 `StoryContentPublicationTests`, 5
+- **1150 API integration tests, 275 Playwright tests** (016: +13 API - 12 `FamilyTreeTypeSemanticsTests`, 1
+  `EntityTypeFamilyTreeMigrationTests` - and +7 in `family-tree-semantics.spec.ts`; format pins 17 -> 18; specs moved to the Types
+  tabs and the New type dialog. API **1150/1150**. Full Playwright on a fresh database, two workers, retries 0: run 1 273/275 -
+  two `restore.spec.ts` format pins, fixed; run 2 274/275 - `rule-validation.spec.ts` met "Lorex could not be reached"
+  (dev-server/API contention, green 3/3 alone); run 3 **275/275**, 13.7 min. Release build clean, no pending model changes.)
+  Before it, 1137 / 268 (015: +13 API - 6 `StoryContentPublicationTests`, 5
   `UniverseAttributionTests`, 1 `StoryContentPublicationMigrationTests`, 1 version-17 case - and +5 in
   `story-publishing.spec.ts`; format pins moved 16 -> 17, allow-lists gained the attribution and the arc's `visibility`, three
   copy pins updated. API **1137/1137** (run 1 was 1136/1137: `PlotArcEndpointTests` pinned the arc's keys, updated). Full Playwright on a fresh database **268/268** first time, one invocation, two workers, retries 0, 13.1 min.
@@ -892,7 +914,9 @@ A public, read-only discovery experience beside the workspace, in the same appli
     fails as a failure instead of telling the author a free name is taken.
 - Under a full parallel Playwright run, `auth.spec.ts` "rejects a wrong password" intermittently
   times out (it navigates to `/login` without awaiting sign-out).
-- 35 migrations, latest `AddStoryContentPublication` - additive: `Scenes.Visibility`, `Scenes.ManuscriptVisibility`,
+- 36 migrations, latest `AddEntityTypeFamilyTreeEligibility` - one additive column, `EntityTypes.FamilyTreeEligible`
+  (false), then on for the untouched starter Character only; native `DROP COLUMN` rollback;
+  `EntityTypeFamilyTreeMigrationTests` walks it on a file. Before it, `AddStoryContentPublication` - additive: `Scenes.Visibility`, `Scenes.ManuscriptVisibility`,
   `PlotArcs.Visibility` (0, Private), `Universes.OriginalCreator`/`OriginalWork` (null); nothing public after the upgrade;
   native `DROP COLUMN` rollback; `StoryContentPublicationMigrationTests` walks it on a file. Before it, `AddPublicReading` - additive: `Stories.PublicSummary`, `ProfileImages.IsPublic` (false),
   `AspNetUsers.PublicAuthorSlug` with a unique index; nothing copied or made public; native `DROP COLUMN` rollback;

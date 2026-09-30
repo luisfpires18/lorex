@@ -10,8 +10,10 @@ import {
 import {
   AgeOrder,
   FAMILY_SEMANTIC_LABELS,
+  FAMILY_SEMANTIC_ORDER,
   FAMILY_SEMANTIC_WORDS,
   FamilySemantic,
+  isParentSemantic,
   type AgeOrderValue,
   type FamilySemanticValue,
   type RelationshipCanonConstraints,
@@ -65,9 +67,10 @@ function draftFrom(type: RelationshipType): TypeDraft {
 
 /** What a kind means to the Family Tree, in words, or null when it means nothing to it. */
 function familySummary(familySemantic: FamilySemanticValue) {
-  return familySemantic === FamilySemantic.None
-    ? null
-    : `Family: ${FAMILY_SEMANTIC_WORDS[familySemantic]} parent → child`
+  if (familySemantic === FamilySemantic.None) return null
+  return isParentSemantic(familySemantic)
+    ? `Family: ${FAMILY_SEMANTIC_WORDS[familySemantic]} parent → child`
+    : 'Family: listed on the Family Tree, defines no ancestry'
 }
 
 /** How a type reads from each side, in the author's own words. */
@@ -185,8 +188,11 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
         minAgeDifferenceYears: min,
         maxAgeDifferenceYears: max,
       },
-      // A symmetric kind has no parent side either, for the same reason.
-      familySemantic: draft.isSymmetric ? FamilySemantic.None : draft.familySemantic,
+      // A symmetric kind has no parent side either, for the same reason; family that defines no ancestry it may carry.
+      familySemantic:
+        draft.isSymmetric && isParentSemantic(draft.familySemantic)
+          ? FamilySemantic.None
+          : draft.familySemantic,
     }
 
     try {
@@ -356,54 +362,60 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
 
         {draft.isSymmetric ? (
           <p className="field__hint" data-testid="reltype-no-family">
-            Reads the same from both sides, so neither end is the parent. Make the kind one-way to
-            give it a family meaning.
+            Reads the same from both sides, so neither end is a parent. It can still be a family
+            relationship that defines no ancestry, like “married to”.
           </p>
-        ) : (
-          <>
-            <div className="field">
-              <label className="field__label" htmlFor="reltype-family-meaning">
-                Family meaning
-              </label>
-              <select
-                id="reltype-family-meaning"
-                className="field__input field__input--select"
-                value={draft.familySemantic}
-                onChange={(event) =>
-                  edit({ familySemantic: Number(event.target.value) as FamilySemanticValue })
-                }
-                aria-invalid={fieldErrors[FAMILY_KEY] ? true : undefined}
-                aria-describedby={fieldErrors[FAMILY_KEY] ? 'reltype-family-error' : undefined}
-                data-testid="reltype-family-meaning"
-              >
-                {[
-                  FamilySemantic.None,
-                  FamilySemantic.BiologicalParent,
-                  FamilySemantic.AdoptiveParent,
-                ].map((option) => (
-                  <option key={option} value={option}>
-                    {FAMILY_SEMANTIC_LABELS[option]}
-                  </option>
-                ))}
-              </select>
-              {fieldErrors[FAMILY_KEY] ? (
-                <p className="field__error" id="reltype-family-error">
-                  {fieldErrors[FAMILY_KEY]}
-                </p>
-              ) : null}
-            </div>
+        ) : null}
 
-            {draft.familySemantic === FamilySemantic.None ? null : (
-              <p className="reltype__direction" data-testid="reltype-family-direction">
-                <span className="reltype__end">Source</span>
-                <span>is the {FAMILY_SEMANTIC_WORDS[draft.familySemantic]} parent</span>
-                <span aria-hidden="true">·</span>
-                <span className="reltype__end">Target</span>
-                <span>is the child</span>
-              </p>
-            )}
-          </>
-        )}
+        <div className="field">
+          <label className="field__label" htmlFor="reltype-family-meaning">
+            Family meaning
+          </label>
+          <select
+            id="reltype-family-meaning"
+            className="field__input field__input--select"
+            value={
+              draft.isSymmetric && isParentSemantic(draft.familySemantic)
+                ? FamilySemantic.None
+                : draft.familySemantic
+            }
+            onChange={(event) =>
+              edit({ familySemantic: Number(event.target.value) as FamilySemanticValue })
+            }
+            aria-invalid={fieldErrors[FAMILY_KEY] ? true : undefined}
+            aria-describedby={fieldErrors[FAMILY_KEY] ? 'reltype-family-error' : undefined}
+            data-testid="reltype-family-meaning"
+          >
+            {FAMILY_SEMANTIC_ORDER.filter(
+              (option) => !draft.isSymmetric || !isParentSemantic(option),
+            ).map((option) => (
+              <option key={option} value={option}>
+                {FAMILY_SEMANTIC_LABELS[option]}
+              </option>
+            ))}
+          </select>
+          {fieldErrors[FAMILY_KEY] ? (
+            <p className="field__error" id="reltype-family-error">
+              {fieldErrors[FAMILY_KEY]}
+            </p>
+          ) : null}
+        </div>
+
+        {!draft.isSymmetric && isParentSemantic(draft.familySemantic) ? (
+          <p className="reltype__direction" data-testid="reltype-family-direction">
+            <span className="reltype__end">Source</span>
+            <span>is the {FAMILY_SEMANTIC_WORDS[draft.familySemantic]} parent</span>
+            <span aria-hidden="true">·</span>
+            <span className="reltype__end">Target</span>
+            <span>is the child</span>
+          </p>
+        ) : null}
+        {draft.familySemantic === FamilySemantic.NonStructuralFamily ? (
+          <p className="field__hint" data-testid="reltype-family-listed">
+            Listed on the Family Tree in this kind&rsquo;s own words. It places nobody in the
+            ancestry and implies no other relative.
+          </p>
+        ) : null}
       </fieldset>
 
       <div className="relform__actions">

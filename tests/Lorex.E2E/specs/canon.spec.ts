@@ -133,7 +133,7 @@ async function promote(page: Page, universeId: string, entityId: string, to: key
 }
 
 async function addRelationKind(page: Page, universeId: string, name: string, inverseName: string) {
-  await page.goto(`/app/universes/${universeId}/types`)
+  await page.goto(`/app/universes/${universeId}/types?tab=relations`)
   await page.getByTestId('add-relationship-type').click()
   await page.getByLabel('Reads as', { exact: true }).fill(name)
   await page.getByLabel('Reads as, from the other side').fill(inverseName)
@@ -191,8 +191,9 @@ async function addFieldTo(
  */
 async function addLifespanType(page: Page, universeId: string, typeName: string) {
   await page.goto(`/app/universes/${universeId}/types`)
-  await page.getByLabel('New type').fill(typeName)
-  await page.getByTestId('add-type').click()
+  await page.getByTestId('new-type').click()
+  await page.getByTestId('new-type-name').fill(typeName)
+  await page.getByTestId('create-type').click()
   await expect(page.locator(`[data-type-name="${typeName}"]`)).toBeVisible()
 
   await openFields(page, universeId, typeName)
@@ -640,7 +641,7 @@ test.describe('canon integrity', () => {
     await finding(page, 'Hollow Gate').getByRole('button', { name: 'Dismiss' }).click()
     await expect(page.getByTestId('canon-empty')).toBeVisible()
 
-    await page.goto(`/app/universes/${universeId}/types`)
+    await page.goto(`/app/universes/${universeId}/types?tab=relations`)
     await page.getByTestId('edit-reltype-guards').click()
     await page.getByLabel('Reads as', { exact: true }).fill('warded')
     await page.getByTestId('save-relationship-type').click()

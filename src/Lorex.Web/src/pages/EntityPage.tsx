@@ -239,6 +239,11 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
     [types, draft?.entityTypeId],
   )
 
+  const offersFamilyTree =
+    !!detail &&
+    (detail.hasFamilyConnections ||
+      !!types.find((type) => type.id === detail.entityTypeId)?.familyTreeEligible)
+
   // Whether the open form differs from what is stored, or for a new entry from the blank form - said in the
   // form's bar, in words, and asked about before the author leaves it. A change put back is no change. A new
   // entry's framed picture waits in the form, so it counts; an existing entry's picture is written the moment
@@ -648,16 +653,18 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
                 <ActionIcon icon={Pencil} />
                 Edit
               </button>
-              {/* Offered on every entry: family is recorded by the author, never inferred from what an
-                  entry is. An entry with no family connections opens an empty tree that says so. */}
-              <Link
-                className="button button--text"
-                to={`/app/universes/${universe.id}/family-tree/${entityId}`}
-                data-testid="entity-family-tree"
-              >
-                <ActionIcon icon={Network} />
-                Family tree
-              </Link>
+              {/* Offered on an entry whose type the author enabled for Family Tree, and on any entry
+                  already holding a family link - never decided by what the type is called (ADR 0040). */}
+              {offersFamilyTree ? (
+                <Link
+                  className="button button--text"
+                  to={`/app/universes/${universe.id}/family-tree/${entityId}`}
+                  data-testid="entity-family-tree"
+                >
+                  <ActionIcon icon={Network} />
+                  Family tree
+                </Link>
+              ) : null}
               <ActionMenu
                 label={`More actions for ${detail?.name ?? 'this entry'}`}
                 triggerTestId="entity-actions"

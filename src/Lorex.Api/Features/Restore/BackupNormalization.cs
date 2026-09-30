@@ -45,6 +45,9 @@ namespace Lorex.Api.Features.Restore;
 /// <item>Versions 1-16: the universe is its author's own - no original creator or work, even when the file carries them
 /// (<c>AddStoryContentPublication</c>, ADR 0039). In every version every restored scene, manuscript and plot arc is
 /// private: no version of the format carries a selection.</item>
+/// <item>Versions 1-17: a type is enabled for the Family Tree only when it is the untouched starter Character, even when the file
+/// carries a value - the rule <c>AddEntityTypeFamilyTreeEligibility</c> applied to a live database, never a name alone (ADR 0040).
+/// A family meaning those versions could not hold is refused by validation, never read as a parent link.</item>
 /// </list>
 ///
 /// One thing is normalized for every version: the live rows of each ordered collection are numbered
@@ -67,6 +70,15 @@ internal static class BackupNormalization
                     ? payload.Universe with { OriginalCreator = null, OriginalWork = null }
                     : payload.Universe with { PublicSummary = null, Category = null, Genres = null, Artwork = null, OriginalCreator = null, OriginalWork = null },
         ChronologyEras = version >= 4 ? payload.ChronologyEras : null,
+        EntityTypes = version >= 18 || payload.EntityTypes is null
+            ? payload.EntityTypes!
+            : [.. payload.EntityTypes.Select(type => type is null
+                ? null!
+                : type with
+                {
+                    FamilyTreeEligible = type.Name is not null
+                        && EntityTypeDefaults.IsUntouchedStarterCharacter(type.Name, type.Description, type.Icon, type.AccentColor),
+                })],
         Entities = payload.Entities is null ? null! : [.. payload.Entities.Select(entity => entity is null ? null! : ProjectEntity(entity, version))],
         RelationshipTypes = version >= 14 || payload.RelationshipTypes is null
             ? payload.RelationshipTypes!

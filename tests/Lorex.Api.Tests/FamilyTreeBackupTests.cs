@@ -29,7 +29,7 @@ public sealed class FamilyTreeBackupTests(LorexApiFactory factory) : IClassFixtu
         var raw = DocumentText(await RawArchive(household.Client, household.Universe));
         var backup = JsonSerializer.Deserialize<UniverseBackup>(raw, UniverseBackupJson.Options)!;
 
-        Assert.Equal(17, backup.FormatVersion);
+        Assert.Equal(18, backup.FormatVersion);
         Assert.Equal(
             [
                 ("bore", RelationshipFamilySemantic.BiologicalParent),
@@ -53,7 +53,8 @@ public sealed class FamilyTreeBackupTests(LorexApiFactory factory) : IClassFixtu
 
         // The authored links, and not one derived position: no sibling, grandparent, grandchild, circle or generation count.
         Assert.Equal(7, backup.Payload.Relationships.Count);
-        foreach (var derived in new[] { "sibling", "grandparent", "grandchild", "generationsEachWay", "loops", "familyTree" })
+        // "familyTreeEligible" on a type is authored (version 18); a member called "familyTree" would be a derived tree.
+        foreach (var derived in new[] { "sibling", "grandparent", "grandchild", "generationsEachWay", "loops", "\"familyTree\"", "connections" })
         {
             Assert.DoesNotContain(derived, raw, StringComparison.OrdinalIgnoreCase);
         }

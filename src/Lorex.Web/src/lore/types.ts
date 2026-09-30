@@ -115,6 +115,8 @@ export interface EntityType {
   displayOrder: number
   entityCount: number
   fields: FieldDefinition[]
+  /** Entries of this type are offered by the Family Tree. Set by the author, never read from the name (ADR 0040). */
+  familyTreeEligible: boolean
 }
 
 export interface FieldValue {
@@ -212,6 +214,8 @@ export interface EntitySummary {
 export interface EntityDetail extends EntitySummary {
   fields: FieldValue[]
   createdAt: string
+  /** A live family link touches it, so its tree stays reachable whatever its type (ADR 0040). */
+  hasFamilyConnections: boolean
 }
 
 export interface EntityPage {
@@ -264,4 +268,6 @@ export interface EntityQuery {
   page: number
   /** Entries per page; the API clamps it to 1-50. Absent is `ENTITY_PAGE_SIZE`. */
   pageSize?: number
+  /** Only entries whose type is enabled for the Family Tree. */
+  familyTreeEligible?: boolean
 }

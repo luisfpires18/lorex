@@ -54,6 +54,8 @@ export interface EntityTypeInput {
   icon: string | null
   accentColor: string | null
   displayOrder: number | null
+  /** Left out keeps what is stored; a new type without it is not eligible. */
+  familyTreeEligible?: boolean
 }
 
 export function createEntityType(universeId: string, input: EntityTypeInput) {
@@ -126,6 +128,7 @@ export function listEntities(universeId: string, query: EntityQuery, signal?: Ab
   if (query.entityTypeId) params.set('entityTypeId', query.entityTypeId)
   if (query.canonStatus !== null) params.set('canonStatus', String(query.canonStatus))
   if (query.tag) params.set('tag', query.tag)
+  if (query.familyTreeEligible) params.set('familyTreeEligible', 'true')
 
   return apiFetch<EntityPage>(`${base(universeId)}/entities?${params.toString()}`, { signal })
 }

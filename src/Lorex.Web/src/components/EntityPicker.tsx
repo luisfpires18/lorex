@@ -14,7 +14,13 @@ export interface EntityChoice {
  * Search-as-you-type over one universe, shared by both pickers. The API does the
  * searching, so nothing is preloaded and a large world costs the same as a small one.
  */
-function useEntitySearch(universeId: string, query: string, isOpen: boolean, excludeIds: string[]) {
+function useEntitySearch(
+  universeId: string,
+  query: string,
+  isOpen: boolean,
+  excludeIds: string[],
+  familyTreeOnly = false,
+) {
   const [results, setResults] = useState<EntitySummary[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [active, setActive] = useState(0)
@@ -34,7 +40,14 @@ function useEntitySearch(universeId: string, query: string, isOpen: boolean, exc
       setIsSearching(true)
       listEntities(
         universeId,
-        { search: query, entityTypeId: null, canonStatus: null, tag: null, page: 1 },
+        {
+          search: query,
+          entityTypeId: null,
+          canonStatus: null,
+          tag: null,
+          page: 1,
+          familyTreeEligible: familyTreeOnly,
+        },
         controller.signal,
       )
         .then((page) => {
@@ -53,7 +66,7 @@ function useEntitySearch(universeId: string, query: string, isOpen: boolean, exc
       clearTimeout(timer)
       controller.abort()
     }
-  }, [universeId, query, excludeKey, isOpen])
+  }, [universeId, query, excludeKey, isOpen, familyTreeOnly])
 
   return { results, isSearching, active, setActive }
 }
@@ -141,6 +154,8 @@ interface EntityPickerProps {
   onChange: (choice: EntityChoice | null) => void
   /** Left out of the results. Normally the entry being edited. */
   excludeId?: string
+  /** Only entries whose type is enabled for the Family Tree. */
+  familyTreeOnly?: boolean
   placeholder?: string
   error?: string
 }
@@ -152,6 +167,7 @@ export function EntityPicker({
   value,
   onChange,
   excludeId,
+  familyTreeOnly = false,
   placeholder = 'Search this universe',
   error,
 }: EntityPickerProps) {
@@ -170,6 +186,7 @@ export function EntityPicker({
     query,
     isOpen,
     excludeId ? [excludeId] : [],
+    familyTreeOnly,
   )
 
   useCloseOnOutside(wrapper, isOpen, () => setIsOpen(false))

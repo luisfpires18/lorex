@@ -530,7 +530,7 @@ test.describe('world rule checks', () => {
     ).toBeNull()
 
     // The vocabulary on the Types screen.
-    await page.goto(`${base}/types`)
+    await page.goto(`${base}/types?tab=events`)
     const terms = page.getByTestId('validation-terms')
     await expect(terms.locator('[data-term-name="Rite of Ash"]')).toContainText('Used by 1 rule')
     await expect(terms.getByTestId('delete-term-Rite of Ash')).toHaveCount(0)

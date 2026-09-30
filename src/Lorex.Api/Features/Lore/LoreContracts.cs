@@ -10,12 +10,17 @@ namespace Lorex.Api.Features.Lore;
 /// <paramref name="Icon"/> is the type's icon key: null or blank for none, otherwise one of
 /// <see cref="EntityTypeIcons.Keys"/>. Any other value is refused.
 /// </summary>
+/// <summary>
+/// <paramref name="FamilyTreeEligible"/> left out keeps what is stored - so a client that predates it cannot clear it by
+/// saving an icon - and is <c>false</c> on a new type (ADR 0040).
+/// </summary>
 public sealed record EntityTypeRequest(
     string? Name,
     string? Description,
     string? Icon,
     string? AccentColor,
-    int? DisplayOrder);
+    int? DisplayOrder,
+    bool? FamilyTreeEligible = null);
 
 public sealed record EntityTypeResponse(
     Guid Id,
@@ -25,7 +30,8 @@ public sealed record EntityTypeResponse(
     string? AccentColor,
     int DisplayOrder,
     int EntityCount,
-    IReadOnlyList<FieldDefinitionResponse> Fields);
+    IReadOnlyList<FieldDefinitionResponse> Fields,
+    bool FamilyTreeEligible);
 
 // ---------- Field definitions ----------
 
@@ -234,7 +240,11 @@ public sealed record EntitySummary(
 /// <summary>One run of an article excerpt: plain text as the author wrote it, and whether it is part of the match.</summary>
 public sealed record SearchExcerptPart(string Text, bool IsMatch);
 
-/// <summary>An entry's structured lore. Its article is read on its own route (<see cref="EntityArticleResponse"/>).</summary>
+/// <summary>
+/// An entry's structured lore. Its article is read on its own route (<see cref="EntityArticleResponse"/>).
+/// <paramref name="HasFamilyConnections"/> says a live link of a family kind touches it, so an entry recorded in a family
+/// before its type's eligibility existed still offers its tree (ADR 0040).
+/// </summary>
 public sealed record EntityDetail(
     Guid Id,
     string Name,
@@ -250,7 +260,8 @@ public sealed record EntityDetail(
     IReadOnlyList<FieldValueResponse> Fields,
     EntityImageRef? Image,
     DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    bool HasFamilyConnections);
 
 public sealed record EntityPage(
     IReadOnlyList<EntitySummary> Items,

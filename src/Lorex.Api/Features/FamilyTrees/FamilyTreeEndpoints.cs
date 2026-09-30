@@ -53,10 +53,13 @@ public static class FamilyTreeEndpoints
             return Results.NotFound();
         }
 
-        var near = await LiveLinks(db, universeId)
+        // Every family link touching the focal entry, in one query: parent links to derive from, and non-structural ones to list.
+        var touching = await LiveLinks(db, universeId)
             .Where(relationship => relationship.SourceEntityId == entityId || relationship.TargetEntityId == entityId)
             .Select(ToRow)
             .ToListAsync(cancellationToken);
+        var near = touching.Where(row => row.Semantic.IsParent()).ToList();
+        var authored = touching.Where(row => row.Semantic == RelationshipFamilySemantic.NonStructuralFamily).ToList();
 
         var parents = near.Where(row => row.ChildEntityId == entityId).Select(row => row.ParentEntityId).Distinct().ToList();
         var children = near.Where(row => row.ParentEntityId == entityId).Select(row => row.ChildEntityId).Distinct().ToList();
@@ -66,6 +69,7 @@ public static class FamilyTreeEndpoints
         List<LinkRow> far = parents.Count == 0 && children.Count == 0
             ? []
             : await LiveLinks(db, universeId)
+                .Where(relationship => RelationshipFamilySemantics.Parent.Contains(relationship.RelationshipType!.FamilySemantic))
                 .Where(relationship => parents.Contains(relationship.TargetEntityId)
                     || parents.Contains(relationship.SourceEntityId)
                     || children.Contains(relationship.SourceEntityId))
@@ -88,6 +92,7 @@ public static class FamilyTreeEndpoints
         var loops = FamilyTreeDerivation.Loops(links.Where(link => used.Contains(link.RelationshipId)));
 
         var nodeIds = shown
+            .Concat(authored)
             .SelectMany(row => new[] { row.ParentEntityId, row.ChildEntityId })
             .Append(entityId)
             .Distinct()
@@ -136,12 +141,38 @@ public static class FamilyTreeEndpoints
                 .. loops.Select(loop => new FamilyTreeLoop(
                     [.. loop.EntityIds.OrderBy(NameOf, StringComparer.Ordinal).ThenBy(id => id)],
                     loop.RelationshipIds)),
-            ]));
+            ],
+            [.. Connections(entityId, authored, NameOf)]));
     }
 
     /// <summary>
-    /// Every live parent link of this universe: a relationship whose type has a family meaning, with both ends live. The type and
-    /// both ends are held to the universe as well as the row, so nothing another universe holds can be walked into.
+    /// The focal entry's non-structural family links, each read from its side with the kind's own wording - the same
+    /// <see cref="RelationshipValidation.LabelFor"/> every relation list uses. A link to itself is left to the relation list.
+    /// </summary>
+    private static IEnumerable<FamilyTreeConnection> Connections(Guid entityId, List<LinkRow> authored, Func<Guid, string> nameOf) =>
+        authored
+            .Where(row => row.ParentEntityId != row.ChildEntityId)
+            .Select(row =>
+            {
+                // For these rows "parent" and "child" are only the stored source and target: nobody is a parent here.
+                var perspective = row.ParentEntityId == entityId ? RelationshipPerspective.Forward : RelationshipPerspective.Inverse;
+                return new FamilyTreeConnection(
+                    row.RelationshipId,
+                    perspective == RelationshipPerspective.Forward ? row.ChildEntityId : row.ParentEntityId,
+                    perspective,
+                    RelationshipValidation.LabelFor(
+                        row.RelationshipTypeName, row.RelationshipTypeInverseName, row.IsSymmetric, perspective),
+                    row.CanonStatus,
+                    row.RelationshipTypeId);
+            })
+            .OrderBy(connection => connection.Label, StringComparer.Ordinal)
+            .ThenBy(connection => nameOf(connection.RelatedEntityId), StringComparer.Ordinal)
+            .ThenBy(connection => connection.RelationshipId);
+
+    /// <summary>
+    /// Every live family link of this universe: a relationship whose type has a family meaning, with both ends live. The type and
+    /// both ends are held to the universe as well as the row, so nothing another universe holds can be walked into. Only the
+    /// parent meanings among them are walked; the caller keeps the rest apart.
     /// </summary>
     private static IQueryable<LoreRelationship> LiveLinks(LorexDbContext db, Guid universeId) =>
         db.Relationships.AsNoTracking()
@@ -161,7 +192,9 @@ public static class FamilyTreeEndpoints
         relationship.RelationshipType!.FamilySemantic,
         relationship.CanonStatus,
         relationship.RelationshipTypeId,
-        relationship.RelationshipType.Name);
+        relationship.RelationshipType.Name,
+        relationship.RelationshipType.InverseName,
+        relationship.RelationshipType.IsSymmetric);
 
     private static readonly Expression<Func<LoreEntity, FamilyTreeNode>> ToNode = entity => new FamilyTreeNode(
         entity.Id,
@@ -188,7 +221,8 @@ public static class FamilyTreeEndpoints
                         entity.Image.CropX.Value,
                         entity.Image.CropY!.Value,
                         entity.Image.CropWidth!.Value,
-                        entity.Image.CropHeight!.Value)));
+                        entity.Image.CropHeight!.Value)),
+        entity.EntityType.FamilyTreeEligible);
 
     private sealed record LinkRow(
         Guid RelationshipId,
@@ -197,5 +231,7 @@ public static class FamilyTreeEndpoints
         RelationshipFamilySemantic Semantic,
         CanonStatus CanonStatus,
         Guid RelationshipTypeId,
-        string RelationshipTypeName);
+        string RelationshipTypeName,
+        string? RelationshipTypeInverseName,
+        bool IsSymmetric);
 }

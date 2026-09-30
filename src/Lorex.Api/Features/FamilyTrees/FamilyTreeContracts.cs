@@ -16,6 +16,9 @@ namespace Lorex.Api.Features.FamilyTrees;
 ///
 /// An entry may be several relatives at once. The focal entry is never its own relative: a circle of links is named in
 /// <see cref="Loops"/> instead.
+///
+/// <see cref="Connections"/> are the focal entry's authored non-structural family links - "uncle of", "married to" - read
+/// from its side. They are listed, never walked: nothing in the positions above comes from one (ADR 0040).
 /// </summary>
 public sealed record FamilyTreeResponse(
     Guid FocalEntityId,
@@ -27,9 +30,14 @@ public sealed record FamilyTreeResponse(
     IReadOnlyList<FamilyTreeRelative> Siblings,
     IReadOnlyList<FamilyTreeRelative> Children,
     IReadOnlyList<FamilyTreeRelative> Grandchildren,
-    IReadOnlyList<FamilyTreeLoop> Loops);
+    IReadOnlyList<FamilyTreeLoop> Loops,
+    IReadOnlyList<FamilyTreeConnection> Connections);
 
-/// <summary>An entry in the tree: enough to recognise it, and its thumbnail's identity. Never a URL, an article or a field.</summary>
+/// <summary>
+/// An entry in the tree: enough to recognise it, and its thumbnail's identity. Never a URL, an article or a field.
+/// <paramref name="EntityTypeFamilyTreeEligible"/> is its type's capability, so the page can say when an entry recorded
+/// in a family is of a type not enabled for it.
+/// </summary>
 public sealed record FamilyTreeNode(
     Guid EntityId,
     string Name,
@@ -38,7 +46,8 @@ public sealed record FamilyTreeNode(
     string? EntityTypeIcon,
     string? EntityTypeAccentColor,
     CanonStatus CanonStatus,
-    EntityImageRef? Image);
+    EntityImageRef? Image,
+    bool EntityTypeFamilyTreeEligible);
 
 /// <summary>
 /// One stored relationship read as a parent link: its type's family meaning says the source is the parent and the target the
@@ -58,3 +67,16 @@ public sealed record FamilyTreeRelative(Guid EntityId, IReadOnlyList<IReadOnlyLi
 
 /// <summary>Parent links among those this tree read that go round in a circle, and the entries on it.</summary>
 public sealed record FamilyTreeLoop(IReadOnlyList<Guid> EntityIds, IReadOnlyList<Guid> RelationshipIds);
+
+/// <summary>
+/// One authored non-structural family link touching the focal entry, read from the focal entry's side the way a relation is
+/// everywhere else: <paramref name="Label"/> is the kind's name when the focal entry is the source, its inverse when it is the
+/// target, and the one name either way for a symmetric kind.
+/// </summary>
+public sealed record FamilyTreeConnection(
+    Guid RelationshipId,
+    Guid RelatedEntityId,
+    RelationshipPerspective Perspective,
+    string Label,
+    CanonStatus CanonStatus,
+    Guid RelationshipTypeId);

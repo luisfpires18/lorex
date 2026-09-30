@@ -185,7 +185,7 @@ public sealed class FamilyTreeEndpointTests(LorexApiFactory factory) : IClassFix
         // A sibling is a position, not a claim about how much of a family two entries share: the answer has no word for it.
         using var document = JsonDocument.Parse(await TreeText(family, lia));
         Assert.Equal(
-            ["focalEntityId", "generationsEachWay", "nodes", "links", "parents", "grandparents", "siblings", "children", "grandchildren", "loops"],
+            ["focalEntityId", "generationsEachWay", "nodes", "links", "parents", "grandparents", "siblings", "children", "grandchildren", "loops", "connections"],
             document.RootElement.EnumerateObject().Select(property => property.Name));
         Assert.Equal(
             ["entityId", "paths"],

@@ -1,5 +1,5 @@
 import type { CanonStatusValue, EntityImageRef } from '../lore/types'
-import type { FamilySemanticValue } from '../relationships/types'
+import type { FamilySemanticValue, PerspectiveValue } from '../relationships/types'
 
 /** One entry in the tree. Enough to recognise it; its article, fields and dates are not here. */
 export interface FamilyTreeNode {
@@ -11,6 +11,8 @@ export interface FamilyTreeNode {
   entityTypeAccentColor: string | null
   canonStatus: CanonStatusValue
   image: EntityImageRef | null
+  /** Whether its type is enabled for the Family Tree - false for an entry recorded in a family before that existed. */
+  entityTypeFamilyTreeEligible: boolean
 }
 
 /**
@@ -45,6 +47,20 @@ export interface FamilyTreeLoop {
   relationshipIds: string[]
 }
 
+/**
+ * One authored non-structural family link touching the focal entry - "uncle of", "married to" - read from the
+ * focal entry's side: `label` is already the right wording. Listed, never derived from: it places nobody in the
+ * tree above.
+ */
+export interface FamilyTreeConnection {
+  relationshipId: string
+  relatedEntityId: string
+  perspective: PerspectiveValue
+  label: string
+  canonStatus: CanonStatusValue
+  relationshipTypeId: string
+}
+
 export interface FamilyTree {
   focalEntityId: string
   generationsEachWay: number
@@ -56,6 +72,7 @@ export interface FamilyTree {
   children: FamilyTreeRelative[]
   grandchildren: FamilyTreeRelative[]
   loops: FamilyTreeLoop[]
+  connections: FamilyTreeConnection[]
 }
 
 /** Where a relative sits relative to the focal entry. The order is the order the tree is drawn in. */
