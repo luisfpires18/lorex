@@ -59,18 +59,18 @@ export const WORLD: readonly Section[] = [
     purpose: 'What happened, in the order it happened.',
   },
   {
-    segment: 'world-rules',
-    label: 'World Rules',
-    testId: 'workspace-world-rules',
-    icon: Scale,
-    purpose: 'How this universe works, stated plainly.',
-  },
-  {
     segment: 'chronology',
     label: 'Chronology',
     testId: 'workspace-chronology',
     icon: CalendarRange,
     purpose: 'The eras its dates are counted and ordered in.',
+  },
+  {
+    segment: 'world-rules',
+    label: 'World Rules',
+    testId: 'workspace-world-rules',
+    icon: Scale,
+    purpose: 'How this universe works, stated plainly.',
   },
 ]
 

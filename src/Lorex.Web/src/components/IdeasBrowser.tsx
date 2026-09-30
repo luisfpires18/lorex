@@ -22,6 +22,7 @@ interface Outcome {
 /** What an idea's editor says it did before handing back to the list. */
 export interface IdeasListNotice {
   deleted?: { id: string; title: string }
+  created?: { id: string; title: string }
 }
 
 /** The value of the Show filter that means ideas in no universe. Never a universe id. */
@@ -68,6 +69,8 @@ export function IdeasBrowser({ universe, basePath }: IdeasBrowserProps) {
 
   // A deletion reported by the editor that sent the author here.
   const notice = (location.state as IdeasListNotice | null)?.deleted ?? null
+  // A creation reported the same way: the new idea is in the list below.
+  const created = (location.state as IdeasListNotice | null)?.created ?? null
 
   /** Writes filters into the address, dropping empty ones, and starts from the first page unless told otherwise. */
   const update = useCallback(
@@ -228,6 +231,14 @@ export function IdeasBrowser({ universe, basePath }: IdeasBrowserProps) {
           </Link>
         }
       />
+
+      {created && !deleted ? (
+        <div className="notice ideas__notice" data-testid="ideas-created-notice">
+          <p role="status">
+            Created <Quoted text={created.title} />.
+          </p>
+        </div>
+      ) : null}
 
       {notice && !deleted ? (
         <div className="notice ideas__notice" data-testid="ideas-deleted-notice">

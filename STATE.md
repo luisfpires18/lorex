@@ -50,6 +50,16 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **Product refinement 017 - workspace editing flow** (`fix/workspace-editing-flow` off `dev` at `ea7af47`, committed, not
+  merged, not pushed). Frontend only: no API, schema, migration or backup change.
+  - A new idea, once created, returns to its list (`replace`, so Back never reopens the finished form) with "Created “…”" in
+    the list's notice: `/app/ideas`, or the universe's Ideas while it still belongs there, otherwise `/app/ideas`. A failed
+    create stays with everything written. An existing idea still saves in place.
+  - Explicit save is one button (`SaveAction`): the verb (Save changes / Create idea / Create rule / Save chronology), quiet and
+    `aria-disabled` (keeps the focus) when nothing is unsaved; Saving…; ✓ Saved for 2 s; quiet again - never a "Saved" label
+    beside it. One visually hidden status per editor says the same (`*-status` test ids); the duplicate "Saved." announcements
+    are gone. Idea, World Rule, Manuscript and Chronology; drafts, conflicts, recovery, Ctrl+S and Canon gating untouched.
+  - Sidebar, phone sheet and Overview: Lore, Family Tree, Timeline, **Chronology, World Rules** (one list, `sections.ts`).
 - **Product refinement 016 - family tree semantics, type capability, Types tabs** (`feat/family-tree-type-semantics` off
   `feat/public-story-reading` at `fc42280` - `dev` + 015 - committed, not merged, not pushed). ADR 0040 (0035 amended, two
   statements superseded; 0014 amended). Migration `AddEntityTypeFamilyTreeEligibility`; backup format **18**.
@@ -838,7 +848,11 @@ A public, read-only discovery experience beside the workspace, in the same appli
 
 ## Baseline
 
-- **1150 API integration tests, 275 Playwright tests** (016: +13 API - 12 `FamilyTreeTypeSemanticsTests`, 1
+- **1150 API integration tests, 283 Playwright tests** (017: +7 in `editing-flow.spec.ts`, idea specs moved to create -> list,
+  one announcer pin moved to the save status; no API change, API suite not rerun. Full Playwright on a fresh database, two
+  workers, retries 0: runs 1-3 each lost one or two tests to Vite failing to serve a lazy page ("Failed to fetch dynamically
+  imported module" - `IdeaPage.tsx` once, `TimelinePage.tsx` three times), each green 3/3 alone; run 4 **283/283**, 14.1 min.)
+  Before it, 1150 / 275 (016: +13 API - 12 `FamilyTreeTypeSemanticsTests`, 1
   `EntityTypeFamilyTreeMigrationTests` - and +7 in `family-tree-semantics.spec.ts`; format pins 17 -> 18; specs moved to the Types
   tabs and the New type dialog. API **1150/1150**. Full Playwright on a fresh database, two workers, retries 0: run 1 273/275 -
   two `restore.spec.ts` format pins, fixed; run 2 274/275 - `rule-validation.spec.ts` met "Lorex could not be reached"

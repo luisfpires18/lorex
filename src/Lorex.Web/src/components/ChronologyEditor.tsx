@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { ActionIcon } from './ActionIcon'
+import { SaveAction } from './SaveAction'
 import { CanonBlockNotice } from './CanonBlockNotice'
 import { blockingFindingsOf } from '../canon/blocked'
 import type { CanonBlockingFinding } from '../canon/types'
@@ -95,7 +96,8 @@ export function ChronologyEditor({ universeId, chronology, onSaved }: Chronology
   const [message, setMessage] = useState<string | null>(null)
   const [blocked, setBlocked] = useState<CanonBlockingFinding[] | null>(null)
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [saves, setSaves] = useState(0)
+  const statusId = useId()
   // The era just added, whose name takes the focus once it is drawn.
   const focusNew = useRef<string | null>(null)
   const touched = useRef(false)
@@ -128,7 +130,6 @@ export function ChronologyEditor({ universeId, chronology, onSaved }: Chronology
   function change(next: EraDraft[]) {
     touched.current = true
     setDrafts(next)
-    setSaved(false)
   }
 
   function update(index: number, part: Partial<EraDraft>) {
@@ -178,7 +179,6 @@ export function ChronologyEditor({ universeId, chronology, onSaved }: Chronology
 
   async function save() {
     setSaving(true)
-    setSaved(false)
     setMessage(null)
     setFieldErrors({})
     setBlocked(null)
@@ -189,7 +189,7 @@ export function ChronologyEditor({ universeId, chronology, onSaved }: Chronology
       setStored(next)
       setDrafts(draftsFrom(next))
       onSaved(next)
-      setSaved(true)
+      setSaves((count) => count + 1)
     } catch (error: unknown) {
       const blocking = blockingFindingsOf(error)
       if (blocking) {
@@ -418,24 +418,21 @@ export function ChronologyEditor({ universeId, chronology, onSaved }: Chronology
           </p>
         ) : null}
 
-        {saved ? (
-          <p className="settings__saved" role="status" data-testid="chronology-saved">
-            Chronology saved.
-          </p>
-        ) : null}
-
         {/* Nothing to save and no eras to save: no lone disabled button under the note. */}
         {dirty || drafts.length > 0 ? (
           <div className="form__actions eras__actions">
-            <button
-              className="button"
+            <SaveAction
+              label="Save chronology"
+              isDirty={dirty}
+              isSaving={saving}
+              saves={saves}
+              restingStatus="Saved"
+              statusId={statusId}
+              statusTestId="chronology-status"
+              testId="save-chronology"
               type="button"
-              onClick={() => void save()}
-              disabled={saving || !dirty}
-              data-testid="save-chronology"
-            >
-              {saving ? 'Saving' : 'Save chronology'}
-            </button>
+              onSave={() => void save()}
+            />
             {dirty ? (
               <button className="button button--secondary" type="button" onClick={discard}>
                 Discard changes

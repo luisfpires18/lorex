@@ -191,7 +191,8 @@ test.describe('world rules', () => {
     await description.fill(written)
     await expect(page.getByTestId('world-rule-status')).toHaveText('Unsaved changes')
     await saveWith(page, () => page.keyboard.press('Control+s'))
-    await expect(page.getByTestId('world-rule-announcer')).toHaveText('Saved.')
+    // Said once, by the save's own status - not a second time by the announcer.
+    await expect(page.getByTestId('world-rule-status')).toHaveText('Saved')
 
     // Kept through a reload, and at its own address.
     await page.reload()

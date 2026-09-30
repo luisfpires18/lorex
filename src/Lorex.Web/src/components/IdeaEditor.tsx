@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { SaveAction } from './SaveAction'
 import { Link } from 'react-router-dom'
 import { Plus, Trash2, X } from 'lucide-react'
 import { ActionIcon } from './ActionIcon'
@@ -203,6 +204,7 @@ export function IdeaEditor({
   const [draft, setDraft] = useState<Fields>(() => fieldsOf(stored))
   const [universes, setUniverses] = useState<UniverseSummary[] | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [saves, setSaves] = useState(0)
   const [isDeleting, setIsDeleting] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -351,7 +353,7 @@ export function IdeaEditor({
       // What was sent is now saved - trimmed, and with its references' names as they are. Anything typed while the save
       // was in flight is still unsaved, and stays.
       setDraft((current) => (sameFields(current, sent) ? fieldsOf(next) : current))
-      setAnnouncement('Saved.')
+      setSaves((count) => count + 1)
     } catch (error: unknown) {
       if (error instanceof ApiError && error.status === 409 && error.code === IDEA_CHANGED) {
         setConflict({ updatedAt: storedMomentOf(error.problem) })
@@ -556,14 +558,6 @@ export function IdeaEditor({
   const chosenUniverse =
     universes?.find((universe) => universe.id === draft.universeId) ??
     (stored.universe && stored.universe.id === draft.universeId ? stored.universe : null)
-
-  const status = isSaving
-    ? { state: 'saving', text: 'Saving…' }
-    : isDirty
-      ? { state: 'dirty', text: 'Unsaved changes' }
-      : stored.updatedAt === null
-        ? { state: 'empty', text: 'Not saved yet' }
-        : { state: 'saved', text: 'Saved' }
 
   const nearLimit = draft.body.length > IDEA_BODY_MAX_LENGTH * 0.9
   const belongsElsewhere =
@@ -875,31 +869,24 @@ export function IdeaEditor({
         </section>
 
         <div className="manuscript__bar idea__bar">
-          <p
-            className="manuscript__status"
-            id={statusId}
-            role="status"
-            data-state={status.state}
-            data-testid="idea-status"
-          >
-            {status.text}
-          </p>
           {failed && isDirty ? (
             <p className="recovery__warning" role="status" data-testid="idea-recovery-warning">
               This device could not keep a recovery copy of these changes. Save to keep them.
             </p>
           ) : null}
           <div className="idea__actions">
-            <button
-              className="button"
-              type="submit"
-              disabled={!isDirty || isSaving || isTooLong || isHeld}
-              aria-describedby={statusId}
-              aria-keyshortcuts="Control+S Meta+S"
-              data-testid="idea-save"
-            >
-              {isSaving ? 'Saving…' : isNew ? 'Create idea' : 'Save'}
-            </button>
+            <SaveAction
+              label={isNew ? 'Create idea' : 'Save changes'}
+              isDirty={isDirty}
+              isSaving={isSaving}
+              isBlocked={isTooLong || isHeld}
+              saves={saves}
+              restingStatus={stored.updatedAt === null ? 'Not saved yet' : 'Saved'}
+              statusId={statusId}
+              statusTestId="idea-status"
+              testId="idea-save"
+              keyShortcuts="Control+S Meta+S"
+            />
           </div>
         </div>
       </form>

@@ -167,7 +167,7 @@ test.describe('chronology', () => {
     ])
 
     await page.getByTestId('save-chronology').click()
-    await expect(page.getByTestId('chronology-saved')).toBeVisible()
+    await expect(page.getByTestId('chronology-status')).toHaveText('Saved')
 
     // The timeline now asks for an era beside every year.
     await page.getByTestId('workspace-timeline').click()
@@ -228,7 +228,7 @@ test.describe('chronology', () => {
     await expect(before.getByTestId('era-remove')).toBeDisabled()
     await fillEra(page, 0, { name: 'Before the Fall', abbreviation: 'B.F.', position: 'after' })
     await page.getByTestId('save-chronology').click()
-    await expect(page.getByTestId('chronology-saved')).toBeVisible()
+    await expect(page.getByTestId('chronology-status')).toHaveText('Saved')
 
     await page.getByTestId('workspace-timeline').click()
     await page.waitForURL(/\/timeline$/)
