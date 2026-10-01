@@ -90,3 +90,19 @@ public sealed record TrashRestored(TrashItemKind Kind, Guid Id, Guid StoryId);
 /// in the Trash on its own. Every other permanent delete answers 204, because a client already knows the one id it erased.
 /// </summary>
 public sealed record TrashErasedStory(Guid Id, IReadOnlyList<Guid> ErasedSceneIds);
+
+/// <summary>One row in the Trash, named by its kind and id: what a bulk delete selects. The kind is never guessed from the id.</summary>
+public sealed record TrashSelection(TrashItemKind Kind, Guid Id);
+
+/// <summary>
+/// Deletes these rows of one universe's Trash for good, of any mix of kinds, all or none. 1 to
+/// <see cref="TrashPermanentDelete.BulkDeleteMaxItems"/> items, none twice.
+/// </summary>
+public sealed record BulkTrashDeleteRequest(IReadOnlyList<TrashSelection?>? Items);
+
+/// <summary>
+/// What a bulk delete erased: how many of the selected rows (each selected row counts once, also when a selected parent's
+/// cascade took it), and the ids of every entry and scene that went - a selected story's scenes included, selected or not -
+/// so a client can let go of exactly the recovery copies it keeps for them.
+/// </summary>
+public sealed record TrashBulkErased(int Deleted, IReadOnlyList<Guid> ErasedEntryIds, IReadOnlyList<Guid> ErasedSceneIds);

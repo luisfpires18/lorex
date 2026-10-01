@@ -5,6 +5,7 @@ import {
   CircleDot,
   Feather,
   FileText,
+  ListChecks,
   Scale,
   Spline,
   type LucideIcon,
@@ -21,7 +22,14 @@ import { formatDateTime } from '../lib/dates'
 import { discardDraft } from '../lib/localDrafts'
 import { unpublishContent } from '../publishing/api'
 import { CANON_LABELS } from '../lore/types'
-import { deleteFromTrash, listTrash, restoredPath, restoreFromTrash } from '../trash/api'
+import {
+  bulkDeleteFromTrash,
+  deleteFromTrash,
+  listTrash,
+  restoredPath,
+  restoreFromTrash,
+  TRASH_SELECTION_CHANGED,
+} from '../trash/api'
 import {
   TRASH_KIND_LABELS,
   TrashBlock,
@@ -43,6 +51,11 @@ type LoadState =
 interface Outcome {
   text: ReactNode
   link: { to: string; label: ReactNode } | null
+}
+
+/** A row's identity: an id is only unique within its kind. */
+function keyOf(item: TrashItem) {
+  return `${item.kind}:${item.id}`
 }
 
 /** Where a row was, in the words the author knows it by. */
@@ -138,8 +151,8 @@ function backText(item: TrashItem) {
  * What deleting a row permanently takes with it, in the author's words. Only what the row owns: a chapter's scenes went
  * to Unchaptered when it was put in the Trash, so they are not among it.
  */
-function eraseText(item: TrashItem) {
-  switch (item.kind) {
+function eraseText(kind: TrashKindValue) {
+  switch (kind) {
     case TrashKind.Entry:
       return 'Its article, fields, picture and saved versions go with it, and links and references to it in your lore, timeline, stories and ideas are removed.'
     case TrashKind.Story:
@@ -191,6 +204,27 @@ export default function UniverseTrash() {
   const [eraseError, setEraseError] = useState<ReactNode>(null)
   const eraseRef = useRef<HTMLDivElement>(null)
   const eraseButtons = useRef(new Map<string, HTMLButtonElement>())
+
+  // Selecting, to delete several rows permanently together. A mode the author turns on, so ordinary browsing carries no
+  // checkboxes; while it is on, the rows' own Restore and Delete permanently… step aside, so one row cannot be restored or
+  // erased on its own while others are selected.
+  const [isSelecting, setIsSelecting] = useState(false)
+  const [selection, setSelection] = useState<{ page: number; keys: ReadonlySet<string> }>({
+    page: 1,
+    keys: new Set(),
+  })
+  const [bulkConfirming, setBulkConfirming] = useState(false)
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkError, setBulkError] = useState<string | null>(null)
+  const bulkWorking = useRef(false)
+  const bulkPanelRef = useRef<HTMLDivElement>(null)
+  const bulkDeleteRef = useRef<HTMLButtonElement>(null)
+  const selectPageRef = useRef<HTMLButtonElement>(null)
+  const selectToggleRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (bulkConfirming) bulkPanelRef.current?.focus()
+  }, [bulkConfirming])
 
   // Cancelling hands the focus back to the button that asked - once it is enabled again, so after the render.
   const returnFocusTo = useRef<string | null>(null)
@@ -412,6 +446,120 @@ export default function UniverseTrash() {
   }
 
   const result = state.kind === 'ready' ? state.page : null
+  const pageItems = result?.items ?? []
+
+  // What is selected belongs to the page on screen, as in Lore: another page is another list, so nothing is ever selected
+  // out of sight. Reset while rendering, so no frame shows an old page's selection; and only rows still on screen count.
+  if (selection.page !== page) setSelection({ page, keys: new Set() })
+  const selectedKeys = selection.page === page ? selection.keys : new Set<string>()
+  const selected = pageItems.filter((item) => selectedKeys.has(keyOf(item)))
+  // While the question is open or the delete is working, the selection cannot change underneath it.
+  const selectionLocked = bulkConfirming || bulkBusy
+
+  function toggle(item: TrashItem) {
+    if (selectionLocked) return
+    const next = new Set(selectedKeys)
+    if (next.has(keyOf(item))) next.delete(keyOf(item))
+    else next.add(keyOf(item))
+    setSelection({ page, keys: next })
+  }
+
+  function selectPage() {
+    setSelection({ page, keys: new Set(pageItems.map(keyOf)) })
+    // Select page has nothing left to do once it has; the next step is the delete.
+    requestAnimationFrame(() => bulkDeleteRef.current?.focus())
+  }
+
+  function clearSelection() {
+    setSelection({ page, keys: new Set() })
+    requestAnimationFrame(() => selectPageRef.current?.focus())
+  }
+
+  function stopSelecting() {
+    setSelection({ page, keys: new Set() })
+    setIsSelecting(false)
+    setBulkConfirming(false)
+    setBulkError(null)
+  }
+
+  function startSelecting() {
+    setOutcome(null)
+    setBlocked(null)
+    setIsSelecting(true)
+  }
+
+  function askToBulkErase() {
+    if (selected.length === 0) return
+    setOutcome(null)
+    setBlocked(null)
+    setBulkError(null)
+    setBulkConfirming(true)
+  }
+
+  function cancelBulkErase() {
+    if (bulkBusy) return
+    setBulkError(null)
+    setBulkConfirming(false)
+    // The question replaced the bar; the focus goes back to the button that asked, once the bar is back.
+    requestAnimationFrame(() => bulkDeleteRef.current?.focus())
+  }
+
+  /**
+   * Erases every selected row in one request, every one or none. A failure the list is still right about keeps the
+   * selection and the question for another try; a Trash that changed underneath (409) deleted nothing, and the selection,
+   * now naming rows that may not be there, is let go.
+   */
+  async function bulkErase() {
+    if (bulkWorking.current || selected.length === 0) return
+    bulkWorking.current = true
+    setBulkBusy(true)
+    setBulkError(null)
+
+    try {
+      const erased = await bulkDeleteFromTrash(universe.id, selected)
+
+      // Only now that the server has erased them: exactly the recovery copies of what went - each erased entry's article,
+      // each erased scene's manuscript, a story's scenes among them - and nothing else. Best effort, as for one row.
+      if (user) {
+        const scopes = [
+          ...erased.erasedEntryIds.map((contentId) => ({ kind: 'article' as const, contentId })),
+          ...erased.erasedSceneIds.map((contentId) => ({ kind: 'manuscript' as const, contentId })),
+        ]
+        for (const scope of scopes) {
+          void discardDraft({ accountId: user.id, universeId: universe.id, ...scope }).catch(
+            () => undefined,
+          )
+        }
+      }
+
+      stopSelecting()
+      setOutcome({
+        text:
+          erased.deleted === 1
+            ? '1 item was permanently deleted.'
+            : `${erased.deleted} items were permanently deleted.`,
+        link: null,
+      })
+      load()
+    } catch (error: unknown) {
+      if (error instanceof ApiError && error.code === TRASH_SELECTION_CHANGED) {
+        stopSelecting()
+        setOutcome({
+          text: 'The Trash changed before these items could be deleted, so nothing was deleted. Select them again.',
+          link: null,
+        })
+        load()
+      } else {
+        setBulkError(
+          'Nothing was deleted. The selected items could not be deleted just now. Try again.',
+        )
+      }
+    } finally {
+      bulkWorking.current = false
+      setBulkBusy(false)
+    }
+  }
+
   const busy = restoring !== null || confirming !== null || erasing !== null
 
   return (
@@ -432,6 +580,22 @@ export default function UniverseTrash() {
               .
             </p>
           </>
+        }
+        actions={
+          pageItems.length > 0 || isSelecting ? (
+            <button
+              ref={selectToggleRef}
+              className="button button--secondary trash__select"
+              type="button"
+              aria-pressed={isSelecting}
+              disabled={busy || bulkBusy}
+              onClick={() => (isSelecting ? stopSelecting() : startSelecting())}
+              data-testid="trash-select"
+            >
+              <ActionIcon icon={ListChecks} />
+              Select
+            </button>
+          ) : null
         }
       />
 
@@ -473,14 +637,10 @@ export default function UniverseTrash() {
             const kind = TRASH_KIND_LABELS[item.kind]
             const waiting = blockedText(item)
             const waitingId = `trash-waiting-${item.id}`
+            const isChecked = isSelecting && selectedKeys.has(keyOf(item))
 
-            return (
-              <li
-                className="trash__row"
-                key={`${item.kind}:${item.id}`}
-                data-testid={`trash-row-${item.name}`}
-                data-kind={kind}
-              >
+            const what = (
+              <>
                 {/* What it is, at a glance: an entry's type tile, or the icon of the story part or rule. The kind is
                     said in words beside the name, so the tile is decorative. */}
                 {item.kind === TrashKind.Entry ? (
@@ -511,6 +671,44 @@ export default function UniverseTrash() {
                     </p>
                   ) : null}
                 </div>
+              </>
+            )
+
+            if (isSelecting) {
+              // Selecting: the row is its checkbox's label, so pressing anywhere on it - or Space on the box - selects
+              // it. Restore and Delete permanently… step aside until selecting is done.
+              return (
+                <li
+                  className="trash__row"
+                  key={keyOf(item)}
+                  data-testid={`trash-row-${item.name}`}
+                  data-kind={kind}
+                  data-selected={isChecked ? 'true' : undefined}
+                >
+                  <label className="trash__pick">
+                    <input
+                      className="trash__check"
+                      type="checkbox"
+                      checked={isChecked}
+                      disabled={selectionLocked}
+                      onChange={() => toggle(item)}
+                      aria-label={`Select ${kind.toLowerCase()} “${item.name}”`}
+                      data-testid={`select-${item.name}`}
+                    />
+                    {what}
+                  </label>
+                </li>
+              )
+            }
+
+            return (
+              <li
+                className="trash__row"
+                key={keyOf(item)}
+                data-testid={`trash-row-${item.name}`}
+                data-kind={kind}
+              >
+                {what}
                 <div className="trash__actions">
                   <button
                     ref={(node) => {
@@ -581,7 +779,7 @@ export default function UniverseTrash() {
           <button
             className="button button--secondary"
             type="button"
-            disabled={result.page <= 1}
+            disabled={result.page <= 1 || selectionLocked}
             onClick={() => setPage((current) => current - 1)}
           >
             Previous
@@ -592,12 +790,78 @@ export default function UniverseTrash() {
           <button
             className="button button--secondary"
             type="button"
-            disabled={result.page >= result.totalPages}
+            disabled={result.page >= result.totalPages || selectionLocked}
             onClick={() => setPage((current) => current + 1)}
           >
             Next
           </button>
         </nav>
+      ) : null}
+
+      {isSelecting && bulkConfirming ? (
+        <BulkEraseConfirm
+          items={selected}
+          panelRef={bulkPanelRef}
+          busy={bulkBusy}
+          error={bulkError}
+          onErase={() => void bulkErase()}
+          onCancel={cancelBulkErase}
+        />
+      ) : null}
+
+      {isSelecting && !bulkConfirming ? (
+        <footer className="actionbar trash__selectbar" data-testid="trash-selectbar">
+          <p className="actionbar__status" role="status" data-testid="trash-selected-count">
+            {selected.length === 0
+              ? 'Select rows on this page to delete them permanently.'
+              : `${selected.length} selected`}
+          </p>
+          <div className="actionbar__actions">
+            {/* The one red control on the screen while selecting; the selection's own tools stay neutral. */}
+            <button
+              ref={bulkDeleteRef}
+              className="button button--danger"
+              type="button"
+              onClick={askToBulkErase}
+              disabled={selected.length === 0}
+              data-testid="trash-bulk-delete"
+            >
+              {selected.length > 0
+                ? `Delete permanently (${selected.length})`
+                : 'Delete permanently'}
+            </button>
+            <button
+              ref={selectPageRef}
+              className="button button--secondary"
+              type="button"
+              onClick={selectPage}
+              disabled={pageItems.length === 0 || selected.length === pageItems.length}
+              data-testid="trash-select-page"
+            >
+              Select page
+            </button>
+            <button
+              className="button button--text"
+              type="button"
+              onClick={clearSelection}
+              disabled={selected.length === 0}
+              data-testid="trash-clear-selection"
+            >
+              Clear selection
+            </button>
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => {
+                stopSelecting()
+                requestAnimationFrame(() => selectToggleRef.current?.focus())
+              }}
+              data-testid="trash-select-done"
+            >
+              Done
+            </button>
+          </div>
+        </footer>
       ) : null}
     </article>
   )
@@ -734,7 +998,7 @@ function EraseConfirm({
         <Quoted text={item.name} />?
       </p>
       <p className="trash__confirmtext" id={textId} data-testid="trash-erase-text">
-        {eraseText(item)} <strong className="trash__final">This cannot be undone.</strong>
+        {eraseText(item.kind)} <strong className="trash__final">This cannot be undone.</strong>
       </p>
       {error ? (
         <p className="trash__confirmerror" role="alert" data-testid="trash-erase-error">
@@ -757,6 +1021,97 @@ function EraseConfirm({
           aria-disabled={busy || undefined}
           onClick={onCancel}
           data-testid="trash-erase-cancel"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The one question before a selection is erased for good: how many, which ones by kind and name, what goes with each kind
+ * selected - said once per kind, from the same words a single row's question uses - and that it cannot be undone. A
+ * selected story or arc takes rows that were not selected; a selected chapter takes none of its former scenes. It takes
+ * the place of the selection bar, so nothing in the selection can change while it is open.
+ */
+function BulkEraseConfirm({
+  items,
+  panelRef,
+  busy,
+  error,
+  onErase,
+  onCancel,
+}: {
+  items: TrashItem[]
+  panelRef: React.RefObject<HTMLDivElement | null>
+  busy: boolean
+  error: string | null
+  onErase: () => void
+  onCancel: () => void
+}) {
+  const kinds = [...new Set(items.map((item) => item.kind))].sort((a, b) => a - b)
+  const count = items.length
+
+  return (
+    <div
+      className="trash__confirm trash__bulkconfirm"
+      role="group"
+      aria-labelledby="trash-bulk-title"
+      aria-describedby="trash-bulk-final"
+      tabIndex={-1}
+      ref={panelRef}
+      data-testid="trash-bulk-confirm"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.stopPropagation()
+          onCancel()
+        }
+      }}
+    >
+      <h2 className="trash__confirmtitle" id="trash-bulk-title">
+        Permanently delete {count} selected {count === 1 ? 'item' : 'items'}?
+      </h2>
+      <ul className="trash__bulklist" aria-label="Selected" data-testid="trash-bulk-list">
+        {items.map((item) => (
+          <li key={keyOf(item)}>
+            <span className="trash__kind">{TRASH_KIND_LABELS[item.kind]}</span>{' '}
+            <bdi className="trash__bulkname">{item.name}</bdi>
+          </li>
+        ))}
+      </ul>
+      <ul className="trash__confirmtext trash__bulkconsequences" data-testid="trash-bulk-text">
+        {kinds.map((kind) => (
+          <li key={kind} data-kind={TRASH_KIND_LABELS[kind]}>
+            <span className="trash__kind">Each {TRASH_KIND_LABELS[kind].toLowerCase()}:</span>{' '}
+            {eraseText(kind)}
+          </li>
+        ))}
+      </ul>
+      <p className="trash__confirmtext" id="trash-bulk-final">
+        <strong className="trash__final">This cannot be undone.</strong>
+      </p>
+      {error ? (
+        <p className="trash__confirmerror" role="alert" data-testid="trash-bulk-error">
+          {error}
+        </p>
+      ) : null}
+      <div className="form__actions">
+        <button
+          className="button button--danger"
+          type="button"
+          aria-disabled={busy || undefined}
+          onClick={onErase}
+          data-testid="trash-bulk-delete-confirm"
+        >
+          {busy ? 'Deleting…' : 'Delete permanently'}
+        </button>
+        <button
+          className="button button--secondary"
+          type="button"
+          aria-disabled={busy || undefined}
+          onClick={onCancel}
+          data-testid="trash-bulk-cancel"
         >
           Cancel
         </button>

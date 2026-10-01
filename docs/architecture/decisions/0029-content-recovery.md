@@ -194,7 +194,8 @@ and numbers and never applies one. Recovered drafts are not in a backup: they we
 
 ## Deliberately unsupported
 
-- Emptying the Trash, bulk permanent deletion and retention. (Permanent deletion of one row exists since 2026-09-30.)
+- Emptying the Trash, bulk Restore and retention. (Permanent deletion of one row exists since 2026-09-30, of a selection
+  since 2026-10-01 - ADR 0015's amendment.)
 - Saved versions for stories, chapters, scenes' planning, arcs and beats; versions of structure (orders, moves, links).
 - Recovered drafts for the entry, story, chapter, scene, arc and beat forms.
 - Syncing recovered drafts between devices or browsers, offline editing, or a list of every draft on a device.
@@ -246,3 +247,9 @@ No Canon: story content contributes no facts (ADR 0024). The Trash screen offers
 row, quiet text rather than a second loud button; it asks once, in the row - kind, name, what goes with it, "This cannot be
 undone." - and its final button says Delete permanently. The lede now says everything can be restored until the author
 deletes it permanently.
+
+**A selection** (2026-10-01, Product refinement 023): story content can also be erased together with any other Trash kinds in
+one all-or-none `POST .../trash/bulk-delete` - ADR 0015's amendment holds the contract. What a story, chapter, scene, arc or beat
+takes is exactly the above, by the same plan; a selected story with its own selected scenes, chapters, arcs and beats, or an
+arc with its beat, is a valid selection, not a conflict. The answer's `erasedSceneIds` - selected scenes and every scene of a
+selected story - drive the same exact recovery-copy cleanup, after success only.

@@ -153,3 +153,6 @@ marked. Its check (`WorldRuleValidations`) cascades; the event kinds and methods
 stay, as do the moments' details. Every recorded finding naming the rule is forgotten in the same transaction. A rule in the
 Trash is not checked, so erasing it changes no live finding and nothing is reconciled. The search index follows through its
 delete trigger. Move to Trash is still the only delete on the World Rules screen.
+
+Since 2026-10-01 (Product refinement 023) rules can also be erased in a Trash selection, with any other kinds, through
+`POST .../trash/bulk-delete` (ADR 0015's amendment): the same plan, the same forgotten findings, all or none.

@@ -160,4 +160,40 @@ delete sweeps nothing.
 The consequence recorded above is closed: once the last entry using a type, field or option is erased, the ordinary reference
 counts fall to zero and the type, field or option can be deleted - no special case. No migration, no backup format change: a
 backup made afterwards simply does not hold what was erased; importing an older one is a backup restore, not a Trash restore.
-Emptying the Trash, bulk permanent deletion and retention are still not offered.
+Emptying the Trash, bulk permanent deletion and retention are still not offered. *(Bulk permanent deletion since
+2026-10-01 - see the next amendment.)*
+
+## Amendment - deleting a selection permanently (2026-10-01, Product refinement 023)
+
+The Trash can erase several rows at once, of any mix of its seven kinds, in one request:
+`POST /api/universes/{universeId}/trash/bulk-delete` with `{ items: [{ kind, id }] }`. Each row is named by its `TrashItemKind`
+and id - never probed for. Owner first (another account's universe is a 404); then the shape - 1 to 100 items, each a known
+kind and a non-empty id, no `(kind, id)` twice - refused as a validation problem keyed `items` / `items[3].kind`, never
+truncated; then the selection itself.
+
+**All or none, checked whole first.** Inside one transaction every selected row must resolve as exactly its kind, in this
+universe, with the marker set. One that does not - live, missing, already erased, another world's, another kind's, restored in
+another tab - refuses the whole request with 409 `trash_selection_changed` ("The Trash changed before these items could be
+deleted. Refresh and select them again."), naming no id, and nothing is written. Only then does the plan run.
+
+**One plan, one row or many.** The single typed routes now run the same plan with a one-row selection (`TrashPermanentDelete`
+`PlanAsync`), so the two cannot drift; their contracts are unchanged (404, 204, a story's 200 `TrashErasedStory`). The plan erases
+by set, parents first: entries (references to any of them removed, emptied moment details removed, findings naming them or
+their relationships forgotten), stories, arcs, chapters, scenes, beats, rules (findings forgotten). **Overlap is valid**: a
+story with its own separately binned scene, chapter or arc, an arc with its beat - both resolved before anything was written,
+the parent's cascade satisfies the child, whose own statement then matches nothing. Request order never matters. A selected
+story or arc still takes owned rows nobody selected; a selected chapter still takes none of its former scenes.
+
+A selection holding any entry runs inside `CanonPromotionGate.RecordAsync` once for the batch - reconciled, never gated; one
+with none uses a plain transaction. Every erased entry's image keys are read first and swept after the commit, best effort;
+a failed sweep is logged orphaned media, a failed transaction sweeps nothing.
+
+200 `TrashBulkErased { deleted, erasedEntryIds, erasedSceneIds }`: `deleted` counts selected rows (each once, also when a
+parent's cascade took it); `erasedSceneIds` are the selected scenes plus every scene of a selected story, never a chapter's.
+The client drops exactly those recovery copies - each entry's article, each scene's manuscript - after the server answers and
+never on any failure.
+
+The Trash screen's **Select** mirrors Lore's: page-scoped (another page, a reload or leaving drops it), rows become their
+checkbox's label, row actions step aside, Select page / Clear selection / Done, and one red **Delete permanently (N)** that asks
+once - every selected row by kind and name, each selected kind's consequence, "This cannot be undone." No migration, no
+backup change. Still not offered: Empty Trash, bulk Restore, cross-page selection, retention.

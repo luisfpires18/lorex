@@ -50,6 +50,24 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **Product refinement 023 - bulk permanent Trash deletion** (`feat/bulk-trash-permanent-delete` off `dev` at `bc0833e`,
+  committed, not merged, not pushed). No migration; backup stays **19**. ADR 0015 amended (contract), 0029 and 0033 pointers.
+  - `POST .../trash/bulk-delete` `{ items: [{ kind, id }] }`: owner 404 first; 1-100 items, known kind, non-empty id, no
+    `(kind, id)` twice, else 400 keyed `items[i]...`; then every row resolved (exact kind, universe, marker) inside the
+    transaction before any write - one stale row = 409 `trash_selection_changed`, nothing written. 200
+    `{ deleted, erasedEntryIds, erasedSceneIds }`; `deleted` = selected rows, parent-cascaded ones included.
+  - One plan for single routes and bulk (`TrashPermanentDelete.PlanAsync`): by set, parents first; overlap (story + own
+    scene/chapter/arc/beat, arc + beat) valid; a chapter still takes no scene. Entries: references, emptied moment details,
+    findings forgotten; one `RecordAsync` reconcile per batch (plain transaction when no entry). Images swept after commit.
+    Single-route contracts unchanged.
+  - Trash **Select** as Lore's: page-scoped, rows are checkbox labels, row actions hidden, Select page / Clear selection /
+    Done, red **Delete permanently (N)** (only red control), one question in place of the bar (rows by kind + `<bdi>` name,
+    one consequence line per selected kind, "This cannot be undone.", red final + Cancel, Esc). Success: "N items were
+    permanently deleted.", selection off, focus to message, page clamped. 409: nothing deleted, selection dropped, list read
+    again. Other failure: question and selection kept, plain error. Drafts dropped from response ids only, after success.
+  - Tests: API 1232 -> 1247 (`TrashPermanentDeleteTests.Bulk.cs`, 15). Playwright 321 -> 327 (`trash-bulk-delete.spec.ts`, 6);
+    shared fixtures moved to `specs/support/trash.ts`.
+  - Not done (owner decisions): Empty Trash, bulk Restore, cross-page selection, retention.
 - **Product refinement 022 - nested Lore types** (`feat/nested-lore-types` off `dev` at `b259ccd`, committed, not merged, not
   pushed). Migration `AddEntityTypeHierarchy`; backup format **19**. ADR 0007, 0014 and 0032 amended.
   - `EntityTypes.ParentId` (null = root), any depth, no privileged root; organisation only - nothing inherited (fields,
@@ -77,7 +95,7 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - Tests: API 1217 -> 1232 (`NestedTypeTests` 14, `NestedTypeMigrationTests` 1; the rich round-trip world now nests two
     levels). Playwright 316 -> 321 (`nested-types.spec.ts` 5); type-filter, types-and-trash and every spec that browsed
     "All" now choose a type (`specs/support/lore.ts`).
-  - Not done: field inheritance (intentional), drag-and-drop ordering (intentional), bulk permanent Trash deletion (next).
+  - Not done: field inheritance (intentional), drag-and-drop ordering (intentional), bulk permanent Trash deletion (done in 023).
 - **Product refinement 021 - permanent Trash deletion** (`feat/trash-permanent-delete` off `dev` at `7988e88`, merged into
   `dev`, then `fix/trash-mobile-action-overflow`; `dev` at `b259ccd`). No migration, no backup format change. ADR 0015, 0029 and 0033 amended. **Move to Trash is not
   Delete permanently**: every ordinary delete (and `bulk-trash`) still only marks; erasing exists only for a row already in the
@@ -103,7 +121,7 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     scope - an entry's article, a scene's manuscript, every erased story scene's manuscript; nothing else, never before
     success, best effort (a storage failure never undoes the delete).
   - Lede: "Everything here can be restored with everything it held, until you choose to delete it permanently."
-  - Not done (owner decisions): Empty Trash, bulk permanent delete, Trash multi-select, retention. Other entries' saved
+  - Not done (owner decisions): Empty Trash, retention. (Bulk permanent delete and Trash multi-select since 023.) Other entries' saved
     versions keep the erased entry's id and name, as for a deleted option or era.
   - Tests: API 1200 -> 1217 (`TrashPermanentDeleteTests`, 17). Playwright 309 -> 316 (`trash-permanent-delete.spec.ts`, 7). Full run
     315/315 before the story-draft follow-up; that follow-up ran focused and neighbouring specs only.

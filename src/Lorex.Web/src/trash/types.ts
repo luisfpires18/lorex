@@ -85,3 +85,10 @@ export interface TrashErasedStory {
   id: string
   erasedSceneIds: string[]
 }
+
+/** What a bulk delete answers: how many selected rows went, and every entry and scene that went with them. */
+export interface TrashBulkErased {
+  deleted: number
+  erasedEntryIds: string[]
+  erasedSceneIds: string[]
+}
