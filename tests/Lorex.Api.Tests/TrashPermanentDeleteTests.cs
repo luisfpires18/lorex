@@ -32,7 +32,7 @@ namespace Lorex.Api.Tests;
 ///
 /// Every assertion is on stored rows or API reads, never on which EF call ran.
 /// </summary>
-public sealed class TrashPermanentDeleteTests(LorexApiFactory factory) : IClassFixture<LorexApiFactory>
+public sealed partial class TrashPermanentDeleteTests(LorexApiFactory factory) : IClassFixture<LorexApiFactory>
 {
     private readonly LorexApiFactory _factory = factory;
 

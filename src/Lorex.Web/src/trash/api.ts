@@ -1,11 +1,20 @@
 import { apiFetch } from '../lib/api'
-import { TrashKind, type TrashErasedStory, type TrashItem, type TrashPage } from './types'
+import {
+  TrashKind,
+  type TrashBulkErased,
+  type TrashErasedStory,
+  type TrashItem,
+  type TrashPage,
+} from './types'
 
 /** The same page size the lore browser uses, so the two screens read at the same rhythm. */
 export const TRASH_PAGE_SIZE = 12
 
 /** The code on the 409 a restore gets when what the row belongs to - its story, or a beat's arc - is in the Trash too. */
 export const TRASH_PARENT_IN_TRASH = 'trash_parent_in_trash'
+
+/** The code on the 409 a bulk delete gets when a selected row is no longer in the Trash as it was: nothing was deleted. */
+export const TRASH_SELECTION_CHANGED = 'trash_selection_changed'
 
 function base(universeId: string) {
   return `/api/universes/${universeId}/trash`
@@ -62,6 +71,20 @@ export async function deleteFromTrash(universeId: string, item: TrashItem): Prom
 
   await apiFetch<unknown>(path, { method: 'DELETE' })
   return item.kind === TrashKind.Scene ? [item.id] : []
+}
+
+/**
+ * Erases a selection of rows for good, of any kinds, in one request: every one or none. Each row is named by its kind and id,
+ * never guessed. A row that is no longer in the Trash as it was refuses all of it (409 `TRASH_SELECTION_CHANGED`).
+ *
+ * Answers how many selected rows went and the ids of every entry and scene that went - a selected story's scenes included -
+ * read only after the server has answered, so a failed delete names nothing.
+ */
+export function bulkDeleteFromTrash(universeId: string, items: TrashItem[]) {
+  return apiFetch<TrashBulkErased>(`${base(universeId)}/bulk-delete`, {
+    method: 'POST',
+    body: JSON.stringify({ items: items.map(({ kind, id }) => ({ kind, id })) }),
+  })
 }
 
 /** Where a restored row lives, so the Trash can offer the way to it. */

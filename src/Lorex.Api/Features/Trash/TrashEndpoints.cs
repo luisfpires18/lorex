@@ -63,6 +63,7 @@ public static class TrashEndpoints
             .WithName("DeleteTrashedPlotBeat");
         group.MapDelete("/world-rules/{worldRuleId:guid}", TrashPermanentDelete.DeleteWorldRuleAsync)
             .WithName("DeleteTrashedWorldRule");
+        group.MapPost("/bulk-delete", TrashPermanentDelete.BulkDeleteAsync).WithName("BulkDeleteTrash");
 
         return endpoints;
     }
