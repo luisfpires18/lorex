@@ -201,7 +201,9 @@ test.describe('Lore pages', () => {
         const { context, page: tab } = await signedIn(browser, page, { viewport })
         await context.addInitScript((t) => localStorage.setItem('lorex-theme', t), theme)
         for (const at of [1, 2, 4]) {
-          await tab.goto(`/app/universes/${w.id}/lore?type=${w.rootId}${at > 1 ? `&page=${at}` : ''}`)
+          await tab.goto(
+            `/app/universes/${w.id}/lore?type=${w.rootId}${at > 1 ? `&page=${at}` : ''}`,
+          )
           await expect(tab.locator('.pager__position')).toHaveText(`Page ${at} of 4`)
           const g = await pagerGeometry(tab)
           const where = `${theme} ${viewport.width} page ${at}`
