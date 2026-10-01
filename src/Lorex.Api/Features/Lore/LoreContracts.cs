@@ -39,6 +39,13 @@ public sealed record EntityTypeParentChoice(Guid? Id);
 public sealed record EntityTypeMoveRequest(string? Direction);
 
 /// <summary>
+/// Puts a type at <see cref="Index"/> (0-based) among its current direct siblings - the types with the same parent - in one
+/// step. <see cref="ParentId"/> is the parent the client saw it under (null for the roots): reordering never reparents, so a
+/// type whose parent has changed since is refused rather than placed by stale numbers.
+/// </summary>
+public sealed record EntityTypeReorderRequest(int? Index, Guid? ParentId);
+
+/// <summary>
 /// <paramref name="EntityCount"/> counts every entry of the type, the Trash included, because a trashed entry keeps its type
 /// and still stops it being deleted; <paramref name="TrashedEntityCount"/> is how many of those are in the Trash. Both are
 /// the type's own entries only, never its descendants'. <paramref name="ParentId"/> is the type it sits beneath, or null for

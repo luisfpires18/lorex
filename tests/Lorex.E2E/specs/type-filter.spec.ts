@@ -491,8 +491,9 @@ test.describe('lore types', () => {
     )
     expect(first.width).toBeLessThan(narrowest * 2)
 
-    // Heading, types, filter and grid share one content area: the same left edge, and the types'
-    // row - closed by Select - and the cards end at the same right edge.
+    // Heading, types, filter and grid share one content area: the same left edge. The types' row
+    // runs the content's whole width; Select acts on the list, so it sits under the types with the
+    // list's controls, ending where the cards end (refinement 027).
     const heading = (await title(page).boundingBox())!
     const filter = (await page.getByLabel('Filter entries').boundingBox())!
     const types = (await page.getByTestId('lore-types').boundingBox())!
@@ -501,7 +502,8 @@ test.describe('lore types', () => {
       expect(Math.abs(left - cards.x)).toBeLessThanOrEqual(3)
     }
     const select = (await page.getByTestId('lore-select').boundingBox())!
-    expect(types.x + types.width).toBeLessThan(select.x)
+    expect(Math.abs(types.x + types.width - (cards.x + cards.width))).toBeLessThanOrEqual(3)
+    expect(select.y).toBeGreaterThanOrEqual(types.y + types.height)
     expect(Math.abs(select.x + select.width - (cards.x + cards.width))).toBeLessThanOrEqual(3)
 
     // The primary action still answers to its name - the type in view - with an icon beside it.
@@ -576,9 +578,10 @@ test.describe('lore types on a phone', () => {
     await expect(page.getByTestId('entity-card')).toHaveCount(1)
     await expect(card(page, 'The Tide Vigil')).toBeVisible()
 
-    // The first card is on the first screen, well above the fold.
+    // The first card is on the first screen, well above the fold - under the type menu and Filters, and since refinement
+    // 027 the list's own row (Select), which a phone keeps out of the Filters panel so it is always reachable.
     const firstCard = (await page.getByTestId('entity-card').first().boundingBox())!
-    expect(firstCard.y).toBeLessThanOrEqual(320)
+    expect(firstCard.y).toBeLessThanOrEqual(380)
     expect(await pageOverflow(page)).toBeLessThanOrEqual(1)
 
     // Escape closes it without choosing.

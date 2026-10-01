@@ -50,6 +50,18 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **Product refinement 027 - type drag reorder and stable Lore controls** (`feat/type-drag-reorder-lore-controls` off `dev`
+  at `75517d7`, committed, not merged, not pushed). No migration, backup stays **19**. ADR 0007 amended.
+  - Lore: Select (and Items per page) left the types' row for the list's controls (`lore__controls`: filters, then
+    `lore__resultactions`), so the type links no longer re-wrap between a type with entries and one without. Phone: Filters
+    folds search and status only; Select keeps its own row.
+  - Types: `POST .../entity-types/{id}/reorder` `{index, parentId}` - absolute place among current siblings, one transaction,
+    400 `index` out of range, 409 `entity_type_parent_changed` if the parent moved; shares `PlaceAmongSiblingsAsync` with
+    `move`. From 641px a grip (`TypeReorderHandle`, `@dnd-kit/core` 6.3.1, mouse only) drags among siblings only, one
+    request per drop, optimistic with rollback; keyboard lift/arrows/drop/Escape on the grip; Move up/down in the row menu.
+    640 and under: no grip, Up/Down unchanged. `ActionMenu` hidden items were already skipped (025).
+  - Tests: API 1247 -> 1251 (`NestedTypeTests.Reorder.cs`, 4). Playwright 349 -> 365 (`type-reorder.spec.ts` 10,
+    `lore-controls.spec.ts` 6); nested-types' Up/Down test runs at 640px; type-filter's layout pins moved with Select.
 - **Tooling refinement 026 - two Playwright workers in CI** (`chore/ci-playwright-parallelism` off `dev` at `7b9c219`,
   committed, not merged, not pushed). No product code. E2E was the CI critical path (~34 of ~36 minutes) at one worker.
   - `ci.yml` E2E step sets `LOREX_E2E_WORKERS=2` and `LOREX_E2E_DB=${{ runner.temp }}/lorex-e2e.db`; `playwright.config.ts`

@@ -81,6 +81,18 @@ in one transaction (SQLite's write lock serialises them). Up on the first and do
 purpose. `DisplayOrder` in a type request is now ignored - a stale or arbitrary number cannot reorder anything. A row whose
 parent or place changed records it in `UpdatedAt`.
 
+**Amendment (2026-10-01, Product refinement 027): an absolute reorder, for a drag.** `POST .../entity-types/{id}/reorder`
+`{ "index": n, "parentId": "<the parent the client saw, or null>" }` puts the type at 0-based place `n` among its current
+direct siblings in one request and one transaction, renumbers that group 1..n, and answers the whole list as `move` does. It
+never reparents: the type's nested types hang from it and so move with it, and nothing else - parent, fields, Family Tree,
+entries, counts - changes. Its own place is an unchanged 200; `n` missing, negative or past the group is a 400 on `index`; a
+`parentId` other than the type's current parent is a 409 `entity_type_parent_changed`, so a stale screen reloads instead of
+reordering a group it never showed. `move` and `reorder` share one helper (`PlaceAmongSiblingsAsync`), so the ordering
+invariant lives in one place. The Types screen: from 641px a grip per row drags a type among its siblings only (mouse only,
+via `@dnd-kit/core`; the drop is computed from sibling branches, so it can never land inside another branch or under another
+parent) and a keyboard lifts, moves and drops it from the same grip; Move up / Move down sit in the row's menu. At 640px and
+under there is no grip and no touch drag: Up and Down stay on the row. Reparenting stays Edit's Parent type.
+
 **Contracts.** `EntityTypeResponse.parentId`; the list stays a flat array, and clients build the tree from ids. The type
 request's `parent` is a wrapper - absent keeps the stored parent, so an older client saving a name cannot detach a type;
 `{ "id": null }` is a root, `{ "id": "…" }` beneath that type. A parent not of this universe is a 400 on `parent`; a cycle is
