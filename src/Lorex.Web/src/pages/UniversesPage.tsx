@@ -1,13 +1,8 @@
-import { ArrowUpRight } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { AccountMenu } from '../components/AccountMenu'
-import { BrandMark } from '../components/BrandMark'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { RestoreBackup } from '../components/RestoreBackup'
-import { MAIN_CONTENT_ID } from '../components/SkipLink'
 import { UniverseCard } from '../components/UniverseCard'
 import { UniverseForm } from '../components/UniverseForm'
-import { Wordmark } from '../components/Wordmark'
 import { createUniverse, listUniverses } from '../universes/api'
 import type { UniversePage } from '../universes/types'
 import { EmptyState } from '../components/EmptyState'
@@ -70,179 +65,157 @@ export default function UniversesPage() {
   const isFiltered = search.trim().length > 0
 
   return (
-    <div className="home">
-      <header className="home__bar">
-        {/* The brand is Lorex's, so it leads to the portal (014). */}
-        <Link className="home__brand" to="/explore" title="Explore worlds" data-testid="home-brand">
-          <BrandMark />
-          <Wordmark />
-        </Link>
-        <div className="home__session">
-          {/* The public portal, from the workspace's front door: what authors have published, this one included. */}
-          <Link className="home__back home__explore" to="/explore" data-testid="home-explore">
-            Explore worlds
-            <ArrowUpRight aria-hidden="true" size={15} strokeWidth={1.75} />
-          </Link>
-          {/* Ideas belong to the account, not to a world, so they are reached from here without opening one. */}
-          <Link className="home__back" to="/app/ideas" data-testid="home-ideas">
-            Ideas
-          </Link>
-          <AccountMenu variant="bar" />
+    <>
+      <div className="home__heading">
+        <h1 className="home__title">Universes</h1>
+        <div className="home__actions">
+          <button
+            className="button"
+            type="button"
+            onClick={() => {
+              setRestoring(false)
+              setIsCreating(true)
+            }}
+            data-testid="new-universe"
+          >
+            New universe
+          </button>
+          <button
+            className="button button--secondary"
+            type="button"
+            aria-expanded={isRestoring}
+            onClick={() => setRestoring(true)}
+            data-testid="restore-backup"
+          >
+            Restore backup
+          </button>
         </div>
-      </header>
+      </div>
 
-      <main className="home__body" id={MAIN_CONTENT_ID} tabIndex={-1}>
-        <div className="home__heading">
-          <h1 className="home__title">Universes</h1>
-          <div className="home__actions">
-            <button
-              className="button"
-              type="button"
-              onClick={() => {
-                setRestoring(false)
-                setIsCreating(true)
-              }}
-              data-testid="new-universe"
-            >
-              New universe
-            </button>
-            <button
-              className="button button--secondary"
-              type="button"
-              aria-expanded={isRestoring}
-              onClick={() => setRestoring(true)}
-              data-testid="restore-backup"
-            >
-              Restore backup
-            </button>
-          </div>
-        </div>
+      {isRestoring ? (
+        <RestoreBackup
+          onCancel={() => setRestoring(false)}
+          onRestored={(universe) => void navigate(`/app/universes/${universe.id}`)}
+        />
+      ) : null}
 
-        {isRestoring ? (
-          <RestoreBackup
-            onCancel={() => setRestoring(false)}
-            onRestored={(universe) => void navigate(`/app/universes/${universe.id}`)}
+      {isCreating ? (
+        <section className="composer" aria-label="Create a universe">
+          <h2 className="composer__title">Name a new world</h2>
+          <UniverseForm
+            submitLabel="Create universe"
+            busyLabel="Creating"
+            onCancel={() => setIsCreating(false)}
+            onSubmit={async (input) => {
+              const created = await createUniverse(input)
+              await navigate(`/app/universes/${created.id}`)
+            }}
           />
-        ) : null}
+        </section>
+      ) : null}
 
-        {isCreating ? (
-          <section className="composer" aria-label="Create a universe">
-            <h2 className="composer__title">Name a new world</h2>
-            <UniverseForm
-              submitLabel="Create universe"
-              busyLabel="Creating"
-              onCancel={() => setIsCreating(false)}
-              onSubmit={async (input) => {
-                const created = await createUniverse(input)
-                await navigate(`/app/universes/${created.id}`)
-              }}
-            />
-          </section>
-        ) : null}
-
-        <div className="controls">
-          <div className="controls__search">
-            <label className="field__label" htmlFor="universe-search">
-              Filter universes
-            </label>
-            <input
-              id="universe-search"
-              className="field__input"
-              type="search"
-              placeholder="Name of a world"
-              value={search}
-              onChange={(event) => changeSearch(event.target.value)}
-            />
-          </div>
-
-          <div className="segmented" role="group" aria-label="Archive filter">
-            <button
-              type="button"
-              className="segmented__option"
-              aria-pressed={!includeArchived}
-              onClick={() => changeFilter(false)}
-            >
-              Active
-            </button>
-            <button
-              type="button"
-              className="segmented__option"
-              aria-pressed={includeArchived}
-              onClick={() => changeFilter(true)}
-              data-testid="filter-all"
-            >
-              All
-            </button>
-          </div>
+      <div className="controls">
+        <div className="controls__search">
+          <label className="field__label" htmlFor="universe-search">
+            Filter universes
+          </label>
+          <input
+            id="universe-search"
+            className="field__input"
+            type="search"
+            placeholder="Name of a world"
+            value={search}
+            onChange={(event) => changeSearch(event.target.value)}
+          />
         </div>
 
-        {state.kind === 'loading' ? (
-          <p className="notice" role="status">
-            Gathering your universes…
-          </p>
-        ) : null}
+        <div className="segmented" role="group" aria-label="Archive filter">
+          <button
+            type="button"
+            className="segmented__option"
+            aria-pressed={!includeArchived}
+            onClick={() => changeFilter(false)}
+          >
+            Active
+          </button>
+          <button
+            type="button"
+            className="segmented__option"
+            aria-pressed={includeArchived}
+            onClick={() => changeFilter(true)}
+            data-testid="filter-all"
+          >
+            All
+          </button>
+        </div>
+      </div>
 
-        {state.kind === 'error' ? (
-          <div className="notice notice--error" role="alert">
-            <p>{state.message}</p>
-            <button
-              className="button button--secondary"
-              type="button"
-              onClick={() => setReloadKey((current) => current + 1)}
-            >
-              Try again
-            </button>
-          </div>
-        ) : null}
+      {state.kind === 'loading' ? (
+        <p className="notice" role="status">
+          Gathering your universes…
+        </p>
+      ) : null}
 
-        {result && result.items.length > 0 ? (
-          <ul className="plates" data-testid="universe-grid">
-            {result.items.map((universe) => (
-              <li key={universe.id}>
-                <UniverseCard universe={universe} />
-              </li>
-            ))}
-          </ul>
-        ) : null}
+      {state.kind === 'error' ? (
+        <div className="notice notice--error" role="alert">
+          <p>{state.message}</p>
+          <button
+            className="button button--secondary"
+            type="button"
+            onClick={() => setReloadKey((current) => current + 1)}
+          >
+            Try again
+          </button>
+        </div>
+      ) : null}
 
-        {result && result.items.length === 0 ? (
-          <EmptyState
-            testId="universe-empty"
-            title={<>{isFiltered ? 'Nothing here by that name.' : 'No universes yet.'}</>}
-            hint={
-              <>
-                {isFiltered
-                  ? 'Try a different word, or clear the search.'
-                  : 'Start one, and everything you invent will hang off it.'}
-              </>
-            }
-          />
-        ) : null}
+      {result && result.items.length > 0 ? (
+        <ul className="plates" data-testid="universe-grid">
+          {result.items.map((universe) => (
+            <li key={universe.id}>
+              <UniverseCard universe={universe} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
-        {result && result.totalPages > 1 ? (
-          <nav className="pager" aria-label="Pagination">
-            <button
-              className="button button--secondary"
-              type="button"
-              disabled={result.page <= 1}
-              onClick={() => setPage((current) => current - 1)}
-            >
-              Previous
-            </button>
-            <span className="pager__position">
-              Page {result.page} of {result.totalPages}
-            </span>
-            <button
-              className="button button--secondary"
-              type="button"
-              disabled={result.page >= result.totalPages}
-              onClick={() => setPage((current) => current + 1)}
-            >
-              Next
-            </button>
-          </nav>
-        ) : null}
-      </main>
-    </div>
+      {result && result.items.length === 0 ? (
+        <EmptyState
+          testId="universe-empty"
+          title={<>{isFiltered ? 'Nothing here by that name.' : 'No universes yet.'}</>}
+          hint={
+            <>
+              {isFiltered
+                ? 'Try a different word, or clear the search.'
+                : 'Start one, and everything you invent will hang off it.'}
+            </>
+          }
+        />
+      ) : null}
+
+      {result && result.totalPages > 1 ? (
+        <nav className="pager" aria-label="Pagination">
+          <button
+            className="button button--secondary"
+            type="button"
+            disabled={result.page <= 1}
+            onClick={() => setPage((current) => current - 1)}
+          >
+            Previous
+          </button>
+          <span className="pager__position">
+            Page {result.page} of {result.totalPages}
+          </span>
+          <button
+            className="button button--secondary"
+            type="button"
+            disabled={result.page >= result.totalPages}
+            onClick={() => setPage((current) => current + 1)}
+          >
+            Next
+          </button>
+        </nav>
+      ) : null}
+    </>
   )
 }

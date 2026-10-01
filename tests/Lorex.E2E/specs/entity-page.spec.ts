@@ -212,7 +212,7 @@ test.describe('an entry page', () => {
     }
 
     const sidebarLink = (page: Page, name: string) =>
-      page.getByRole('navigation', { name: 'Universe sections' }).getByRole('link', { name })
+      page.getByRole('navigation', { name: 'Universe', exact: true }).getByRole('link', { name })
 
     test('a link out asks once; staying keeps the edit, leaving lets it go', async ({ page }) => {
       await signUp(page)

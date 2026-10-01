@@ -174,8 +174,8 @@ directly, after a refresh, in a new browser. Signing in is a choice made from it
 - **Log in** and **Create account** in the portal bar pass the current page (path and query) as router state
   (`{ from }`) - the same mechanism `RequireAuth` uses. Signing in or registering returns there, not to the workspace;
   the Login and Register screens' links to each other carry it along. Signing out from the portal stays on the page.
-- **My workspace ↗** is the one way into the workspace from the portal; the universes header's **Explore worlds ↗**
-  is the way back. Visibility belongs to universes; the two sides are the portal and the workspace, never "public
+- **My workspace** is the one way into the workspace from the portal; My workspace's bar's **Explore** (and the account
+  menu's Go to on every screen) is the way back. Both are plain same-tab links - no outward arrow (refinement 024). Visibility belongs to universes; the two sides are the portal and the workspace, never "public
   mode" and "private mode".
 - **Return safety.** The page travels in history state, never in the address, so no link anyone else writes can choose
   it. `auth/returnPath.ts` still checks it, since anything on the page can write history state: it resolves the value
@@ -400,10 +400,10 @@ in both.
 
 ## 21. Front door and brand (UI refinement 014)
 
-- **Lorex's brand always leads to `/explore`**: the portal bar, the workspace rail's "L", the universes, ideas and profile
-  headers, and the sign-in plate. It is not context-sensitive. **My workspace** stays the deliberate way in; "Explore
-  worlds" stays in the universes header as the labelled way out. The universes are "All universes", at the head of the
-  sidebar and of the phone's Sections sheet.
+- **Lorex's brand always leads to `/explore`**: the portal bar, the workspace rail's "L", My workspace's bar, and the
+  sign-in plate. It is not context-sensitive, and its accessible name says where it goes: "Lorex – Explore". **My
+  workspace** stays the deliberate way in. The universes are "All universes", at the head of the sidebar and of the
+  phone's Sections sheet.
 - **The installed app opens Explore**, signed in or out, whatever was used last. The cause of it opening the workspace
   or Login on real installs was the service worker keeping the pre-011 manifest (`start_url: /app`) - fixed in 014 by
   never caching the manifest and bumping the worker's cache (ADR 0017 amendment). An unknown address now lands on
@@ -411,6 +411,40 @@ in both.
   say, `/app/...` by the sign-in rules. A device check is in the DEV runbook ("The installed app's front door").
 - **Publishing moved** from Settings to its own workspace page, Publish (`/app/universes/{id}/publish`), just above
   Settings. Same API, same rules, same confirmations (section 14's "Settings' Public portal section" is now this page).
+
+### 21.1 Global navigation and wayfinding (Product refinement 024)
+
+The hierarchy, made visible rather than implied:
+
+```
+Lorex
+├── Explore                        public side (PublicLayout)
+└── My workspace                   signed-in side
+    ├── Universes      /app        ┐ WorkspaceLayout: one bar, two tabs
+    ├── Ideas          /app/ideas  ┘
+    ├── Profile        /app/profile  (account menu; same bar, no tab current)
+    └── a universe     /app/universes/:id  (its own rail and sidebar; up = All universes)
+```
+
+- **Words.** The public side is **Explore** wherever a person reads a destination - the portal's nav and landmark, My
+  workspace's bar, the account menu. "Portal" is the architecture's word, not the screen's; "Explore worlds" is retired
+  as a link. The Explore page's own heading and title stay "Explore Worlds" (ADR 0038's server head says the same). The
+  signed-in side is **My workspace**; Universes is its default screen, not its synonym. Profile is **Profile**.
+- **My workspace's bar** (`WorkspaceLayout`, a layout route over `/app`, `/app/profile`, `/app/ideas...`): brand, the
+  caption "My workspace", Universes and Ideas as `NavLink`s (`aria-current="page"`, ink plus a rule at the bar's foot),
+  Explore, the account. `<nav aria-label="My workspace">`. On a phone (40rem) two intentional rows - brand and account,
+  then My workspace with its tabs - and Explore leaves the bar for the account menu. Not drawn above a universe.
+- **Account menu** (one `AccountMenu`, every surface): the account, then **Go to** - My workspace (`/app`), Ideas,
+  Explore - then Profile, Theme, Sign out. Ordinary links, none marked current, so it always opens on its first item.
+  A long address breaks before its @ and dots, inside a panel at most 20rem wide.
+- **A universe** keeps rail, seal, sidebar, search and the Sections sheet. "All universes" and the sections are one
+  landmark, `<nav aria-label="Universe">`. The `L` keeps its glyph on a 40px target. Explore from a universe is the `L`
+  or the account menu's Go to; no text link is added to the rail.
+- **Titles.** One owner per screen: `WorkspaceLayout` ("Universes | Lorex", "Ideas | Lorex", "Profile | Lorex"), the
+  universe shell ("Lore — Hollowmere | Lorex", an entry or a story still its section), portal pages their own.
+- **Focus.** Changing place - portal, an account-level screen, or a universe - moves the focus to the new `main`
+  (`RouteFocus`); a section, a query string, an entry or an idea within the same place does not.
+- **Back** is the way to the exact deep screen left for Profile; no "return to" state is kept.
 
 ## 22. Story content and attribution (Product refinement 015, ADR 0039)
 

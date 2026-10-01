@@ -50,6 +50,20 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **Product refinement 024 - global navigation and wayfinding** (`feat/global-navigation-wayfinding` off `dev` at
+  `b6cc948`, committed, not merged, not pushed). Frontend only: no migration, backup stays **19**. Hierarchy and rules:
+  `docs/public-portal/PUBLIC_PORTAL.md` 21.1; ADR 0036 amended.
+  - `WorkspaceLayout`: one layout route and bar for `/app`, `/app/profile`, `/app/ideas...` (three copied headers gone):
+    brand, "My workspace", Universes / Ideas `NavLink` tabs, Explore, account; two rows under 40rem, Explore then only in
+    the account menu. Not over a universe.
+  - Words: Explore (not "Explore worlds"/"Portal") for the public side, My workspace, Universes, All universes, Profile.
+    No outward arrows on same-tab links. Brand everywhere -> `/explore`, named "Lorex – Explore"; rail `L` on a 40px target.
+  - `AccountMenu` gains Go to (My workspace, Ideas, Explore) before Profile, Theme, Sign out; email breaks at @ and dots.
+  - Universe sidebar is one `<nav aria-label="Universe">` holding All universes and the sections.
+  - Titles: shells own them (`lib/useDocumentTitle`): "Universes | Lorex", "Lore — Hollowmere | Lorex". `RouteFocus` moves
+    focus to the new `main` on a change of place only.
+  - Tests: Playwright 327 -> 341 (`global-navigation.spec.ts`, 14); full run 341/341, fresh DB, 2 workers, 0 retries.
+  - Not done: publishing copy still says "public portal" in prose (Publish, Settings, Profile notes, a section purpose).
 - **Product refinement 023 - bulk permanent Trash deletion** (`feat/bulk-trash-permanent-delete` off `dev` at `bc0833e`,
   committed, not merged, not pushed). No migration; backup stays **19**. ADR 0015 amended (contract), 0029 and 0033 pointers.
   - `POST .../trash/bulk-delete` `{ items: [{ kind, id }] }`: owner 404 first; 1-100 items, known kind, non-empty id, no

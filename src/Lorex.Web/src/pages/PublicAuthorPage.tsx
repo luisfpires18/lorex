@@ -9,7 +9,7 @@ import {
   type PublicUniverse,
 } from '../portal/api'
 import { usePublicPages } from '../portal/usePublicPages'
-import { useDocumentTitle } from '../portal/useDocumentTitle'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 
 type LoadState =
   | { slug: string; kind: 'ready'; author: PublicAuthor }

@@ -6,7 +6,7 @@ import { listPublicUniverses, type ExploreQuery, type PublicUniverse } from '../
 import heroImage from '../portal/explore-worlds-background.png'
 import heroImageWebp from '../portal/explore-worlds-background.webp'
 import { CATEGORIES, GENRES } from '../publishing/types'
-import { useDocumentTitle } from '../portal/useDocumentTitle'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 
 /** The API's own limit on a search; the portal bar's field holds the same. */
 const SEARCH_MAX = 100

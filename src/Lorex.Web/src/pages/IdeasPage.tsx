@@ -1,39 +1,6 @@
-import type { ReactNode } from 'react'
-import { Link, useOutletContext } from 'react-router-dom'
-import { AccountMenu } from '../components/AccountMenu'
-import { BrandMark } from '../components/BrandMark'
+import { useOutletContext } from 'react-router-dom'
 import { IdeasBrowser } from '../components/IdeasBrowser'
-import { MAIN_CONTENT_ID } from '../components/SkipLink'
-import { Wordmark } from '../components/Wordmark'
 import type { WorkspaceContext } from './UniverseWorkspace'
-
-/**
- * The account-level frame the global Ideas screens wear: the same bar as the universe browser and the Profile screen,
- * because ideas belong to the account and to no one world.
- */
-export function IdeasHome({ children }: { children: ReactNode }) {
-  return (
-    <div className="home">
-      <header className="home__bar">
-        {/* The brand is Lorex's, so it leads to the portal (014). */}
-        <Link className="home__brand" to="/explore" title="Explore worlds" data-testid="home-brand">
-          <BrandMark />
-          <Wordmark />
-        </Link>
-        <div className="home__session">
-          <Link className="home__back" to="/app" data-testid="ideas-universes">
-            All universes
-          </Link>
-          <AccountMenu variant="bar" />
-        </div>
-      </header>
-
-      <main className="home__body" id={MAIN_CONTENT_ID} tabIndex={-1}>
-        {children}
-      </main>
-    </div>
-  )
-}
 
 /**
  * Ideas: every idea the account has at `/app/ideas`, or one universe's inside its workspace. One list either way
@@ -52,9 +19,5 @@ export default function IdeasPage({ inUniverse = false }: { inUniverse?: boolean
     )
   }
 
-  return (
-    <IdeasHome>
-      <IdeasBrowser universe={null} basePath="/app/ideas" />
-    </IdeasHome>
-  )
+  return <IdeasBrowser universe={null} basePath="/app/ideas" />
 }

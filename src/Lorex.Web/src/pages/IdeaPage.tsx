@@ -2,7 +2,6 @@ import { useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { IdeaEditor } from '../components/IdeaEditor'
 import { Quoted } from '../components/NameList'
 import type { IdeasListNotice } from '../components/IdeasBrowser'
-import { IdeasHome } from './IdeasPage'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
 interface IdeaPageProps {
@@ -21,7 +20,7 @@ export default function IdeaPage({ inUniverse = false, isNew = false }: IdeaPage
   const universe = inUniverse && context ? context.universe : null
   const listPath = universe ? `/app/universes/${universe.id}/ideas` : '/app/ideas'
 
-  const editor = (
+  return (
     <IdeaEditor
       // A different idea - or the new one becoming saved - is a different editor, starting from nothing.
       key={isNew ? 'new' : ideaId}
@@ -52,6 +51,4 @@ export default function IdeaPage({ inUniverse = false, isNew = false }: IdeaPage
       }
     />
   )
-
-  return universe ? editor : <IdeasHome>{editor}</IdeasHome>
 }

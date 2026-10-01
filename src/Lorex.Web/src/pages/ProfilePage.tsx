@@ -1,22 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
-import { AccountMenu } from '../components/AccountMenu'
-import { BrandMark } from '../components/BrandMark'
 import { ProfileAvatar } from '../components/ProfileAvatar'
 import { PublicAuthorSection } from '../components/PublicAuthorSection'
 import { PublicNameForm } from '../components/PublicNameForm'
 import { ThemeSwitch } from '../components/ThemeSwitch'
-import { MAIN_CONTENT_ID } from '../components/SkipLink'
-import { Wordmark } from '../components/Wordmark'
 import { listUniverses } from '../universes/api'
 
 /**
  * The signed-in account, and only what Lorex genuinely knows about it.
  *
  * A user-level screen rather than a universe one: nothing here belongs to a world, so it sits
- * beside the universe browser at `/app/profile` and wears the same bar. The workspace sidebar
- * still links to it, which is where an author is when they think to look.
+ * beside the universes and the ideas at `/app/profile`, inside My workspace's frame
+ * (`WorkspaceLayout`). It is not one of that frame's tabs: it is reached from the account menu,
+ * which is on every screen in Lorex, a universe's included.
  *
  * The circle near the top is the account's photo, or its initial when there is none. The username is
  * the account's name here; the public name is a separate, chosen one, shown only as the author of
@@ -45,82 +41,64 @@ export default function ProfilePage() {
   if (!user) return null
 
   return (
-    <div className="home">
-      <header className="home__bar">
-        {/* The brand is Lorex's, so it leads to the portal (014). */}
-        <Link className="home__brand" to="/explore" title="Explore worlds" data-testid="home-brand">
-          <BrandMark />
-          <Wordmark />
-        </Link>
-        <div className="home__session">
-          <Link className="home__back" to="/app">
-            All universes
-          </Link>
-          <AccountMenu variant="bar" />
+    <article className="profile" data-testid="profile">
+      <h1 className="profile__title">Profile</h1>
+
+      <ProfileAvatar name={user.username} />
+
+      <p className="profile__name" data-testid="profile-name">
+        {user.username}
+      </p>
+
+      <dl className="profile__facts">
+        <div className="profile__fact">
+          <dt className="profile__label">Email</dt>
+          <dd className="profile__value" data-testid="profile-email">
+            {user.email}
+          </dd>
         </div>
-      </header>
+        {universeCount === null ? null : (
+          <div className="profile__fact">
+            <dt className="profile__label">Universes</dt>
+            <dd className="profile__value" data-testid="profile-universes">
+              {universeCount}
+            </dd>
+          </div>
+        )}
+        <div className="profile__fact">
+          <dt className="profile__label">Account ID</dt>
+          <dd className="profile__value profile__value--id" data-testid="profile-id">
+            {user.id}
+          </dd>
+        </div>
+      </dl>
 
-      <main className="home__body" id={MAIN_CONTENT_ID} tabIndex={-1}>
-        <article className="profile" data-testid="profile">
-          <h1 className="profile__title">Profile</h1>
+      <section className="profile__public" aria-labelledby="profile-public-heading">
+        <h2 className="profile__subtitle" id="profile-public-heading">
+          Publishing
+        </h2>
+        <PublicNameForm />
+        <PublicAuthorSection />
+      </section>
 
-          <ProfileAvatar name={user.username} />
+      <section className="profile__public" aria-labelledby="profile-appearance-heading">
+        <h2 className="profile__subtitle" id="profile-appearance-heading">
+          Appearance
+        </h2>
+        <p className="settings__note">
+          One theme for the whole of Lorex - the public portal and your workspace. It is kept in
+          this browser.
+        </p>
+        <ThemeSwitch />
+      </section>
 
-          <p className="profile__name" data-testid="profile-name">
-            {user.username}
-          </p>
-
-          <dl className="profile__facts">
-            <div className="profile__fact">
-              <dt className="profile__label">Email</dt>
-              <dd className="profile__value" data-testid="profile-email">
-                {user.email}
-              </dd>
-            </div>
-            {universeCount === null ? null : (
-              <div className="profile__fact">
-                <dt className="profile__label">Universes</dt>
-                <dd className="profile__value" data-testid="profile-universes">
-                  {universeCount}
-                </dd>
-              </div>
-            )}
-            <div className="profile__fact">
-              <dt className="profile__label">Account ID</dt>
-              <dd className="profile__value profile__value--id" data-testid="profile-id">
-                {user.id}
-              </dd>
-            </div>
-          </dl>
-
-          <section className="profile__public" aria-labelledby="profile-public-heading">
-            <h2 className="profile__subtitle" id="profile-public-heading">
-              Publishing
-            </h2>
-            <PublicNameForm />
-            <PublicAuthorSection />
-          </section>
-
-          <section className="profile__public" aria-labelledby="profile-appearance-heading">
-            <h2 className="profile__subtitle" id="profile-appearance-heading">
-              Appearance
-            </h2>
-            <p className="settings__note">
-              One theme for the whole of Lorex - the public portal and your workspace. It is kept in
-              this browser.
-            </p>
-            <ThemeSwitch />
-          </section>
-
-          <p className="profile__note">
-            Lorex keeps only what it needs to sign you in: a username, an email address, and the
-            photo above if you add one - and the public name above, if you choose one, which is the
-            only thing the public portal shows about you, with your author page's address. Your
-            photo is private - served only to your own signed-in session - unless you choose to show
-            it on your author page, and it is never part of a universe backup.
-          </p>
-        </article>
-      </main>
-    </div>
+      <p className="profile__note">
+        Lorex keeps only what it needs to sign you in: a username, an email address, and the photo
+        above if you add one - and the public name above, if you choose one, which is the only thing
+        the public portal shows about you, with your author page's address. Your photo is private -
+        served only to your own signed-in session - unless you choose to show it on your author
+        page, and it is never part of a universe backup.
+      </p>
+    </article>
   )
 }

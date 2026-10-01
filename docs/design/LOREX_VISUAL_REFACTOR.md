@@ -340,7 +340,8 @@ one-off component per screen.
 - **Item:** 36px (44px under touch), `--radius-sm`, 14px label. Hover: `--hover-wash`. Current:
   `--accent-wash` background, ink label at 500, a 3px bar in `--universe-accent` on the inside left
   edge, `aria-current="page"`.
-- **Landmark:** `<nav aria-label="Universe sections">`.
+- **Landmark:** `<nav aria-label="Universe">`, holding the head's "All universes" as well as the sections
+  (refinement 024; `PUBLIC_PORTAL.md` 21.1).
 - **Head:** "← All universes" (13px muted), the universe name (serif 20; no longer the page's `h1`),
   the Archived badge.
 - **Width:** 15rem from 1280px, 13.5rem from 861 to 1279px.

@@ -120,6 +120,13 @@ The same principle, one level down: nothing inside a universe is public because 
 - Relationships, family trees, timeline, world rules, ideas and Canon stay private; no public detail route for an entry
   or a story exists yet. Task 011 builds reading on these contracts with its own detail DTOs.
 
+## Amendment (2026-10-01, Product refinement 024) - three frames, one vocabulary
+
+- "One application, two layouts" is now three frames over one session and router: `PublicLayout` (Explore),
+  `WorkspaceLayout` (My workspace's account-level screens: Universes, Ideas, Profile) and a universe's own shell. The
+  workspace's way across is **Explore**, not "Explore worlds"; the brand still leads to `/explore` from every frame.
+  Detail: `docs/public-portal/PUBLIC_PORTAL.md` 21.1. Navigation only - no API, schema or backup change.
+
 ## Amendment (2026-09-28, Task 011) - public reading: an entry's page, a story's page, and a story's public summary
 
 - **An entry's page carries its article.** `GET /api/public/universes/{slug}/lore/{loreSlug}` -> `PublicLoreDetail`: the
