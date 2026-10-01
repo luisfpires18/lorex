@@ -7,20 +7,25 @@ const apiBaseUrl = process.env.LOREX_API_URL ?? 'http://localhost:5180'
 const isCi = !!process.env.CI
 
 /**
- * How many browsers run at once, locally.
+ * How many browsers run at once.
  *
- * Playwright's own default - half the logical processors - is what this stays at, because it was
- * measured and nothing below it was steadier. Against a database the suite made itself, the full
- * 155 at that default came back green three runs out of three with no SQLite contention at all.
- * Against a copy of a long-lived development one it lost tests and logged `database is locked` in
- * both runs, and halving the workers changed neither, at 1.7x the wall clock. So the knob that
- * matters is `LOREX_E2E_DB`, below; this one is here for a machine that wants to be told rather
- * than to guess. The numbers are in `README.md`.
+ * `LOREX_E2E_WORKERS`, when it is a whole number above zero, decides - locally and in CI alike, so
+ * the workflow states its concurrency where it is run (`ci.yml` asks for two). Without it, CI falls
+ * back to one, the conservative floor, and a local run gets Playwright's own default: half the
+ * logical processors.
+ *
+ * That local default was measured rather than assumed. Against a database the suite made itself,
+ * the full 155 at eight workers came back green three runs out of three with no SQLite contention
+ * at all; against a copy of a long-lived development one it lost tests and logged `database is
+ * locked` in both runs, and halving the workers changed neither, at 1.7x the wall clock. So a
+ * fresh database (`LOREX_E2E_DB`, below) is the condition parallel browsers depend on, and CI
+ * always gives itself one. Two workers sharing one API and one fresh database is how every full
+ * run since 008 has been proved locally; the numbers, and why CI stops at two, are in `README.md`.
  */
 const workers = (() => {
-  if (isCi) return 1
   const asked = Number(process.env.LOREX_E2E_WORKERS)
-  return Number.isInteger(asked) && asked > 0 ? asked : undefined
+  if (Number.isInteger(asked) && asked > 0) return asked
+  return isCi ? 1 : undefined
 })()
 
 /**

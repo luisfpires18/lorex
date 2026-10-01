@@ -50,6 +50,14 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **Tooling refinement 026 - two Playwright workers in CI** (`chore/ci-playwright-parallelism` off `dev` at `7b9c219`,
+  committed, not merged, not pushed). No product code. E2E was the CI critical path (~34 of ~36 minutes) at one worker.
+  - `ci.yml` E2E step sets `LOREX_E2E_WORKERS=2` and `LOREX_E2E_DB=${{ runner.temp }}/lorex-e2e.db`; `playwright.config.ts`
+    lets a valid `LOREX_E2E_WORKERS` win in CI too (unset: CI 1, local Playwright's default). Retries (2) and the whole suite
+    unchanged; one job, one report.
+  - Proof, fresh DB, 2 workers, retries 0, API logging every status: write-heavy 105/105, full 348/349 in 15m59s (one blank
+    `/register` - dev-server flake - green 3/3 alone); 0 `database is locked`, 0 5xx. Shards considered and not taken
+    (`tests/Lorex.E2E/README.md`). Remote speed-up unproven until the next GitHub run.
 - **Product refinement 025 - Lore type browser restore and Add child** (`feat/lore-type-browser-child-ux` off `dev` at
   `ee10cb9`, committed, not merged, not pushed). Frontend only; no migration, backup stays **19**. ADR 0007 amended.
   - Lore: 022's chooser and inline tree (`TypeTree.tsx`, `useOpenBranches.ts`, `lore__choose`, `typetree`/`typechooser` CSS)
