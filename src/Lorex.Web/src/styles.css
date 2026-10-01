@@ -237,8 +237,8 @@ textarea,
   margin: 0 0 1.5rem;
 }
 
-/* Mark and wordmark as one lockup in the paper bars, so they move together and the bar's own
-   space-between still puts the account menu opposite them. */
+/* Mark and wordmark as one lockup in the paper bars - My workspace's and the sign-in plate's - so
+   they move together. */
 .home__brand,
 .auth__brand {
   display: flex;
@@ -686,43 +686,122 @@ a.button--danger:visited {
   background: var(--surface);
 }
 
-.home__bar {
+/* My workspace's bar (`WorkspaceLayout`): the brand, the workspace by name and its two places, Explore, the account.
+   Paper and a hairline like the rest of the workspace, not the portal's band: the two sides of Lorex stay two looks. */
+.workspacebar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1.15rem clamp(1.25rem, 4vw, 3rem);
+  gap: var(--space-3) var(--space-6);
+  min-height: 4rem;
+  padding: 0 clamp(1.25rem, 4vw, 3rem);
   border-bottom: 1px solid var(--rule);
 }
 
-.home__session {
+.workspacebar__brand {
+  flex: none;
+}
+
+.workspacebar__nav {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  align-self: stretch;
+  gap: var(--space-5);
+  min-width: 0;
 }
 
-/* Quiet text rather than a link until it is pointed at: the bar is chrome, and an accent-blue word beside the
-   wordmark would outweigh the screen under it. */
-.home__back {
-  font-size: 0.925rem;
+/* The name of the side of Lorex this is: a caption set off from the brand by a hairline, quieter than the places
+   beside it, because it is where you are rather than somewhere to go. */
+.workspacebar__context {
+  padding-left: var(--space-5);
+  border-left: 1px solid var(--rule-strong);
+  font-size: var(--text-sm);
   color: var(--muted);
-  text-decoration: none;
+  white-space: nowrap;
 }
 
-.home__back:hover {
-  color: var(--accent);
-  text-decoration: underline;
+.workspacebar__links {
+  display: flex;
+  align-self: stretch;
+  gap: var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.home__back {
-  font-size: 0.875rem;
+.workspacebar__links li {
+  display: flex;
 }
 
-/* The way across to the public portal: an arrow out, the same one the portal's "My workspace" points back with. */
-.home__explore {
+.workspacebar__link,
+.workspacebar__explore {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
+  color: var(--muted);
+  font-size: var(--text-ui);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.workspacebar__link:hover,
+.workspacebar__explore:hover {
+  color: var(--ink);
+}
+
+/* The place you are in: a rule along the bar's foot as well as the ink, so it is never colour alone. */
+.workspacebar__link[aria-current='page'] {
+  color: var(--ink);
+  box-shadow: inset 0 -2px 0 var(--ink);
+}
+
+.workspacebar__link:focus-visible,
+.workspacebar__explore:focus-visible {
+  outline-offset: -2px;
+}
+
+.workspacebar__explore {
+  margin-left: auto;
+  align-self: stretch;
+}
+
+/* A phone: two rows on purpose rather than one that wraps by accident. The brand and the account across the top; My
+   workspace and its places on a row of their own beneath, each place a full-height target with its rule at the foot.
+   Explore leaves the bar - the account menu's "Go to" holds it, and the brand leads there too. */
+@media (max-width: 40rem) {
+  .workspacebar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'brand account'
+      'nav nav';
+    gap: 0 var(--space-3);
+    min-height: 0;
+    padding-top: var(--space-3);
+  }
+
+  .workspacebar__brand {
+    grid-area: brand;
+    justify-self: start;
+  }
+
+  .workspacebar .accountmenu {
+    grid-area: account;
+  }
+
+  .workspacebar__nav {
+    grid-area: nav;
+    min-height: var(--control-touch);
+    margin-top: var(--space-2);
+  }
+
+  .workspacebar__context {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .workspacebar__explore {
+    display: none;
+  }
 }
 
 .home__body {
@@ -1105,22 +1184,43 @@ a.button--danger:visited {
   left: calc(100% + 0.5rem);
 }
 
-.accountmenu__panel {
+/* Doubled so it outranks the general panel's own width, which is declared further down. */
+.actionmenu__panel.accountmenu__panel {
   min-width: 16rem;
+  max-width: min(20rem, calc(100vw - 2rem));
 }
 
+/* A name or an address longer than the panel wraps inside it rather than widening it: the address at its own breaks
+   (before the @ and each dot, see AccountMenu), and only a single part too long for a line is cut mid-word. */
 .accountmenu__username {
   margin: 0;
   font-size: var(--text-ui);
   font-weight: 600;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .accountmenu__email {
   margin: 0.15rem 0 0;
   font-size: var(--text-sm);
   color: var(--muted);
-  overflow-wrap: anywhere;
+  text-align: start;
+  overflow-wrap: break-word;
+}
+
+/* "Go to": Lorex's places, under a caption of their own, ruled off from the account above and below. */
+.accountmenu__goto {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: var(--space-1);
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid var(--rule);
+}
+
+.accountmenu__grouplabel {
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--muted);
 }
 
 /* ---------- Action menu ----------
@@ -1903,7 +2003,14 @@ a.button--danger:visited {
   padding: 1.1rem 0;
 }
 
+/* A small glyph on a comfortable target: 40px square, centred in the 56px rail. */
 .rail__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-sm);
   font-family: var(--display);
   font-size: 1.35rem;
   letter-spacing: 0.05em;

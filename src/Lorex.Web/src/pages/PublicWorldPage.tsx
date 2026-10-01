@@ -17,7 +17,7 @@ import {
 import { usePublicPages } from '../portal/usePublicPages'
 import { useWorkspaceLink } from '../portal/useWorkspaceLink'
 import { categoryLabel, genreKey, genreLabel } from '../publishing/types'
-import { useDocumentTitle } from '../portal/useDocumentTitle'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 
 type LoadState =
   | { slug: string; kind: 'ready'; world: PublicUniverse }

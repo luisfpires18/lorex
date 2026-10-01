@@ -239,7 +239,7 @@ test.describe('ideas', () => {
 
     // Reached from the universes screen, without opening a world.
     await page.goto('/app')
-    await page.getByTestId('home-ideas').click()
+    await page.getByTestId('workspacebar-ideas').click()
     await page.waitForURL('/app/ideas')
     await expect(row(page, 'An idea about the other shore')).toBeVisible()
 
@@ -667,7 +667,7 @@ test.describe('ideas', () => {
     await page.getByTestId('confirm-delete').click()
     await page.waitForURL('/app')
 
-    await page.getByTestId('home-ideas').click()
+    await page.getByTestId('workspacebar-ideas').click()
     const kept = row(page, 'An idea that outlives its world')
     await expect(kept.getByTestId('idea-universe-label')).toHaveText('No universe')
     await kept.getByTestId('idea-open').click()

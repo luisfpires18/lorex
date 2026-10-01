@@ -126,7 +126,7 @@ test.describe('Explore worlds', () => {
     await expect(session.getByRole('link', { name: 'Create account' })).toBeVisible()
     await expect(visitor.getByTestId('portal-workspace')).toHaveCount(0)
     await expect(
-      visitor.getByRole('navigation', { name: 'Portal' }).getByRole('link', { name: 'Explore' }),
+      visitor.getByRole('navigation', { name: 'Explore' }).getByRole('link', { name: 'Explore' }),
     ).toHaveAttribute('aria-current', 'page')
 
     // Only what was published, each as one card: artwork, name, what it is, and who made it.
@@ -159,7 +159,7 @@ test.describe('Explore worlds', () => {
     await context.close()
   })
 
-  test('signed in: My workspace and Explore worlds lead across and back', async ({ page }) => {
+  test('signed in: My workspace and Explore lead across and back', async ({ page }) => {
     await author(page, 'Iris Hale')
     await page.goto('/explore')
 
@@ -487,7 +487,7 @@ test.describe('the portal is the front door', () => {
     await fresh.context.close()
   })
 
-  test('Log in from Explore comes back to Explore, not the workspace; My workspace and Explore worlds cross over', async ({
+  test('Log in from Explore comes back to Explore, not the workspace; My workspace and Explore cross over', async ({
     page,
     request,
   }) => {

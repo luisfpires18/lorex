@@ -3,7 +3,8 @@ import { createBrowserRouter, Navigate, Route, RouterProvider, Routes } from 're
 import { AuthProvider } from './auth/AuthProvider'
 import { RequireAuth, RequireGuest } from './auth/routes'
 import { PublicLayout } from './components/PublicLayout'
-import { SkipLink } from './components/SkipLink'
+import { RouteFocus, SkipLink } from './components/SkipLink'
+import { WorkspaceLayout } from './components/WorkspaceLayout'
 import { HistoryLeaveGuard } from './lib/leaveGuard'
 import { ProfileImageProvider } from './profile/ProfileImageProvider'
 import UniverseOverview from './pages/UniverseOverview'
@@ -56,7 +57,7 @@ function ScreenPending() {
   return <div className="session-pending" role="status" aria-label="Loading this screen" />
 }
 
-/** The same hold inside a universe, where the rail, the sidebar and the search stay put around it. */
+/** The same hold inside a frame that stays put around it: a universe's rail, sidebar and search, or the workspace bar. */
 function SectionPending() {
   return (
     <p className="notice" role="status">
@@ -98,6 +99,7 @@ function Root() {
       <ProfileImageProvider>
         <HistoryLeaveGuard />
         <SkipLink />
+        <RouteFocus />
         <Routes>
           {/* The public portal: outside both guards, so it answers signed in or out, and outside the
               workspace, so none of its chrome is mounted. It reads only the anonymous API (ADR 0036). */}
@@ -124,11 +126,15 @@ function Root() {
           </Route>
 
           <Route element={<RequireAuth />}>
-            <Route path="/app" element={asScreen('universes', <UniversesPage />)} />
-            <Route path="/app/profile" element={asScreen('profile', <ProfilePage />)} />
-            <Route path="/app/ideas" element={asScreen('ideas', <IdeasPage />)} />
-            <Route path="/app/ideas/new" element={asScreen('idea', <IdeaPage isNew />)} />
-            <Route path="/app/ideas/:ideaId" element={asScreen('idea', <IdeaPage />)} />
+            {/* My workspace's account-level screens share one frame (`WorkspaceLayout`). A universe, below, is a level
+                deeper and keeps its own rail and sidebar instead. */}
+            <Route element={<WorkspaceLayout />}>
+              <Route path="/app" element={asSection('universes', <UniversesPage />)} />
+              <Route path="/app/profile" element={asSection('profile', <ProfilePage />)} />
+              <Route path="/app/ideas" element={asSection('ideas', <IdeasPage />)} />
+              <Route path="/app/ideas/new" element={asSection('idea', <IdeaPage isNew />)} />
+              <Route path="/app/ideas/:ideaId" element={asSection('idea', <IdeaPage />)} />
+            </Route>
             <Route path="/app/universes/:id" element={<UniverseWorkspace />}>
               <Route index element={<UniverseOverview />} />
               <Route path="lore" element={asSection('lore', <LorePage />)} />

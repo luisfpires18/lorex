@@ -201,11 +201,14 @@ test.describe('profile', () => {
     // No stored picture exists, so the circle carries the account's initial.
     await expect(page.getByTestId('profile-avatar')).toHaveText(account.username[0]!.toUpperCase())
 
-    // The way back out is a link, not the browser's button.
-    await page.getByRole('link', { name: 'All universes' }).click()
+    // The way back out is a link, not the browser's button: My workspace's own Universes.
+    await page
+      .getByRole('navigation', { name: 'My workspace' })
+      .getByRole('link', { name: 'Universes' })
+      .click()
     await expect(page).toHaveURL('/app')
 
-    // And the universes header carries the same menu, to the same place.
+    // And the universes screen carries the same menu, to the same place.
     await openAccountMenu(page)
     await page.getByTestId('account-menu-profile').click()
     await expect(page).toHaveURL('/app/profile')

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { useDocumentTitle } from '../portal/useDocumentTitle'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 
 /**
  * The one page every public address answers with when it has nothing to show: a private world, a private or trashed
@@ -13,7 +13,7 @@ export function PortalMissing({ title, testId }: { title: string; testId: string
       <h1 className="pmissing__title">{title}</h1>
       <p className="pmissing__hint">Its address may be wrong, or it is not public.</p>
       <Link className="portal__pill" to="/explore">
-        Explore worlds
+        Explore
       </Link>
     </div>
   )

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 
 import { Link } from 'react-router-dom'
-import { BrandMark } from './BrandMark'
+import { BRAND_LINK_LABEL, BrandMark } from './BrandMark'
 import { MAIN_CONTENT_ID } from './SkipLink'
 import { Wordmark } from './Wordmark'
 
@@ -28,7 +28,7 @@ export function AuthLayout({ heading, intro, children, footer }: AuthLayoutProps
           <Link
             className="auth__brand"
             to="/explore"
-            title="Explore worlds"
+            aria-label={BRAND_LINK_LABEL}
             data-testid="auth-brand"
           >
             <BrandMark className="brandmark brandmark--plate" />

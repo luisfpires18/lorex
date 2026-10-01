@@ -80,7 +80,7 @@ test.describe('the account menu', () => {
 
     await openAccountMenu(page)
     await expect(trigger).toHaveAttribute('aria-expanded', 'true')
-    await page.getByRole('link', { name: 'View profile' }).click()
+    await page.getByRole('link', { name: 'Profile', exact: true }).click()
     await expect(page).toHaveURL('/app/profile')
   })
 
@@ -152,8 +152,8 @@ test.describe('the account menu', () => {
     await page.keyboard.press('Enter')
     await expect(panel).toBeVisible()
 
-    // Focus went into the panel, so the keyboard is not left behind the trigger it just pressed.
-    await expect(page.getByRole('link', { name: 'View profile' })).toBeFocused()
+    // Focus went into the panel - onto its first place - so the keyboard is not left behind the trigger it just pressed.
+    await expect(page.getByRole('link', { name: 'My workspace' })).toBeFocused()
 
     // Escape closes it and hands focus back.
     await page.keyboard.press('Escape')
@@ -195,7 +195,7 @@ test.describe('the account menu', () => {
       )
       expect(overflow, `the bar scrolls sideways by ${overflow}px`).toBeLessThanOrEqual(1)
 
-      await page.getByRole('link', { name: 'View profile' }).click()
+      await page.getByRole('link', { name: 'Profile', exact: true }).click()
       await expect(page).toHaveURL('/app/profile')
     })
   })

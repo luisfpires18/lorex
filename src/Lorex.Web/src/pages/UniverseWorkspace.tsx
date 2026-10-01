@@ -2,12 +2,14 @@ import { useCallback, useEffect, useId, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { AccountMenu } from '../components/AccountMenu'
+import { BRAND_LINK_LABEL } from '../components/BrandMark'
 import { MAIN_CONTENT_ID } from '../components/SkipLink'
 import { UniverseSearch } from '../components/UniverseSearch'
 import { getChronology } from '../chronology/api'
 import type { Chronology } from '../chronology/types'
 import { getUniverse } from '../universes/api'
 import { SECTION_GROUPS, UPKEEP } from '../universes/sections'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 import type { UniverseDetail } from '../universes/types'
 import { EmptyState } from '../components/EmptyState'
 
@@ -107,6 +109,12 @@ export default function UniverseWorkspace() {
     setState((current) => (current.kind === 'ready' ? { ...current, chronology } : current))
   }, [])
 
+  // The tab names the section and then the universe - "Lore — Hollowmere | Lorex" - from the shell, which knows both;
+  // an entry or a story inside a section is still that section here, and nothing beneath sets a title of its own.
+  useDocumentTitle(
+    ...(state.kind === 'ready' ? [currentSection(pathname, id), state.universe.name] : []),
+  )
+
   if (state.kind === 'loading') {
     return (
       <p className="notice" role="status">
@@ -155,14 +163,11 @@ export default function UniverseWorkspace() {
             puts the only saturated colour in the chrome directly above the universe's accent
             seal - which is the one thing in the rail that carries meaning. The mark is shown
             large on the auth plate and small in the paper bars instead. */}
-        {/* Lorex's mark leads to Lorex's front door, the portal, from everywhere (014). The universes are "All
-            universes", at the head of the sidebar and of the phone's Sections sheet. */}
-        <Link
-          className="rail__mark"
-          to="/explore"
-          aria-label="Lorex - explore worlds"
-          title="Explore worlds"
-        >
+        {/* Lorex's mark leads to Explore, Lorex's front door, from everywhere (014), and its name says so. The
+            universes are "All universes", at the head of the sidebar and of the phone's Sections sheet; the account
+            menu at the rail's foot names Explore and My workspace too. The glyph stays small and its target does
+            not: a 40px square, the rail's own width less its margins. */}
+        <Link className="rail__mark" to="/explore" aria-label={BRAND_LINK_LABEL}>
           L
         </Link>
         <span className="rail__seal" aria-hidden="true" />
@@ -205,7 +210,13 @@ export default function UniverseWorkspace() {
         <AccountMenu variant="rail" />
       </nav>
 
-      <div className="sidebar" id={navId} data-open={isNavOpen ? 'true' : 'false'}>
+      {/* One landmark for the universe: the way up out of it and its sections, read as one list of places. */}
+      <nav
+        className="sidebar"
+        id={navId}
+        data-open={isNavOpen ? 'true' : 'false'}
+        aria-label="Universe"
+      >
         <div className="sidebar__head">
           <Link className="sidebar__back" to="/app">
             <ArrowLeft className="sidebar__backicon" aria-hidden="true" focusable="false" />
@@ -218,41 +229,39 @@ export default function UniverseWorkspace() {
           {universe.isArchived ? <span className="sidebar__archived">Archived</span> : null}
         </div>
 
-        <nav aria-label="Universe sections">
-          <ul className="sidebar__nav">
-            {SECTION_GROUPS.map((group) => (
-              <li
-                className={
-                  group === UPKEEP ? 'sidebar__group sidebar__group--upkeep' : 'sidebar__group'
-                }
-                key={group[0].segment}
-                data-testid={group === UPKEEP ? 'sidebar-upkeep' : undefined}
-              >
-                <ul className="sidebar__links">
-                  {group.map(({ segment, label, testId, icon: Icon }) => (
-                    <li key={label}>
-                      <NavLink
-                        to={segment === '' ? '.' : segment}
-                        end={segment === ''}
-                        className="sidebar__link"
-                        data-testid={testId}
-                      >
-                        <Icon
-                          className="sidebar__icon"
-                          aria-hidden="true"
-                          focusable="false"
-                          strokeWidth={1.75}
-                        />
-                        {label}
-                      </NavLink>
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      </div>
+        <ul className="sidebar__nav">
+          {SECTION_GROUPS.map((group) => (
+            <li
+              className={
+                group === UPKEEP ? 'sidebar__group sidebar__group--upkeep' : 'sidebar__group'
+              }
+              key={group[0].segment}
+              data-testid={group === UPKEEP ? 'sidebar-upkeep' : undefined}
+            >
+              <ul className="sidebar__links">
+                {group.map(({ segment, label, testId, icon: Icon }) => (
+                  <li key={label}>
+                    <NavLink
+                      to={segment === '' ? '.' : segment}
+                      end={segment === ''}
+                      className="sidebar__link"
+                      data-testid={testId}
+                    >
+                      <Icon
+                        className="sidebar__icon"
+                        aria-hidden="true"
+                        focusable="false"
+                        strokeWidth={1.75}
+                      />
+                      {label}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      </nav>
 
       <div className="workspace__column">
         {/* The universe's search, above every screen in it rather than on any one of them. Keyed by the universe, so a

@@ -20,7 +20,7 @@ crawlers or name a production origin.
 `<!-- /lorex:head -->`. The API's fallback (`FrontendHosting`) reads the template once and, per request, replaces that block
 from `PageMetadataResolver`: title, description, robots, canonical, Open Graph and `twitter:card`. The body stays the empty
 shell; content is still fetched by the app from `/api/public`. The app also sets the same title while navigating
-(`useDocumentTitle`). Nothing else of the head changes on client navigation - crawlers load each address fresh.
+(`useDocumentTitle`, `src/lib/`, which the workspace's shells now also use - refinement 024). Nothing else of the head changes on client navigation - crawlers load each address fresh.
 
 **The public predicates decide, and only public text is read.** `/worlds/{slug}`, `/lore/{slug}`, `/stories/{slug}` and
 `/authors/{slug}` resolve through `PublicationRules.Public`, `PublicLore` and `PublicStories` - the queries the public API

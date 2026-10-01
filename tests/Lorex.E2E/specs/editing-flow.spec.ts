@@ -336,11 +336,12 @@ test.describe('workspace navigation', () => {
     await page.goto(`/app/universes/${universeId}`)
 
     const world = ['Lore', 'Family Tree', 'Timeline', 'Chronology', 'World Rules']
-    const sections = page.getByRole('navigation', { name: 'Universe sections' })
-    await expect(sections.getByRole('link')).toHaveCount(13)
+    const sections = page.getByRole('navigation', { name: 'Universe', exact: true })
+    // All universes, Overview, then the world's five.
+    await expect(sections.getByRole('link')).toHaveCount(14)
     await expect(page.locator('[data-testid="overview-lore"]')).toBeVisible()
     const links = (await sections.getByRole('link').allTextContents()).map((text) => text.trim())
-    expect(links.slice(1, 6)).toEqual(world)
+    expect(links.slice(2, 7)).toEqual(world)
 
     const doorways = ['lore', 'family-tree', 'timeline', 'chronology', 'world-rules']
     const overview = await page
@@ -356,7 +357,7 @@ test.describe('workspace navigation', () => {
     await expect(page.getByTestId('workspace-chronology')).toBeVisible()
     const sheet = (
       await page
-        .getByRole('navigation', { name: 'Universe sections' })
+        .getByRole('navigation', { name: 'Universe', exact: true })
         .getByRole('link')
         .allTextContents()
     ).map((text) => text.trim())

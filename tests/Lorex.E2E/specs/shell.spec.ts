@@ -67,9 +67,11 @@ test.describe('the shell', () => {
     await signUp(page)
     const base = await newUniverse(page)
 
-    const sections = page.getByRole('navigation', { name: 'Universe sections' })
-    // Thirteen: Publish joined the foot in 014, and Chronology left Settings for a section of its own.
-    await expect(sections.getByRole('link')).toHaveCount(13)
+    const sections = page.getByRole('navigation', { name: 'Universe', exact: true })
+    // The way up, then thirteen sections: Publish joined the foot in 014, and Chronology left Settings for a section of
+    // its own. All universes shares the landmark since refinement 024.
+    await expect(sections.getByRole('link')).toHaveCount(14)
+    await expect(sections.getByRole('link').first()).toHaveText('All universes')
 
     // One h1 per screen, and it is the screen's title - the universe name in the sidebar is not it.
     await page.goto(`${base}/timeline`)
@@ -110,18 +112,27 @@ test.describe('the shell', () => {
     page,
   }) => {
     await signUp(page)
+    // The workspace bar is drawn before the screen beneath it; Tab out of the menu needs that screen to land on.
+    await expect(page.getByRole('heading', { level: 1, name: 'Universes' })).toBeVisible()
 
     const trigger = page.getByTestId('account-menu-trigger')
     const panel = page.getByTestId('account-menu-panel')
-    const profile = page.getByRole('link', { name: 'View profile' })
+    const workspace = page.getByTestId('account-menu-workspace')
+    const profile = page.getByTestId('account-menu-profile')
     const signOut = page.getByRole('button', { name: 'Sign out' })
 
     await trigger.focus()
     await page.keyboard.press('Enter')
     await expect(trigger).toHaveAttribute('aria-expanded', 'true')
-    await expect(profile).toBeFocused()
+    await expect(workspace).toBeFocused()
 
-    // The theme's two buttons sit between the profile and the way out (013).
+    // Go to's three places, then the profile; the theme's two buttons sit between it and the way out (013).
+    await page.keyboard.press('ArrowDown')
+    await expect(page.getByTestId('account-menu-ideas')).toBeFocused()
+    await page.keyboard.press('ArrowDown')
+    await expect(page.getByTestId('account-menu-explore')).toBeFocused()
+    await page.keyboard.press('ArrowDown')
+    await expect(profile).toBeFocused()
     await page.keyboard.press('ArrowDown')
     await expect(page.getByTestId('theme-light')).toBeFocused()
     await page.keyboard.press('ArrowDown')
@@ -129,11 +140,11 @@ test.describe('the shell', () => {
     await page.keyboard.press('ArrowDown')
     await expect(signOut).toBeFocused()
     await page.keyboard.press('ArrowDown')
-    await expect(profile).toBeFocused()
+    await expect(workspace).toBeFocused()
     await page.keyboard.press('ArrowUp')
     await expect(signOut).toBeFocused()
     await page.keyboard.press('Home')
-    await expect(profile).toBeFocused()
+    await expect(workspace).toBeFocused()
     await page.keyboard.press('End')
     await expect(signOut).toBeFocused()
 
@@ -145,9 +156,9 @@ test.describe('the shell', () => {
 
     // Tab past the last item leaves the menu, and the menu closes behind it.
     await page.keyboard.press('Enter')
-    await expect(profile).toBeFocused()
-    // Profile, Light, Dark, Sign out - and the next Tab is out.
-    for (let press = 0; press < 4; press++) await page.keyboard.press('Tab')
+    await expect(workspace).toBeFocused()
+    // My workspace, Ideas, Explore, Profile, Light, Dark, Sign out - and the next Tab is out.
+    for (let press = 0; press < 7; press++) await page.keyboard.press('Tab')
     await expect(panel).toHaveCount(0)
 
     // Choosing an item does what it says.

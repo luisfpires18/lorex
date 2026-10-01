@@ -1,9 +1,9 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { ArrowUpRight, SunMoon } from 'lucide-react'
+import { SunMoon } from 'lucide-react'
 import { useAuth } from '../auth/useAuth'
 import { AccountMenu } from './AccountMenu'
 import { ActionMenu } from './ActionMenu'
-import { BrandMark } from './BrandMark'
+import { BRAND_LINK_LABEL, BrandMark } from './BrandMark'
 import { PortalSearch } from './PortalSearch'
 import { ThemeSwitch } from './ThemeSwitch'
 import { MAIN_CONTENT_ID } from './SkipLink'
@@ -19,6 +19,10 @@ import { Wordmark } from './Wordmark'
  * passed as router state, which `returnPath` checks); the workspace is entered only by choosing My workspace, and
  * signing out from here stays here.
  *
+ * What a visitor sees this side of Lorex called is Explore - its one destination, the brand's, and its landmark's name;
+ * "portal" is the architecture's word for it, not the screen's. My workspace is a plain link across, in the same tab:
+ * no outward arrow, which would say it opened somewhere else.
+ *
  * The portal follows Lorex's one theme (013), in its own look: `.portal` redefines the shared tokens for everything
  * inside it, dark or light, so buttons, notices and menus drawn here follow without a second set of components. The
  * bar is a solid band above every page, holding the brand, Explore, the search (see `PortalSearch`) and the way in.
@@ -32,11 +36,11 @@ export function PublicLayout() {
   return (
     <div className="portal">
       <header className="portal__bar">
-        <Link className="portal__brand" to="/explore">
+        <Link className="portal__brand" to="/explore" aria-label={BRAND_LINK_LABEL}>
           <BrandMark />
           <Wordmark />
         </Link>
-        <nav className="portal__nav" aria-label="Portal">
+        <nav className="portal__nav" aria-label="Explore">
           <NavLink className="portal__link" to="/explore" end>
             Explore
           </NavLink>
@@ -51,7 +55,6 @@ export function PublicLayout() {
                 data-testid="portal-workspace"
               >
                 My workspace
-                <ArrowUpRight aria-hidden="true" size={16} strokeWidth={1.75} />
               </Link>
               <AccountMenu variant="bar" signedOutTo={here} />
             </>

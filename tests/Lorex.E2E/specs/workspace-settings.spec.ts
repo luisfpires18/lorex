@@ -109,8 +109,9 @@ test.describe('Publish', () => {
     const w = await universe(page)
     await page.goto(`/app/universes/${w.id}`)
 
-    const sections = page.getByRole('navigation', { name: 'Universe sections' })
-    await expect(sections.getByRole('link')).toHaveCount(13)
+    const sections = page.getByRole('navigation', { name: 'Universe', exact: true })
+    // The way up, All universes, then the thirteen sections.
+    await expect(sections.getByRole('link')).toHaveCount(14)
     const links = (await sections.getByRole('link').allTextContents()).map((text) => text.trim())
     expect(links.indexOf('Publish')).toBe(links.indexOf('Settings') - 1)
 
@@ -162,10 +163,12 @@ test.describe('the sidebar, Chronology and the theme control (014 follow-up)', (
     const w = await universe(page)
     await page.goto(`/app/universes/${w.id}`)
 
-    const sections = page.getByRole('navigation', { name: 'Universe sections' })
-    await expect(sections.getByRole('link')).toHaveCount(13)
+    const sections = page.getByRole('navigation', { name: 'Universe', exact: true })
+    // The way up, All universes, then the thirteen sections.
+    await expect(sections.getByRole('link')).toHaveCount(14)
     const links = (await sections.getByRole('link').allTextContents()).map((text) => text.trim())
     expect(links).toEqual([
+      'All universes',
       'Overview',
       'Lore',
       'Family Tree',

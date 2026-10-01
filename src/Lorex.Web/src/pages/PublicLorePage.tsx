@@ -11,7 +11,7 @@ import {
   type PublicUniverse,
 } from '../portal/api'
 import { useWorkspaceLink } from '../portal/useWorkspaceLink'
-import { useDocumentTitle } from '../portal/useDocumentTitle'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 
 type LoadState =
   | { key: string; kind: 'ready'; world: PublicUniverse; entry: PublicLoreDetail }
