@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
-import { ArrowDown, ArrowUp, Pencil, Plus } from 'lucide-react'
+import { ArrowDown, ArrowUp, ListTree, Pencil, Plus } from 'lucide-react'
 import { ActionIcon } from '../components/ActionIcon'
 import { ActionMenu } from '../components/ActionMenu'
 import { Field } from '../components/Field'
@@ -73,8 +73,10 @@ export default function UniverseTypes() {
 
   const [types, setTypes] = useState<EntityType[] | null>(null)
   const [message, setMessage] = useState<string | null>(null)
-  // The type editor: a new type, or the existing one being edited. One drawer for both.
+  // The type editor: a new type, or the existing one being edited. One drawer for both. A new type opened from a row's
+  // Add child starts inside that row's type.
   const [editing, setEditing] = useState<EntityType | 'new' | null>(null)
+  const [childOf, setChildOf] = useState<EntityType | null>(null)
   const [openTypeId, setOpenTypeId] = useState<string | null>(null)
   // Why one type cannot be deleted, said under it: counted from the list, or the API's own words if it refused.
   const [blocked, setBlocked] = useState<{ typeId: string; text: string } | null>(null)
@@ -188,6 +190,12 @@ export default function UniverseTypes() {
     }
   }
 
+  function openChild(parent: EntityType) {
+    setBlocked(null)
+    setChildOf(parent)
+    setEditing('new')
+  }
+
   async function submitField(typeId: string) {
     if (!fieldName.trim()) return
     setMessage(null)
@@ -271,7 +279,10 @@ export default function UniverseTypes() {
             <button
               className="button"
               type="button"
-              onClick={() => setEditing('new')}
+              onClick={() => {
+                setChildOf(null)
+                setEditing('new')
+              }}
               data-testid="new-type"
             >
               <ActionIcon icon={Plus} />
@@ -288,13 +299,21 @@ export default function UniverseTypes() {
           universeId={universe.id}
           tree={tree}
           type={editing === 'new' ? null : editing}
+          initialParent={editing === 'new' ? childOf : null}
           onClose={() => setEditing(null)}
-          onSaved={async (savedName) => {
+          onSaved={async (savedName, parentId) => {
             const wasNew = editing === 'new'
+            // Made from a row's Add child: said with where it went, which is where the author chose in the end.
+            const parent =
+              wasNew && childOf && parentId ? tree.byId.get(parentId)?.type.name : undefined
             setEditing(null)
             setBlocked(null)
             setNotice(
-              wasNew ? `Created the type “${savedName}”.` : `Saved the type “${savedName}”.`,
+              parent
+                ? `Created “${savedName}” inside “${parent}”.`
+                : wasNew
+                  ? `Created the type “${savedName}”.`
+                  : `Saved the type “${savedName}”.`,
             )
             await refresh()
           }}
@@ -398,6 +417,19 @@ export default function UniverseTypes() {
                           )
                         })}
                       </span>
+                      {/* A type straight inside this one, its parent already chosen - the quick way to build a branch.
+                          Quiet like Up and Down; on a phone it waits in the row's menu instead. Coming back from the
+                          drawer, the focus is on this button again, ready for the next sibling. */}
+                      <button
+                        className="button button--text button--sm types__addchild"
+                        type="button"
+                        onClick={() => openChild(type)}
+                        aria-label={`Add child type inside ${type.name}`}
+                        data-testid={`add-child-${type.name}`}
+                      >
+                        <ActionIcon icon={ListTree} />
+                        Add child
+                      </button>
                       <button
                         className="button button--secondary button--sm"
                         type="button"
@@ -428,6 +460,16 @@ export default function UniverseTypes() {
                         label={`More actions for ${type.name}`}
                         triggerTestId={`type-actions-${type.name}`}
                       >
+                        <button
+                          className="actionmenu__item types__addchilditem"
+                          type="button"
+                          onClick={() => openChild(type)}
+                          aria-label={`Add child type inside ${type.name}`}
+                          data-testid={`add-child-item-${type.name}`}
+                        >
+                          <ActionIcon icon={ListTree} />
+                          Add child type
+                        </button>
                         <button
                           className="actionmenu__item actionmenu__item--danger"
                           type="button"
@@ -687,6 +729,7 @@ function TypeDialog({
   universeId,
   tree,
   type,
+  initialParent = null,
   onClose,
   onSaved,
 }: {
@@ -694,21 +737,25 @@ function TypeDialog({
   tree: TypeTree
   /** The type being edited, or null for a new one. */
   type: EntityType | null
+  /** For a new type: the type it starts inside (a row's Add child). Still only a starting choice - the select decides. */
+  initialParent?: EntityType | null
   onClose: () => void
-  onSaved: (name: string) => Promise<void>
+  /** With the parent it was saved under, null at the top. */
+  onSaved: (name: string, parentId: string | null) => Promise<void>
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const initial = {
     name: type?.name ?? '',
     icon: type?.icon ?? null,
     familyTreeEligible: type?.familyTreeEligible ?? false,
-    parentId: type?.parentId ?? null,
+    parentId: type ? type.parentId : (initialParent?.id ?? null),
   }
   const [name, setName] = useState(initial.name)
   const [parentId, setParentId] = useState<string | null>(initial.parentId)
   const ownBranch =
     type && tree.byId.get(type.id) ? branchIds(tree.byId.get(type.id)!) : new Set<string>()
   const parents = tree.ordered.filter((node) => !ownBranch.has(node.type.id))
+  const chosenParent = parentId ? (tree.byId.get(parentId)?.type ?? null) : null
   const [icon, setIcon] = useState<string | null>(initial.icon)
   const [familyTreeEligible, setFamilyTreeEligible] = useState(initial.familyTreeEligible)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -769,7 +816,7 @@ function TypeDialog({
           parent: { id: parentId },
         })
       }
-      await onSaved(name.trim())
+      await onSaved(name.trim(), parentId)
     } catch (error: unknown) {
       if (error instanceof ApiError) {
         setFieldErrors(error.fieldErrors)
@@ -804,8 +851,14 @@ function TypeDialog({
         <header className="drawer__head">
           <p className="drawer__eyebrow">Lore Types</p>
           <h2 className="drawer__title" id="type-heading">
-            {type ? 'Edit type' : 'New type'}
+            {type ? 'Edit type' : chosenParent ? 'New child type' : 'New type'}
           </h2>
+          {/* Where a new type is going, in a line, while it is going inside one. The Parent type select is what decides. */}
+          {!type && chosenParent ? (
+            <p className="drawer__context" data-testid="type-dialog-context">
+              Inside <bdi>{chosenParent.name}</bdi>
+            </p>
+          ) : null}
         </header>
 
         <div className="drawer__body">

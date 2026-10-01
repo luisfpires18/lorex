@@ -35,10 +35,12 @@ async function openLore(page: Page) {
   await page.waitForURL(/\/lore$/)
 }
 
-/** Lore starts with no type chosen; a root type is chosen from the chooser in the header. */
+/** Lore starts with no type chosen; a type is chosen from the type row under its heading. */
 async function chooseType(page: Page, name: string) {
-  await page.getByTestId('lore-type-menu').click()
-  await page.getByTestId('lore-type-menu-panel').getByRole('link', { name, exact: true }).click()
+  await page
+    .getByRole('navigation', { name: 'Lore types' })
+    .getByRole('link', { name, exact: true })
+    .click()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(name)
 }
 
@@ -92,9 +94,8 @@ test.describe('lore', () => {
 
     // Write the entry.
     await openLore(page)
-    await expect(page.getByTestId('lore-choose')).toContainText(
-      'Choose a type to browse your lore.',
-    )
+    // No type chosen yet: nothing is listed, and the types are the way in.
+    await expect(page.getByTestId('entity-card')).toHaveCount(0)
     await chooseType(page, 'Starship')
     await expect(page.getByTestId('entity-empty')).toBeVisible()
     await page.getByTestId('new-entity').click()

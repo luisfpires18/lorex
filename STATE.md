@@ -50,6 +50,18 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **Product refinement 025 - Lore type browser restore and Add child** (`feat/lore-type-browser-child-ux` off `dev` at
+  `ee10cb9`, committed, not merged, not pushed). Frontend only; no migration, backup stays **19**. ADR 0007 amended.
+  - Lore: 022's chooser and inline tree (`TypeTree.tsx`, `useOpenBranches.ts`, `lore__choose`, `typetree`/`typechooser` CSS)
+    deleted; pre-022 `TypeSwitcher` restored (wrapped row from 641px, menu on a phone), types in tree preorder, **no All**.
+    Bare `/lore`: nothing current, menu "Choose type", no entry read, no cards/skeleton/filters/Select/panel. Branch
+    browsing, path crumb (root crumb test id `lore-path-root`), unknown-id drop unchanged. No types at all: one notice line.
+  - Types: every row has **Add child** (quiet text button beside Up/Down; in the row's More menu at 640px and under) opening
+    `TypeDialog` with that parent preselected and editable; title "New child type", "Inside …"; notice "Created “X” inside
+    “Y”."; focus back on the row's Add child. Family Tree still creation-only, nothing inherited.
+  - `ActionMenu` skips items a layout hides (`display: none`) for first focus and arrow keys.
+  - Tests: Playwright 341 -> 349 (`lore-type-browser.spec.ts`, 8); nested-types, type-filter, types-and-trash, lore,
+    mass-create, text-direction and `support/lore.ts` back on the row/menu.
 - **Product refinement 024 - global navigation and wayfinding** (`feat/global-navigation-wayfinding` off `dev` at
   `b6cc948`, committed, not merged, not pushed). Frontend only: no migration, backup stays **19**. Hierarchy and rules:
   `docs/public-portal/PUBLIC_PORTAL.md` 21.1; ADR 0036 amended.
@@ -97,8 +109,8 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     1..n, transactional (first-up/last-down = unchanged 200). Request `displayOrder` now ignored. List in preorder.
   - Request `parent` wrapper: absent keeps parent (old clients safe), `{id:null}` root. Response `parentId`. `entityCount` still
     the type's own. Delete blocked by entries and/or children, `childCount`, words.
-  - Lore: **no All**. No type chosen = nothing read or listed, filters/Select hidden, "Choose a type to browse your lore." with
-    the tree inline; unknown type id dropped from the address. A type shows its branch (`includeDescendants=true`, resolved
+  - Lore: **no All**. No type chosen = nothing read or listed, filters/Select hidden (the chooser and inline tree were
+    replaced by the restored type row in 025); unknown type id dropped from the address. A type shows its branch (`includeDescendants=true`, resolved
     server-side; `entityTypeId` alone stays exact). One "Type" disclosure on every width with the nested lists; ancestors
     opened and named in the header path. Entry crumb "Lore" now goes to the entry's type. Mass create returns to no-type with
     its count. New entry / Mass create selects in tree order with path labels. Types screen: nested rows (1.25rem a level,

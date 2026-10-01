@@ -1,9 +1,9 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test'
 
 /**
- * Product refinement 022: nested Lore types. Lore has no "All" - it starts by asking for a type and reads nothing until
- * one is chosen; the types are a tree to choose from, the chosen one's path is said and kept open, and a type shows its
- * whole branch. Types nest on the Types screen, move one place among their siblings, and refuse to be deleted while they
+ * Product refinement 022: nested Lore types. Lore has no "All" - it starts with no type chosen and reads nothing until
+ * one is; its type navigation is the wrapped row (a menu on a phone) it had before 022, listing every type parent-first
+ * (refinement 025); the chosen one's path is said above its title, and a type shows its whole branch. Types nest on the Types screen, move one place among their siblings, and refuse to be deleted while they
  * hold others; every picker follows the author's order. What the API refuses and stores is proved by its own tests; this is
  * what only a browser shows.
  */
@@ -88,10 +88,13 @@ const names = (page: Page) =>
   cards(page).evaluateAll((all) => all.map((card) => card.getAttribute('data-entity-name')).sort())
 const heading = (page: Page) => page.getByRole('heading', { level: 1 })
 const panel = (page: Page) => page.getByTestId('lore-type-menu-panel')
-const toggleIn = (scope: ReturnType<Page['getByTestId']>, name: string) =>
-  scope.locator(`[data-testid="lore-type-toggle"][data-type-name="${name}"]`)
+const row = (page: Page) => page.getByRole('navigation', { name: 'Lore types' })
 const linkIn = (scope: ReturnType<Page['getByTestId']>, name: string) =>
-  scope.locator(`[data-testid="lore-type"][data-type-name="${name}"]`)
+  scope.locator(`[data-type-name="${name}"]`)
+const rowOrder = (page: Page) =>
+  row(page)
+    .getByTestId('lore-type')
+    .evaluateAll((links) => links.map((link) => link.getAttribute('data-type-name')))
 
 function sideways(page: Page) {
   return page.evaluate(
@@ -100,7 +103,7 @@ function sideways(page: Page) {
 }
 
 test.describe('Lore with nested types', () => {
-  test('starts with no type chosen: no All, nothing read, and an invitation to choose', async ({
+  test('starts with no type chosen: no All, nothing read, and only the type row to choose from', async ({
     page,
   }) => {
     await signUp(page)
@@ -112,14 +115,16 @@ test.describe('Lore with nested types', () => {
     })
 
     await page.goto(lore(w.u, '?q=rune&status=0'))
-    const choose = page.getByTestId('lore-choose')
-    await expect(choose).toContainText('Choose a type to browse your lore.')
-    await expect(choose).not.toContainText('No entries yet')
+    await expect(heading(page)).toHaveText('Lore')
+    await expect(row(page)).toBeVisible()
+    await expect(row(page).locator('[aria-current="page"]')).toHaveCount(0)
+    // No panel asks, no card, no skeleton, no Filters, no Select, no All - only the way to choose.
+    await expect(page.getByTestId('lore-choose')).toHaveCount(0)
+    await expect(page.locator('.lore__skeleton')).toHaveCount(0)
     await expect(cards(page)).toHaveCount(0)
     await expect(page.getByRole('link', { name: 'All', exact: true })).toHaveCount(0)
     await expect(page.getByTestId('lore-filters-toggle')).toHaveCount(0)
     await expect(page.getByTestId('lore-select')).toHaveCount(0)
-    await expect(page.getByTestId('lore-type-menu')).toHaveAccessibleName('Choose type')
 
     // Creating needs no type chosen first.
     await expect(page.getByTestId('new-entity')).toHaveAccessibleName('New entry')
@@ -128,7 +133,7 @@ test.describe('Lore with nested types', () => {
     // An id this universe does not have is taken out of the address, and still nothing is read.
     await page.goto(lore(w.u, '?type=00000000-0000-0000-0000-000000000000'))
     await expect(page).toHaveURL(/\/lore$/)
-    await expect(choose).toBeVisible()
+    await expect(row(page).locator('[aria-current="page"]')).toHaveCount(0)
     await expect(cards(page)).toHaveCount(0)
     expect(reads).toEqual([])
 
@@ -139,35 +144,25 @@ test.describe('Lore with nested types', () => {
     await page.waitForURL(/\/lore\/mass-create$/)
   })
 
-  test('a tree to choose from: branches open and close, a chosen type shows its branch and its path', async ({
+  test('the type row lists every type parent-first; a chosen type shows its branch and its path', async ({
     page,
   }) => {
     await signUp(page)
     const w = await runeWorld(page)
     await page.goto(lore(w.u))
 
-    // Roots, in order; branches closed until opened.
-    const tree = page.getByTestId('lore-choose')
-    await expect(linkIn(tree, 'Character')).toBeVisible()
-    await expect(linkIn(tree, 'Runes')).toBeVisible()
-    await expect(linkIn(tree, 'Material Runes')).toHaveCount(0)
-    const runesToggle = toggleIn(tree, 'Runes')
-    await expect(runesToggle).toHaveAccessibleName('Types inside Runes')
-    await expect(runesToggle).toHaveAttribute('aria-expanded', 'false')
-
-    // Open and close from the keyboard.
-    await runesToggle.focus()
-    await page.keyboard.press('Enter')
-    await expect(runesToggle).toHaveAttribute('aria-expanded', 'true')
-    await expect(linkIn(tree, 'Material Runes')).toBeVisible()
-    await expect(linkIn(tree, 'Animal Runes')).toBeVisible()
-    await page.keyboard.press('Space')
-    await expect(runesToggle).toHaveAttribute('aria-expanded', 'false')
-    await expect(linkIn(tree, 'Material Runes')).toHaveCount(0)
+    // Every type, flat and in the hierarchy's order: a parent, then what is nested in it, at any depth.
+    await expect
+      .poll(async () => {
+        const order = await rowOrder(page)
+        return order.slice(order.indexOf('Runes'), order.indexOf('Runes') + 5)
+      })
+      .toEqual(['Runes', 'Material Runes', 'Metal Runes', 'Stone Runes', 'Animal Runes'])
 
     // A parent shows its whole branch - its own entries and every type beneath - and never a sibling branch.
-    await linkIn(tree, 'Runes').click()
+    await linkIn(row(page), 'Runes').click()
     await expect(heading(page)).toHaveText('Runes')
+    await expect(linkIn(row(page), 'Runes')).toHaveAttribute('aria-current', 'page')
     await expect
       .poll(() => names(page))
       .toEqual(['Granite rune', 'Iron rune', 'Rune of beginnings', 'Silver rune', 'Wolf rune'])
@@ -176,23 +171,13 @@ test.describe('Lore with nested types', () => {
     // Cards still name each entry's own type.
     await expect(cards(page).filter({ hasText: 'Silver rune' })).toContainText('Metal Runes')
 
-    // A nested choice opens every ancestor in the chooser and says the path above the title.
-    await page.getByTestId('lore-type-menu').click()
-    await toggleIn(panel(page), 'Material Runes').click()
-    await linkIn(panel(page), 'Metal Runes').click()
+    // A nested choice says its path above the title; only it is current.
+    await linkIn(row(page), 'Metal Runes').click()
     await expect(heading(page)).toHaveText('Metal Runes')
     await expect(page.getByTestId('lore-path')).toHaveText('Lore›Runes›Material Runes')
     await expect.poll(() => names(page)).toEqual(['Silver rune'])
-
-    await page.getByTestId('lore-type-menu').click()
-    await expect(toggleIn(panel(page), 'Runes')).toHaveAttribute('aria-expanded', 'true')
-    await expect(toggleIn(panel(page), 'Material Runes')).toHaveAttribute('aria-expanded', 'true')
-    await expect(linkIn(panel(page), 'Metal Runes')).toHaveAttribute('aria-current', 'page')
-    await expect(linkIn(panel(page), 'Metal Runes')).toBeFocused()
-    await expect(linkIn(panel(page), 'Runes')).toHaveAttribute('data-ancestor', 'true')
-    await page.keyboard.press('Escape')
-    await expect(panel(page)).toHaveCount(0)
-    await expect(page.getByTestId('lore-type-menu')).toBeFocused()
+    await expect(row(page).locator('[aria-current="page"]')).toHaveCount(1)
+    await expect(linkIn(row(page), 'Metal Runes')).toHaveAttribute('aria-current', 'page')
 
     // A crumb goes up a level, to that type's branch.
     await page.getByTestId('lore-path').getByRole('link', { name: 'Material Runes' }).click()
@@ -214,6 +199,20 @@ test.describe('Lore with nested types', () => {
     await expect(page.getByLabel('Entry type').locator('option:checked')).toHaveText(
       'Runes › Material Runes',
     )
+    await page.goBack()
+    await expect(heading(page)).toHaveText('Material Runes')
+
+    // The Lore crumb is Lore with no type chosen - nothing current, nothing read - not every entry.
+    const reads: string[] = []
+    page.on('request', (request) => {
+      if (/\/entities\?/.test(request.url())) reads.push(request.url())
+    })
+    await page.getByTestId('lore-path-root').click()
+    await expect(page).toHaveURL(/\/lore$/)
+    await expect(heading(page)).toHaveText('Lore')
+    await expect(row(page).locator('[aria-current="page"]')).toHaveCount(0)
+    await expect(cards(page)).toHaveCount(0)
+    expect(reads).toEqual([])
   })
 })
 
@@ -354,20 +353,22 @@ test.describe('Types screen with nested types', () => {
     await page.reload()
     await expect.poll(order).toEqual(moved)
 
-    // Lore's chooser, New entry and Mass create all read the same order.
+    // Lore's type row, New entry and Mass create all read the same order.
     await page.goto(lore(w.u))
-    const tree = page.getByTestId('lore-choose')
-    await toggleIn(tree, 'Runes').click()
-    const chooser = await tree
-      .getByTestId('lore-type')
-      .evaluateAll((links) => links.map((link) => link.getAttribute('data-type-name')))
-    expect(chooser.slice(chooser.indexOf('Species'), chooser.indexOf('Species') + 5)).toEqual([
-      'Species',
-      'Runes',
-      'Animal Runes',
-      'Material Runes',
-      'Concept',
-    ])
+    await expect
+      .poll(async () => {
+        const lored = await rowOrder(page)
+        return lored.slice(lored.indexOf('Species'), lored.indexOf('Species') + 7)
+      })
+      .toEqual([
+        'Species',
+        'Runes',
+        'Animal Runes',
+        'Material Runes',
+        'Metal Runes',
+        'Stone Runes',
+        'Concept',
+      ])
 
     const inOrder = [
       'Character',
@@ -401,7 +402,6 @@ test.describe('nested types at every size', () => {
     await signUp(page)
     const w = await runeWorld(page)
     let parent = w.location
-    const path = ['Location']
     for (const name of [
       'Continent',
       'Kingdom',
@@ -411,7 +411,6 @@ test.describe('nested types at every size', () => {
       'Outpost',
     ]) {
       parent = await w.type(name, parent)
-      path.push(name)
     }
     await post(page, `/api/universes/${w.u}/entities`, {
       entityTypeId: parent,
@@ -425,7 +424,7 @@ test.describe('nested types at every size', () => {
     const state = await setup.storageState()
     await setup.close()
 
-    await everySize(browser, state, w.u, parent, path)
+    await everySize(browser, state, w.u, parent)
   })
 })
 
@@ -434,7 +433,6 @@ async function everySize(
   state: Awaited<ReturnType<BrowserContext['storageState']>>,
   u: string,
   deepest: string,
-  path: string[],
 ) {
   for (const theme of ['light', 'dark']) {
     for (const size of [
@@ -466,34 +464,34 @@ async function everySize(
       ).toBeVisible()
       expect(await sideways(page), at).toBeLessThanOrEqual(0)
 
-      await page.getByTestId('lore-type-menu').click()
-      await expect(linkIn(panel(page), 'Outpost')).toHaveAttribute('aria-current', 'page')
-      for (const name of path.slice(0, -1)) {
-        await expect(toggleIn(panel(page), name), at).toHaveAttribute('aria-expanded', 'true')
-      }
-      const box = await panel(page).boundingBox()
-      expect(box!.x + box!.width, at).toBeLessThanOrEqual(size.width)
-      const linksInside = await panel(page).evaluate((element) => {
-        const bounds = element.getBoundingClientRect()
-        return [...element.querySelectorAll('a, button')].every((control) => {
-          const rect = control.getBoundingClientRect()
-          return rect.left >= bounds.left - 1 && rect.right <= bounds.right + 1
+      // The type navigation: the wrapped row from 641px, every link inside it and the deepest current; on a phone,
+      // the menu, inside the window, the deepest current there.
+      if (size.width > 640) {
+        await expect(linkIn(row(page), 'Outpost'), at).toHaveAttribute('aria-current', 'page')
+        const inRow = await page.getByTestId('lore-types').evaluate((element) => {
+          const bounds = element.getBoundingClientRect()
+          return (
+            element.scrollWidth <= element.clientWidth &&
+            [...element.querySelectorAll('a')].every((link) => {
+              const rect = link.getBoundingClientRect()
+              return rect.left >= bounds.left - 1 && rect.right <= bounds.right + 1
+            })
+          )
         })
-      })
-      expect(linksInside, at).toBe(true)
-      expect(await sideways(page), at).toBeLessThanOrEqual(0)
-
-      // Under a finger: a branch closes and opens again, and its button is a full target.
-      if (size.width <= 390) {
-        const kingdom = toggleIn(panel(page), 'Kingdom')
-        expect((await kingdom.boundingBox())!.height, at).toBeGreaterThanOrEqual(43.5)
-        await kingdom.tap()
-        await expect(kingdom).toHaveAttribute('aria-expanded', 'false')
-        await expect(linkIn(panel(page), 'Outpost')).toHaveCount(0)
-        await kingdom.tap()
-        await expect(linkIn(panel(page), 'Outpost')).toBeVisible()
+        expect(inRow, at).toBe(true)
+      } else {
+        await expect(row(page), at).toBeHidden()
+        const trigger = page.getByTestId('lore-type-menu')
+        await expect(trigger, at).toHaveAccessibleName('Type: Outpost')
+        await trigger.click()
+        await expect(linkIn(panel(page), 'Outpost'), at).toHaveAttribute('aria-current', 'page')
+        const box = await panel(page).boundingBox()
+        expect(box!.x, at).toBeGreaterThanOrEqual(0)
+        expect(box!.x + box!.width, at).toBeLessThanOrEqual(size.width)
+        await page.keyboard.press('Escape')
+        await expect(panel(page)).toHaveCount(0)
       }
-      await page.keyboard.press('Escape')
+      expect(await sideways(page), at).toBeLessThanOrEqual(0)
 
       // The Types screen: every row's tools inside the window, at every depth.
       await page.goto(`/app/universes/${u}/types`)

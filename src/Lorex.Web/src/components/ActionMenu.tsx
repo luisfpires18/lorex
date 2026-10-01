@@ -32,6 +32,13 @@ interface ActionMenuProps {
 
 const FOCUSABLE = 'a[href], button:not(:disabled)'
 
+/** The items a keyboard can reach: an item a layout hides at this width (`display: none`) is not one of them. */
+function reachable(panel: HTMLElement | null) {
+  return Array.from(panel?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []).filter(
+    (item) => item.getClientRects().length > 0,
+  )
+}
+
 /**
  * A button that opens a short list of actions - an item's secondary and destructive verbs, or the
  * account - and the one implementation of that behaviour in Lorex.
@@ -90,11 +97,8 @@ export function ActionMenu({
 
     // Into the panel on opening, so the first thing Tab or a screen reader meets is its contents.
     // Onto the current item where the menu marks one (a place chosen from a list), else the first.
-    const items = panel.current
-    ;(
-      items?.querySelector<HTMLElement>(`[aria-current="page"]`) ??
-      items?.querySelector<HTMLElement>(FOCUSABLE)
-    )?.focus()
+    const items = reachable(panel.current)
+    ;(items.find((item) => item.getAttribute('aria-current') === 'page') ?? items[0])?.focus()
 
     return () => {
       document.removeEventListener('pointerdown', onPointerDown)
@@ -104,7 +108,7 @@ export function ActionMenu({
   }, [open])
 
   function moveFocus(event: KeyboardEvent<HTMLDivElement>) {
-    const items = Array.from(panel.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])
+    const items = reachable(panel.current)
     if (items.length === 0) return
     const at = items.indexOf(document.activeElement as HTMLElement)
     let next: number

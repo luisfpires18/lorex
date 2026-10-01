@@ -317,14 +317,12 @@ test.describe('text direction', () => {
       card.locator('.entitycard__name'),
     )
     expect(cardNameBox).toBeGreaterThan(portraitBox)
-    // The type's name in Lore's chooser and in the header, each isolated.
+    // The type's name in Lore's type row and in the header, each isolated.
     await expectIsolated(page.getByRole('heading', { level: 1 }), 'شخصية')
-    await page.getByTestId('lore-type-menu').click()
     await expectIsolated(
-      page.locator('[data-testid="lore-type"][data-type-name="شخصية"] .typetree__name'),
+      page.locator('[data-testid="lore-type"][data-type-name="شخصية"] .typeswitch__name'),
       'شخصية',
     )
-    await page.keyboard.press('Escape')
 
     const answered = page.waitForResponse(
       (response) =>
