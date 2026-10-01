@@ -216,12 +216,11 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                             optionsByField.GetValueOrDefault(field.Id, []))),
                 ]);
 
+        // The hierarchy's own order, as the app lists it: a parent before its descendants, siblings by place, then name,
+        // then id - so the file reads top-down and two exports of unchanged lore are identical.
         return
         [
-            .. types
-                .OrderBy(type => type.DisplayOrder)
-                .ThenBy(type => type.Name, StringComparer.Ordinal)
-                .ThenBy(type => Key(type.Id), StringComparer.Ordinal)
+            .. EntityTypeHierarchy.Preorder(types, type => type.Id, type => type.ParentId, type => type.DisplayOrder, type => type.Name)
                 .Select(type => new BackupEntityType(
                     type.Id,
                     type.Name,
@@ -232,7 +231,8 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                     type.DisplayOrder,
                     Utc(type.CreatedAt),
                     Utc(type.UpdatedAt),
-                    fieldsByType.GetValueOrDefault(type.Id, []))),
+                    fieldsByType.GetValueOrDefault(type.Id, []),
+                    type.ParentId)),
         ];
     }
 

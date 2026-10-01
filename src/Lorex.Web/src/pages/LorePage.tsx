@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
   Link,
   useLocation,
@@ -21,7 +21,8 @@ import { ActionIcon } from '../components/ActionIcon'
 import { EmptyState } from '../components/EmptyState'
 import { EntityCard } from '../components/EntityCard'
 import { PageHeader } from '../components/PageHeader'
-import { TypeSwitcher } from '../components/TypeSwitcher'
+import { TypeChooser, TypeTreeList } from '../components/TypeTree'
+import { useOpenBranches } from '../lore/useOpenBranches'
 import { ApiError } from '../lib/api'
 import {
   LORE_PAGE_SIZES,
@@ -38,10 +39,12 @@ import {
   type EntityPage,
   type EntityType,
 } from '../lore/types'
+import { buildTypeTree } from '../lore/typeTree'
 import type { MassCreatedState } from './MassCreatePage'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
-type LoadState = { kind: 'loading' } | { kind: 'ready'; page: EntityPage } | { kind: 'error' }
+type LoadState =
+  { kind: 'idle' } | { kind: 'loading' } | { kind: 'ready'; page: EntityPage } | { kind: 'error' }
 
 /** How many card shapes stand in for the first page while it is read. */
 const SKELETON_CARDS = 6
@@ -62,8 +65,13 @@ function readPage(value: string | null) {
  * which page - is the address and nothing else: `lore?type=<id>&status=<0|1|2>&q=<text>&page=<n>`.
  *
  * Choosing a type or a page is a move, so it is a history entry Back returns through; typing and
- * the status replace the entry they are on, so a word typed is not twenty steps of Back. A type id
- * the universe does not have - deleted, mistyped, or another world's - falls back to All.
+ * the status replace the entry they are on, so a word typed is not twenty steps of Back.
+ *
+ * A type is where browsing starts (ADR 0007 amendment, 2026-10-01). There is no "All": with no type chosen the page lists
+ * nothing and reads nothing - a search or status in the address waits for a type - and offers the universe's types to
+ * choose from. A chosen type shows its whole branch: its own entries and those of every type nested beneath it, each card
+ * still naming its own type. A type id the universe does not have - deleted, mistyped, or another world's - is taken out of
+ * the address, which leaves nothing chosen; it never widens to every entry.
  */
 export default function LorePage() {
   const { universe } = useOutletContext<WorkspaceContext>()
@@ -115,7 +123,7 @@ export default function LorePage() {
     listEntityTypes(universe.id, controller.signal)
       .then(setTypes)
       .catch(() => {
-        // Browsing still works without the type navigation: every entry, under All.
+        // Without its types Lore has nothing to choose from; the page says so rather than reading every entry.
         if (!controller.signal.aborted) setTypes([])
       })
     return () => {
@@ -123,10 +131,13 @@ export default function LorePage() {
     }
   }, [universe.id])
 
-  const selectedType = types?.find((type) => type.id === typeParam) ?? null
+  const tree = useMemo(() => buildTypeTree(types ?? []), [types])
+  const selectedNode = (typeParam && tree.byId.get(typeParam)) || null
+  const selectedType = selectedNode?.type ?? null
   const isUnknownType = typeParam !== null && types !== null && selectedType === null
+  const inline = useOpenBranches(tree, null)
 
-  // A type this universe does not have is read as All, and the address is corrected in place.
+  // A type this universe does not have is taken out of the address in place, which leaves nothing chosen.
   useEffect(() => {
     if (!isUnknownType) return
     setParams(
@@ -140,14 +151,16 @@ export default function LorePage() {
     )
   }, [isUnknownType, setParams])
 
-  const entityTypeId = isUnknownType ? null : typeParam
+  // Only a type of this universe is ever asked for, and only once the types are known.
+  const entityTypeId = selectedType?.id ?? null
 
   useEffect(() => {
+    if (entityTypeId === null) return
     const controller = new AbortController()
     const timer = setTimeout(() => {
       listEntities(
         universe.id,
-        { search, entityTypeId, canonStatus, tag: null, page, pageSize },
+        { search, entityTypeId, includeDescendants: true, canonStatus, tag: null, page, pageSize },
         controller.signal,
       )
         .then((result) => setState({ kind: 'ready', page: result }))
@@ -190,7 +203,11 @@ export default function LorePage() {
     return { search: next ? `?${next}` : '' }
   }
 
-  const result = state.kind === 'ready' ? state.page : null
+  const typeHref = (typeId: string) => hrefFor(typeId)
+
+  // Nothing chosen is nothing read: whatever the last type's read left behind is not shown.
+  const view: LoadState = entityTypeId === null ? { kind: 'idle' } : state
+  const result = view.kind === 'ready' ? view.page : null
 
   const scope = [location.search, pageSize].join('|')
   const listKey = (() => {
@@ -309,10 +326,22 @@ export default function LorePage() {
     <article className="lore" data-selecting={isSelecting ? 'true' : undefined}>
       <PageHeader
         crumb={
-          selectedType ? (
-            <Link to={hrefFor(null)} data-testid="lore-all">
-              Lore
-            </Link>
+          selectedNode ? (
+            <span className="lore__path" data-testid="lore-path">
+              <Link to={hrefFor(null)} data-testid="lore-all">
+                Lore
+              </Link>
+              {selectedNode.path.slice(0, -1).map((ancestor) => (
+                <Fragment key={ancestor.id}>
+                  <span className="lore__pathsep" aria-hidden="true">
+                    ›
+                  </span>
+                  <Link to={hrefFor(ancestor.id)} data-testid="lore-path-type">
+                    <bdi>{ancestor.name}</bdi>
+                  </Link>
+                </Fragment>
+              ))}
+            </span>
           ) : null
         }
         title={selectedType ? <bdi>{selectedType.name}</bdi> : 'Lore'}
@@ -343,8 +372,8 @@ export default function LorePage() {
         }
       >
         <div className="lore__nav">
-          <TypeSwitcher types={types ?? []} selected={selectedType} hrefFor={hrefFor} />
-          {pageItems.length > 0 || isSelecting ? (
+          <TypeChooser tree={tree} selected={selectedNode} hrefFor={typeHref} />
+          {selectedType && (pageItems.length > 0 || isSelecting) ? (
             <button
               className="button button--secondary lore__select"
               type="button"
@@ -356,22 +385,28 @@ export default function LorePage() {
               Select
             </button>
           ) : null}
-          <button
-            className="button button--secondary lore__filtertoggle"
-            type="button"
-            aria-expanded={filtersOpen}
-            aria-controls={filtersId}
-            onClick={() => setFiltersOpen((open) => !open)}
-            data-testid="lore-filters-toggle"
-          >
-            <ActionIcon icon={ListFilter} />
-            Filters
-            {activeFilters > 0 ? <span className="lore__filtercount">{activeFilters}</span> : null}
-          </button>
+          {selectedType ? (
+            <button
+              className="button button--secondary lore__filtertoggle"
+              type="button"
+              aria-expanded={filtersOpen}
+              aria-controls={filtersId}
+              onClick={() => setFiltersOpen((open) => !open)}
+              data-testid="lore-filters-toggle"
+            >
+              <ActionIcon icon={ListFilter} />
+              Filters
+              {activeFilters > 0 ? (
+                <span className="lore__filtercount">{activeFilters}</span>
+              ) : null}
+            </button>
+          ) : null}
         </div>
       </PageHeader>
 
+      {/* Filters narrow a type's entries, so they wait for one: nothing typed here can widen to the whole universe. */}
       <div
+        hidden={!selectedType}
         className="lore__filters"
         id={filtersId}
         data-open={filtersOpen ? 'true' : 'false'}
@@ -450,7 +485,43 @@ export default function LorePage() {
         </p>
       ) : null}
 
-      {state.kind === 'loading' ? (
+      {types !== null && !selectedType && !isUnknownType ? (
+        <section
+          className="lore__choose"
+          aria-labelledby="lore-choose-title"
+          data-testid="lore-choose"
+        >
+          <h2 className="lore__choosetitle" id="lore-choose-title">
+            {types.length > 0
+              ? 'Choose a type to browse your lore.'
+              : 'This universe has no types yet.'}
+          </h2>
+          {types.length > 0 ? (
+            <>
+              <p className="lore__choosehint">
+                A type shows its own entries and those of every type nested inside it.
+              </p>
+              <nav className="typetree lore__typetree" aria-label="Lore types">
+                <TypeTreeList
+                  nodes={tree.roots}
+                  selectedId={null}
+                  ancestorIds={new Set()}
+                  hrefFor={typeHref}
+                  open={inline.open}
+                  onToggle={inline.toggle}
+                />
+              </nav>
+            </>
+          ) : (
+            <p className="lore__choosehint">
+              Every entry has a type.{' '}
+              <Link to={`/app/universes/${universe.id}/types`}>Add one on Types</Link>.
+            </p>
+          )}
+        </section>
+      ) : null}
+
+      {view.kind === 'loading' ? (
         <div className="lore__loading">
           <p className="visually-hidden" role="status">
             Reading the archive…
@@ -469,7 +540,7 @@ export default function LorePage() {
         </div>
       ) : null}
 
-      {state.kind === 'error' ? (
+      {view.kind === 'error' ? (
         <div className="notice notice--error" role="alert" data-testid="lore-load-error">
           <p>The lore could not be read.</p>
           <button
@@ -485,7 +556,7 @@ export default function LorePage() {
         </div>
       ) : null}
 
-      {result && result.items.length > 0 ? (
+      {selectedType && result && result.items.length > 0 ? (
         <ul className="cardgrid lore__grid" data-testid="entity-grid">
           {result.items.map((entity) => (
             <li key={entity.id}>
@@ -503,7 +574,7 @@ export default function LorePage() {
         </ul>
       ) : null}
 
-      {result && result.items.length === 0 && isFiltered ? (
+      {selectedType && result && result.items.length === 0 && isFiltered ? (
         <EmptyState
           testId="entity-empty"
           title="Nothing matches that."
@@ -534,7 +605,7 @@ export default function LorePage() {
         />
       ) : null}
 
-      {result && result.items.length === 0 && !isFiltered ? (
+      {selectedType && result && result.items.length === 0 && !isFiltered ? (
         <EmptyState
           testId="entity-empty"
           title={
@@ -556,7 +627,7 @@ export default function LorePage() {
         />
       ) : null}
 
-      {result && result.totalPages > 1 ? (
+      {selectedType && result && result.totalPages > 1 ? (
         <nav className="pager" aria-label="Pagination">
           <button
             className="button button--secondary"

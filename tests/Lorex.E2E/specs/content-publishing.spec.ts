@@ -184,7 +184,7 @@ test.describe('publishing lore and stories', () => {
       .getByRole('navigation', { name: 'Breadcrumb' })
       .getByRole('link', { name: 'Lore' })
       .click()
-    await page.waitForURL(`/app/universes/${universe.id}/lore`)
+    await page.waitForURL(new RegExp(`/app/universes/${universe.id}/lore[?]type=[0-9a-f-]+$`))
     expect(asked).toEqual([])
   })
 

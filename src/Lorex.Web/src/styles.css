@@ -3158,113 +3158,174 @@ a.button--danger:visited {
   }
 }
 
-/* ---------- Lore types: the local navigation ----------
+/* ---------- Lore types: the chooser and the tree ----------
 
-   The links wrap onto as many rows as a world's types need, in their own order: nothing scrolls sideways, is clipped
-   or fades out, so every type is in sight. Current is the accent wash (a place), never the ink fill (an action). */
+   A type is where Lore starts, and types nest (ADR 0007 amendment). One button names the chosen type - or asks for
+   one - and opens the universe's types as nested lists; with nothing chosen the same lists sit in the page. Each level
+   steps in by a small, fixed amount with a hairline down its side, and past the sixth level stops stepping in, so a deep
+   branch never pushes a name off a phone: the line and the order still say where it hangs. Current is the accent wash
+   (a place), never the ink fill (an action); its ancestors are marked by weight, and the header says the path in words. */
 
-.typeswitch {
-  flex: 1 1 auto;
+.typechooser {
+  position: relative;
+  flex: 0 1 auto;
   min-width: 0;
   margin-top: var(--space-2);
 }
 
-.typeswitch__row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-  padding: 2px 2px var(--space-2);
-  border-bottom: 1px solid var(--rule);
-}
-
-.typeswitch__link {
-  display: inline-flex;
-  flex: 0 1 auto;
-  align-items: center;
+.typechooser__trigger {
   gap: var(--space-2);
-  min-width: 0;
-  max-width: min(16rem, 100%);
-  min-height: var(--control-md);
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-sm);
-  color: var(--muted);
-  font-size: var(--text-ui);
-  font-weight: 500;
-  text-decoration: none;
-  white-space: nowrap;
-  transition:
-    background-color var(--duration-1) var(--ease),
-    color var(--duration-1) var(--ease);
+  max-width: 100%;
 }
 
-.typeswitch__link:hover {
-  background: var(--hover-wash);
-  color: var(--ink);
-}
-
-.typeswitch__link:active {
-  background: var(--press-wash);
-}
-
-.typeswitch__link:focus-visible {
-  outline-offset: -2px;
-}
-
-.typeswitch__link[aria-current='page'] {
-  background: var(--accent-wash);
-  color: var(--ink);
-  box-shadow: inset 0 -2px 0 var(--accent);
-}
-
-.typeswitch__name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.typeswitch__icon,
-.typemenu__icon {
+.typechooser__icon,
+.typetree__icon {
   flex: none;
   width: 1rem;
   height: 1rem;
   color: var(--type-ink, var(--muted));
 }
 
-/* A type's own colour is the author's, so it is never used raw: mixed toward the ink so it reads
-   on either paper. */
-.typeswitch__link,
-.typemenu__item,
-.entitycard__type,
-.tile--blank {
-  --type-ink: color-mix(in srgb, var(--type-accent, var(--muted)) 65%, var(--ink));
-}
-
-/* The phone's "Type" button, and the menu it opens: every type, the current one marked. */
-.typemenu {
-  display: none;
-}
-
-.typemenu__trigger {
-  gap: var(--space-2);
-  max-width: 100%;
-}
-
-.typemenu__label {
+.typechooser__label {
   color: var(--muted);
   font-weight: 400;
 }
 
-.typemenu__current {
+.typechooser__current {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.typemenu__chevron {
+.typechooser__chevron {
   flex: none;
   width: 1rem;
   height: 1rem;
+}
+
+.typechooser__panel {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  z-index: var(--z-dropdown);
+  width: min(24rem, calc(100vw - 2 * var(--gutter)));
+  max-height: min(70vh, 34rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+  color: var(--ink);
+  box-shadow: var(--shadow-3);
+}
+
+.typechooser__none {
+  margin: 0;
+  padding: var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-ui);
+}
+
+.typetree__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.typetree__list .typetree__list {
+  margin-inline-start: calc(var(--control-sm) / 2);
+  padding-inline-start: var(--space-2);
+  border-inline-start: 1px solid var(--rule);
+}
+
+/* Deeper than six levels the hairline still marks the level, but the step in stops growing. */
+.typetree__item[data-depth='6'] .typetree__list {
+  margin-inline-start: 0;
+  padding-inline-start: var(--space-1);
+}
+
+.typetree__row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.typetree__toggle,
+.typetree__spacer {
+  flex: none;
+  width: var(--control-sm);
+  height: var(--control-sm);
+}
+
+.typetree__toggle {
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.typetree__toggle svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.typetree__toggle:hover {
+  background: var(--hover-wash);
+  color: var(--ink);
+}
+
+.typetree__link {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: var(--control-md);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-size: var(--text-ui);
+  text-decoration: none;
+}
+
+.typetree__link:hover {
+  background: var(--hover-wash);
+}
+
+.typetree__link:focus-visible {
+  outline-offset: -2px;
+}
+
+.typetree__link[data-ancestor='true'] {
+  font-weight: 600;
+}
+
+.typetree__link[aria-current='page'] {
+  background: var(--accent-wash);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* A name wraps rather than hides: a long one is still all there to read. */
+.typetree__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A type's own colour is the author's, so it is never used raw: mixed toward the ink so it reads
+   on either paper. */
+.typetree__item,
+.typechooser,
+.entitycard__type,
+.tile--blank {
+  --type-ink: color-mix(in srgb, var(--type-accent, var(--muted)) 65%, var(--ink));
 }
 
 .actionmenu__panel--start {
@@ -3272,16 +3333,57 @@ a.button--danger:visited {
   left: 0;
 }
 
-.typemenu__panel {
-  width: min(20rem, calc(100vw - 2 * var(--gutter)));
-  max-height: min(60vh, 28rem);
-  overflow-y: auto;
-  overscroll-behavior: contain;
+/* Where Lore starts when no type is chosen: the question, and every type to answer it with. */
+.lore__choose {
+  max-width: 34rem;
+  margin-top: var(--space-2);
 }
 
-.typemenu__item[aria-current='page'] {
-  background: var(--accent-wash);
-  font-weight: 500;
+.lore__choosetitle {
+  margin: 0;
+  font-family: var(--display);
+  font-size: var(--text-item);
+  font-weight: 400;
+}
+
+.lore__choosehint {
+  margin: var(--space-1) 0 var(--space-4);
+  color: var(--muted);
+  font-size: var(--text-ui);
+}
+
+.lore__typetree {
+  padding: var(--space-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+}
+
+/* The chosen type's path above its name: Lore, then each ancestor, every one a way back up. */
+.lore__path {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.lore__pathsep {
+  color: var(--muted);
+}
+
+.lore__filters[hidden] {
+  display: none;
+}
+
+/* Under a finger, a branch's disclosure is a full touch target like any button. */
+@media (pointer: coarse) {
+  .typetree__toggle,
+  .typetree__spacer {
+    width: var(--control-touch);
+    height: var(--control-touch);
+  }
 }
 
 /* ---------- Lore cards ----------
@@ -3498,8 +3600,8 @@ a.button--danger:visited {
   background: color-mix(in srgb, var(--type-accent, var(--muted)) 22%, var(--raised));
 }
 
-:root[data-theme='dark'] .typeswitch__link,
-:root[data-theme='dark'] .typemenu__item,
+:root[data-theme='dark'] .typetree__item,
+:root[data-theme='dark'] .typechooser,
 :root[data-theme='dark'] .entitycard__type,
 :root[data-theme='dark'] .tile--blank {
   --type-ink: color-mix(in srgb, var(--type-accent, var(--muted)) 50%, var(--ink));
@@ -3571,24 +3673,23 @@ a.button--danger:visited {
     flex-wrap: nowrap;
   }
 
-  .typeswitch {
-    display: none;
-  }
-
-  .typemenu {
-    display: inline-flex;
+  .typechooser {
+    display: flex;
     flex: 1 1 auto;
-    min-width: 0;
   }
 
-  .typemenu__trigger {
+  .typechooser__trigger {
     flex: 1 1 auto;
     justify-content: flex-start;
     min-width: 0;
   }
 
-  .typemenu__chevron {
+  .typechooser__chevron {
     margin-left: auto;
+  }
+
+  .typechooser__panel {
+    width: calc(100vw - 2 * var(--gutter));
   }
 
   .lore__filtertoggle {
@@ -4897,6 +4998,49 @@ html:has(.viewer[open]) {
 .types__row {
   padding: var(--space-3) 0;
   border-top: 1px solid var(--rule);
+}
+
+/* A nested type steps in under its parent - 1.25rem a level, no further than six levels however deep the tree goes, so a
+   deep branch never pushes a row off a phone - with a hairline marking the step. The order and the hairline say where it
+   hangs; a reader hears "inside" and the parent's path. */
+.types__row[data-depth]:not([data-depth='0']) {
+  position: relative;
+  padding-inline-start: calc(var(--depth) * 1.25rem);
+}
+
+.types__row[data-depth]:not([data-depth='0'])::before {
+  content: '';
+  position: absolute;
+  inset-block: var(--space-2);
+  inset-inline-start: calc(var(--depth) * 1.25rem - 0.625rem);
+  border-inline-start: 1px solid var(--rule-strong);
+}
+
+/* Up and Down: quiet text beside the row's tools, never louder than Edit. */
+.types__move {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.types__movebutton[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* A phone: a smaller step that stops after four levels, and a row's tools always on a line of their own, so a deep row
+   wraps the same way a top-level one does instead of scattering its buttons. */
+@media (max-width: 640px) {
+  .types__row[data-depth]:not([data-depth='0']) {
+    padding-inline-start: calc(min(var(--depth), 4) * 0.75rem);
+  }
+
+  .types__row[data-depth]:not([data-depth='0'])::before {
+    inset-inline-start: calc(min(var(--depth), 4) * 0.75rem - 0.375rem);
+  }
+
+  .types__actions {
+    flex-basis: 100%;
+  }
 }
 
 /* A collapsed type reads as one line: its picture and name, how many entries use it, then Edit, Fields and the rest in

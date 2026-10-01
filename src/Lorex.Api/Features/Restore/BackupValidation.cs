@@ -332,6 +332,7 @@ internal static partial class BackupValidation
             // point anywhere in the file regardless of order.
             RegisterEras(eras);
             RegisterTypes(types);
+            CheckTypeHierarchy(types);
             RegisterTags(tags);
             RegisterEntities(entities);
             RegisterRelationshipTypes(relationshipTypes);
@@ -511,6 +512,42 @@ internal static partial class BackupValidation
         }
 
         // ---------- Types and fields ----------
+
+        /// <summary>
+        /// Every parent is a type of this file and not the type itself, and following parents always ends at a root: the
+        /// types are a forest, or nothing is written. Places among siblings are restored as stored - ties are ordered by
+        /// name, as the app orders them - so a valid file is never rearranged.
+        /// </summary>
+        private void CheckTypeHierarchy(IReadOnlyList<BackupEntityType> types)
+        {
+            var parentOf = new Dictionary<Guid, Guid?>();
+            var sound = true;
+
+            foreach (var type in types)
+            {
+                if (type is null || !parentOf.TryAdd(type.Id, type.ParentId) || type.ParentId is not { } parent)
+                {
+                    continue;
+                }
+
+                var what = $"The entry type {Quote(type.Name)}";
+                if (parent == type.Id)
+                {
+                    Add(BackupIssueCodes.InvalidValue, $"{what} is nested inside itself.");
+                    sound = false;
+                }
+                else if (!_types.ContainsKey(parent))
+                {
+                    Reference(false, $"{what} is nested inside an entry type the backup does not hold.");
+                    sound = false;
+                }
+            }
+
+            if (sound && !EntityTypeHierarchy.IsForest(parentOf))
+            {
+                Add(BackupIssueCodes.InvalidValue, "The entry types are nested in a loop: a type ends up inside itself.");
+            }
+        }
 
         private void RegisterTypes(IReadOnlyList<BackupEntityType> types)
         {

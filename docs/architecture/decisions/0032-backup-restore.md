@@ -255,3 +255,14 @@ Importer 1-15. A restored universe is always private, with no address and no pub
 says - no version of the format can carry visibility (ADR 0036). Its public details are restored as authored, and its
 artwork is validated through the upload gate with the 16:10 card frame, stored under the new universe's keys with the
 card cut again from the recorded frame, and swept with the entries' pictures if the restore fails.
+
+## Amendment: format 19 and nested types (2026-10-01)
+
+A version 19 file's types must be a forest before anything is written: every `parentId` names a type of the same file,
+never the type itself, and following parents always ends at a root - a missing parent is a missing reference, a self or a
+loop an invalid value, all refused by validation like any other. Places among siblings are restored as stored (ties are
+ordered by name, as the app orders them), so a valid file is never rearranged. Restore gives every type a new id and maps
+`parentId` through the same `RestoreIdentity` as every other internal reference; the types are written as roots and then
+nested in a second write of the same transaction, because the database checks a parent as each row is written and one save
+does not promise parents first. Two restores of one file make two independent, identical trees. Files at version 18 and
+earlier restore flat.

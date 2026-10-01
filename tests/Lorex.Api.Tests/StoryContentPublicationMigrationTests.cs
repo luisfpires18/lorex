@@ -80,8 +80,8 @@ public sealed class StoryContentPublicationMigrationTests : IDisposable
             Assert.DoesNotContain("OriginalCreator", await Columns(db, "Universes"));
             Assert.DoesNotContain("OriginalWork", await Columns(db, "Universes"));
             Assert.Empty(await ForeignKeyViolations(db));
-            Assert.Equal(triggers, await Triggers(db));
-            Assert.Equal(indexes, await Indexes(db));
+            Assert.Equal(triggers.Where(LaterSchema.BeforeNestedTypes), await Triggers(db));
+            Assert.Equal(indexes.Where(LaterSchema.BeforeNestedTypes), await Indexes(db));
         }
 
         SqliteConnection.ClearAllPools();

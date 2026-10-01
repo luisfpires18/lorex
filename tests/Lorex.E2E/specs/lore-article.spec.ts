@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { chooseLoreType } from './support/lore'
 import { clickSignOut } from './support/account'
 
 /**
@@ -188,6 +189,7 @@ test.describe('lore article', () => {
     // Search finds a word only the article holds, and says where it was found.
     await page.getByTestId('workspace-lore').click()
     await page.waitForURL(/\/lore$/)
+    await chooseLoreType(page, 'Character')
     await page.getByLabel('Filter entries').fill('Halloway')
     const card = page.locator('[data-testid="entity-card"][data-entity-name="Alenna Vance"]')
     const excerpt = card.getByTestId('entity-excerpt')
@@ -338,7 +340,7 @@ test.describe('lore article', () => {
     const entityId = await seedEntity(page, universeId, 'Wayfarer')
     await writeArticle(page, universeId, entityId, doc('Saved words.'))
 
-    const loreUrl = new RegExp(`/universes/${universeId}/lore$`)
+    const loreUrl = new RegExp(`/universes/${universeId}/lore([?]type=[0-9a-f-]+)?$`)
     const entryUrl = new RegExp(`/lore/${entityId}$`)
     const article = page.getByTestId('article')
     const editor = page.getByTestId('lore-editor')
@@ -355,6 +357,7 @@ test.describe('lore article', () => {
 
     // In-app history: the Lore browser, then the entry, reached by its card.
     await page.goto(`/app/universes/${universeId}/lore`)
+    await chooseLoreType(page, 'Character')
     await page.locator('[data-testid="entity-card"][data-entity-name="Wayfarer"]').click()
     await page.waitForURL(entryUrl)
     await expect(article.getByTestId('lore-article')).toHaveText('Saved words.')

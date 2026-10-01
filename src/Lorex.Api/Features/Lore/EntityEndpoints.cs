@@ -112,6 +112,7 @@ public static class EntityEndpoints
         [FromQuery] string? tag = null,
         [FromQuery] bool includeArchived = false,
         [FromQuery] bool familyTreeEligible = false,
+        [FromQuery] bool includeDescendants = false,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = DefaultPageSize)
     {
@@ -135,9 +136,19 @@ public static class EntityEndpoints
             query = query.Where(entity => !entity.IsArchived);
         }
 
-        if (entityTypeId is { } typeId)
+        // Exact by default, as every caller has always had it. Lore's browser asks for the branch: the type and every type
+        // nested beneath it at any depth, worked out here from the universe's small type graph rather than sent as a list.
+        if (entityTypeId is { } typeId && includeDescendants)
         {
-            query = query.Where(entity => entity.EntityTypeId == typeId);
+            var parentOf = await db.EntityTypes.AsNoTracking()
+                .Where(type => type.UniverseId == universeId)
+                .ToDictionaryAsync(type => type.Id, type => type.ParentId, cancellationToken);
+            var branch = EntityTypeHierarchy.Branch(parentOf, typeId).ToList();
+            query = query.Where(entity => branch.Contains(entity.EntityTypeId));
+        }
+        else if (entityTypeId is { } exactTypeId)
+        {
+            query = query.Where(entity => entity.EntityTypeId == exactTypeId);
         }
 
         if (canonStatus is { } status)

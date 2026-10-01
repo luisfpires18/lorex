@@ -70,15 +70,19 @@ internal static class BackupNormalization
                     ? payload.Universe with { OriginalCreator = null, OriginalWork = null }
                     : payload.Universe with { PublicSummary = null, Category = null, Genres = null, Artwork = null, OriginalCreator = null, OriginalWork = null },
         ChronologyEras = version >= 4 ? payload.ChronologyEras : null,
-        EntityTypes = version >= 18 || payload.EntityTypes is null
+        // Before 19 there is no hierarchy: every type is a root, in its stored order, whatever it is called.
+        EntityTypes = version >= 19 || payload.EntityTypes is null
             ? payload.EntityTypes!
             : [.. payload.EntityTypes.Select(type => type is null
                 ? null!
-                : type with
-                {
-                    FamilyTreeEligible = type.Name is not null
-                        && EntityTypeDefaults.IsUntouchedStarterCharacter(type.Name, type.Description, type.Icon, type.AccentColor),
-                })],
+                : version >= 18
+                    ? type with { ParentId = null }
+                    : type with
+                    {
+                        ParentId = null,
+                        FamilyTreeEligible = type.Name is not null
+                            && EntityTypeDefaults.IsUntouchedStarterCharacter(type.Name, type.Description, type.Icon, type.AccentColor),
+                    })],
         Entities = payload.Entities is null ? null! : [.. payload.Entities.Select(entity => entity is null ? null! : ProjectEntity(entity, version))],
         RelationshipTypes = version >= 14 || payload.RelationshipTypes is null
             ? payload.RelationshipTypes!

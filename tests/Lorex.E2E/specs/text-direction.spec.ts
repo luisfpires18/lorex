@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { chooseLoreType } from './support/lore'
 
 /**
  * Titles and names written right to left, or mixing scripts, drawn in their own direction.
@@ -296,6 +297,7 @@ test.describe('text direction', () => {
     // ---- The card in the lore grid, and the universe's search bar ----
 
     await page.goto(`/app/universes/${universeId}/lore`)
+    await chooseLoreType(page, 'شخصية')
     const card = page.locator(`[data-testid="entity-card"][data-entity-name="${Text.numbers}"]`)
     await expectIsolated(card.locator('.entitycard__name'), Text.numbers)
     // The type's name is cut with an ellipsis, so the cutting element carries the direction - the
@@ -315,10 +317,14 @@ test.describe('text direction', () => {
       card.locator('.entitycard__name'),
     )
     expect(cardNameBox).toBeGreaterThan(portraitBox)
+    // The type's name in Lore's chooser and in the header, each isolated.
+    await expectIsolated(page.getByRole('heading', { level: 1 }), 'شخصية')
+    await page.getByTestId('lore-type-menu').click()
     await expectIsolated(
-      page.locator('[data-testid="lore-type"][data-type-name="شخصية"] .typeswitch__name'),
+      page.locator('[data-testid="lore-type"][data-type-name="شخصية"] .typetree__name'),
       'شخصية',
     )
+    await page.keyboard.press('Escape')
 
     const answered = page.waitForResponse(
       (response) =>
@@ -663,7 +669,9 @@ test.describe('text direction', () => {
 
       // ---- The lore grid ----
 
-      await page.goto(`/app/universes/${universeId}/lore`)
+      await page.goto(
+        `/app/universes/${universeId}/lore?type=${await characterTypeId(page, universeId)}`,
+      )
       await expectIsolated(page.getByTestId('entity-card').locator('.entitycard__name'), Text.long)
       expect(await scrollsSideways(page)).toBe(false)
     })

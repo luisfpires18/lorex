@@ -90,6 +90,15 @@ public sealed class EntityType
     /// </summary>
     public bool FamilyTreeEligible { get; set; }
 
+    /// <summary>
+    /// The type this one sits beneath, or null for a root type (ADR 0007 amendment, 2026-10-01). Always a type of the same
+    /// universe (a trigger refuses anything else) and never the type itself or one of its descendants (the API and the
+    /// restore refuse that), so the types form a forest. Organisation only: nothing - fields, icon, accent, Family Tree,
+    /// Canon - is inherited.
+    /// </summary>
+    public Guid? ParentId { get; set; }
+
+    /// <summary>The type's place among its direct siblings - the types with the same <see cref="ParentId"/> - from 1.</summary>
     public int DisplayOrder { get; set; }
 
     public DateTime CreatedAt { get; set; }

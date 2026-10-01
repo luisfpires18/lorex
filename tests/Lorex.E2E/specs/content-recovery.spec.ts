@@ -406,7 +406,7 @@ test.describe('content recovery', () => {
       void dialog.accept()
     })
     await tab.locator('.entry__crumbs').getByRole('link', { name: 'Lore' }).click()
-    await tab.waitForURL(new RegExp(`/universes/${universeId}/lore$`))
+    await tab.waitForURL(new RegExp(`/universes/${universeId}/lore[?]type=[0-9a-f-]+$`))
     expect(questions).toHaveLength(1)
     expect(questions[0]).toContain('has unsaved changes')
     await expect.poll(async () => (await recoveryCopies(tab)).length).toBe(0)
