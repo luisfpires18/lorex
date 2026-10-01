@@ -34,13 +34,14 @@ than anything the specs did.
 
 ## How many browsers at once
 
-Locally, Playwright's own default: half the logical processors. `LOREX_E2E_WORKERS` overrides it.
+`LOREX_E2E_WORKERS`, a whole number above zero, decides wherever the suite runs. Without it a
+local run gets Playwright's own default - half the logical processors - and CI falls back to one.
 
 ```
 LOREX_E2E_WORKERS=4 npm test
 ```
 
-The default was measured rather than assumed, on 16 logical processors, so eight browsers:
+The local default was measured rather than assumed, on 16 logical processors, so eight browsers:
 
 | Database        | Workers | Passed                | Wall clock    | `SQLite Error 5` lines |
 | --------------- | ------- | --------------------- | ------------- | ---------------------- |
@@ -49,7 +50,36 @@ The default was measured rather than assumed, on 16 logical processors, so eight
 | long-lived copy | 4       | 153/155               | 4m08s         | 3                      |
 
 Halving the workers left the contention exactly where it was and took 1.7x as long, so nothing
-below Playwright's default is committed as the default. CI still runs one worker.
+below Playwright's default is committed as the default. The database, not the worker count, is
+what decides: parallel browsers need one the run built for itself.
+
+### CI: two browsers, one fresh database (Tooling refinement 026)
+
+CI runs the whole suite in one job with **two workers** sharing one API, one Vite server and one
+database, which `ci.yml` names explicitly - `LOREX_E2E_DB` under the job's `runner.temp` - rather
+than trusting the runner to be fresh. Retries stay at two (`playwright.config.ts`). The one-worker
+setting it replaces came with the Playwright scaffold and was never measured for CI; every full
+local run since 008 had already been two workers on a fresh database.
+
+Proved before the change, on 349 tests, with the API logging every request's status:
+
+| Run                                  | Workers | Retries | Passed  | Wall clock | Requests | `database is locked` | 5xx |
+| ------------------------------------ | ------- | ------- | ------- | ---------- | -------- | -------------------- | --- |
+| Write-heavy specs (19 files: Trash, permanent delete, stories, bulk Lore, nested types, restore, publishing, auth) | 2 | 0 | 105/105 | 5m24s | 6,095 | 0 | 0 |
+| Full suite                           | 2       | 0       | 348/349 | 15m59s     | 18,379   | 0                    | 0   |
+
+The full run's one loss was `profile.spec.ts`'s photo test meeting a wholly blank `/register`
+before any request reached the API - the dev server failing to deliver the page's modules under
+load, the same flake recorded in `STATE.md` since 013 - and it was green three times out of three
+alone. Nothing in either run was SQLite contention or a server error.
+
+**Why not two shards.** Native `--shard=1/2` and `--shard=2/2` on two runners would give each half
+a database of its own - isolation the evidence above shows is not needed - at the price of the
+whole job's setup twice over (.NET, Node, two `npm ci`, Chromium with its system packages, the API
+build) and double the runner minutes for roughly the same wall clock. It remains the next step if
+two workers on one runner ever show contention, and it needs no spec list: Playwright partitions.
+
+Local runs are not CI's clock. How long CI takes now is measured on the next GitHub-hosted run.
 
 ## Laying out a page the way CI does
 

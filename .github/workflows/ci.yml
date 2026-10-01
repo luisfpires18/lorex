@@ -125,9 +125,18 @@ jobs:
         run: dotnet build src/Lorex.Api
 
       # Playwright starts the API and the Vite dev server itself; see playwright.config.ts.
+      #
+      # Two browsers share that one API and one database the run builds for itself. The database
+      # is named explicitly, under this job's own temporary directory, rather than left to the
+      # runner happening to be fresh: a fresh database is the condition parallel browsers were
+      # proved on, and a long-lived one is where SQLite contention showed (README.md, "How many
+      # browsers at once"). The whole suite runs; retries are unchanged (playwright.config.ts).
       - name: Run Playwright
         run: npx playwright test
         working-directory: tests/Lorex.E2E
+        env:
+          LOREX_E2E_WORKERS: '2'
+          LOREX_E2E_DB: ${{ runner.temp }}/lorex-e2e.db
 
       - name: Upload report
         if: ${{ !cancelled() }}
