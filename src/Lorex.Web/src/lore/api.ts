@@ -90,6 +90,22 @@ export function moveEntityType(universeId: string, typeId: string, direction: 'u
   })
 }
 
+/**
+ * Puts a type at `index` (0-based) among its siblings in one request - a whole drag, however far. `parentId` is the parent
+ * this screen showed it under; the API refuses (409) if that is no longer so, rather than reorder a group nobody saw.
+ */
+export function reorderEntityType(
+  universeId: string,
+  typeId: string,
+  index: number,
+  parentId: string | null,
+) {
+  return apiFetch<EntityType[]>(`${base(universeId)}/entity-types/${typeId}/reorder`, {
+    method: 'POST',
+    body: JSON.stringify({ index, parentId }),
+  })
+}
+
 export function deleteEntityType(universeId: string, typeId: string) {
   return apiFetch<void>(`${base(universeId)}/entity-types/${typeId}`, { method: 'DELETE' })
 }

@@ -295,6 +295,8 @@ test.describe('Types screen with nested types', () => {
   test('Up and Down move a type among its own siblings, and every picker follows', async ({
     page,
   }) => {
+    // Up and Down are set out on the row on a phone; a wide screen reorders by the grip (type-reorder.spec.ts).
+    await page.setViewportSize({ width: 640, height: 900 })
     await signUp(page)
     const w = await runeWorld(page)
     await page.goto(`/app/universes/${w.u}/types`)
@@ -354,6 +356,8 @@ test.describe('Types screen with nested types', () => {
     await expect.poll(order).toEqual(moved)
 
     // Lore's type row, New entry and Mass create all read the same order.
+    // Lore's wrapped type row is a wide screen's.
+    await page.setViewportSize({ width: 1280, height: 720 })
     await page.goto(lore(w.u))
     await expect
       .poll(async () => {

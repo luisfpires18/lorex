@@ -54,6 +54,9 @@ public static class EntityTypeEndpoints
     /// <summary>The machine-readable marker on the refusal of a parent or a move that would put a type inside itself.</summary>
     public const string ParentCycleCode = "entity_type_parent_cycle";
 
+    /// <summary>The machine-readable marker on a reorder whose type no longer sits under the parent the client saw.</summary>
+    public const string ParentChangedCode = "entity_type_parent_changed";
+
     public static IEndpointRouteBuilder MapEntityTypeEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/universes/{universeId:guid}/entity-types")
@@ -65,6 +68,7 @@ public static class EntityTypeEndpoints
         group.MapPut("/{typeId:guid}", UpdateAsync).WithName("UpdateEntityType");
         group.MapDelete("/{typeId:guid}", DeleteAsync).WithName("DeleteEntityType");
         group.MapPost("/{typeId:guid}/move", MoveAsync).WithName("MoveEntityType");
+        group.MapPost("/{typeId:guid}/reorder", ReorderAsync).WithName("ReorderEntityType");
 
         group.MapPost("/{typeId:guid}/fields", AddFieldAsync).WithName("AddEntityField");
         group.MapPut("/{typeId:guid}/fields/{fieldId:guid}", UpdateFieldAsync).WithName("UpdateEntityField");
@@ -308,6 +312,80 @@ public static class EntityTypeEndpoints
             });
         }
 
+        // Past either end is no move at all: the same list back, not an error.
+        return await PlaceAmongSiblingsAsync(
+            db,
+            universeId,
+            typeId,
+            (moving, from, count) =>
+            {
+                var to = from + step;
+                return to >= 0 && to < count ? to : from;
+            },
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Puts a type at an absolute place among its direct siblings in one request - a desktop drag, however far it went - and
+    /// numbers the group 1..n again. Only the order of that one sibling group changes: the parent, the type's own nested types
+    /// (which hang from it, and so move with it in the shown order), its fields and its entries are untouched. Its own place
+    /// is an unchanged 200. An index outside the group is a 400 on <c>index</c>; a type no longer under the parent the client
+    /// saw is a 409 <see cref="ParentChangedCode"/>, so a stale screen reloads rather than reordering a group it never showed.
+    /// Answers the whole list, in order, as a move does.
+    /// </summary>
+    private static async Task<IResult> ReorderAsync(
+        Guid universeId,
+        Guid typeId,
+        [FromBody] EntityTypeReorderRequest request,
+        ClaimsPrincipal principal,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
+        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        {
+            return Results.NotFound();
+        }
+
+        if (request.Index is not { } index || index < 0)
+        {
+            return OutOfRange();
+        }
+
+        return await PlaceAmongSiblingsAsync(
+            db,
+            universeId,
+            typeId,
+            (moving, _, count) =>
+                moving.ParentId != request.ParentId ? SiblingPlace.Refused(ParentChanged())
+                : index >= count ? SiblingPlace.Refused(OutOfRange())
+                : index,
+            cancellationToken);
+
+        static IResult OutOfRange() => Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["index"] = ["Choose a place among this type's siblings."],
+        });
+
+        static IResult ParentChanged() => Results.Problem(
+            title: "This type has moved",
+            detail: "It no longer sits where this list showed it. Reload the types and try again.",
+            statusCode: StatusCodes.Status409Conflict,
+            extensions: new Dictionary<string, object?> { ["code"] = ParentChangedCode });
+    }
+
+    /// <summary>
+    /// The one place a type's position among its siblings is changed, for a one-step move and an absolute reorder alike. Inside
+    /// one transaction - which takes SQLite's write lock first, so two at once apply one after the other - it reads the type
+    /// and its sibling group, asks <paramref name="target"/> for the new index (or a refusal), takes the type out and puts it
+    /// back there, numbers the group 1..n, and answers the whole list.
+    /// </summary>
+    private static async Task<IResult> PlaceAmongSiblingsAsync(
+        LorexDbContext db,
+        Guid universeId,
+        Guid typeId,
+        Func<EntityType, int, int, SiblingPlace> target,
+        CancellationToken cancellationToken)
+    {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
         var moving = await db.EntityTypes.FirstOrDefaultAsync(
@@ -321,18 +399,28 @@ public static class EntityTypeEndpoints
 
         var siblings = await SiblingsAsync(db, universeId, moving.ParentId, cancellationToken);
         var from = siblings.FindIndex(sibling => sibling.Id == typeId);
-        var to = from + step;
-
-        if (to >= 0 && to < siblings.Count)
+        var decided = target(moving, from, siblings.Count);
+        if (decided.Refusal is { } refusal)
         {
-            (siblings[from], siblings[to]) = (siblings[to], siblings[from]);
+            return refusal;
         }
+
+        siblings.RemoveAt(from);
+        siblings.Insert(decided.Index, moving);
 
         Renumber(siblings, DateTime.UtcNow);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
         return Results.Ok(await LoadTypesAsync(db, universeId, cancellationToken));
+    }
+
+    /// <summary>Where a type goes among its siblings, or why it does not.</summary>
+    private readonly record struct SiblingPlace(int Index, IResult? Refusal)
+    {
+        public static implicit operator SiblingPlace(int index) => new(index, null);
+
+        public static SiblingPlace Refused(IResult refusal) => new(0, refusal);
     }
 
     /// <summary>A type's direct siblings with <paramref name="parentId"/>, tracked, in their shown order.</summary>

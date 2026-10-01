@@ -1,6 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
-import { ArrowDown, ArrowUp, ListTree, Pencil, Plus } from 'lucide-react'
+import {
+  DndContext,
+  DragOverlay,
+  MouseSensor,
+  useSensor,
+  useSensors,
+  type DragMoveEvent,
+} from '@dnd-kit/core'
+import { ArrowDown, ArrowUp, GripVertical, ListTree, Pencil, Plus } from 'lucide-react'
 import { ActionIcon } from '../components/ActionIcon'
 import { ActionMenu } from '../components/ActionMenu'
 import { Field } from '../components/Field'
@@ -9,6 +17,7 @@ import { useQueryTab } from '../lib/queryTab'
 import { RelationshipTypeManager } from '../components/RelationshipTypeManager'
 import { TypeIcon } from '../components/TypeIcon'
 import { TypeIconPicker } from '../components/TypeIconPicker'
+import { TypeReorderHandle } from '../components/TypeReorderHandle'
 import { ValidationTermManager } from '../components/ValidationTermManager'
 import { ApiError } from '../lib/api'
 import { payloadKey, useDrawerGuard } from '../lib/drawerGuard'
@@ -20,6 +29,7 @@ import {
   deleteField,
   listEntityTypes,
   moveEntityType,
+  reorderEntityType,
   updateEntityType,
   updateField,
 } from '../lore/api'
@@ -33,7 +43,13 @@ import {
   type FieldKindValue,
   type FieldSemanticValue,
 } from '../lore/types'
-import { buildTypeTree, branchIds, typePathLabel, type TypeTree } from '../lore/typeTree'
+import {
+  buildTypeTree,
+  branchIds,
+  typePathLabel,
+  type TypeNode,
+  type TypeTree,
+} from '../lore/typeTree'
 import { PageHeader } from '../components/PageHeader'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
@@ -101,6 +117,157 @@ export default function UniverseTypes() {
     moveButtons.current.get(refocus.current)?.focus()
     refocus.current = null
   }, [types])
+
+  // Reordering by the grip (wide screens). `target` is where the type being carried would land among its siblings - from a
+  // mouse drag or from the keyboard - and is drawn as a line at that place; `lifted` is a keyboard carry in progress.
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [lifted, setLifted] = useState<string | null>(null)
+  const [target, setTarget] = useState<number | null>(null)
+  // A mouse only, and only after it has moved a little: a click on the grip is not a drag, and a finger never is one.
+  const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 4 } }))
+
+  /** The type's own sibling group - its parent's children, or the roots - which is all it can be reordered among. */
+  function siblingsOf(node: TypeNode) {
+    return node.depth === 0
+      ? tree.roots
+      : tree.byId.get(node.path[node.path.length - 2]!.id)!.children
+  }
+
+  /** The row a branch ends on: the type's last descendant, or the type itself. */
+  function lastOf(node: TypeNode): TypeNode {
+    return node.children.length > 0 ? lastOf(node.children[node.children.length - 1]!) : node
+  }
+
+  /**
+   * Which sibling's place a pointer at `y` points to: the sibling whose whole branch - its row and every row nested under it
+   * - holds `y`, or the nearest one. Only siblings are ever candidates, so a drop can never land inside another branch or
+   * under another parent, however far the pointer drifts.
+   */
+  function placeAt(node: TypeNode, y: number) {
+    const siblings = siblingsOf(node)
+    let best = siblings.indexOf(node)
+    let distance = Number.POSITIVE_INFINITY
+    siblings.forEach((sibling, index) => {
+      const top = rowOf(sibling.type.id)?.getBoundingClientRect().top
+      const bottom = rowOf(lastOf(sibling).type.id)?.getBoundingClientRect().bottom
+      if (top === undefined || bottom === undefined) return
+      const away = y < top ? top - y : y > bottom ? y - bottom : 0
+      if (away < distance) {
+        distance = away
+        best = index
+      }
+    })
+    return best
+  }
+
+  function rowOf(typeId: string) {
+    return document.querySelector<HTMLElement>(`.types__row[data-type-id="${typeId}"]`)
+  }
+
+  function onDragMove(event: DragMoveEvent) {
+    const node = tree.byId.get(String(event.active.id))
+    const start = event.activatorEvent as MouseEvent
+    if (!node || typeof start.clientY !== 'number') return
+    const next = placeAt(node, start.clientY + event.delta.y)
+    if (next !== target) setTarget(next)
+  }
+
+  /**
+   * Puts a type at `to` among its siblings: the list shows it there at once, one request makes it so, and the server's list
+   * replaces the guess. A refusal puts the order back as it was and says why; a type that has moved since this screen read
+   * the list reloads it.
+   */
+  async function reorder(type: EntityType, to: number) {
+    const node = tree.byId.get(type.id)
+    if (!node || moving || !types) return
+    const siblings = siblingsOf(node)
+    const from = siblings.indexOf(node)
+    if (to === from || to < 0 || to >= siblings.length) return
+
+    const previous = types
+    const order = siblings.map((sibling) => sibling.type.id)
+    order.splice(from, 1)
+    order.splice(to, 0, type.id)
+    const place = new Map(order.map((id, index) => [id, index + 1]))
+    setTypes(
+      previous.map((each) =>
+        place.has(each.id) ? { ...each, displayOrder: place.get(each.id)! } : each,
+      ),
+    )
+
+    setMessage(null)
+    setNotice(null)
+    setMoving(type.id)
+    try {
+      const reordered = await reorderEntityType(universe.id, type.id, to, type.parentId)
+      refocus.current = `${type.id}:handle`
+      setTypes(reordered)
+      setNotice(`Moved “${type.name}” to place ${to + 1} of ${siblings.length}.`)
+    } catch (error: unknown) {
+      setTypes(previous)
+      refocus.current = `${type.id}:handle`
+      report(error, 'That type could not be moved.')
+      if (error instanceof ApiError && error.status === 409) await refresh().catch(() => undefined)
+    } finally {
+      setMoving(null)
+    }
+  }
+
+  /** The grip from the keyboard: Space or Enter lifts and drops, the arrows move among siblings, Escape puts it back. */
+  function onHandleKey(type: EntityType, event: KeyboardEvent<HTMLButtonElement>) {
+    const node = tree.byId.get(type.id)
+    if (!node) return
+    const siblings = siblingsOf(node)
+    const from = siblings.indexOf(node)
+    const isLifted = lifted === type.id
+    // Alone among its siblings, there is nowhere for it to go.
+    if (siblings.length < 2) return
+    const say = (to: number) => `place ${to + 1} of ${siblings.length} among its siblings`
+
+    if (event.key === ' ' || event.key === 'Enter') {
+      event.preventDefault()
+      if (moving) return
+      if (!isLifted) {
+        setLifted(type.id)
+        setTarget(from)
+        setNotice(
+          `Lifted “${type.name}”, at ${say(from)}. Up and down arrows move it, Space drops it, Escape puts it back.`,
+        )
+      } else {
+        const to = target ?? from
+        setLifted(null)
+        setTarget(null)
+        if (to === from) setNotice(`“${type.name}” stays at ${say(from)}.`)
+        else void reorder(type, to)
+      }
+    } else if (isLifted && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+      event.preventDefault()
+      const to = Math.min(
+        siblings.length - 1,
+        Math.max(0, (target ?? from) + (event.key === 'ArrowUp' ? -1 : 1)),
+      )
+      setTarget(to)
+      setNotice(`“${type.name}”: ${say(to)}.`)
+    } else if (isLifted && event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      setLifted(null)
+      setTarget(null)
+      setNotice(`Put back. “${type.name}” stays at ${say(from)}.`)
+    }
+  }
+
+  // The type being carried, by the mouse or the keyboard, and the line showing where it would land.
+  const carried = tree.byId.get(dragId ?? lifted ?? '') ?? null
+  const carriedFrom = carried ? siblingsOf(carried).indexOf(carried) : -1
+  const dropLine = (() => {
+    if (!carried || target === null || target === carriedFrom) return null
+    const at = siblingsOf(carried)[target]!
+    // Up: above the sibling it takes the place of. Down: below that sibling's whole branch.
+    return target < carriedFrom
+      ? { typeId: at.type.id, edge: 'before' as const }
+      : { typeId: lastOf(at).type.id, edge: 'after' as const }
+  })()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -336,330 +503,427 @@ export default function UniverseTypes() {
             Reading the types…
           </p>
         ) : (
-          <ul className="types__list" data-testid="type-list">
-            {tree.ordered.map((node) => {
-              const type = node.type
-              const siblings =
-                node.depth === 0
-                  ? tree.roots
-                  : tree.byId.get(node.path[node.path.length - 2]!.id)!.children
-              const place = siblings.indexOf(node)
-              const isFirst = place === 0
-              const isLast = place === siblings.length - 1
-              return (
-                <li
-                  className="types__row"
-                  key={type.id}
-                  data-type-name={type.name}
-                  data-depth={node.depth}
-                  style={{ ['--depth' as string]: Math.min(node.depth, 6) }}
-                >
-                  <div className="types__head">
-                    <span className="types__icon" data-testid={`type-icon-${type.name}`}>
-                      <TypeIcon iconKey={type.icon} />
-                    </span>
-                    <span className="types__name">
-                      <bdi>{type.name}</bdi>
-                      {node.depth > 0 ? (
-                        <span className="visually-hidden">
-                          , inside{' '}
-                          {typePathLabel(tree.byId.get(node.path[node.path.length - 2]!.id)!)}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="types__count" data-testid={`type-count-${type.name}`}>
-                      {type.entityCount === 1 ? '1 entry' : `${type.entityCount} entries`}
-                      {type.trashedEntityCount > 0 ? (
-                        <span className="types__trashed">
-                          {type.trashedEntityCount === type.entityCount
-                            ? type.entityCount === 1
-                              ? ', in the Trash'
-                              : ', all in the Trash'
-                            : `, ${type.trashedEntityCount} in the Trash`}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="types__actions">
-                      <span
-                        className="types__move"
-                        role="group"
-                        aria-label={`Order of ${type.name}`}
-                      >
-                        {(['up', 'down'] as const).map((direction) => {
-                          const isEnd = direction === 'up' ? isFirst : isLast
-                          return (
-                            <button
-                              key={direction}
-                              ref={(element) => {
-                                const key = `${type.id}:${direction}`
-                                if (element) moveButtons.current.set(key, element)
-                                else moveButtons.current.delete(key)
-                              }}
-                              className="button button--text button--sm types__movebutton"
-                              type="button"
-                              aria-disabled={isEnd || moving !== null || undefined}
-                              aria-label={`Move ${type.name} ${direction}`}
-                              title={
-                                isEnd
-                                  ? direction === 'up'
-                                    ? 'Already first among its siblings'
-                                    : 'Already last among its siblings'
-                                  : undefined
-                              }
-                              onClick={() => {
-                                if (!isEnd) void move(type, direction)
-                              }}
-                              data-testid={`move-${direction}-${type.name}`}
-                            >
-                              <ActionIcon icon={direction === 'up' ? ArrowUp : ArrowDown} />
-                              {direction === 'up' ? 'Up' : 'Down'}
-                            </button>
-                          )
-                        })}
+          <DndContext
+            sensors={sensors}
+            onDragStart={(event) => {
+              setLifted(null)
+              setDragId(String(event.active.id))
+              const node = tree.byId.get(String(event.active.id))
+              setTarget(node ? siblingsOf(node).indexOf(node) : null)
+            }}
+            onDragMove={onDragMove}
+            onDragEnd={(event) => {
+              const node = tree.byId.get(String(event.active.id))
+              const to = target
+              setDragId(null)
+              setTarget(null)
+              if (node && to !== null) void reorder(node.type, to)
+            }}
+            onDragCancel={() => {
+              setDragId(null)
+              setTarget(null)
+            }}
+            accessibility={{
+              screenReaderInstructions: {
+                draggable:
+                  'Press Space or Enter to lift this type, the up and down arrows to move it among its siblings, and ' +
+                  'Space or Enter again to drop it, or Escape to put it back. It never moves to another parent.',
+              },
+              announcements: {
+                onDragStart: ({ active }) =>
+                  `Picked up ${tree.byId.get(String(active.id))?.type.name ?? 'a type'}.`,
+                onDragOver: () => undefined,
+                onDragEnd: ({ active }) =>
+                  `Dropped ${tree.byId.get(String(active.id))?.type.name ?? 'the type'}.`,
+                onDragCancel: ({ active }) =>
+                  `Put back ${tree.byId.get(String(active.id))?.type.name ?? 'the type'}.`,
+              },
+            }}
+          >
+            <ul
+              className="types__list"
+              data-testid="type-list"
+              data-reordering={carried ? 'true' : undefined}
+            >
+              {tree.ordered.map((node) => {
+                const type = node.type
+                const siblings =
+                  node.depth === 0
+                    ? tree.roots
+                    : tree.byId.get(node.path[node.path.length - 2]!.id)!.children
+                const place = siblings.indexOf(node)
+                const isFirst = place === 0
+                const isLast = place === siblings.length - 1
+                return (
+                  <li
+                    className="types__row"
+                    key={type.id}
+                    data-type-id={type.id}
+                    data-type-name={type.name}
+                    data-carried={carried?.type.id === type.id ? 'true' : undefined}
+                    data-drop={dropLine?.typeId === type.id ? dropLine.edge : undefined}
+                    data-depth={node.depth}
+                    style={{ ['--depth' as string]: Math.min(node.depth, 6) }}
+                  >
+                    <div className="types__head">
+                      {/* Wide screens reorder by this grip; a phone keeps Up and Down. */}
+                      <TypeReorderHandle
+                        id={type.id}
+                        name={type.name}
+                        lifted={lifted === type.id}
+                        disabled={moving !== null || siblings.length < 2}
+                        onKey={(event) => onHandleKey(type, event)}
+                        onLeave={() => {
+                          if (lifted !== type.id) return
+                          setLifted(null)
+                          setTarget(null)
+                          setNotice(`Put back. “${type.name}” stays where it was.`)
+                        }}
+                        buttonRef={(element) => {
+                          const key = `${type.id}:handle`
+                          if (element) moveButtons.current.set(key, element)
+                          else moveButtons.current.delete(key)
+                        }}
+                      />
+                      <span className="types__icon" data-testid={`type-icon-${type.name}`}>
+                        <TypeIcon iconKey={type.icon} />
                       </span>
-                      {/* A type straight inside this one, its parent already chosen - the quick way to build a branch.
+                      <span className="types__name">
+                        <bdi>{type.name}</bdi>
+                        {node.depth > 0 ? (
+                          <span className="visually-hidden">
+                            , inside{' '}
+                            {typePathLabel(tree.byId.get(node.path[node.path.length - 2]!.id)!)}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="types__count" data-testid={`type-count-${type.name}`}>
+                        {type.entityCount === 1 ? '1 entry' : `${type.entityCount} entries`}
+                        {type.trashedEntityCount > 0 ? (
+                          <span className="types__trashed">
+                            {type.trashedEntityCount === type.entityCount
+                              ? type.entityCount === 1
+                                ? ', in the Trash'
+                                : ', all in the Trash'
+                              : `, ${type.trashedEntityCount} in the Trash`}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="types__actions">
+                        <span
+                          className="types__move"
+                          role="group"
+                          aria-label={`Order of ${type.name}`}
+                        >
+                          {(['up', 'down'] as const).map((direction) => {
+                            const isEnd = direction === 'up' ? isFirst : isLast
+                            return (
+                              <button
+                                key={direction}
+                                ref={(element) => {
+                                  const key = `${type.id}:${direction}`
+                                  if (element) moveButtons.current.set(key, element)
+                                  else moveButtons.current.delete(key)
+                                }}
+                                className="button button--text button--sm types__movebutton"
+                                type="button"
+                                aria-disabled={isEnd || moving !== null || undefined}
+                                aria-label={`Move ${type.name} ${direction}`}
+                                title={
+                                  isEnd
+                                    ? direction === 'up'
+                                      ? 'Already first among its siblings'
+                                      : 'Already last among its siblings'
+                                    : undefined
+                                }
+                                onClick={() => {
+                                  if (!isEnd) void move(type, direction)
+                                }}
+                                data-testid={`move-${direction}-${type.name}`}
+                              >
+                                <ActionIcon icon={direction === 'up' ? ArrowUp : ArrowDown} />
+                                {direction === 'up' ? 'Up' : 'Down'}
+                              </button>
+                            )
+                          })}
+                        </span>
+                        {/* A type straight inside this one, its parent already chosen - the quick way to build a branch.
                           Quiet like Up and Down; on a phone it waits in the row's menu instead. Coming back from the
                           drawer, the focus is on this button again, ready for the next sibling. */}
-                      <button
-                        className="button button--text button--sm types__addchild"
-                        type="button"
-                        onClick={() => openChild(type)}
-                        aria-label={`Add child type inside ${type.name}`}
-                        data-testid={`add-child-${type.name}`}
-                      >
-                        <ActionIcon icon={ListTree} />
-                        Add child
-                      </button>
-                      <button
-                        className="button button--secondary button--sm"
-                        type="button"
-                        onClick={() => {
-                          setBlocked(null)
-                          setEditing(type)
-                        }}
-                        aria-label={`Edit ${type.name}`}
-                        data-testid={`edit-type-${type.name}`}
-                      >
-                        <ActionIcon icon={Pencil} />
-                        Edit
-                      </button>
-                      <button
-                        className="button button--secondary button--sm"
-                        type="button"
-                        aria-expanded={openTypeId === type.id}
-                        aria-label={`Fields of ${type.name}`}
-                        onClick={() => setOpenTypeId(openTypeId === type.id ? null : type.id)}
-                        data-testid={`fields-${type.name}`}
-                      >
-                        Fields
-                        {type.fields.length > 0 ? (
-                          <span className="types__fieldcount">{type.fields.length}</span>
-                        ) : null}
-                      </button>
-                      <ActionMenu
-                        label={`More actions for ${type.name}`}
-                        triggerTestId={`type-actions-${type.name}`}
-                      >
                         <button
-                          className="actionmenu__item types__addchilditem"
+                          className="button button--text button--sm types__addchild"
                           type="button"
                           onClick={() => openChild(type)}
                           aria-label={`Add child type inside ${type.name}`}
-                          data-testid={`add-child-item-${type.name}`}
+                          data-testid={`add-child-${type.name}`}
                         >
                           <ActionIcon icon={ListTree} />
-                          Add child type
+                          Add child
                         </button>
                         <button
-                          className="actionmenu__item actionmenu__item--danger"
+                          className="button button--secondary button--sm"
                           type="button"
-                          onClick={() => void removeType(type)}
-                          data-testid={`delete-type-${type.name}`}
+                          onClick={() => {
+                            setBlocked(null)
+                            setEditing(type)
+                          }}
+                          aria-label={`Edit ${type.name}`}
+                          data-testid={`edit-type-${type.name}`}
                         >
-                          Delete type
+                          <ActionIcon icon={Pencil} />
+                          Edit
                         </button>
-                      </ActionMenu>
-                    </span>
-                  </div>
-
-                  {type.description ? (
-                    <p className="types__description prose">{type.description}</p>
-                  ) : null}
-
-                  {blocked?.typeId === type.id ? (
-                    <div
-                      className="callout callout--warning types__blocked"
-                      role="alert"
-                      data-testid={`type-blocked-${type.name}`}
-                    >
-                      <p className="types__blockedtext">{blocked.text}</p>
-                      <p className="types__blockedlinks">
-                        {type.entityCount > type.trashedEntityCount ? (
-                          <Link to={`/app/universes/${universe.id}/lore?type=${type.id}`}>
-                            Show its entries in Lore
-                          </Link>
-                        ) : null}
-                        {type.trashedEntityCount > 0 ? (
-                          <Link to={`/app/universes/${universe.id}/trash`}>Open the Trash</Link>
-                        ) : null}
-                      </p>
-                    </div>
-                  ) : null}
-
-                  {openTypeId === type.id ? (
-                    <div className="types__fields">
-                      {type.fields.length > 0 ? (
-                        <ul className="types__fieldlist">
-                          {type.fields.map((field) => (
-                            <li key={field.id} data-field-name={field.name}>
-                              <span className="types__fieldname">{field.name}</span>
-                              <span className="types__fieldkind">
-                                {FIELD_KIND_LABELS[field.kind]}
-                              </span>
-                              {field.isRequired ? (
-                                <span className="types__fieldkind">required</span>
-                              ) : null}
-                              {semanticsFor(field.kind).length > 0 ? (
-                                <select
-                                  className="types__meaning"
-                                  aria-label={`Canon meaning of ${field.name}`}
-                                  value={field.semantic ?? ''}
-                                  disabled={busyFieldId === field.id}
-                                  onChange={(event) =>
-                                    void changeMeaning(
-                                      type.id,
-                                      field,
-                                      event.target.value === ''
-                                        ? null
-                                        : (Number(event.target.value) as FieldSemanticValue),
-                                    )
-                                  }
-                                  data-testid={`field-meaning-${field.name}`}
-                                >
-                                  <option value="">No meaning</option>
-                                  {semanticsFor(field.kind).map((semantic) => (
-                                    <option key={semantic} value={semantic}>
-                                      {FIELD_SEMANTIC_LABELS[semantic]}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : null}
-                              <button
-                                className="token__remove"
-                                type="button"
-                                aria-label={`Delete ${field.name}`}
-                                onClick={() => removeField(type.id, field.id)}
-                              >
-                                &times;
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="settings__note">No custom fields yet.</p>
-                      )}
-
-                      <div className="types__add">
-                        <Field
-                          label="Field name"
-                          name={`field-name-${type.id}`}
-                          value={fieldName}
-                          onChange={(event) => setFieldName(event.target.value)}
-                        />
-
-                        <div className="field">
-                          <label className="field__label" htmlFor={`field-kind-${type.id}`}>
-                            Kind
-                          </label>
-                          <select
-                            id={`field-kind-${type.id}`}
-                            className="field__input field__input--select"
-                            value={fieldKind}
-                            onChange={(event) => {
-                              const kind = Number(event.target.value) as FieldKindValue
-                              setFieldKind(kind)
-                              // A meaning belongs to a shape. Switching away from one that can
-                              // carry it drops it rather than sending a pair the API refuses.
-                              setFieldSemantic((current) =>
-                                current !== null && semanticsFor(kind).includes(current)
-                                  ? current
-                                  : null,
-                              )
-                            }}
+                        <button
+                          className="button button--secondary button--sm"
+                          type="button"
+                          aria-expanded={openTypeId === type.id}
+                          aria-label={`Fields of ${type.name}`}
+                          onClick={() => setOpenTypeId(openTypeId === type.id ? null : type.id)}
+                          data-testid={`fields-${type.name}`}
+                        >
+                          Fields
+                          {type.fields.length > 0 ? (
+                            <span className="types__fieldcount">{type.fields.length}</span>
+                          ) : null}
+                        </button>
+                        <ActionMenu
+                          label={`More actions for ${type.name}`}
+                          triggerTestId={`type-actions-${type.name}`}
+                        >
+                          <button
+                            className="actionmenu__item types__addchilditem"
+                            type="button"
+                            onClick={() => openChild(type)}
+                            aria-label={`Add child type inside ${type.name}`}
+                            data-testid={`add-child-item-${type.name}`}
                           >
-                            {KIND_ORDER.map((kind) => (
-                              <option key={kind} value={kind}>
-                                {FIELD_KIND_LABELS[kind]}
-                              </option>
+                            <ActionIcon icon={ListTree} />
+                            Add child type
+                          </button>
+                          {/* The grip's plain alternative on a wide screen, where Up and Down are not set out on the row. */}
+                          {(['up', 'down'] as const).map((direction) =>
+                            (direction === 'up' ? isFirst : isLast) ? null : (
+                              <button
+                                key={direction}
+                                className="actionmenu__item types__moveitem"
+                                type="button"
+                                onClick={() => void move(type, direction)}
+                                disabled={moving !== null}
+                                data-testid={`move-${direction}-item-${type.name}`}
+                              >
+                                <ActionIcon icon={direction === 'up' ? ArrowUp : ArrowDown} />
+                                {direction === 'up' ? 'Move up' : 'Move down'}
+                              </button>
+                            ),
+                          )}
+                          <button
+                            className="actionmenu__item actionmenu__item--danger"
+                            type="button"
+                            onClick={() => void removeType(type)}
+                            data-testid={`delete-type-${type.name}`}
+                          >
+                            Delete type
+                          </button>
+                        </ActionMenu>
+                      </span>
+                    </div>
+
+                    {type.description ? (
+                      <p className="types__description prose">{type.description}</p>
+                    ) : null}
+
+                    {blocked?.typeId === type.id ? (
+                      <div
+                        className="callout callout--warning types__blocked"
+                        role="alert"
+                        data-testid={`type-blocked-${type.name}`}
+                      >
+                        <p className="types__blockedtext">{blocked.text}</p>
+                        <p className="types__blockedlinks">
+                          {type.entityCount > type.trashedEntityCount ? (
+                            <Link to={`/app/universes/${universe.id}/lore?type=${type.id}`}>
+                              Show its entries in Lore
+                            </Link>
+                          ) : null}
+                          {type.trashedEntityCount > 0 ? (
+                            <Link to={`/app/universes/${universe.id}/trash`}>Open the Trash</Link>
+                          ) : null}
+                        </p>
+                      </div>
+                    ) : null}
+
+                    {openTypeId === type.id ? (
+                      <div className="types__fields">
+                        {type.fields.length > 0 ? (
+                          <ul className="types__fieldlist">
+                            {type.fields.map((field) => (
+                              <li key={field.id} data-field-name={field.name}>
+                                <span className="types__fieldname">{field.name}</span>
+                                <span className="types__fieldkind">
+                                  {FIELD_KIND_LABELS[field.kind]}
+                                </span>
+                                {field.isRequired ? (
+                                  <span className="types__fieldkind">required</span>
+                                ) : null}
+                                {semanticsFor(field.kind).length > 0 ? (
+                                  <select
+                                    className="types__meaning"
+                                    aria-label={`Canon meaning of ${field.name}`}
+                                    value={field.semantic ?? ''}
+                                    disabled={busyFieldId === field.id}
+                                    onChange={(event) =>
+                                      void changeMeaning(
+                                        type.id,
+                                        field,
+                                        event.target.value === ''
+                                          ? null
+                                          : (Number(event.target.value) as FieldSemanticValue),
+                                      )
+                                    }
+                                    data-testid={`field-meaning-${field.name}`}
+                                  >
+                                    <option value="">No meaning</option>
+                                    {semanticsFor(field.kind).map((semantic) => (
+                                      <option key={semantic} value={semantic}>
+                                        {FIELD_SEMANTIC_LABELS[semantic]}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : null}
+                                <button
+                                  className="token__remove"
+                                  type="button"
+                                  aria-label={`Delete ${field.name}`}
+                                  onClick={() => removeField(type.id, field.id)}
+                                >
+                                  &times;
+                                </button>
+                              </li>
                             ))}
-                          </select>
-                        </div>
+                          </ul>
+                        ) : (
+                          <p className="settings__note">No custom fields yet.</p>
+                        )}
 
-                        {fieldKind === FieldKind.Select || fieldKind === FieldKind.MultiSelect ? (
+                        <div className="types__add">
                           <Field
-                            label="Options, separated by commas"
-                            name={`field-options-${type.id}`}
-                            value={fieldOptions}
-                            onChange={(event) => setFieldOptions(event.target.value)}
+                            label="Field name"
+                            name={`field-name-${type.id}`}
+                            value={fieldName}
+                            onChange={(event) => setFieldName(event.target.value)}
                           />
-                        ) : null}
 
-                        {semanticsFor(fieldKind).length > 0 ? (
                           <div className="field">
-                            <label className="field__label" htmlFor={`field-semantic-${type.id}`}>
-                              Canon meaning
+                            <label className="field__label" htmlFor={`field-kind-${type.id}`}>
+                              Kind
                             </label>
                             <select
-                              id={`field-semantic-${type.id}`}
+                              id={`field-kind-${type.id}`}
                               className="field__input field__input--select"
-                              value={fieldSemantic ?? ''}
-                              onChange={(event) =>
-                                setFieldSemantic(
-                                  event.target.value === ''
-                                    ? null
-                                    : (Number(event.target.value) as FieldSemanticValue),
+                              value={fieldKind}
+                              onChange={(event) => {
+                                const kind = Number(event.target.value) as FieldKindValue
+                                setFieldKind(kind)
+                                // A meaning belongs to a shape. Switching away from one that can
+                                // carry it drops it rather than sending a pair the API refuses.
+                                setFieldSemantic((current) =>
+                                  current !== null && semanticsFor(kind).includes(current)
+                                    ? current
+                                    : null,
                                 )
-                              }
-                              data-testid={`field-semantic-${type.name}`}
+                              }}
                             >
-                              <option value="">None</option>
-                              {semanticsFor(fieldKind).map((semantic) => (
-                                <option key={semantic} value={semantic}>
-                                  {FIELD_SEMANTIC_LABELS[semantic]}
+                              {KIND_ORDER.map((kind) => (
+                                <option key={kind} value={kind}>
+                                  {FIELD_KIND_LABELS[kind]}
                                 </option>
                               ))}
                             </select>
-                            <p className="field__hint">
-                              Read by the deterministic Canon Integrity rules, never by a reader,
-                              and never guessed from the field&rsquo;s name. Most fields need none.
-                            </p>
                           </div>
-                        ) : null}
 
-                        <label className="check">
-                          <input
-                            type="checkbox"
-                            checked={fieldRequired}
-                            onChange={(event) => setFieldRequired(event.target.checked)}
-                          />
-                          <span>Required</span>
-                        </label>
+                          {fieldKind === FieldKind.Select || fieldKind === FieldKind.MultiSelect ? (
+                            <Field
+                              label="Options, separated by commas"
+                              name={`field-options-${type.id}`}
+                              value={fieldOptions}
+                              onChange={(event) => setFieldOptions(event.target.value)}
+                            />
+                          ) : null}
 
-                        <button
-                          className="button"
-                          type="button"
-                          onClick={() => submitField(type.id)}
-                          data-testid={`add-field-${type.name}`}
-                        >
-                          Add field
-                        </button>
+                          {semanticsFor(fieldKind).length > 0 ? (
+                            <div className="field">
+                              <label className="field__label" htmlFor={`field-semantic-${type.id}`}>
+                                Canon meaning
+                              </label>
+                              <select
+                                id={`field-semantic-${type.id}`}
+                                className="field__input field__input--select"
+                                value={fieldSemantic ?? ''}
+                                onChange={(event) =>
+                                  setFieldSemantic(
+                                    event.target.value === ''
+                                      ? null
+                                      : (Number(event.target.value) as FieldSemanticValue),
+                                  )
+                                }
+                                data-testid={`field-semantic-${type.name}`}
+                              >
+                                <option value="">None</option>
+                                {semanticsFor(fieldKind).map((semantic) => (
+                                  <option key={semantic} value={semantic}>
+                                    {FIELD_SEMANTIC_LABELS[semantic]}
+                                  </option>
+                                ))}
+                              </select>
+                              <p className="field__hint">
+                                Read by the deterministic Canon Integrity rules, never by a reader,
+                                and never guessed from the field&rsquo;s name. Most fields need
+                                none.
+                              </p>
+                            </div>
+                          ) : null}
+
+                          <label className="check">
+                            <input
+                              type="checkbox"
+                              checked={fieldRequired}
+                              onChange={(event) => setFieldRequired(event.target.checked)}
+                            />
+                            <span>Required</span>
+                          </label>
+
+                          <button
+                            className="button"
+                            type="button"
+                            onClick={() => submitField(type.id)}
+                            data-testid={`add-field-${type.name}`}
+                          >
+                            Add field
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    ) : null}
+                  </li>
+                )
+              })}
+            </ul>
+            {/* What the pointer carries: the row's grip, picture and name - and, for a branch, how much comes with it. */}
+            <DragOverlay dropAnimation={null}>
+              {dragId && carried ? (
+                <div className="types__dragging">
+                  <GripVertical aria-hidden="true" focusable="false" strokeWidth={1.75} />
+                  <TypeIcon iconKey={carried.type.icon} />
+                  <bdi>{carried.type.name}</bdi>
+                  {branchIds(carried).size > 1 ? (
+                    <span className="types__draggingnested">
+                      + {branchIds(carried).size - 1} nested{' '}
+                      {branchIds(carried).size === 2 ? 'type' : 'types'}
+                    </span>
                   ) : null}
-                </li>
-              )
-            })}
-          </ul>
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
         )}
       </TabPanel>
 

@@ -371,20 +371,11 @@ export default function LorePage() {
           </>
         }
       >
+        {/* Navigation only: the types, and on a phone the Filters button beside them. Nothing that comes and goes with the
+            list - Select, a page size - shares this row, so the types have the same width whichever type is open and their
+            links never move from one row to another as the author goes between a type with entries and one without. */}
         <div className="lore__nav">
           <TypeSwitcher types={orderedTypes} selected={selectedType} hrefFor={typeHref} />
-          {selectedType && (pageItems.length > 0 || isSelecting) ? (
-            <button
-              className="button button--secondary lore__select"
-              type="button"
-              aria-pressed={isSelecting}
-              onClick={() => (isSelecting ? stopSelecting() : setIsSelecting(true))}
-              data-testid="lore-select"
-            >
-              <ActionIcon icon={ListChecks} />
-              Select
-            </button>
-          ) : null}
           {selectedType ? (
             <button
               className="button button--secondary lore__filtertoggle"
@@ -404,69 +395,88 @@ export default function LorePage() {
         </div>
       </PageHeader>
 
-      {/* Filters narrow a type's entries, so they wait for one: nothing typed here can widen to the whole universe. */}
-      <div
-        hidden={!selectedType}
-        className="lore__filters"
-        id={filtersId}
-        data-open={filtersOpen ? 'true' : 'false'}
-        data-testid="lore-filters"
-      >
-        <div className="lore__search">
-          <label className="visually-hidden" htmlFor="lore-search">
-            Filter entries
-          </label>
-          <ListFilter className="lore__searchicon" aria-hidden="true" focusable="false" />
-          <input
-            id="lore-search"
-            className="field__input lore__searchinput"
-            type="search"
-            placeholder="Filter by name, alias, summary or article"
-            value={search}
-            onChange={(event) => update({ q: event.target.value }, true)}
-          />
-        </div>
+      {/* The list's own controls, under the navigation: what narrows the list (search and status, folded behind Filters on a
+          phone), then what acts on it (the page size and Select), at the row's end. They wait for a type: nothing here can
+          widen to the whole universe. Select is offered while there is something on the page to select. */}
+      <div className="lore__controls" hidden={!selectedType} data-testid="lore-controls">
+        <div
+          className="lore__filters"
+          id={filtersId}
+          data-open={filtersOpen ? 'true' : 'false'}
+          data-testid="lore-filters"
+        >
+          <div className="lore__search">
+            <label className="visually-hidden" htmlFor="lore-search">
+              Filter entries
+            </label>
+            <ListFilter className="lore__searchicon" aria-hidden="true" focusable="false" />
+            <input
+              id="lore-search"
+              className="field__input lore__searchinput"
+              type="search"
+              placeholder="Filter by name, alias, summary or article"
+              value={search}
+              onChange={(event) => update({ q: event.target.value }, true)}
+            />
+          </div>
 
-        <div className="segmented" role="group" aria-label="Status">
-          <button
-            className="segmented__option"
-            type="button"
-            aria-pressed={canonStatus === null}
-            onClick={() => update({ status: null }, true)}
-          >
-            Any status
-          </button>
-          {CANON_ORDER.map((status) => (
+          <div className="segmented" role="group" aria-label="Status">
             <button
-              key={status}
               className="segmented__option"
               type="button"
-              aria-pressed={canonStatus === status}
-              onClick={() => update({ status: String(status) }, true)}
+              aria-pressed={canonStatus === null}
+              onClick={() => update({ status: null }, true)}
             >
-              {CANON_LABELS[status]}
+              Any status
             </button>
-          ))}
+            {CANON_ORDER.map((status) => (
+              <button
+                key={status}
+                className="segmented__option"
+                type="button"
+                aria-pressed={canonStatus === status}
+                onClick={() => update({ status: String(status) }, true)}
+              >
+                {CANON_LABELS[status]}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {offerPageSize ? (
-          <div className="lore__pagesize">
-            <label className="lore__pagesizelabel" htmlFor="lore-page-size">
-              Items per page
-            </label>
-            <select
-              id="lore-page-size"
-              className="field__input lore__pagesizeselect"
-              value={pageSize}
-              onChange={(event) => changePageSize(Number(event.target.value))}
-              data-testid="lore-page-size"
-            >
-              {LORE_PAGE_SIZES.map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </select>
+        {offerPageSize || pageItems.length > 0 || isSelecting ? (
+          <div className="lore__resultactions" data-testid="lore-result-actions">
+            {offerPageSize ? (
+              <div className="lore__pagesize">
+                <label className="lore__pagesizelabel" htmlFor="lore-page-size">
+                  Items per page
+                </label>
+                <select
+                  id="lore-page-size"
+                  className="field__input lore__pagesizeselect"
+                  value={pageSize}
+                  onChange={(event) => changePageSize(Number(event.target.value))}
+                  data-testid="lore-page-size"
+                >
+                  {LORE_PAGE_SIZES.map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+            {pageItems.length > 0 || isSelecting ? (
+              <button
+                className="button button--secondary lore__select"
+                type="button"
+                aria-pressed={isSelecting}
+                onClick={() => (isSelecting ? stopSelecting() : setIsSelecting(true))}
+                data-testid="lore-select"
+              >
+                <ActionIcon icon={ListChecks} />
+                Select
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>

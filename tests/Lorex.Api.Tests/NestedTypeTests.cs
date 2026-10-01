@@ -20,7 +20,7 @@ namespace Lorex.Api.Tests;
 /// Lore asks for a branch explicitly; every other reader of the list still gets an exact type. A backup carries the tree
 /// (version 19), an older one restores flat, and a file whose types are not a forest is refused before anything is written.
 /// </summary>
-public sealed class NestedTypeTests(LorexApiFactory factory) : IClassFixture<LorexApiFactory>
+public sealed partial class NestedTypeTests(LorexApiFactory factory) : IClassFixture<LorexApiFactory>
 {
     private readonly LorexApiFactory _factory = factory;
 
