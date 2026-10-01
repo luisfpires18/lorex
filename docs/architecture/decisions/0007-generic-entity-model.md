@@ -95,3 +95,13 @@ unknown or foreign type id is taken out of the address, which chooses nothing. M
 its count. The chooser is a disclosure of nested lists (links to choose, buttons to open a branch); the chosen type's
 ancestors are opened and named in the header's path. Every type picker - Lore, the Types screen, New entry, Mass create -
 follows the tree order, and a `<select>` names a type by its path ("Runes › Material Runes").
+
+**Amendment (2026-10-01, Product refinement 025): the type row is back, without All; a type grows from its own row.**
+The chooser above is withdrawn. Lore's type navigation is again `TypeSwitcher` - wrapped links from 641px, one menu on a
+phone - listing every type flat in the tree's preorder (names are unique per universe, so no indentation is needed) and no
+"All". Bare `/lore` is a real state: no type current, the menu says "Choose type", nothing listed or read - no entry
+request, no skeleton, no filters, no Select, no panel. The header path's "Lore" crumb returns there. Branch browsing
+(`includeDescendants`), the unknown-id rule and Mass create's return are unchanged. On the Types screen each row has **Add
+child**, opening the same type drawer with that row's type as the starting parent (still editable); the drawer says "New
+child type" and "Inside …", and the focus comes back to that row's Add child after creating or cancelling. Frontend only:
+the create request already took `parent`.

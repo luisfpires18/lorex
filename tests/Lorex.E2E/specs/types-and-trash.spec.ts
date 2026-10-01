@@ -198,7 +198,9 @@ test.describe('Lore types', () => {
 
     await page.goto(`/app/universes/${universeId}/lore?type=${location.id}`)
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Region')
-    await expect(page.getByTestId('lore-type-menu')).toHaveAccessibleName('Type: Region')
+    await expect(
+      page.getByTestId('lore-types').getByRole('link', { name: 'Region' }),
+    ).toHaveAttribute('aria-current', 'page')
     await expect(page.getByTestId('entity-card')).toHaveCount(1)
     await page.getByTestId('entity-card').click()
     await page.waitForURL(new RegExp(`/lore/${rivendell}$`))
@@ -366,30 +368,46 @@ test.describe('Lore types', () => {
       await page.goto(`/app/universes/${universeId}/lore`)
       await expect(page.locator('html')).toHaveAttribute('data-theme', colorScheme)
 
-      // With no type chosen, every type is listed - one under another, each inside the list - and nothing scrolls.
-      const tree = page.getByTestId('lore-choose').getByRole('navigation', { name: 'Lore types' })
-      const links = tree.getByRole('link')
-      await expect(links).toHaveCount(all)
+      // No type chosen: no card and nothing scrolls - only the types to choose from.
+      await expect(page.getByTestId('entity-card')).toHaveCount(0)
       expect(await sideways(page), at).toBeLessThanOrEqual(1)
-      const inside = await tree.evaluate((element) => {
-        const bounds = element.getBoundingClientRect()
-        return [...element.querySelectorAll('a')].every((link) => {
-          const box = link.getBoundingClientRect()
-          return box.left >= bounds.left - 1 && box.right <= bounds.right + 1
-        })
-      })
-      expect(inside, at).toBe(true)
-      // The right-to-left name keeps its own direction inside Lorex's order.
-      await expect(tree.locator('bdi', { hasText: 'עידן האור' })).toBeVisible()
 
-      // The header's chooser holds the same list, and choosing goes there.
-      await page.getByTestId('lore-type-menu').click()
-      const menu = page.getByTestId('lore-type-menu-panel')
-      await expect(menu.getByRole('link')).toHaveCount(all)
-      await menu.getByRole('link', { name: 'Guild' }).click()
-      await expect(page).toHaveURL(/\?type=/)
-      await expect(page.getByTestId('lore-type-menu')).toContainText('Guild')
-      expect(await sideways(page), at).toBeLessThanOrEqual(1)
+      if (width > 640) {
+        const typeRow = page.getByTestId('lore-types')
+        const links = typeRow.getByRole('link')
+        await expect(links).toHaveCount(all)
+        const shape = await typeRow.evaluate((element) => {
+          const bounds = element.getBoundingClientRect()
+          const boxes = [...element.querySelectorAll('a')].map((link) =>
+            link.getBoundingClientRect(),
+          )
+          return {
+            overflowX: getComputedStyle(element).overflowX,
+            fits: element.scrollWidth <= element.clientWidth,
+            rows: new Set(boxes.map((box) => Math.round(box.top))).size,
+            inside: boxes.every(
+              (box) => box.left >= bounds.left - 1 && box.right <= bounds.right + 1,
+            ),
+          }
+        })
+        expect(shape.overflowX, at).toBe('visible')
+        expect(shape.fits, at).toBe(true)
+        expect(shape.inside, at).toBe(true)
+        expect(shape.rows, at).toBeGreaterThanOrEqual(2)
+        // The right-to-left name keeps its own direction inside Lorex's order.
+        await expect(typeRow.locator('bdi', { hasText: 'עידן האור' })).toBeVisible()
+      } else {
+        await expect(page.getByTestId('lore-types')).toBeHidden()
+        const trigger = page.getByTestId('lore-type-menu')
+        await expect(trigger).toHaveAccessibleName('Choose type')
+        await trigger.click()
+        const menu = page.getByTestId('lore-type-menu-panel')
+        await expect(menu.getByRole('link')).toHaveCount(all)
+        await menu.getByRole('link', { name: 'Guild' }).click()
+        await expect(page).toHaveURL(/\?type=/)
+        await expect(trigger).toContainText('Guild')
+        expect(await sideways(page), at).toBeLessThanOrEqual(1)
+      }
     }
   })
 })

@@ -225,8 +225,9 @@ test.describe('Mass create', () => {
     expect(
       await entryCount(page, w.id, `&entityTypeId=${w.type.get('Location')}&canonStatus=1`),
     ).toBe(40)
-    // Lore has no "All" to show a mixed batch in: it lands with no type chosen, says what was made, and asks for a type.
-    await expect(page.getByTestId('lore-choose')).toBeVisible()
+    // Lore has no "All" to show a mixed batch in: it lands with no type chosen and says what was made; a type is chosen
+    // from its type navigation.
+    await expect(page.getByTestId('lore-mass-created')).toBeVisible()
     await expect(page.getByTestId('entity-card')).toHaveCount(0)
     await chooseLoreType(page, 'Location')
     await expect(page.getByTestId('entity-card').first()).toBeVisible()

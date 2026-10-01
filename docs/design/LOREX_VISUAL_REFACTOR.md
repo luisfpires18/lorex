@@ -350,12 +350,13 @@ one-off component per screen.
 
 ### 4.3 Lore: the type is the page's local navigation
 
-- The **TypeSwitcher** sits directly under the Lore title: All, then every type (type tile and
-  name) in the universe's order. Current = `--accent-wash`. Arrow keys, Home and End as today. On a
+- The **TypeSwitcher** sits directly under the Lore title: every type (type tile and name) in the
+  universe's order - the hierarchy's preorder since 022, and no All since 022; with none chosen,
+  nothing is current and nothing is read (refinement 025, ADR 0007). Current = `--accent-wash`. Arrow keys, Home and End as today. On a
   desktop it wraps; on a phone, Decision 1.
 - **The address holds the state:** `lore?type=<typeId>&status=<0|1|2>&q=<text>&page=<n>`. Filter
   changes `replace` the history entry; opening an entry pushes one, so Back returns to the same
-  type, status, search and page. An unknown type id falls back to All.
+  type, status, search and page. An unknown type id is dropped, choosing nothing (022).
 - **Scroll position on Back** is restored for the Lore list only (the router's scroll restoration,
   which the existing data router supports), and only once the hash deep links (`#article`,
   `#scene-…`, `#beat-…`) are proven unaffected.

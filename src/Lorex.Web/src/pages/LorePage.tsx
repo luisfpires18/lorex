@@ -21,8 +21,7 @@ import { ActionIcon } from '../components/ActionIcon'
 import { EmptyState } from '../components/EmptyState'
 import { EntityCard } from '../components/EntityCard'
 import { PageHeader } from '../components/PageHeader'
-import { TypeChooser, TypeTreeList } from '../components/TypeTree'
-import { useOpenBranches } from '../lore/useOpenBranches'
+import { TypeSwitcher } from '../components/TypeSwitcher'
 import { ApiError } from '../lib/api'
 import {
   LORE_PAGE_SIZES,
@@ -68,8 +67,8 @@ function readPage(value: string | null) {
  * the status replace the entry they are on, so a word typed is not twenty steps of Back.
  *
  * A type is where browsing starts (ADR 0007 amendment, 2026-10-01). There is no "All": with no type chosen the page lists
- * nothing and reads nothing - a search or status in the address waits for a type - and offers the universe's types to
- * choose from. A chosen type shows its whole branch: its own entries and those of every type nested beneath it, each card
+ * nothing and reads nothing - a search or status in the address waits for a type. The type navigation above the list is
+ * how one is chosen: the same wrapped row (a menu on a phone) Lore always had, minus All, with nothing current. A chosen type shows its whole branch: its own entries and those of every type nested beneath it, each card
  * still naming its own type. A type id the universe does not have - deleted, mistyped, or another world's - is taken out of
  * the address, which leaves nothing chosen; it never widens to every entry.
  */
@@ -135,7 +134,7 @@ export default function LorePage() {
   const selectedNode = (typeParam && tree.byId.get(typeParam)) || null
   const selectedType = selectedNode?.type ?? null
   const isUnknownType = typeParam !== null && types !== null && selectedType === null
-  const inline = useOpenBranches(tree, null)
+  const orderedTypes = useMemo(() => tree.ordered.map((node) => node.type), [tree])
 
   // A type this universe does not have is taken out of the address in place, which leaves nothing chosen.
   useEffect(() => {
@@ -328,7 +327,8 @@ export default function LorePage() {
         crumb={
           selectedNode ? (
             <span className="lore__path" data-testid="lore-path">
-              <Link to={hrefFor(null)} data-testid="lore-all">
+              {/* Lore itself: no type chosen, which reads nothing - not every entry. */}
+              <Link to={hrefFor(null)} data-testid="lore-path-root">
                 Lore
               </Link>
               {selectedNode.path.slice(0, -1).map((ancestor) => (
@@ -372,7 +372,7 @@ export default function LorePage() {
         }
       >
         <div className="lore__nav">
-          <TypeChooser tree={tree} selected={selectedNode} hrefFor={typeHref} />
+          <TypeSwitcher types={orderedTypes} selected={selectedType} hrefFor={typeHref} />
           {selectedType && (pageItems.length > 0 || isSelecting) ? (
             <button
               className="button button--secondary lore__select"
@@ -485,40 +485,12 @@ export default function LorePage() {
         </p>
       ) : null}
 
-      {types !== null && !selectedType && !isUnknownType ? (
-        <section
-          className="lore__choose"
-          aria-labelledby="lore-choose-title"
-          data-testid="lore-choose"
-        >
-          <h2 className="lore__choosetitle" id="lore-choose-title">
-            {types.length > 0
-              ? 'Choose a type to browse your lore.'
-              : 'This universe has no types yet.'}
-          </h2>
-          {types.length > 0 ? (
-            <>
-              <p className="lore__choosehint">
-                A type shows its own entries and those of every type nested inside it.
-              </p>
-              <nav className="typetree lore__typetree" aria-label="Lore types">
-                <TypeTreeList
-                  nodes={tree.roots}
-                  selectedId={null}
-                  ancestorIds={new Set()}
-                  hrefFor={typeHref}
-                  open={inline.open}
-                  onToggle={inline.toggle}
-                />
-              </nav>
-            </>
-          ) : (
-            <p className="lore__choosehint">
-              Every entry has a type.{' '}
-              <Link to={`/app/universes/${universe.id}/types`}>Add one on Types</Link>.
-            </p>
-          )}
-        </section>
+      {/* No types at all leaves nothing to choose: one line to where types are made, not a panel. */}
+      {types !== null && types.length === 0 ? (
+        <p className="notice" data-testid="lore-no-types">
+          This universe has no types yet.{' '}
+          <Link to={`/app/universes/${universe.id}/types`}>Add one on Types</Link>.
+        </p>
       ) : null}
 
       {view.kind === 'loading' ? (
