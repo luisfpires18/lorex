@@ -242,10 +242,18 @@ internal static partial class RestoreTestClient
         var types = (await client.GetFromJsonAsync<List<EntityTypeResponse>>($"/api/universes/{u}/entity-types"))!;
         var character = types.First(type => type.Name == "Character").Id;
 
+        // Nested (version 19): Relic beneath the starter Item, and a type beneath Relic, so every round trip carries a
+        // hierarchy two levels deep.
         var relic = await PostJson<EntityTypeResponse>(
             client,
             $"/api/universes/{u}/entity-types",
-            new EntityTypeRequest("Relic", "Things that outlast kings.", "gem", "#b3922f", 40));
+            new EntityTypeRequest(
+                "Relic", "Things that outlast kings.", "gem", "#b3922f", 40,
+                Parent: new EntityTypeParentChoice(types.First(type => type.Name == "Item").Id)));
+        await PostJson<EntityTypeResponse>(
+            client,
+            $"/api/universes/{u}/entity-types",
+            new EntityTypeRequest("Crown relic", null, null, null, null, Parent: new EntityTypeParentChoice(relic.Id)));
 
         var born = await AddField(client, u, character, "Born", EntityFieldKind.Number, EntityFieldSemantic.BirthYear);
         var died = await AddField(client, u, character, "Died", EntityFieldKind.Number, EntityFieldSemantic.DeathYear);
@@ -468,6 +476,15 @@ internal static partial class RestoreTestClient
             foreach (var member in members)
             {
                 node?.AsObject().Remove(member);
+            }
+        }
+
+        if (version < 19)
+        {
+            // A type's parent arrived in version 19.
+            foreach (var type in payload["entityTypes"]!.AsArray())
+            {
+                Drop(type, "parentId");
             }
         }
 
@@ -799,7 +816,8 @@ internal static partial class RestoreTestClient
 
         foreach (var type in payload.EntityTypes.OrderBy(type => type.Name, StringComparer.Ordinal))
         {
-            lines.Add($"type {type.Name} description={type.Description} icon={type.Icon} accent={type.AccentColor} familyTree={type.FamilyTreeEligible} order={type.DisplayOrder} {T(type.CreatedAt)} {T(type.UpdatedAt)}");
+            var parent = payload.EntityTypes.FirstOrDefault(candidate => candidate.Id == type.ParentId)?.Name;
+            lines.Add($"type {type.Name} parent={parent} description={type.Description} icon={type.Icon} accent={type.AccentColor} familyTree={type.FamilyTreeEligible} order={type.DisplayOrder} {T(type.CreatedAt)} {T(type.UpdatedAt)}");
 
             foreach (var field in type.Fields.OrderBy(field => field.Name, StringComparer.Ordinal))
             {

@@ -379,3 +379,12 @@ the new meaning and must never read it as a parent link, and the capability is a
 earlier reads each type as eligible only when it is the untouched starter Character - the rule the migration applied - even
 if the file carries a value, and a file at version 17 or earlier carrying `NonStructuralFamily` is refused, never
 reinterpreted.
+
+## Amendment: version 19, nested types (2026-10-01)
+
+`entityTypes[].parentId` names the type of the same file a type sits beneath, null for a root (ADR 0007 amendment), and
+`displayOrder` is its place among its siblings. Types are written in preorder - a parent before its descendants, siblings by
+place, then name, then id - so a file reads top-down and two exports of unchanged lore are still identical. A bump, not an
+ignorable member: the hierarchy is how the author organised their lore and how Lore is browsed, and a version 18 reader would
+restore every type flat. A file at version 18 or earlier has no `parentId`: every type is a root, in its stored order, and
+nothing is ever inferred from names like "Location" or "Kingdom".

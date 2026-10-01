@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
-import { Pencil, Plus } from 'lucide-react'
+import { ArrowDown, ArrowUp, Pencil, Plus } from 'lucide-react'
 import { ActionIcon } from '../components/ActionIcon'
 import { ActionMenu } from '../components/ActionMenu'
 import { Field } from '../components/Field'
@@ -19,6 +19,7 @@ import {
   deleteEntityType,
   deleteField,
   listEntityTypes,
+  moveEntityType,
   updateEntityType,
   updateField,
 } from '../lore/api'
@@ -32,6 +33,7 @@ import {
   type FieldKindValue,
   type FieldSemanticValue,
 } from '../lore/types'
+import { buildTypeTree, branchIds, typePathLabel, type TypeTree } from '../lore/typeTree'
 import { PageHeader } from '../components/PageHeader'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
@@ -54,7 +56,7 @@ const TABS = [
 ] as const
 
 const LEDES: Record<(typeof TABS)[number]['id'], string> = {
-  lore: 'Every entry is one of these. Add your own, and give it the fields this world actually needs.',
+  lore: 'Every entry is one of these. Add your own, nest one inside another to organise Lore, and give each the fields this world actually needs.',
   relations:
     'How entries connect: each kind’s two readings, its Canon constraints and its family meaning.',
   events: 'The event kinds and methods a moment and a world rule’s check can name.',
@@ -85,6 +87,19 @@ export default function UniverseTypes() {
   const [fieldSemantic, setFieldSemantic] = useState<FieldSemanticValue | null>(null)
   const [busyFieldId, setBusyFieldId] = useState<string | null>(null)
 
+  const tree = useMemo(() => buildTypeTree(types ?? []), [types])
+  // One move at a time; the button that asked keeps the focus once its row has moved (React moves the row's node, which
+  // a browser does not keep focused on its own).
+  const [moving, setMoving] = useState<string | null>(null)
+  const moveButtons = useRef(new Map<string, HTMLButtonElement>())
+  const refocus = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!refocus.current) return
+    moveButtons.current.get(refocus.current)?.focus()
+    refocus.current = null
+  }, [types])
+
   useEffect(() => {
     const controller = new AbortController()
     listEntityTypes(universe.id, controller.signal)
@@ -108,6 +123,24 @@ export default function UniverseTypes() {
     setTypes(await listEntityTypes(universe.id))
   }
 
+  /** One place up or down among the type's own siblings; the list comes back from the move itself. */
+  async function move(type: EntityType, direction: 'up' | 'down') {
+    if (moving) return
+    setMessage(null)
+    setNotice(null)
+    setMoving(type.id)
+    try {
+      const moved = await moveEntityType(universe.id, type.id, direction)
+      refocus.current = `${type.id}:${direction}`
+      setTypes(moved)
+      setNotice(`Moved “${type.name}” ${direction}.`)
+    } catch (error: unknown) {
+      report(error, 'That type could not be moved.')
+    } finally {
+      setMoving(null)
+    }
+  }
+
   /**
    * Deleting a type. A type any entry still uses - in Lore or in the Trash, since an entry there keeps its type - is not
    * offered a confirmation it could only fail: the author is told, under the type, exactly what uses it and where to
@@ -118,13 +151,16 @@ export default function UniverseTypes() {
     setNotice(null)
     setBlocked(null)
 
-    if (type.entityCount > 0) {
+    // Nested types hold it too: never deleted with it, never promoted or moved somewhere the author did not choose.
+    const children = tree.byId.get(type.id)?.children.length ?? 0
+    if (type.entityCount > 0 || children > 0) {
       setBlocked({
         typeId: type.id,
         text: inUseDetail(
           type.name,
           type.entityCount - type.trashedEntityCount,
           type.trashedEntityCount,
+          children,
         ),
       })
       return
@@ -250,6 +286,7 @@ export default function UniverseTypes() {
       {editing ? (
         <TypeDialog
           universeId={universe.id}
+          tree={tree}
           type={editing === 'new' ? null : editing}
           onClose={() => setEditing(null)}
           onSaved={async (savedName) => {
@@ -281,246 +318,305 @@ export default function UniverseTypes() {
           </p>
         ) : (
           <ul className="types__list" data-testid="type-list">
-            {types.map((type) => (
-              <li className="types__row" key={type.id} data-type-name={type.name}>
-                <div className="types__head">
-                  <span className="types__icon" data-testid={`type-icon-${type.name}`}>
-                    <TypeIcon iconKey={type.icon} />
-                  </span>
-                  <span className="types__name">
-                    <bdi>{type.name}</bdi>
-                  </span>
-                  <span className="types__count" data-testid={`type-count-${type.name}`}>
-                    {type.entityCount === 1 ? '1 entry' : `${type.entityCount} entries`}
-                    {type.trashedEntityCount > 0 ? (
-                      <span className="types__trashed">
-                        {type.trashedEntityCount === type.entityCount
-                          ? type.entityCount === 1
-                            ? ', in the Trash'
-                            : ', all in the Trash'
-                          : `, ${type.trashedEntityCount} in the Trash`}
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="types__actions">
-                    <button
-                      className="button button--secondary button--sm"
-                      type="button"
-                      onClick={() => {
-                        setBlocked(null)
-                        setEditing(type)
-                      }}
-                      aria-label={`Edit ${type.name}`}
-                      data-testid={`edit-type-${type.name}`}
-                    >
-                      <ActionIcon icon={Pencil} />
-                      Edit
-                    </button>
-                    <button
-                      className="button button--secondary button--sm"
-                      type="button"
-                      aria-expanded={openTypeId === type.id}
-                      aria-label={`Fields of ${type.name}`}
-                      onClick={() => setOpenTypeId(openTypeId === type.id ? null : type.id)}
-                      data-testid={`fields-${type.name}`}
-                    >
-                      Fields
-                      {type.fields.length > 0 ? (
-                        <span className="types__fieldcount">{type.fields.length}</span>
+            {tree.ordered.map((node) => {
+              const type = node.type
+              const siblings =
+                node.depth === 0
+                  ? tree.roots
+                  : tree.byId.get(node.path[node.path.length - 2]!.id)!.children
+              const place = siblings.indexOf(node)
+              const isFirst = place === 0
+              const isLast = place === siblings.length - 1
+              return (
+                <li
+                  className="types__row"
+                  key={type.id}
+                  data-type-name={type.name}
+                  data-depth={node.depth}
+                  style={{ ['--depth' as string]: Math.min(node.depth, 6) }}
+                >
+                  <div className="types__head">
+                    <span className="types__icon" data-testid={`type-icon-${type.name}`}>
+                      <TypeIcon iconKey={type.icon} />
+                    </span>
+                    <span className="types__name">
+                      <bdi>{type.name}</bdi>
+                      {node.depth > 0 ? (
+                        <span className="visually-hidden">
+                          , inside{' '}
+                          {typePathLabel(tree.byId.get(node.path[node.path.length - 2]!.id)!)}
+                        </span>
                       ) : null}
-                    </button>
-                    <ActionMenu
-                      label={`More actions for ${type.name}`}
-                      triggerTestId={`type-actions-${type.name}`}
-                    >
-                      <button
-                        className="actionmenu__item actionmenu__item--danger"
-                        type="button"
-                        onClick={() => void removeType(type)}
-                        data-testid={`delete-type-${type.name}`}
-                      >
-                        Delete type
-                      </button>
-                    </ActionMenu>
-                  </span>
-                </div>
-
-                {type.description ? (
-                  <p className="types__description prose">{type.description}</p>
-                ) : null}
-
-                {blocked?.typeId === type.id ? (
-                  <div
-                    className="callout callout--warning types__blocked"
-                    role="alert"
-                    data-testid={`type-blocked-${type.name}`}
-                  >
-                    <p className="types__blockedtext">{blocked.text}</p>
-                    <p className="types__blockedlinks">
-                      {type.entityCount > type.trashedEntityCount ? (
-                        <Link to={`/app/universes/${universe.id}/lore?type=${type.id}`}>
-                          Show its entries in Lore
-                        </Link>
-                      ) : null}
+                    </span>
+                    <span className="types__count" data-testid={`type-count-${type.name}`}>
+                      {type.entityCount === 1 ? '1 entry' : `${type.entityCount} entries`}
                       {type.trashedEntityCount > 0 ? (
-                        <Link to={`/app/universes/${universe.id}/trash`}>Open the Trash</Link>
+                        <span className="types__trashed">
+                          {type.trashedEntityCount === type.entityCount
+                            ? type.entityCount === 1
+                              ? ', in the Trash'
+                              : ', all in the Trash'
+                            : `, ${type.trashedEntityCount} in the Trash`}
+                        </span>
                       ) : null}
-                    </p>
-                  </div>
-                ) : null}
-
-                {openTypeId === type.id ? (
-                  <div className="types__fields">
-                    {type.fields.length > 0 ? (
-                      <ul className="types__fieldlist">
-                        {type.fields.map((field) => (
-                          <li key={field.id} data-field-name={field.name}>
-                            <span className="types__fieldname">{field.name}</span>
-                            <span className="types__fieldkind">
-                              {FIELD_KIND_LABELS[field.kind]}
-                            </span>
-                            {field.isRequired ? (
-                              <span className="types__fieldkind">required</span>
-                            ) : null}
-                            {semanticsFor(field.kind).length > 0 ? (
-                              <select
-                                className="types__meaning"
-                                aria-label={`Canon meaning of ${field.name}`}
-                                value={field.semantic ?? ''}
-                                disabled={busyFieldId === field.id}
-                                onChange={(event) =>
-                                  void changeMeaning(
-                                    type.id,
-                                    field,
-                                    event.target.value === ''
-                                      ? null
-                                      : (Number(event.target.value) as FieldSemanticValue),
-                                  )
-                                }
-                                data-testid={`field-meaning-${field.name}`}
-                              >
-                                <option value="">No meaning</option>
-                                {semanticsFor(field.kind).map((semantic) => (
-                                  <option key={semantic} value={semantic}>
-                                    {FIELD_SEMANTIC_LABELS[semantic]}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : null}
+                    </span>
+                    <span className="types__actions">
+                      <span
+                        className="types__move"
+                        role="group"
+                        aria-label={`Order of ${type.name}`}
+                      >
+                        {(['up', 'down'] as const).map((direction) => {
+                          const isEnd = direction === 'up' ? isFirst : isLast
+                          return (
                             <button
-                              className="token__remove"
+                              key={direction}
+                              ref={(element) => {
+                                const key = `${type.id}:${direction}`
+                                if (element) moveButtons.current.set(key, element)
+                                else moveButtons.current.delete(key)
+                              }}
+                              className="button button--text button--sm types__movebutton"
                               type="button"
-                              aria-label={`Delete ${field.name}`}
-                              onClick={() => removeField(type.id, field.id)}
+                              aria-disabled={isEnd || moving !== null || undefined}
+                              aria-label={`Move ${type.name} ${direction}`}
+                              title={
+                                isEnd
+                                  ? direction === 'up'
+                                    ? 'Already first among its siblings'
+                                    : 'Already last among its siblings'
+                                  : undefined
+                              }
+                              onClick={() => {
+                                if (!isEnd) void move(type, direction)
+                              }}
+                              data-testid={`move-${direction}-${type.name}`}
                             >
-                              &times;
+                              <ActionIcon icon={direction === 'up' ? ArrowUp : ArrowDown} />
+                              {direction === 'up' ? 'Up' : 'Down'}
                             </button>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="settings__note">No custom fields yet.</p>
-                    )}
-
-                    <div className="types__add">
-                      <Field
-                        label="Field name"
-                        name={`field-name-${type.id}`}
-                        value={fieldName}
-                        onChange={(event) => setFieldName(event.target.value)}
-                      />
-
-                      <div className="field">
-                        <label className="field__label" htmlFor={`field-kind-${type.id}`}>
-                          Kind
-                        </label>
-                        <select
-                          id={`field-kind-${type.id}`}
-                          className="field__input field__input--select"
-                          value={fieldKind}
-                          onChange={(event) => {
-                            const kind = Number(event.target.value) as FieldKindValue
-                            setFieldKind(kind)
-                            // A meaning belongs to a shape. Switching away from one that can
-                            // carry it drops it rather than sending a pair the API refuses.
-                            setFieldSemantic((current) =>
-                              current !== null && semanticsFor(kind).includes(current)
-                                ? current
-                                : null,
-                            )
-                          }}
+                          )
+                        })}
+                      </span>
+                      <button
+                        className="button button--secondary button--sm"
+                        type="button"
+                        onClick={() => {
+                          setBlocked(null)
+                          setEditing(type)
+                        }}
+                        aria-label={`Edit ${type.name}`}
+                        data-testid={`edit-type-${type.name}`}
+                      >
+                        <ActionIcon icon={Pencil} />
+                        Edit
+                      </button>
+                      <button
+                        className="button button--secondary button--sm"
+                        type="button"
+                        aria-expanded={openTypeId === type.id}
+                        aria-label={`Fields of ${type.name}`}
+                        onClick={() => setOpenTypeId(openTypeId === type.id ? null : type.id)}
+                        data-testid={`fields-${type.name}`}
+                      >
+                        Fields
+                        {type.fields.length > 0 ? (
+                          <span className="types__fieldcount">{type.fields.length}</span>
+                        ) : null}
+                      </button>
+                      <ActionMenu
+                        label={`More actions for ${type.name}`}
+                        triggerTestId={`type-actions-${type.name}`}
+                      >
+                        <button
+                          className="actionmenu__item actionmenu__item--danger"
+                          type="button"
+                          onClick={() => void removeType(type)}
+                          data-testid={`delete-type-${type.name}`}
                         >
-                          {KIND_ORDER.map((kind) => (
-                            <option key={kind} value={kind}>
-                              {FIELD_KIND_LABELS[kind]}
-                            </option>
+                          Delete type
+                        </button>
+                      </ActionMenu>
+                    </span>
+                  </div>
+
+                  {type.description ? (
+                    <p className="types__description prose">{type.description}</p>
+                  ) : null}
+
+                  {blocked?.typeId === type.id ? (
+                    <div
+                      className="callout callout--warning types__blocked"
+                      role="alert"
+                      data-testid={`type-blocked-${type.name}`}
+                    >
+                      <p className="types__blockedtext">{blocked.text}</p>
+                      <p className="types__blockedlinks">
+                        {type.entityCount > type.trashedEntityCount ? (
+                          <Link to={`/app/universes/${universe.id}/lore?type=${type.id}`}>
+                            Show its entries in Lore
+                          </Link>
+                        ) : null}
+                        {type.trashedEntityCount > 0 ? (
+                          <Link to={`/app/universes/${universe.id}/trash`}>Open the Trash</Link>
+                        ) : null}
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {openTypeId === type.id ? (
+                    <div className="types__fields">
+                      {type.fields.length > 0 ? (
+                        <ul className="types__fieldlist">
+                          {type.fields.map((field) => (
+                            <li key={field.id} data-field-name={field.name}>
+                              <span className="types__fieldname">{field.name}</span>
+                              <span className="types__fieldkind">
+                                {FIELD_KIND_LABELS[field.kind]}
+                              </span>
+                              {field.isRequired ? (
+                                <span className="types__fieldkind">required</span>
+                              ) : null}
+                              {semanticsFor(field.kind).length > 0 ? (
+                                <select
+                                  className="types__meaning"
+                                  aria-label={`Canon meaning of ${field.name}`}
+                                  value={field.semantic ?? ''}
+                                  disabled={busyFieldId === field.id}
+                                  onChange={(event) =>
+                                    void changeMeaning(
+                                      type.id,
+                                      field,
+                                      event.target.value === ''
+                                        ? null
+                                        : (Number(event.target.value) as FieldSemanticValue),
+                                    )
+                                  }
+                                  data-testid={`field-meaning-${field.name}`}
+                                >
+                                  <option value="">No meaning</option>
+                                  {semanticsFor(field.kind).map((semantic) => (
+                                    <option key={semantic} value={semantic}>
+                                      {FIELD_SEMANTIC_LABELS[semantic]}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : null}
+                              <button
+                                className="token__remove"
+                                type="button"
+                                aria-label={`Delete ${field.name}`}
+                                onClick={() => removeField(type.id, field.id)}
+                              >
+                                &times;
+                              </button>
+                            </li>
                           ))}
-                        </select>
-                      </div>
+                        </ul>
+                      ) : (
+                        <p className="settings__note">No custom fields yet.</p>
+                      )}
 
-                      {fieldKind === FieldKind.Select || fieldKind === FieldKind.MultiSelect ? (
+                      <div className="types__add">
                         <Field
-                          label="Options, separated by commas"
-                          name={`field-options-${type.id}`}
-                          value={fieldOptions}
-                          onChange={(event) => setFieldOptions(event.target.value)}
+                          label="Field name"
+                          name={`field-name-${type.id}`}
+                          value={fieldName}
+                          onChange={(event) => setFieldName(event.target.value)}
                         />
-                      ) : null}
 
-                      {semanticsFor(fieldKind).length > 0 ? (
                         <div className="field">
-                          <label className="field__label" htmlFor={`field-semantic-${type.id}`}>
-                            Canon meaning
+                          <label className="field__label" htmlFor={`field-kind-${type.id}`}>
+                            Kind
                           </label>
                           <select
-                            id={`field-semantic-${type.id}`}
+                            id={`field-kind-${type.id}`}
                             className="field__input field__input--select"
-                            value={fieldSemantic ?? ''}
-                            onChange={(event) =>
-                              setFieldSemantic(
-                                event.target.value === ''
-                                  ? null
-                                  : (Number(event.target.value) as FieldSemanticValue),
+                            value={fieldKind}
+                            onChange={(event) => {
+                              const kind = Number(event.target.value) as FieldKindValue
+                              setFieldKind(kind)
+                              // A meaning belongs to a shape. Switching away from one that can
+                              // carry it drops it rather than sending a pair the API refuses.
+                              setFieldSemantic((current) =>
+                                current !== null && semanticsFor(kind).includes(current)
+                                  ? current
+                                  : null,
                               )
-                            }
-                            data-testid={`field-semantic-${type.name}`}
+                            }}
                           >
-                            <option value="">None</option>
-                            {semanticsFor(fieldKind).map((semantic) => (
-                              <option key={semantic} value={semantic}>
-                                {FIELD_SEMANTIC_LABELS[semantic]}
+                            {KIND_ORDER.map((kind) => (
+                              <option key={kind} value={kind}>
+                                {FIELD_KIND_LABELS[kind]}
                               </option>
                             ))}
                           </select>
-                          <p className="field__hint">
-                            Read by the deterministic Canon Integrity rules, never by a reader, and
-                            never guessed from the field&rsquo;s name. Most fields need none.
-                          </p>
                         </div>
-                      ) : null}
 
-                      <label className="check">
-                        <input
-                          type="checkbox"
-                          checked={fieldRequired}
-                          onChange={(event) => setFieldRequired(event.target.checked)}
-                        />
-                        <span>Required</span>
-                      </label>
+                        {fieldKind === FieldKind.Select || fieldKind === FieldKind.MultiSelect ? (
+                          <Field
+                            label="Options, separated by commas"
+                            name={`field-options-${type.id}`}
+                            value={fieldOptions}
+                            onChange={(event) => setFieldOptions(event.target.value)}
+                          />
+                        ) : null}
 
-                      <button
-                        className="button"
-                        type="button"
-                        onClick={() => submitField(type.id)}
-                        data-testid={`add-field-${type.name}`}
-                      >
-                        Add field
-                      </button>
+                        {semanticsFor(fieldKind).length > 0 ? (
+                          <div className="field">
+                            <label className="field__label" htmlFor={`field-semantic-${type.id}`}>
+                              Canon meaning
+                            </label>
+                            <select
+                              id={`field-semantic-${type.id}`}
+                              className="field__input field__input--select"
+                              value={fieldSemantic ?? ''}
+                              onChange={(event) =>
+                                setFieldSemantic(
+                                  event.target.value === ''
+                                    ? null
+                                    : (Number(event.target.value) as FieldSemanticValue),
+                                )
+                              }
+                              data-testid={`field-semantic-${type.name}`}
+                            >
+                              <option value="">None</option>
+                              {semanticsFor(fieldKind).map((semantic) => (
+                                <option key={semantic} value={semantic}>
+                                  {FIELD_SEMANTIC_LABELS[semantic]}
+                                </option>
+                              ))}
+                            </select>
+                            <p className="field__hint">
+                              Read by the deterministic Canon Integrity rules, never by a reader,
+                              and never guessed from the field&rsquo;s name. Most fields need none.
+                            </p>
+                          </div>
+                        ) : null}
+
+                        <label className="check">
+                          <input
+                            type="checkbox"
+                            checked={fieldRequired}
+                            onChange={(event) => setFieldRequired(event.target.checked)}
+                          />
+                          <span>Required</span>
+                        </label>
+
+                        <button
+                          className="button"
+                          type="button"
+                          onClick={() => submitField(type.id)}
+                          data-testid={`add-field-${type.name}`}
+                        >
+                          Add field
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ) : null}
-              </li>
-            ))}
+                  ) : null}
+                </li>
+              )
+            })}
           </ul>
         )}
       </TabPanel>
@@ -541,7 +637,11 @@ export default function UniverseTypes() {
  * (`EntityTypeEndpoints.InUseDetail`), said from the list before anything is sent: an entry in the Trash is out of sight in
  * Lore and still keeps its type, so it is named.
  */
-function inUseDetail(name: string, live: number, trashed: number) {
+function inUseDetail(name: string, live: number, trashed: number, children = 0) {
+  const nested = children === 1 ? '1 nested type' : `${children} nested types`
+  if (live + trashed === 0) {
+    return `${name} can't be deleted because it still contains ${nested}. Move or delete those types first.`
+  }
   const total = live + trashed
   const uses = total === 1 ? '1 entry still uses it' : `${total} entries still use it`
   const where =
@@ -560,7 +660,10 @@ function inUseDetail(name: string, live: number, trashed: number) {
       : trashed === 0
         ? 'Move them to another type first.'
         : 'Move them to another type first; an entry in the Trash has to be restored before it can be moved.'
-  return `${name} can't be deleted because ${uses}${where}. ${fix}`
+  return children === 0
+    ? `${name} can't be deleted because ${uses}${where}. ${fix}`
+    : `${name} can't be deleted because ${uses}${where}, and it still contains ${nested}. ${fix} ` +
+        (children === 1 ? 'Move or delete that type too.' : 'Move or delete those types too.')
 }
 
 /**
@@ -574,14 +677,21 @@ function inUseDetail(name: string, live: number, trashed: number) {
  * An edit changes the type in place, by id: every entry keeps it, and so do Lore's filter and its address. The route
  * replaces the whole type, so what this form does not edit - the description, the colour, the order, the Family Tree
  * choice - is sent back exactly as it is stored.
+ *
+ * Both choose where the type sits: at the top, or inside another type - structure, so it belongs with the name. Moving a
+ * type moves everything inside it, and it goes last among its new siblings. The type itself and anything already inside
+ * it are not offered, since a type cannot sit inside itself. Nothing is inherited from a parent, and a parent's Family
+ * Tree choice says nothing about its children.
  */
 function TypeDialog({
   universeId,
+  tree,
   type,
   onClose,
   onSaved,
 }: {
   universeId: string
+  tree: TypeTree
   /** The type being edited, or null for a new one. */
   type: EntityType | null
   onClose: () => void
@@ -592,8 +702,13 @@ function TypeDialog({
     name: type?.name ?? '',
     icon: type?.icon ?? null,
     familyTreeEligible: type?.familyTreeEligible ?? false,
+    parentId: type?.parentId ?? null,
   }
   const [name, setName] = useState(initial.name)
+  const [parentId, setParentId] = useState<string | null>(initial.parentId)
+  const ownBranch =
+    type && tree.byId.get(type.id) ? branchIds(tree.byId.get(type.id)!) : new Set<string>()
+  const parents = tree.ordered.filter((node) => !ownBranch.has(node.type.id))
   const [icon, setIcon] = useState<string | null>(initial.icon)
   const [familyTreeEligible, setFamilyTreeEligible] = useState(initial.familyTreeEligible)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -601,11 +716,12 @@ function TypeDialog({
   const [isSaving, setIsSaving] = useState(false)
 
   const isDirty =
-    payloadKey({ name: name.trim(), icon, familyTreeEligible }) !==
+    payloadKey({ name: name.trim(), icon, familyTreeEligible, parentId }) !==
     payloadKey({
       name: initial.name,
       icon: initial.icon,
       familyTreeEligible: initial.familyTreeEligible,
+      parentId: initial.parentId,
     })
   const { close, dialogProps } = useDrawerGuard(
     isDirty,
@@ -640,6 +756,7 @@ function TypeDialog({
           accentColor: type.accentColor,
           displayOrder: type.displayOrder,
           familyTreeEligible: type.familyTreeEligible,
+          parent: { id: parentId },
         })
       } else {
         await createEntityType(universeId, {
@@ -649,6 +766,7 @@ function TypeDialog({
           accentColor: null,
           displayOrder: null,
           familyTreeEligible,
+          parent: { id: parentId },
         })
       }
       await onSaved(name.trim())
@@ -715,6 +833,32 @@ function TypeDialog({
               for you from the name.
             </p>
             {fieldErrors.icon ? <p className="field__error">{fieldErrors.icon}</p> : null}
+          </div>
+
+          <div className="field">
+            <label className="field__label" htmlFor="type-parent">
+              Parent type
+            </label>
+            <select
+              id="type-parent"
+              className="field__input field__input--select"
+              value={parentId ?? ''}
+              onChange={(event) => setParentId(event.target.value || null)}
+              aria-describedby="type-parent-hint"
+              data-testid="type-parent"
+            >
+              <option value="">None – a top-level type</option>
+              {parents.map((node) => (
+                <option key={node.type.id} value={node.type.id}>
+                  {typePathLabel(node)}
+                </option>
+              ))}
+            </select>
+            <p className="field__hint" id="type-parent-hint">
+              Organises Lore: choosing a type there shows the entries of the types inside it too.
+              Nothing is inherited - each type keeps its own fields.
+            </p>
+            {fieldErrors.parent ? <p className="field__error">{fieldErrors.parent}</p> : null}
           </div>
 
           {type ? null : (

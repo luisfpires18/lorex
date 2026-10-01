@@ -35,6 +35,13 @@ async function openLore(page: Page) {
   await page.waitForURL(/\/lore$/)
 }
 
+/** Lore starts with no type chosen; a root type is chosen from the chooser in the header. */
+async function chooseType(page: Page, name: string) {
+  await page.getByTestId('lore-type-menu').click()
+  await page.getByTestId('lore-type-menu-panel').getByRole('link', { name, exact: true }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(name)
+}
+
 function card(page: Page, name: string) {
   return page.locator(`[data-testid="entity-card"][data-entity-name="${name}"]`)
 }
@@ -85,9 +92,13 @@ test.describe('lore', () => {
 
     // Write the entry.
     await openLore(page)
+    await expect(page.getByTestId('lore-choose')).toContainText(
+      'Choose a type to browse your lore.',
+    )
+    await chooseType(page, 'Starship')
     await expect(page.getByTestId('entity-empty')).toBeVisible()
     await page.getByTestId('new-entity').click()
-    await page.waitForURL(/\/lore\/new$/)
+    await page.waitForURL(/\/lore\/new\?type=/)
 
     const name = unique('The Kestrel ')
     await page.getByLabel('Entry type').selectOption({ label: 'Starship' })
@@ -125,6 +136,7 @@ test.describe('lore', () => {
     // It shows on the grid, and search finds it.
     await page.getByRole('link', { name: 'Lore', exact: true }).first().click()
     await page.waitForURL(/\/lore$/)
+    await chooseType(page, 'Starship')
     await expect(card(page, name)).toBeVisible()
 
     await page.getByLabel('Filter entries').fill('Grey Bird')
@@ -208,17 +220,22 @@ test.describe('lore', () => {
 
     await page.getByRole('link', { name: 'Lore', exact: true }).first().click()
     await page.waitForURL(/\/lore$/)
-    await expect(page.getByTestId('entity-card')).toHaveCount(2)
 
-    const types = page.getByRole('navigation', { name: 'Lore types' })
-    await types.getByRole('link', { name: 'Location', exact: true }).click()
+    // No "All": nothing is listed until a type is chosen.
+    await expect(page.getByTestId('entity-card')).toHaveCount(0)
+    await expect(page.getByRole('link', { name: 'All', exact: true })).toHaveCount(0)
+
+    await chooseType(page, 'Location')
     await expect(card(page, 'A Place')).toBeVisible()
     await expect(card(page, 'A Person')).toBeHidden()
 
-    await types.getByRole('link', { name: 'All', exact: true }).click()
+    await chooseType(page, 'Character')
     await page.getByRole('group', { name: 'Status' }).getByRole('button', { name: 'Canon' }).click()
     await expect(card(page, 'A Person')).toBeVisible()
     await expect(card(page, 'A Place')).toBeHidden()
+
+    await chooseType(page, 'Location')
+    await expect(page.getByTestId('entity-empty')).toBeVisible()
   })
 
   test('one owner cannot open another owner entry', async ({ page }) => {

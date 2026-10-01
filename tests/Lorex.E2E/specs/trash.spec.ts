@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { chooseLoreType } from './support/lore'
 
 /**
  * One journey through the Trash, and no more than that.
@@ -92,6 +93,7 @@ test.describe('trash', () => {
 
     // And it is out of the lore: not in the browser, not findable, not openable.
     await page.goto(`/app/universes/${universeId}/lore`)
+    await chooseLoreType(page, 'Character')
     await expect(page.getByTestId('entity-grid')).toContainText('Gatewarden')
     await expect(page.getByTestId('entity-grid')).not.toContainText('Northern Gate')
 

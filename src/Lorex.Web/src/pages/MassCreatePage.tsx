@@ -9,6 +9,7 @@ import type { CanonBlockingFinding } from '../canon/types'
 import { ApiError } from '../lib/api'
 import { useLeaveGuard } from '../lib/leaveGuard'
 import { bulkCreateEntities, listEntityTypes } from '../lore/api'
+import { typeChoices } from '../lore/typeTree'
 import {
   MASS_CREATE_MAX,
   fieldOfKey,
@@ -95,6 +96,8 @@ export default function MassCreatePage() {
 
   const types = useMemo(() => (load.kind === 'ready' ? load.types : []), [load])
   const typesById = useMemo(() => new Map(types.map((type) => [type.id, type])), [types])
+  // One exact type a row: every type in the hierarchy's order, named by its path.
+  const choices = useMemo(() => typeChoices(types), [types])
   const eligible = types.filter((type) => !hasRequiredFields(type))
 
   // Opened from a Lore type, that type starts as the default, as a new entry opened there does; otherwise the first. Read
@@ -406,9 +409,9 @@ export default function MassCreatePage() {
                 disabled={eligible.length === 0}
                 data-testid="mass-default-type"
               >
-                {types.map((type) => (
+                {choices.map(({ type, label }) => (
                   <option key={type.id} value={type.id} disabled={hasRequiredFields(type)}>
-                    {type.name}
+                    {label}
                     {hasRequiredFields(type) ? ' (has required fields)' : ''}
                   </option>
                 ))}
@@ -613,13 +616,13 @@ export default function MassCreatePage() {
                                 {row.typeText ? `Unknown: ${row.typeText}` : 'Choose a type'}
                               </option>
                             ) : null}
-                            {types.map((type) => (
+                            {choices.map(({ type, label }) => (
                               <option
                                 key={type.id}
                                 value={type.id}
                                 disabled={hasRequiredFields(type) && type.id !== row.typeId}
                               >
-                                {type.name}
+                                {label}
                                 {hasRequiredFields(type) ? ' (has required fields)' : ''}
                               </option>
                             ))}

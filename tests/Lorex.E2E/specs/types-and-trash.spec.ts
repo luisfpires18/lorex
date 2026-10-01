@@ -197,9 +197,8 @@ test.describe('Lore types', () => {
     await expect(row(page, 'Location')).toHaveCount(0)
 
     await page.goto(`/app/universes/${universeId}/lore?type=${location.id}`)
-    await expect(
-      page.getByTestId('lore-types').getByRole('link', { name: 'Region' }),
-    ).toHaveAttribute('aria-current', 'page')
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Region')
+    await expect(page.getByTestId('lore-type-menu')).toHaveAccessibleName('Type: Region')
     await expect(page.getByTestId('entity-card')).toHaveCount(1)
     await page.getByTestId('entity-card').click()
     await page.waitForURL(new RegExp(`/lore/${rivendell}$`))
@@ -350,7 +349,7 @@ test.describe('Lore types', () => {
       'Guild',
     ]
     for (const name of names) await newType(page, universeId, name)
-    const all = 1 + 7 + names.length
+    const all = 7 + names.length
 
     for (const [width, height, colorScheme] of [
       [1920, 1080, 'light'],
@@ -366,42 +365,31 @@ test.describe('Lore types', () => {
       await page.setViewportSize({ width, height })
       await page.goto(`/app/universes/${universeId}/lore`)
       await expect(page.locator('html')).toHaveAttribute('data-theme', colorScheme)
-      await expect(page.getByTestId('entity-empty')).toBeVisible()
-      expect(await sideways(page), at).toBeLessThanOrEqual(1)
 
-      if (width > 640) {
-        const typeRow = page.getByTestId('lore-types')
-        const links = typeRow.getByRole('link')
-        await expect(links).toHaveCount(all)
-        const shape = await typeRow.evaluate((element) => {
-          const bounds = element.getBoundingClientRect()
-          const boxes = [...element.querySelectorAll('a')].map((link) =>
-            link.getBoundingClientRect(),
-          )
-          return {
-            overflowX: getComputedStyle(element).overflowX,
-            fits: element.scrollWidth <= element.clientWidth,
-            rows: new Set(boxes.map((box) => Math.round(box.top))).size,
-            inside: boxes.every(
-              (box) => box.left >= bounds.left - 1 && box.right <= bounds.right + 1,
-            ),
-          }
+      // With no type chosen, every type is listed - one under another, each inside the list - and nothing scrolls.
+      const tree = page.getByTestId('lore-choose').getByRole('navigation', { name: 'Lore types' })
+      const links = tree.getByRole('link')
+      await expect(links).toHaveCount(all)
+      expect(await sideways(page), at).toBeLessThanOrEqual(1)
+      const inside = await tree.evaluate((element) => {
+        const bounds = element.getBoundingClientRect()
+        return [...element.querySelectorAll('a')].every((link) => {
+          const box = link.getBoundingClientRect()
+          return box.left >= bounds.left - 1 && box.right <= bounds.right + 1
         })
-        expect(shape.overflowX, at).toBe('visible')
-        expect(shape.fits, at).toBe(true)
-        expect(shape.inside, at).toBe(true)
-        expect(shape.rows, at).toBeGreaterThanOrEqual(2)
-        // The right-to-left name keeps its own direction inside Lorex's order.
-        await expect(typeRow.locator('bdi', { hasText: 'עידן האור' })).toBeVisible()
-      } else {
-        await expect(page.getByTestId('lore-types')).toBeHidden()
-        await page.getByTestId('lore-type-menu').click()
-        const menu = page.getByTestId('lore-type-menu-panel')
-        await expect(menu.getByRole('link')).toHaveCount(all)
-        await menu.getByRole('link', { name: 'Guild' }).click()
-        await expect(page).toHaveURL(/\?type=/)
-        await expect(page.getByTestId('lore-type-menu')).toContainText('Guild')
-      }
+      })
+      expect(inside, at).toBe(true)
+      // The right-to-left name keeps its own direction inside Lorex's order.
+      await expect(tree.locator('bdi', { hasText: 'עידן האור' })).toBeVisible()
+
+      // The header's chooser holds the same list, and choosing goes there.
+      await page.getByTestId('lore-type-menu').click()
+      const menu = page.getByTestId('lore-type-menu-panel')
+      await expect(menu.getByRole('link')).toHaveCount(all)
+      await menu.getByRole('link', { name: 'Guild' }).click()
+      await expect(page).toHaveURL(/\?type=/)
+      await expect(page.getByTestId('lore-type-menu')).toContainText('Guild')
+      expect(await sideways(page), at).toBeLessThanOrEqual(1)
     }
   })
 })
@@ -421,11 +409,17 @@ test.describe('moving Lore to the Trash together', () => {
   const cards = (page: Page) => page.getByTestId('entity-card')
   const checks = (page: Page) => page.getByTestId('entity-select')
 
+  /** Lore on the type every seeded entry has: there is no "All" to browse them in. */
+  async function lore(page: Page, universeId: string, query = '') {
+    const character = (await typeNamed(page, universeId, 'Character')).id
+    return `/app/universes/${universeId}/lore?type=${character}${query}`
+  }
+
   test('ordinary Lore has no checkboxes; Select turns on selecting, one card or the page at a time', async ({
     page,
   }) => {
     const universeId = await seeded(page, 5)
-    await page.goto(`/app/universes/${universeId}/lore`)
+    await page.goto(await lore(page, universeId))
 
     await expect(cards(page)).toHaveCount(5)
     await expect(checks(page)).toHaveCount(0)
@@ -443,7 +437,7 @@ test.describe('moving Lore to the Trash together', () => {
 
     // A card is not a link while selecting: pressing it selects it, and again unselects it.
     await cards(page).first().click()
-    await expect(page).toHaveURL(/\/lore$/)
+    await expect(page).toHaveURL(/\/lore\?type=[0-9a-f-]+$/)
     await expect(checks(page).first()).toBeChecked()
     await expect(page.getByTestId('lore-selected-count')).toHaveText('1 selected')
     await expect(checks(page).first()).toHaveAccessibleName(/^Select Wanderer 0\d$/)
@@ -466,7 +460,7 @@ test.describe('moving Lore to the Trash together', () => {
     page,
   }) => {
     const universeId = await seeded(page, 13)
-    await page.goto(`/app/universes/${universeId}/lore?page=2`)
+    await page.goto(await lore(page, universeId, '&page=2'))
     await expect(cards(page)).toHaveCount(1)
 
     const writes: string[] = []
@@ -517,7 +511,7 @@ test.describe('moving Lore to the Trash together', () => {
     page,
   }) => {
     const universeId = await seeded(page, 14)
-    await page.goto(`/app/universes/${universeId}/lore`)
+    await page.goto(await lore(page, universeId))
     answer(page, true)
 
     await page.getByTestId('lore-select').click()
@@ -566,7 +560,7 @@ test.describe('moving Lore to the Trash together', () => {
       const at = `${width}px ${colorScheme}`
       await page.emulateMedia({ colorScheme })
       await page.setViewportSize({ width, height })
-      await page.goto(`/app/universes/${universeId}/lore`)
+      await page.goto(await lore(page, universeId))
       await page.getByTestId('lore-select').click()
       await expect(checks(page)).toHaveCount(3)
       expect(await sideways(page), at).toBeLessThanOrEqual(1)

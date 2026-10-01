@@ -23,15 +23,35 @@ async function signUp(page: Page) {
   await page.waitForURL('/app')
 }
 
-/** A universe of 45 entries, 15 in each of its first three types. */
+/**
+ * A universe of 45 entries, 15 in each of three types nested inside one: Lore has no "All" (Product refinement 022), and
+ * the parent's branch is the 45.
+ */
 async function world(page: Page) {
   const created = await page.request.post('/api/universes', {
     data: { name: unique('Paged World '), description: null, accentColor: null },
   })
   const id = ((await created.json()) as { id: string }).id
-  const types = (await (await page.request.get(`/api/universes/${id}/entity-types`)).json()) as {
-    id: string
-  }[]
+  const type = async (name: string, parent: string | null) => {
+    const response = await page.request.post(`/api/universes/${id}/entity-types`, {
+      data: {
+        name,
+        description: null,
+        icon: null,
+        accentColor: null,
+        displayOrder: null,
+        parent: { id: parent },
+      },
+    })
+    expect(response.ok()).toBe(true)
+    return ((await response.json()) as { id: string }).id
+  }
+  const rootId = await type('Ledger', null)
+  const types = [
+    { id: await type('Ledger I', rootId) },
+    { id: await type('Ledger II', rootId) },
+    { id: await type('Ledger III', rootId) },
+  ]
   for (let index = 1; index <= 45; index++) {
     const response = await page.request.post(`/api/universes/${id}/entities`, {
       data: {
@@ -46,7 +66,7 @@ async function world(page: Page) {
     })
     expect(response.ok()).toBe(true)
   }
-  return { id, typeId: types[1].id }
+  return { id, typeId: types[1].id, rootId }
 }
 
 const cards = (page: Page) => page.getByTestId('entity-grid').locator(':scope > li')
@@ -102,7 +122,7 @@ test.describe('Lore pages', () => {
     test.setTimeout(120_000)
     await signUp(page)
     const w = await world(page)
-    await page.goto(`/app/universes/${w.id}/lore?page=2`)
+    await page.goto(`/app/universes/${w.id}/lore?type=${w.rootId}&page=2`)
 
     const size = page.getByLabel('Items per page')
     await expect(size).toHaveValue('12')
@@ -149,7 +169,7 @@ test.describe('Lore pages', () => {
 
     // Never "Page 5 of 3": an address past the end is brought back to the last page there is.
     await page.getByLabel('Items per page').selectOption('12')
-    await page.goto(`/app/universes/${w.id}/lore?page=9`)
+    await page.goto(`/app/universes/${w.id}/lore?type=${w.rootId}&page=9`)
     await expect(page.locator('.pager__position')).toHaveText('Page 4 of 4')
     await expect(page).toHaveURL(/[?&]page=4$/)
     await expect(cards(page)).toHaveCount(9)
@@ -181,7 +201,7 @@ test.describe('Lore pages', () => {
         const { context, page: tab } = await signedIn(browser, page, { viewport })
         await context.addInitScript((t) => localStorage.setItem('lorex-theme', t), theme)
         for (const at of [1, 2, 4]) {
-          await tab.goto(`/app/universes/${w.id}/lore${at > 1 ? `?page=${at}` : ''}`)
+          await tab.goto(`/app/universes/${w.id}/lore?type=${w.rootId}${at > 1 ? `&page=${at}` : ''}`)
           await expect(tab.locator('.pager__position')).toHaveText(`Page ${at} of 4`)
           const g = await pagerGeometry(tab)
           const where = `${theme} ${viewport.width} page ${at}`
@@ -224,7 +244,7 @@ test.describe('Lore pages', () => {
       ['200%', { viewport: { width: 640, height: 400 }, deviceScaleFactor: 2 }],
     ] as const) {
       const { context, page: tab } = await signedIn(browser, page, options)
-      await tab.goto(`/app/universes/${w.id}/lore`)
+      await tab.goto(`/app/universes/${w.id}/lore?type=${w.rootId}`)
       await expect(cards(tab)).toHaveCount(12)
       const card = (await cards(tab).first().boundingBox())!
       measured[label] = { columns: await columns(tab), card: card.width }

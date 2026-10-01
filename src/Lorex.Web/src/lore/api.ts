@@ -58,6 +58,11 @@ export interface EntityTypeInput {
   displayOrder: number | null
   /** Left out keeps what is stored; a new type without it is not eligible. */
   familyTreeEligible?: boolean
+  /**
+   * Where the type sits: `{ id }` beneath that type, `{ id: null }` at the root. Left out keeps the stored parent, so a save
+   * that is not about the hierarchy cannot move a type.
+   */
+  parent?: { id: string | null }
 }
 
 export function createEntityType(universeId: string, input: EntityTypeInput) {
@@ -71,6 +76,17 @@ export function updateEntityType(universeId: string, typeId: string, input: Enti
   return apiFetch<EntityType>(`${base(universeId)}/entity-types/${typeId}`, {
     method: 'PUT',
     body: JSON.stringify(input),
+  })
+}
+
+/**
+ * One place up or down among the type's direct siblings. Answers the whole list, in order. Up on the first and down on the
+ * last change nothing and answer the list as it is.
+ */
+export function moveEntityType(universeId: string, typeId: string, direction: 'up' | 'down') {
+  return apiFetch<EntityType[]>(`${base(universeId)}/entity-types/${typeId}/move`, {
+    method: 'POST',
+    body: JSON.stringify({ direction }),
   })
 }
 
@@ -128,6 +144,7 @@ export function listEntities(universeId: string, query: EntityQuery, signal?: Ab
   })
   if (query.search.trim()) params.set('search', query.search.trim())
   if (query.entityTypeId) params.set('entityTypeId', query.entityTypeId)
+  if (query.entityTypeId && query.includeDescendants) params.set('includeDescendants', 'true')
   if (query.canonStatus !== null) params.set('canonStatus', String(query.canonStatus))
   if (query.tag) params.set('tag', query.tag)
   if (query.familyTreeEligible) params.set('familyTreeEligible', 'true')

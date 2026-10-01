@@ -170,8 +170,15 @@ public sealed record UniverseBackup(
     /// <c>familyTreeEligible</c>; each type reads as eligible only when it is the untouched starter Character, the rule the
     /// migration applied to a live database, and no older file may carry <c>NonStructuralFamily</c> - one that does was not
     /// written by Lorex and is refused.
+    ///
+    /// 19 - A type may sit beneath another type (ADR 0007 amendment, 2026-10-01). <see cref="BackupEntityType.ParentId"/> names
+    /// the type of the same file it is nested in, null for a root, and <see cref="BackupEntityType.DisplayOrder"/> is now its
+    /// place among its siblings. Types are listed parent before descendants. Not ignorable: the hierarchy is how the author
+    /// organised their lore and how Lore is browsed - choosing a type shows its whole branch - so a version 18 reader would
+    /// restore every type flat and the organisation would be silently gone. A file at version 18 or earlier has no
+    /// <c>parentId</c>; every type reads as a root in its stored order, and nothing is ever inferred from names.
     /// </summary>
-    public const int CurrentVersion = 18;
+    public const int CurrentVersion = 19;
 
     public static UniverseBackup Of(UniverseBackupPayload payload, DateTime generatedAt) =>
         new(FormatName, CurrentVersion, generatedAt, payload);
@@ -270,7 +277,10 @@ public sealed record BackupChronologyEra(
     ChronologyEraDirection Direction,
     ChronologyLabelPosition LabelPosition);
 
-/// <summary><paramref name="FamilyTreeEligible"/> was added in version 18 (see <see cref="UniverseBackup.CurrentVersion"/>).</summary>
+/// <summary>
+/// <paramref name="FamilyTreeEligible"/> was added in version 18, <paramref name="ParentId"/> in version 19 (see
+/// <see cref="UniverseBackup.CurrentVersion"/>): the type of this file it sits beneath, or null for a root.
+/// </summary>
 public sealed record BackupEntityType(
     Guid Id,
     string Name,
@@ -281,7 +291,8 @@ public sealed record BackupEntityType(
     int DisplayOrder,
     DateTime CreatedAt,
     DateTime UpdatedAt,
-    IReadOnlyList<BackupFieldDefinition> Fields);
+    IReadOnlyList<BackupFieldDefinition> Fields,
+    Guid? ParentId = null);
 
 /// <summary>
 /// One custom field, with its declared meaning. <c>Semantic</c> is authored (ADR 0011) and

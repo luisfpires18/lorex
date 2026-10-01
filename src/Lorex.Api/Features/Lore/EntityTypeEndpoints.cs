@@ -21,8 +21,13 @@ public static class EntityTypeEndpoints
     /// Why a type cannot be deleted, in the author's terms: how many entries still use it and how many of those are in the
     /// Trash, since an entry there is invisible in Lore and still keeps its type. Mirrored by the Types screen.
     /// </summary>
-    internal static string InUseDetail(string name, int live, int trashed)
+    internal static string InUseDetail(string name, int live, int trashed, int children = 0)
     {
+        if (live + trashed == 0)
+        {
+            return $"{name} can't be deleted because it still contains {Nested(children)}. Move or delete those types first.";
+        }
+
         var total = live + trashed;
         var uses = total == 1 ? "1 entry still uses it" : $"{total} entries still use it";
         var where = trashed == 0
@@ -38,8 +43,16 @@ public static class EntityTypeEndpoints
             _ => "Move them to another type first; an entry in the Trash has to be restored before it can be moved.",
         };
 
-        return $"{name} can't be deleted because {uses}{where}. {fix}";
+        return children == 0
+            ? $"{name} can't be deleted because {uses}{where}. {fix}"
+            : $"{name} can't be deleted because {uses}{where}, and it still contains {Nested(children)}. {fix} "
+                + (children == 1 ? "Move or delete that type too." : "Move or delete those types too.");
     }
+
+    private static string Nested(int children) => children == 1 ? "1 nested type" : $"{children} nested types";
+
+    /// <summary>The machine-readable marker on the refusal of a parent or a move that would put a type inside itself.</summary>
+    public const string ParentCycleCode = "entity_type_parent_cycle";
 
     public static IEndpointRouteBuilder MapEntityTypeEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -51,6 +64,7 @@ public static class EntityTypeEndpoints
         group.MapPost("/", CreateAsync).WithName("CreateEntityType");
         group.MapPut("/{typeId:guid}", UpdateAsync).WithName("UpdateEntityType");
         group.MapDelete("/{typeId:guid}", DeleteAsync).WithName("DeleteEntityType");
+        group.MapPost("/{typeId:guid}/move", MoveAsync).WithName("MoveEntityType");
 
         group.MapPost("/{typeId:guid}/fields", AddFieldAsync).WithName("AddEntityField");
         group.MapPut("/{typeId:guid}/fields/{fieldId:guid}", UpdateFieldAsync).WithName("UpdateEntityField");
@@ -95,6 +109,10 @@ public static class EntityTypeEndpoints
         }
 
         var name = request.Name!.Trim();
+        var parentId = request.Parent?.Id;
+
+        // One writer at a time from here, so two types created under the same parent cannot both take the last place.
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
         if (await db.EntityTypes.AnyAsync(
                 type => type.UniverseId == universeId && type.Name == name,
@@ -103,11 +121,14 @@ public static class EntityTypeEndpoints
             return NameTaken();
         }
 
+        if (parentId is { } parent
+            && !await db.EntityTypes.AnyAsync(type => type.Id == parent && type.UniverseId == universeId, cancellationToken))
+        {
+            return ParentMissing();
+        }
+
         var now = DateTime.UtcNow;
-        var order = request.DisplayOrder
-            ?? await db.EntityTypes.Where(type => type.UniverseId == universeId)
-                .Select(type => (int?)type.DisplayOrder).MaxAsync(cancellationToken) + 1
-            ?? 1;
+        var order = await NextPlaceAsync(db, universeId, parentId, cancellationToken);
 
         var entityType = new EntityType
         {
@@ -118,6 +139,7 @@ public static class EntityTypeEndpoints
             Icon = LoreValidation.Normalize(request.Icon),
             AccentColor = LoreValidation.NormalizeAccent(request.AccentColor),
             FamilyTreeEligible = request.FamilyTreeEligible ?? false,
+            ParentId = parentId,
             DisplayOrder = order,
             CreatedAt = now,
             UpdatedAt = now,
@@ -133,6 +155,8 @@ public static class EntityTypeEndpoints
         {
             return NameTaken();
         }
+
+        await transaction.CommitAsync(cancellationToken);
 
         var created = await LoadTypesAsync(db, universeId, cancellationToken);
         return Results.Created(
@@ -161,6 +185,8 @@ public static class EntityTypeEndpoints
 
         var name = request.Name!.Trim();
 
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
         if (!string.Equals(entityType.Name, name, StringComparison.Ordinal)
             && await db.EntityTypes.AnyAsync(
                 other => other.UniverseId == universeId && other.Name == name && other.Id != typeId,
@@ -174,8 +200,14 @@ public static class EntityTypeEndpoints
         entityType.Icon = LoreValidation.Normalize(request.Icon);
         entityType.AccentColor = LoreValidation.NormalizeAccent(request.AccentColor);
         entityType.FamilyTreeEligible = request.FamilyTreeEligible ?? entityType.FamilyTreeEligible;
-        entityType.DisplayOrder = request.DisplayOrder ?? entityType.DisplayOrder;
         entityType.UpdatedAt = DateTime.UtcNow;
+
+        // Absent keeps the parent; present - a type, or null for the root - moves the type there with everything beneath it.
+        if (request.Parent is { } parent && parent.Id != entityType.ParentId
+            && await ReparentAsync(db, universeId, entityType, parent.Id, cancellationToken) is { } refused)
+        {
+            return refused;
+        }
 
         try
         {
@@ -186,9 +218,174 @@ public static class EntityTypeEndpoints
             return NameTaken();
         }
 
+        await transaction.CommitAsync(cancellationToken);
+
         var types = await LoadTypesAsync(db, universeId, cancellationToken);
         return Results.Ok(types.First(type => type.Id == typeId));
     }
+
+    /// <summary>
+    /// Puts <paramref name="entityType"/> beneath <paramref name="parentId"/> (null for the root), last among its new siblings,
+    /// and closes the gap it leaves among the old ones. Its descendants are untouched: they hang from it, so they move with it
+    /// in their own order. Refuses a parent that is not a type of this universe, or that is the type itself or beneath it.
+    /// Staged on the context; the caller saves, inside its transaction.
+    /// </summary>
+    private static async Task<IResult?> ReparentAsync(
+        LorexDbContext db,
+        Guid universeId,
+        EntityType entityType,
+        Guid? parentId,
+        CancellationToken cancellationToken)
+    {
+        if (parentId is { } parent)
+        {
+            var parentOf = await ParentsAsync(db, universeId, cancellationToken);
+            if (!parentOf.ContainsKey(parent))
+            {
+                return ParentMissing();
+            }
+
+            if (EntityTypeHierarchy.WouldCycle(parentOf, entityType.Id, parent))
+            {
+                return Results.Problem(
+                    title: "A type can't sit inside itself",
+                    detail: parent == entityType.Id
+                        ? $"{entityType.Name} can't be its own parent. Choose another type, or none."
+                        : $"{entityType.Name} can't go beneath one of its own nested types. Choose another type, or none.",
+                    statusCode: StatusCodes.Status409Conflict,
+                    extensions: new Dictionary<string, object?> { ["code"] = ParentCycleCode });
+            }
+        }
+
+        var now = DateTime.UtcNow;
+        var oldParentId = entityType.ParentId;
+        var order = await NextPlaceAsync(db, universeId, parentId, cancellationToken);
+
+        entityType.ParentId = parentId;
+        entityType.DisplayOrder = order;
+        entityType.UpdatedAt = now;
+
+        var formerSiblings = await SiblingsAsync(db, universeId, oldParentId, cancellationToken);
+        Renumber(formerSiblings.Where(sibling => sibling.Id != entityType.Id).ToList(), now);
+
+        return null;
+    }
+
+    /// <summary>
+    /// Moves a type one place up or down among its direct siblings - the types with the same parent, and only those - and
+    /// numbers that sibling group 1..n again, so gaps and ties left by older data are gone after the first move. Up on the
+    /// first sibling and down on the last are an unchanged 200, deliberately: the button that asked is already disabled on
+    /// screen, and a stale second click should find the list as it is, not an error. Answers the whole list, in order.
+    ///
+    /// One writer at a time (the transaction takes SQLite's write lock first), and the group is read inside it, so two moves
+    /// at once apply one after the other and never leave two siblings in one place.
+    /// </summary>
+    private static async Task<IResult> MoveAsync(
+        Guid universeId,
+        Guid typeId,
+        [FromBody] EntityTypeMoveRequest request,
+        ClaimsPrincipal principal,
+        LorexDbContext db,
+        CancellationToken cancellationToken)
+    {
+        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        {
+            return Results.NotFound();
+        }
+
+        var step = request.Direction?.Trim().ToLowerInvariant() switch
+        {
+            "up" => -1,
+            "down" => 1,
+            _ => 0,
+        };
+
+        if (step == 0)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["direction"] = ["Say \"up\" or \"down\"."],
+            });
+        }
+
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        var moving = await db.EntityTypes.FirstOrDefaultAsync(
+            type => type.Id == typeId && type.UniverseId == universeId,
+            cancellationToken);
+
+        if (moving is null)
+        {
+            return Results.NotFound();
+        }
+
+        var siblings = await SiblingsAsync(db, universeId, moving.ParentId, cancellationToken);
+        var from = siblings.FindIndex(sibling => sibling.Id == typeId);
+        var to = from + step;
+
+        if (to >= 0 && to < siblings.Count)
+        {
+            (siblings[from], siblings[to]) = (siblings[to], siblings[from]);
+        }
+
+        Renumber(siblings, DateTime.UtcNow);
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return Results.Ok(await LoadTypesAsync(db, universeId, cancellationToken));
+    }
+
+    /// <summary>A type's direct siblings with <paramref name="parentId"/>, tracked, in their shown order.</summary>
+    private static async Task<List<EntityType>> SiblingsAsync(
+        LorexDbContext db,
+        Guid universeId,
+        Guid? parentId,
+        CancellationToken cancellationToken)
+    {
+        var siblings = await db.EntityTypes
+            .Where(type => type.UniverseId == universeId && type.ParentId == parentId)
+            .ToListAsync(cancellationToken);
+
+        return [.. siblings.OrderBy(type => type.DisplayOrder).ThenBy(type => type.Name, StringComparer.Ordinal).ThenBy(type => type.Id)];
+    }
+
+    /// <summary>Numbers a sibling group 1..n in the order given; a row whose place changed records the edit.</summary>
+    private static void Renumber(List<EntityType> siblings, DateTime now)
+    {
+        for (var index = 0; index < siblings.Count; index++)
+        {
+            if (siblings[index].DisplayOrder != index + 1)
+            {
+                siblings[index].DisplayOrder = index + 1;
+                siblings[index].UpdatedAt = now;
+            }
+        }
+    }
+
+    /// <summary>The place after the last of <paramref name="parentId"/>'s children (the roots, for null).</summary>
+    private static async Task<int> NextPlaceAsync(
+        LorexDbContext db,
+        Guid universeId,
+        Guid? parentId,
+        CancellationToken cancellationToken) =>
+        (await db.EntityTypes
+            .Where(type => type.UniverseId == universeId && type.ParentId == parentId)
+            .MaxAsync(type => (int?)type.DisplayOrder, cancellationToken) ?? 0) + 1;
+
+    /// <summary>Every type of the universe and its parent: the whole graph, which is small.</summary>
+    private static async Task<Dictionary<Guid, Guid?>> ParentsAsync(
+        LorexDbContext db,
+        Guid universeId,
+        CancellationToken cancellationToken) =>
+        await db.EntityTypes.AsNoTracking()
+            .Where(type => type.UniverseId == universeId)
+            .ToDictionaryAsync(type => type.Id, type => type.ParentId, cancellationToken);
+
+    private static IResult ParentMissing() =>
+        Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["parent"] = ["Choose a type from this universe, or none."],
+        });
 
     private static async Task<IResult> DeleteAsync(
         Guid universeId,
@@ -215,17 +412,24 @@ public static class EntityTypeEndpoints
         var live = users.Where(group => group.Live).Sum(group => group.Count);
         var trashed = users.Where(group => !group.Live).Sum(group => group.Count);
 
-        if (live + trashed > 0)
+        // A type holding nested types is refused too - never deleted with them, and never leaving them promoted or moved
+        // somewhere the author did not choose. The key refuses it as well.
+        var children = await db.EntityTypes.CountAsync(
+            type => type.UniverseId == universeId && type.ParentId == typeId,
+            cancellationToken);
+
+        if (live + trashed + children > 0)
         {
             return Results.Problem(
                 title: "Type is in use",
-                detail: InUseDetail(entityType.Name, live, trashed),
+                detail: InUseDetail(entityType.Name, live, trashed, children),
                 statusCode: StatusCodes.Status409Conflict,
                 extensions: new Dictionary<string, object?>
                 {
                     ["code"] = TypeInUseCode,
                     ["liveCount"] = live,
                     ["trashedCount"] = trashed,
+                    ["childCount"] = children,
                 });
         }
 
@@ -558,10 +762,9 @@ public static class EntityTypeEndpoints
         LorexDbContext db,
         Guid universeId,
         CancellationToken cancellationToken) =>
-        await db.EntityTypes.AsNoTracking()
+        EntityTypeHierarchy.Preorder(
+            await db.EntityTypes.AsNoTracking()
             .Where(type => type.UniverseId == universeId)
-            .OrderBy(type => type.DisplayOrder)
-            .ThenBy(type => type.Name)
             .Select(type => new EntityTypeResponse(
                 type.Id,
                 type.Name,
@@ -587,8 +790,13 @@ public static class EntityTypeEndpoints
                             .ToList(),
                         field.Semantic))
                     .ToList(),
-                type.FamilyTreeEligible))
-            .ToListAsync(cancellationToken);
+                type.FamilyTreeEligible,
+                type.ParentId))
+            .ToListAsync(cancellationToken),
+            type => type.Id,
+            type => type.ParentId,
+            type => type.DisplayOrder,
+            type => type.Name);
 
     private static IResult NameTaken() =>
         Results.ValidationProblem(new Dictionary<string, string[]>

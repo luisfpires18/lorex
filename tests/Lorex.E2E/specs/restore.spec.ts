@@ -200,7 +200,7 @@ test.describe('restore a backup', () => {
     await expect(preview).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Ready to restore' })).toBeFocused()
     await expect(page.getByTestId('restore-universe-name')).toHaveText(source.name)
-    await expect(preview).toContainText('Version 18')
+    await expect(preview).toContainText('Version 19')
     await expect(preview).toContainText('1 world rule')
     await expect(preview).toContainText('1 entry')
     await expect(preview).toContainText('1 picture')
@@ -223,13 +223,13 @@ test.describe('restore a backup', () => {
     const r = `/api/universes/${restoredId}`
 
     // The entry, its article and its picture.
-    const entities = await api<{ items: { id: string; name: string }[] }>(
+    const entities = await api<{ items: { id: string; name: string; entityTypeId: string }[] }>(
       page,
       'GET',
       `${r}/entities`,
     )
     const isolde = entities.items.find((item) => item.name === 'Isolde Varrow')!
-    await page.goto(`/app/universes/${restoredId}/lore`)
+    await page.goto(`/app/universes/${restoredId}/lore?type=${isolde.entityTypeId}`)
     const portrait = page.getByTestId('entity-portrait').first()
     await expect(portrait).toBeVisible()
     await expect
@@ -328,7 +328,7 @@ test.describe('restore a backup', () => {
         {
           name: 'future.json',
           mimeType: 'application/json',
-          buffer: Buffer.from(JSON.stringify({ ...document, formatVersion: 19 })),
+          buffer: Buffer.from(JSON.stringify({ ...document, formatVersion: 20 })),
         },
         /newer Lorex/,
       ],

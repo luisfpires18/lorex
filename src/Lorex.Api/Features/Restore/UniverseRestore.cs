@@ -406,6 +406,29 @@ internal sealed partial class UniverseRestore(
 
     // ---------- The database ----------
 
+    /// <summary>
+    /// Puts each restored type beneath its restored parent - through the same map as every other internal reference, so the
+    /// copy is a tree of its own. A second write in the restore's transaction: the database checks a parent exists as a row
+    /// is written, and one save does not promise to write parents first, so the parents are set once every type is there.
+    /// </summary>
+    private async Task NestTypesAsync(UniverseBackupPayload payload, RestoreIdentity ids, CancellationToken cancellationToken)
+    {
+        var nested = payload.EntityTypes.Where(type => type.ParentId is not null).ToList();
+        if (nested.Count == 0)
+        {
+            return;
+        }
+
+        var restored = db.EntityTypes.Local.ToDictionary(type => type.Id);
+        foreach (var type in nested)
+        {
+            restored[ids.Map(type.Id)].ParentId = ids.Map(type.ParentId);
+        }
+
+        db.ChangeTracker.DetectChanges();
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
     private async Task<Universe> WriteAsync(
         UniverseBackupPayload payload,
         RestoreIdentity ids,
@@ -467,6 +490,7 @@ internal sealed partial class UniverseRestore(
             AddRuleValidation(payload, ids, universeId);
 
             await db.SaveChangesAsync(cancellationToken);
+            await NestTypesAsync(payload, ids, cancellationToken);
         }
         catch (DbUpdateException)
         {
@@ -527,6 +551,8 @@ internal sealed partial class UniverseRestore(
                 Icon = type.Icon,
                 AccentColor = type.AccentColor?.ToLowerInvariant(),
                 FamilyTreeEligible = type.FamilyTreeEligible,
+
+                // Written as a root; NestTypesAsync gives it its parent once every type exists.
                 DisplayOrder = type.DisplayOrder,
                 CreatedAt = type.CreatedAt,
                 UpdatedAt = type.UpdatedAt,

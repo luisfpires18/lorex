@@ -194,7 +194,7 @@ test.describe('an entry page', () => {
     await expect(page.getByRole('button', { name: 'View full image' })).toHaveCount(0)
 
     // The card keeps the square thumbnail; the original is never loaded for a grid.
-    await page.goto(`/app/universes/${world.universeId}/lore`)
+    await page.goto(`/app/universes/${world.universeId}/lore?type=${world.character}`)
     const card = page.locator('[data-testid="entity-card"][data-entity-name="Maren Ashvale"]')
     await expect(card.getByTestId('entity-portrait')).toHaveAttribute('src', /\/thumbnail\//)
   })
@@ -249,7 +249,7 @@ test.describe('an entry page', () => {
       await signUp(page)
       const world = await seedWorld(page)
       const id = await world.entry('Wren Allard')
-      const loreUrl = `/app/universes/${world.universeId}/lore`
+      const loreUrl = `/app/universes/${world.universeId}/lore?type=${world.character}`
       await page.goto(loreUrl)
       await page.locator('[data-testid="entity-card"][data-entity-name="Wren Allard"]').click()
       await page.waitForURL(entryUrl(world.universeId, id))

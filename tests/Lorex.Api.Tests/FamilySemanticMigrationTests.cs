@@ -94,11 +94,11 @@ public sealed class FamilySemanticMigrationTests : IDisposable
             Assert.Contains("AgeOrder", columns);
             Assert.Contains("InverseName", columns);
             Assert.Empty(await ForeignKeyViolations(db));
-            Assert.Equal(triggers, await Triggers(db));
+            Assert.Equal(triggers.Where(LaterSchema.BeforeNestedTypes), await Triggers(db));
 
             // The walk down also passes back through the publishing migration after this one, which takes its own
             // indexes with it; every other index is exactly where it was.
-            Assert.Equal(indexes.Where(index => !IsPublishing(index)), await Indexes(db));
+            Assert.Equal(indexes.Where(index => !IsPublishing(index)).Where(LaterSchema.BeforeNestedTypes), await Indexes(db));
 
             Assert.Equal(8, await db.RelationshipTypes.CountAsync());
             Assert.Equal(8, await db.Relationships.CountAsync());

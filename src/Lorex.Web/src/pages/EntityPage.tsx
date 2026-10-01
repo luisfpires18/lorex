@@ -50,6 +50,7 @@ import {
   type EntityType,
   type FieldValueInput,
 } from '../lore/types'
+import { typeChoices } from '../lore/typeTree'
 import type { WorkspaceContext } from './UniverseWorkspace'
 import { EmptyState } from '../components/EmptyState'
 
@@ -519,7 +520,12 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
       <header className="entry__head">
         <div className="entry__kind">
           <nav className="entry__crumbs" aria-label="Breadcrumb">
-            <Link to={`/app/universes/${universe.id}/lore`}>Lore</Link>
+            {/* Lore lists nothing until a type is chosen, so the way back is to this entry's own type. */}
+            <Link
+              to={`/app/universes/${universe.id}/lore?type=${detail?.entityTypeId ?? draft.entityTypeId}`}
+            >
+              Lore
+            </Link>
           </nav>
 
           {isEditing ? (
@@ -531,9 +537,9 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
                 setDraft({ ...draft, entityTypeId: event.target.value, fields: {} })
               }
             >
-              {types.map((type) => (
+              {typeChoices(types).map(({ type, label }) => (
                 <option key={type.id} value={type.id}>
-                  {type.name}
+                  {label}
                 </option>
               ))}
             </select>

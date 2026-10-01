@@ -50,8 +50,36 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
-- **Product refinement 021 - permanent Trash deletion** (`feat/trash-permanent-delete` off `dev` at `7988e88`, committed,
-  not merged, not pushed). No migration, no backup format change. ADR 0015, 0029 and 0033 amended. **Move to Trash is not
+- **Product refinement 022 - nested Lore types** (`feat/nested-lore-types` off `dev` at `b259ccd`, committed, not merged, not
+  pushed). Migration `AddEntityTypeHierarchy`; backup format **19**. ADR 0007, 0014 and 0032 amended.
+  - `EntityTypes.ParentId` (null = root), any depth, no privileged root; organisation only - nothing inherited (fields,
+    required, icon, accent, Family Tree, Canon). Names stay unique per universe. Entries keep one exact type.
+  - Same universe and not-itself enforced by triggers, plus a trigger refusing to delete a type with children (except inside
+    its universe's own delete). **Not a foreign key, deliberately**: SQLite adds one by rebuilding `EntityTypes`, which moved
+    it first in a universe delete's cascade order and the entries' RESTRICT key then refused every universe delete (seen in
+    tests, raw SQL and endpoint alike). Additive migration instead; rollback drops triggers, index, column natively.
+  - Cycles refused by API (409 `entity_type_parent_cycle`) and backup validation, by graph walk with visited sets
+    (`EntityTypeHierarchy`, `lore/typeTree.ts`); no depth cap anywhere.
+  - `DisplayOrder` = place among direct siblings. New type last among its siblings; reparent moves the subtree last among
+    new siblings and closes the old gap; `POST .../entity-types/{id}/move` `{direction}` swaps one place and renumbers the group
+    1..n, transactional (first-up/last-down = unchanged 200). Request `displayOrder` now ignored. List in preorder.
+  - Request `parent` wrapper: absent keeps parent (old clients safe), `{id:null}` root. Response `parentId`. `entityCount` still
+    the type's own. Delete blocked by entries and/or children, `childCount`, words.
+  - Lore: **no All**. No type chosen = nothing read or listed, filters/Select hidden, "Choose a type to browse your lore." with
+    the tree inline; unknown type id dropped from the address. A type shows its branch (`includeDescendants=true`, resolved
+    server-side; `entityTypeId` alone stays exact). One "Type" disclosure on every width with the nested lists; ancestors
+    opened and named in the header path. Entry crumb "Lore" now goes to the entry's type. Mass create returns to no-type with
+    its count. New entry / Mass create selects in tree order with path labels. Types screen: nested rows (1.25rem a level,
+    capped at 6; 0.75rem capped at 4 on a phone), Up/Down per row, Parent type on New and Edit (self and descendants not
+    offered); Family Tree still New-only, no Family Tree block on rows.
+  - Backup 19: `parentId`, types in preorder; v1-18 restore flat; missing/self/looped parents refused before writing;
+    restore writes types as roots then nests them in the same transaction (the insert trigger checks parents row by row).
+  - Tests: API 1217 -> 1232 (`NestedTypeTests` 14, `NestedTypeMigrationTests` 1; the rich round-trip world now nests two
+    levels). Playwright 316 -> 321 (`nested-types.spec.ts` 5); type-filter, types-and-trash and every spec that browsed
+    "All" now choose a type (`specs/support/lore.ts`).
+  - Not done: field inheritance (intentional), drag-and-drop ordering (intentional), bulk permanent Trash deletion (next).
+- **Product refinement 021 - permanent Trash deletion** (`feat/trash-permanent-delete` off `dev` at `7988e88`, merged into
+  `dev`, then `fix/trash-mobile-action-overflow`; `dev` at `b259ccd`). No migration, no backup format change. ADR 0015, 0029 and 0033 amended. **Move to Trash is not
   Delete permanently**: every ordinary delete (and `bulk-trash`) still only marks; erasing exists only for a row already in the
   Trash.
   - Typed routes, as for restore: `DELETE .../trash/{entityId}` and `.../trash/stories|chapters|scenes|plot-arcs|plot-beats|world-rules/{id}`,

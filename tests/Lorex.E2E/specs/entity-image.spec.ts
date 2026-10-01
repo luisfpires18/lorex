@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { chooseLoreType } from './support/lore'
 import { png, type Rgb } from './support/png'
 import { colours, expectShows, expectSquareCovered } from './support/pixels'
 import { entryNames } from './support/zip'
@@ -145,6 +146,7 @@ test.describe('an entry with a picture', () => {
 
     await page.getByTestId('workspace-lore').click()
     await page.waitForURL(/\/lore$/)
+    await chooseLoreType(page, 'Character')
 
     const card = page.locator(`[data-testid="entity-card"][data-entity-name="${name}"]`)
     await expect(card.getByTestId('entity-portrait')).toBeVisible()
@@ -199,6 +201,7 @@ test.describe('an entry with a picture', () => {
     // And the card falls back to its monogram rather than to a broken picture.
     await page.getByTestId('workspace-lore').click()
     await page.waitForURL(/\/lore$/)
+    await chooseLoreType(page, 'Character')
     await expect(card.getByTestId('entity-portrait')).toHaveCount(0)
     await expect(card.getByTestId('entity-portrait-blank')).toBeVisible()
   })
@@ -249,6 +252,7 @@ test.describe('an entry with a picture', () => {
 
     await page.getByTestId('workspace-lore').click()
     await page.waitForURL(/\/lore$/)
+    await chooseLoreType(page, 'Character')
 
     const card = page.locator(`[data-testid="entity-card"][data-entity-name="${name}"]`)
     const portrait = card.getByTestId('entity-portrait')
@@ -299,6 +303,7 @@ test.describe('an entry with a picture', () => {
 
     await page.getByTestId('workspace-lore').click()
     await page.waitForURL(/\/lore$/)
+    await chooseLoreType(page, 'Character')
     await expect(portrait).not.toHaveAttribute('src', firstThumbnail!)
     await expectShows(portrait, BLUE)
   })
@@ -381,6 +386,7 @@ test.describe('an entry with a picture', () => {
     await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
     await page.getByTestId('workspace-lore').click()
     await page.waitForURL(/\/lore$/)
+    await chooseLoreType(page, 'Character')
 
     // Picture to its very corners: the red band, and not one clear pixel.
     const portrait = page
@@ -429,6 +435,7 @@ test.describe('an entry with a picture', () => {
 
     await page.getByTestId('workspace-lore').click()
     await page.waitForURL(/\/lore$/)
+    await chooseLoreType(page, 'Character')
 
     await expectShows(
       page
@@ -479,6 +486,7 @@ test.describe('an entry with a picture', () => {
 
     await openSection(page, 'workspace-lore', true)
     await page.waitForURL(/\/lore$/)
+    await chooseLoreType(page, 'Character')
     await expectShows(
       page
         .locator(`[data-testid="entity-card"][data-entity-name="${name}"]`)
@@ -518,6 +526,7 @@ test.describe('an entry with a picture', () => {
     // And the card grid behind it, where the portrait sits beside the name.
     await openSection(page, 'workspace-lore', true)
     await page.waitForURL(/\/lore$/)
+    await chooseLoreType(page, 'Character')
     await expect(
       page
         .locator(`[data-testid="entity-card"][data-entity-name="${name}"]`)

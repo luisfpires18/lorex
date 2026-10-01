@@ -13,6 +13,15 @@ namespace Lorex.Api.Features.Lore;
 /// <summary>
 /// <paramref name="FamilyTreeEligible"/> left out keeps what is stored - so a client that predates it cannot clear it by
 /// saving an icon - and is <c>false</c> on a new type (ADR 0040).
+///
+/// <paramref name="DisplayOrder"/> is no longer how a type is placed, and is ignored: a new type goes last among its siblings,
+/// and a type moves one place at a time through <c>POST .../entity-types/{id}/move</c>. Kept so an older client's request
+/// still binds.
+///
+/// <paramref name="Parent"/> is the type's place in the hierarchy, as a wrapper so leaving it out and choosing "no parent" are
+/// different: absent keeps the stored parent - an older client saving a name cannot detach a type - while
+/// <c>{ "id": null }</c> makes it a root and <c>{ "id": "…" }</c> puts it beneath that type, subtree and all. On a new type,
+/// absent and <c>{ "id": null }</c> both make a root.
 /// </summary>
 public sealed record EntityTypeRequest(
     string? Name,
@@ -20,11 +29,21 @@ public sealed record EntityTypeRequest(
     string? Icon,
     string? AccentColor,
     int? DisplayOrder,
-    bool? FamilyTreeEligible = null);
+    bool? FamilyTreeEligible = null,
+    EntityTypeParentChoice? Parent = null);
+
+/// <summary>Where a type sits: beneath <paramref name="Id"/>, or at the root when it is null.</summary>
+public sealed record EntityTypeParentChoice(Guid? Id);
+
+/// <summary>One step among a type's siblings: <c>"up"</c> or <c>"down"</c>.</summary>
+public sealed record EntityTypeMoveRequest(string? Direction);
 
 /// <summary>
 /// <paramref name="EntityCount"/> counts every entry of the type, the Trash included, because a trashed entry keeps its type
-/// and still stops it being deleted; <paramref name="TrashedEntityCount"/> is how many of those are in the Trash.
+/// and still stops it being deleted; <paramref name="TrashedEntityCount"/> is how many of those are in the Trash. Both are
+/// the type's own entries only, never its descendants'. <paramref name="ParentId"/> is the type it sits beneath, or null for
+/// a root. A list of types is always in the hierarchy's order - a parent before its descendants, siblings by
+/// <paramref name="DisplayOrder"/> - but a client builds the tree from the ids, never from positions.
 /// </summary>
 public sealed record EntityTypeResponse(
     Guid Id,
@@ -36,7 +55,8 @@ public sealed record EntityTypeResponse(
     int EntityCount,
     int TrashedEntityCount,
     IReadOnlyList<FieldDefinitionResponse> Fields,
-    bool FamilyTreeEligible);
+    bool FamilyTreeEligible,
+    Guid? ParentId = null);
 
 // ---------- Field definitions ----------
 

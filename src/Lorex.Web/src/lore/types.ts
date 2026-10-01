@@ -120,6 +120,11 @@ export interface EntityType {
   fields: FieldDefinition[]
   /** Entries of this type are offered by the Family Tree. Set by the author, never read from the name (ADR 0040). */
   familyTreeEligible: boolean
+  /**
+   * The type this one sits beneath, or null for a root. Organisation only - nothing is inherited. A list of types arrives
+   * parent before descendants, but the tree is always built from these ids (`lore/typeTree.ts`), never from positions.
+   */
+  parentId: string | null
 }
 
 export interface FieldValue {
@@ -287,4 +292,6 @@ export interface EntityQuery {
   pageSize?: number
   /** Only entries whose type is enabled for the Family Tree. */
   familyTreeEligible?: boolean
+  /** With `entityTypeId`: that type and every type nested beneath it - Lore's browsing. Absent is the exact type. */
+  includeDescendants?: boolean
 }

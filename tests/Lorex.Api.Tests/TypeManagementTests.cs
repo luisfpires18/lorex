@@ -348,10 +348,11 @@ public sealed class TypeManagementTests(LorexApiFactory factory) : IClassFixture
     }
 
     [Fact]
-    public void The_backup_format_is_unchanged()
+    public void The_backup_format_is_the_nested_types_version()
     {
-        // A rename, an icon and the new icon keys are all values of columns a version 18 backup already carries.
-        Assert.Equal(18, UniverseBackup.CurrentVersion);
+        // A rename, an icon and the new icon keys are all values of columns a version 18 backup already carried; version 19
+        // added only a type's parent (nested types, Product refinement 022).
+        Assert.Equal(19, UniverseBackup.CurrentVersion);
     }
 
     // ---------- Helpers ----------

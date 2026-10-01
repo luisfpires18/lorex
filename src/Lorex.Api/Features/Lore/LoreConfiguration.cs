@@ -38,6 +38,14 @@ public sealed class EntityTypeConfiguration : IEntityTypeConfiguration<EntityTyp
         // Names are unique per universe, which is also what makes default seeding idempotent.
         builder.HasIndex(type => new { type.UniverseId, type.Name }).IsUnique();
         builder.HasIndex(type => new { type.UniverseId, type.DisplayOrder });
+
+        // A type's parent (ADR 0007 amendment, 2026-10-01). Deliberately not a foreign key: SQLite adds one only by rebuilding
+        // the table, and a rebuilt EntityTypes changes the order a universe's delete cascades in - the types would go before
+        // the entries using them, and those entries' RESTRICT key would refuse the delete. The same guarantees are triggers
+        // instead, written by the migration: a parent is a type of the same universe, and a type with children cannot be
+        // deleted except with its universe. That a parent is never the type itself or beneath it is the API's and the
+        // restore's, which walk the graph; a trigger cannot.
+        builder.HasIndex(type => new { type.UniverseId, type.ParentId });
     }
 }
 

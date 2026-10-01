@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { chooseLoreType } from './support/lore'
 
 /**
  * Mass create: "I have 40 names. Put them in Lorex." A secondary action on Lore opens one page inside the workspace:
@@ -138,7 +139,7 @@ test.describe('Mass create', () => {
     expect(asked).toEqual([])
 
     // Opened from a type, that type is the default, and Back returns to it.
-    await page.getByTestId('lore-types').getByRole('link', { name: 'Location' }).click()
+    await chooseLoreType(page, 'Location')
     await page.getByTestId('mass-create').click()
     await page.waitForURL(new RegExp(`/lore/mass-create\\?type=${w.type.get('Location')}$`))
     await expect(page.getByTestId('mass-default-type')).toHaveValue(w.type.get('Location')!)
@@ -224,6 +225,10 @@ test.describe('Mass create', () => {
     expect(
       await entryCount(page, w.id, `&entityTypeId=${w.type.get('Location')}&canonStatus=1`),
     ).toBe(40)
+    // Lore has no "All" to show a mixed batch in: it lands with no type chosen, says what was made, and asks for a type.
+    await expect(page.getByTestId('lore-choose')).toBeVisible()
+    await expect(page.getByTestId('entity-card')).toHaveCount(0)
+    await chooseLoreType(page, 'Location')
     await expect(page.getByTestId('entity-card').first()).toBeVisible()
     await page.getByLabel('Filter entries').fill('Wayfarer 23')
     await expect(page.getByTestId('entity-card')).toHaveCount(1)
@@ -623,6 +628,7 @@ test.describe('Mass create', () => {
 
     await submit(page).click()
     await expect(page.getByTestId('lore-mass-created')).toHaveText('Created 3 entries.')
+    await chooseLoreType(page, 'Character')
     await expect(
       page.getByTestId('entity-card').filter({ hasText: 'فرودو باغنز' }).locator('bdi'),
     ).toHaveText('فرودو باغنز')

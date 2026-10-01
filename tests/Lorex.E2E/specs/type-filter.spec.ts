@@ -7,8 +7,9 @@ import { expect, test, type Locator, type Page } from '@playwright/test'
  * browser can show is that an author picks an icon where types are managed and sees it where lore
  * is browsed; that a type nobody gave an icon to gets the neutral shape rather than a guess from its
  * name; that the chosen type is an address - reloaded, walked back and forward, kept by an opened
- * entry and by a new one - custom types included; that the filter and status narrow within it; and
- * that it works from a keyboard, in one row on a desktop and one menu under a thumb.
+ * entry and by a new one - custom types included; that Lore lists nothing until a type is chosen (there
+ * is no "All" since Product refinement 022); that the filter and status narrow within it; and that it
+ * works from a keyboard, through one chooser on every width.
  *
  * Types are made through the screen, because that is part of what is being proved. Entries are
  * made through the API: they are only the grid the bar filters.
@@ -75,12 +76,21 @@ async function createEntry(
   return ((await response.json()) as { id: string }).id
 }
 
-function typeNav(page: Page) {
-  return page.getByRole('navigation', { name: 'Lore types' })
+/** The chooser's panel of types, opened if it is not. */
+async function typeNav(page: Page) {
+  const panel = page.getByTestId('lore-type-menu-panel')
+  if ((await panel.count()) === 0) await page.getByTestId('lore-type-menu').click()
+  return panel
 }
 
-function typeLink(page: Page, name: string) {
-  return typeNav(page).getByRole('link', { name, exact: true })
+async function typeLink(page: Page, name: string) {
+  return (await typeNav(page)).getByRole('link', { name, exact: true })
+}
+
+/** Closes the chooser if it is open, so it covers nothing below it. */
+async function closeTypes(page: Page) {
+  if ((await page.getByTestId('lore-type-menu-panel').count()) > 0)
+    await page.keyboard.press('Escape')
 }
 
 function card(page: Page, name: string) {
@@ -194,15 +204,24 @@ test.describe('lore types', () => {
 
     await page.getByTestId('workspace-lore').click()
     await page.waitForURL(/\/lore$/)
-    await expect(page.getByTestId('entity-card')).toHaveCount(4)
+
+    // ---------- Nothing is listed until a type is chosen ----------
+
+    await expect(page.getByTestId('lore-choose')).toContainText(
+      'Choose a type to browse your lore.',
+    )
+    await expect(page.getByTestId('entity-card')).toHaveCount(0)
+    await expect(page.getByTestId('lore-filters-toggle')).toHaveCount(0)
+    await expect(title(page)).toHaveText('Lore')
 
     // ---------- Every type the world has, starters and custom, and nothing else ----------
 
-    const labels = await typeNav(page)
+    const labels = await (
+      await typeNav(page)
+    )
       .getByRole('link')
       .evaluateAll((links) => links.map((link) => link.textContent?.trim()))
     expect(labels).toEqual([
-      'All',
       'Character',
       'Location',
       'Organization',
@@ -213,46 +232,55 @@ test.describe('lore types', () => {
       'Starship',
       'Kingdom',
     ])
-    await expect(typeLink(page, 'All')).toHaveAttribute('aria-current', 'page')
-    await expect(typeNav(page).locator('[aria-current="page"]')).toHaveCount(1)
-    await expect(title(page)).toHaveText('Lore')
+    await expect((await typeNav(page)).locator('[aria-current="page"]')).toHaveCount(0)
 
     // The chosen icon, the seeded one, and the fallback - drawn where the lore is browsed.
-    await expect(typeLink(page, 'Starship').locator('svg')).toHaveAttribute('data-icon', 'ship')
-    await expect(typeLink(page, 'Location').locator('svg')).toHaveAttribute('data-icon', 'location')
-    await expect(typeLink(page, 'Kingdom').locator('svg')).toHaveAttribute('data-icon', 'fallback')
+    await expect((await typeLink(page, 'Starship')).locator('svg')).toHaveAttribute(
+      'data-icon',
+      'ship',
+    )
+    await expect((await typeLink(page, 'Location')).locator('svg')).toHaveAttribute(
+      'data-icon',
+      'location',
+    )
+    await expect((await typeLink(page, 'Kingdom')).locator('svg')).toHaveAttribute(
+      'data-icon',
+      'fallback',
+    )
 
     // ---------- A type is a place: the address says it ----------
 
-    await typeLink(page, 'Character').click()
+    await (await typeLink(page, 'Character')).click()
     await expect(page).toHaveURL(new RegExp(`/lore\\?type=${ids.get('Character')}$`))
-    await expect(typeLink(page, 'Character')).toHaveAttribute('aria-current', 'page')
+    await expect(await typeLink(page, 'Character')).toHaveAttribute('aria-current', 'page')
     await expect(title(page)).toHaveText('Character')
     await expect(page.getByTestId('entity-card')).toHaveCount(2)
     await expect(card(page, 'Tidewatch Keep')).toBeHidden()
 
     // Current is drawn, not only announced.
-    const background = (name: string) =>
-      typeLink(page, name).evaluate((element) => getComputedStyle(element).backgroundColor)
+    const background = async (name: string) =>
+      (await typeLink(page, name)).evaluate((element) => getComputedStyle(element).backgroundColor)
     expect(await background('Character')).not.toEqual(await background('Location'))
 
-    await typeLink(page, 'Location').click()
+    await (await typeLink(page, 'Location')).click()
     await expect(title(page)).toHaveText('Location')
     await expect(card(page, 'Tidewatch Keep')).toBeVisible()
 
     // Back returns to Character, Forward to Location, and a reload stays where it is.
     await page.goBack()
     await expect(title(page)).toHaveText('Character')
-    await expect(typeLink(page, 'Character')).toHaveAttribute('aria-current', 'page')
+    await expect(await typeLink(page, 'Character')).toHaveAttribute('aria-current', 'page')
     await expect(page.getByTestId('entity-card')).toHaveCount(2)
     await page.goForward()
     await expect(title(page)).toHaveText('Location')
     await page.reload()
     await expect(title(page)).toHaveText('Location')
-    await expect(typeLink(page, 'Location')).toHaveAttribute('aria-current', 'page')
+    await expect(await typeLink(page, 'Location')).toHaveAttribute('aria-current', 'page')
     await expect(card(page, 'Tidewatch Keep')).toBeVisible()
 
     // ---------- Opening an entry, and coming back to the same type ----------
+
+    await closeTypes(page)
 
     await card(page, 'Tidewatch Keep').click()
     await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
@@ -261,30 +289,31 @@ test.describe('lore types', () => {
     await expect(card(page, 'Tidewatch Keep')).toBeVisible()
 
     // The entry's type crumb leads back to that type too.
+    await closeTypes(page)
     await card(page, 'Tidewatch Keep').click()
     await page.getByTestId('entry-type').click()
     await expect(page).toHaveURL(new RegExp(`/lore\\?type=${ids.get('Location')}$`))
 
     // ---------- A custom type works exactly like a starter ----------
 
-    await typeLink(page, 'Starship').click()
+    await (await typeLink(page, 'Starship')).click()
     await expect(title(page)).toHaveText('Starship')
     await expect(card(page, 'The Kestrel')).toBeVisible()
     const shipUrl = page.url()
     await page.goto('/app')
     await page.goto(shipUrl)
-    await expect(typeLink(page, 'Starship')).toHaveAttribute('aria-current', 'page')
+    await expect(await typeLink(page, 'Starship')).toHaveAttribute('aria-current', 'page')
 
     // ---------- The filter and the status narrow within the type, and keep it ----------
 
-    await typeLink(page, 'Character').click()
+    await (await typeLink(page, 'Character')).click()
     await expect(title(page)).toHaveText('Character')
     await page.getByLabel('Filter entries').fill('warden')
     await expect(page.getByTestId('entity-card')).toHaveCount(1)
     await expect(card(page, 'Alenna Vance')).toBeVisible()
 
     // Changing type keeps the filter: Location's warden, not the whole list.
-    await typeLink(page, 'Location').click()
+    await (await typeLink(page, 'Location')).click()
     await expect(page.getByLabel('Filter entries')).toHaveValue('warden')
     await expect(page.getByTestId('entity-card')).toHaveCount(1)
     await expect(card(page, 'Tidewatch Keep')).toBeVisible()
@@ -302,7 +331,7 @@ test.describe('lore types', () => {
 
     // ---------- An empty type invites its first entry, in that type ----------
 
-    await typeLink(page, 'Kingdom').click()
+    await (await typeLink(page, 'Kingdom')).click()
     await expect(empty).toContainText('Nothing filed under Kingdom yet.')
     const create = page.getByTestId('new-entity')
     await expect(create).toHaveAccessibleName('New Kingdom')
@@ -314,42 +343,53 @@ test.describe('lore types', () => {
     await expect(page.getByLabel('Entry type')).toHaveValue(ids.get('Character')!)
     await page.goBack()
 
-    // ---------- An id this universe does not have is All ----------
+    // ---------- An id this universe does not have chooses nothing - never every entry ----------
 
+    const requests: string[] = []
+    page.on('request', (request) => {
+      if (request.url().includes('/entities?')) requests.push(request.url())
+    })
     await page.goto(`/app/universes/${universeId}/lore?type=00000000-0000-0000-0000-000000000000`)
     await expect(page).toHaveURL(/\/lore$/)
-    await expect(typeLink(page, 'All')).toHaveAttribute('aria-current', 'page')
-    await expect(page.getByTestId('entity-card')).toHaveCount(4)
+    await expect(page.getByTestId('lore-choose')).toBeVisible()
+    await expect(page.getByTestId('entity-card')).toHaveCount(0)
+    expect(requests).toEqual([])
 
     // ---------- The Trash stays out of it ----------
 
     expect(
       (await page.request.delete(`/api/universes/${universeId}/entities/${brannoch}`)).ok(),
     ).toBeTruthy()
-    await typeLink(page, 'Character').click()
+    await (await typeLink(page, 'Character')).click()
     await expect(page.getByTestId('entity-card')).toHaveCount(1)
     await expect(card(page, 'Brannoch Hale')).toHaveCount(0)
 
     // ---------- From the keyboard ----------
 
     // In the tab order straight after the page's create action.
+    await page.keyboard.press('Escape')
     await page.getByTestId('new-entity').focus()
     await page.keyboard.press('Tab')
-    await expect(typeLink(page, 'All')).toBeFocused()
+    const trigger = page.getByTestId('lore-type-menu')
+    await expect(trigger).toBeFocused()
     // A visible focus ring, not only a focused element.
-    expect(
-      await typeLink(page, 'All').evaluate((element) => getComputedStyle(element).outlineStyle),
-    ).not.toBe('none')
-    await page.keyboard.press('ArrowRight')
-    await expect(typeLink(page, 'Character')).toBeFocused()
-    await page.keyboard.press('End')
-    await expect(typeLink(page, 'Kingdom')).toBeFocused()
-    await page.keyboard.press('Home')
-    await expect(typeLink(page, 'All')).toBeFocused()
-    await page.keyboard.press('ArrowRight')
-    await page.keyboard.press('ArrowRight')
+    expect(await trigger.evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe(
+      'none',
+    )
+    // Opening puts the focus on the chosen type; Tab walks the list; Enter chooses.
+    await page.keyboard.press('Enter')
+    await expect(
+      page
+        .getByTestId('lore-type-menu-panel')
+        .getByRole('link', { name: 'Character', exact: true }),
+    ).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(
+      page.getByTestId('lore-type-menu-panel').getByRole('link', { name: 'Location', exact: true }),
+    ).toBeFocused()
     await page.keyboard.press('Enter')
     await expect(title(page)).toHaveText('Location')
+    await expect(trigger).toBeFocused()
 
     // A card is one link, opened from the keyboard, holding nothing else to press.
     const keep = card(page, 'Tidewatch Keep')
@@ -380,20 +420,13 @@ test.describe('lore types', () => {
 
     await page.getByTestId('workspace-lore').click()
     await page.waitForURL(/\/lore$/)
-    await expect(page.getByTestId('entity-card')).toHaveCount(2)
 
-    // All, the seven starters and every added type, over more than one row, every one inside the row's box.
-    const links = typeNav(page).getByRole('link')
-    await expect(links).toHaveCount(1 + 7 + MANY_TYPES.length)
-    const tops = await links.evaluateAll((all) =>
-      all.map((link) => Math.round(link.getBoundingClientRect().top)),
-    )
-    expect(new Set(tops).size).toBeGreaterThan(1)
-    const row = page.getByTestId('lore-types')
-    expect(await row.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
-    expect(await row.evaluate((element) => getComputedStyle(element).overflowX)).toBe('visible')
+    // The seven starters and every added type, one under another, every one inside the list's box.
+    const tree = page.getByTestId('lore-choose').getByRole('navigation', { name: 'Lore types' })
+    const links = tree.getByRole('link')
+    await expect(links).toHaveCount(7 + MANY_TYPES.length)
     const inside = await links.evaluateAll((all) => {
-      const bounds = all[0].parentElement!.getBoundingClientRect()
+      const bounds = all[0].closest('nav')!.getBoundingClientRect()
       return all.every((link) => {
         const box = link.getBoundingClientRect()
         return box.left >= bounds.left - 1 && box.right <= bounds.right + 1
@@ -402,12 +435,13 @@ test.describe('lore types', () => {
     expect(inside).toBe(true)
     expect(await pageOverflow(page)).toBeLessThanOrEqual(1)
 
-    // The last type, chosen by address, is simply there and marked current.
+    // The last type, chosen by address, is marked current in the chooser, and its entries are shown.
     await page.goto(`/app/universes/${universeId}/lore?type=${ids.get('Rumour of the Tide')}`)
-    const last = typeLink(page, 'Rumour of the Tide')
+    await expect(card(page, 'The Tide Vigil')).toBeVisible()
+    const last = await typeLink(page, 'Rumour of the Tide')
     await expect(last).toHaveAttribute('aria-current', 'page')
     await expect(last).toBeInViewport()
-    await expect(card(page, 'The Tide Vigil')).toBeVisible()
+    await expect(last).toBeFocused()
   })
 
   test('fills the workspace column on every screen, and the Lore grid turns that into columns', async ({
@@ -459,8 +493,7 @@ test.describe('lore types', () => {
 
     // ---------- The Lore browser ----------
 
-    await page.getByTestId('workspace-lore').click()
-    await page.waitForURL(/\/lore$/)
+    await page.goto(`/app/universes/${universeId}/lore?type=${ids.get('Character')}`)
     await expect(card(page, 'Alenna Vance')).toBeVisible()
 
     const grid = page.getByTestId('entity-grid')
@@ -476,23 +509,25 @@ test.describe('lore types', () => {
     )
     expect(first.width).toBeLessThan(narrowest * 2)
 
-    // Heading, types, filter and grid share one content area: the same left edge, and the types'
-    // row - closed by Select - and the cards end at the same right edge.
+    // Heading, the type chooser, filter and grid share one content area: the same left edge, and
+    // Select sits after the chooser, inside the cards' right edge.
     const heading = (await title(page).boundingBox())!
     const filter = (await page.getByLabel('Filter entries').boundingBox())!
-    const types = (await page.getByTestId('lore-types').boundingBox())!
+    const types = (await page.getByTestId('lore-type-menu').boundingBox())!
     const cards = (await grid.boundingBox())!
     for (const left of [heading.x, filter.x, types.x]) {
       expect(Math.abs(left - cards.x)).toBeLessThanOrEqual(3)
     }
     const select = (await page.getByTestId('lore-select').boundingBox())!
     expect(types.x + types.width).toBeLessThan(select.x)
-    expect(Math.abs(select.x + select.width - (cards.x + cards.width))).toBeLessThanOrEqual(3)
+    expect(select.x + select.width).toBeLessThanOrEqual(cards.x + cards.width + 3)
 
-    // The primary action still answers to its name with an icon beside it.
-    await expect(page.getByRole('link', { name: 'New entry', exact: true })).toBeVisible()
+    // The primary action still answers to its name - the type in view - with an icon beside it.
+    await expect(page.getByRole('link', { name: 'New Character', exact: true })).toBeVisible()
 
     // ---------- An entry's own page ----------
+
+    await closeTypes(page)
 
     await card(page, 'Alenna Vance').click()
     await page.waitForURL(/\/lore\/[0-9a-f-]+$/)
@@ -523,7 +558,9 @@ test.describe('lore types', () => {
 test.describe('lore types on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
 
-  test('fold into one labelled Type menu, and the first screen is cards', async ({ page }) => {
+  test("are one labelled Type button, and a chosen type's first screen is cards", async ({
+    page,
+  }) => {
     await signUp(page)
     const universeId = await newUniverse(page)
 
@@ -535,27 +572,20 @@ test.describe('lore types on a phone', () => {
     await page.getByTestId('workspace-nav-toggle').click()
     await page.getByTestId('workspace-lore').click()
     await page.waitForURL(/\/lore$/)
-    await expect(page.getByTestId('entity-card')).toHaveCount(2)
+    await expect(page.getByTestId('entity-card')).toHaveCount(0)
 
-    // No row of chips: one button that says what it chooses and what is chosen.
-    await expect(typeNav(page)).toBeHidden()
+    // One button that says what it chooses - nothing chosen yet.
     const trigger = page.getByTestId('lore-type-menu')
-    await expect(trigger).toHaveAccessibleName('Type: All')
+    await expect(trigger).toHaveAccessibleName('Choose type')
     await expect(trigger).toHaveAttribute('aria-expanded', 'false')
     expect((await trigger.boundingBox())!.height).toBeGreaterThanOrEqual(44)
-
-    // The first card is on the first screen, well above the fold.
-    const firstCard = (await page.getByTestId('entity-card').first().boundingBox())!
-    expect(firstCard.y).toBeLessThanOrEqual(300)
     expect(await pageOverflow(page)).toBeLessThanOrEqual(1)
 
-    // Every type is in the menu, the current one marked, and focus lands on it.
+    // Every type is in it, and focus lands on the first.
     await trigger.tap()
     const menu = page.getByTestId('lore-type-menu-panel')
-    await expect(menu.getByRole('link')).toHaveCount(1 + 7 + MANY_TYPES.length)
-    const allItem = menu.getByRole('link', { name: 'All', exact: true })
-    await expect(allItem).toHaveAttribute('aria-current', 'page')
-    await expect(allItem).toBeFocused()
+    await expect(menu.getByRole('link')).toHaveCount(7 + MANY_TYPES.length)
+    await expect(menu.getByRole('link', { name: 'Character', exact: true })).toBeFocused()
 
     // Choosing one closes the menu, goes there, and hands the focus back to the button.
     await menu.getByRole('link', { name: 'Ritual Circle', exact: true }).tap()
@@ -565,6 +595,11 @@ test.describe('lore types on a phone', () => {
     await expect(trigger).toBeFocused()
     await expect(page.getByTestId('entity-card')).toHaveCount(1)
     await expect(card(page, 'The Tide Vigil')).toBeVisible()
+
+    // The first card is on the first screen, well above the fold.
+    const firstCard = (await page.getByTestId('entity-card').first().boundingBox())!
+    expect(firstCard.y).toBeLessThanOrEqual(320)
+    expect(await pageOverflow(page)).toBeLessThanOrEqual(1)
 
     // Escape closes it without choosing.
     await trigger.tap()
