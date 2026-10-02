@@ -50,6 +50,16 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **Product refinement 028 - Lore categories** (`feat/lore-category-hierarchy` off `dev` at `19e4cff`, committed, not
+  merged, not pushed). Frontend only; the `ParentId` hierarchy (022) already held the taxonomy. No migration, backup **19**.
+  ADR 0007 amended.
+  - `TypeSwitcher`: top-level types only; a chosen type that holds others opens an inset row ("All Runes", then its
+    subtypes); deeper levels add rows. Phone: Category menu + Filters, then one menu per level. Cards, filters, Select,
+    pagination, `?type=<id>` addresses unchanged.
+  - Bare Lore: "Choose a category to browse your lore." + New entry (still no entry read). Empty category: "No entries in
+    this category yet." + its create. Search placeholder "Search <type>"; New label keeps the name as written.
+  - Tests: Playwright 365 -> 370 (`lore-categories.spec.ts`, 5); nested-types, type-filter, types-and-trash,
+    lore-type-browser, type-reorder and `support/lore.ts` moved to the category rows and menus.
 - **Product refinement 027 - type drag reorder and stable Lore controls** (`feat/type-drag-reorder-lore-controls` off `dev`
   at `75517d7`, committed, not merged, not pushed). No migration, backup stays **19**. ADR 0007 amended.
   - Lore: Select (and Items per page) left the types' row for the list's controls (`lore__controls`: filters, then

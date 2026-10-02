@@ -311,7 +311,8 @@ test.describe('lore types', () => {
     // ---------- An empty type invites its first entry, in that type ----------
 
     await typeLink(page, 'Kingdom').click()
-    await expect(empty).toContainText('Nothing filed under Kingdom yet.')
+    await expect(empty).toContainText('No entries in this category yet.')
+    await expect(empty).toContainText('Nothing is filed under Kingdom yet.')
     const create = page.getByTestId('new-entity')
     await expect(create).toHaveAccessibleName('New Kingdom')
     await empty.getByRole('link', { name: 'New Kingdom' }).click()
@@ -409,7 +410,7 @@ test.describe('lore types', () => {
     expect(await row.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
     expect(await row.evaluate((element) => getComputedStyle(element).overflowX)).toBe('visible')
     const inside = await links.evaluateAll((all) => {
-      const bounds = all[0].parentElement!.getBoundingClientRect()
+      const bounds = all[0].closest('ul')!.getBoundingClientRect()
       return all.every((link) => {
         const box = link.getBoundingClientRect()
         return box.left >= bounds.left - 1 && box.right <= bounds.right + 1
@@ -558,7 +559,7 @@ test.describe('lore types on a phone', () => {
 
     // One button that says what it chooses - nothing chosen yet.
     const trigger = page.getByTestId('lore-type-menu')
-    await expect(trigger).toHaveAccessibleName('Choose type')
+    await expect(trigger).toHaveAccessibleName('Choose category')
     await expect(trigger).toHaveAttribute('aria-expanded', 'false')
     expect((await trigger.boundingBox())!.height).toBeGreaterThanOrEqual(44)
     expect(await pageOverflow(page)).toBeLessThanOrEqual(1)
@@ -573,7 +574,7 @@ test.describe('lore types on a phone', () => {
     await menu.getByRole('link', { name: 'Ritual Circle', exact: true }).tap()
     await expect(menu).toHaveCount(0)
     await expect(page).toHaveURL(new RegExp(`/lore\\?type=${ids.get('Ritual Circle')}$`))
-    await expect(trigger).toHaveAccessibleName('Type: Ritual Circle')
+    await expect(trigger).toHaveAccessibleName('Category: Ritual Circle')
     await expect(trigger).toBeFocused()
     await expect(page.getByTestId('entity-card')).toHaveCount(1)
     await expect(card(page, 'The Tide Vigil')).toBeVisible()

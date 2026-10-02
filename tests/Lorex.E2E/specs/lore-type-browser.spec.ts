@@ -203,7 +203,7 @@ test.describe('Lore: the type row again, without All', () => {
   })
 
   for (const width of [390, 360]) {
-    test(`a phone at ${width}px: one Choose type menu of real types, naming the one chosen`, async ({
+    test(`a phone at ${width}px: a Category menu of real top-level types, then a menu inside the chosen one`, async ({
       page,
     }) => {
       await page.setViewportSize({ width, height: 800 })
@@ -213,8 +213,9 @@ test.describe('Lore: the type row again, without All', () => {
 
       await expect(row(page)).toBeHidden()
       const trigger = page.getByTestId('lore-type-menu')
-      await expect(trigger).toHaveAccessibleName('Choose type')
-      await expect(trigger).toHaveText('Choose type')
+      await expect(trigger).toHaveAccessibleName('Choose category')
+      await expect(trigger).toHaveText('Choose category')
+      await expect(page.getByTestId('lore-subtype-menu')).toHaveCount(0)
       await expect(cards(page)).toHaveCount(0)
       expect(await sideways(page)).toBeLessThanOrEqual(0)
 
@@ -224,15 +225,25 @@ test.describe('Lore: the type row again, without All', () => {
         .getByRole('link')
         .evaluateAll((links) => links.map((link) => link.textContent?.trim()))
       expect(items).not.toContain('All')
-      // The hierarchy's order: the child straight after its parent.
-      expect(items[items.indexOf('Runes') + 1]).toBe('Material Runes')
+      // Top-level types only: what is inside Runes waits for Runes.
+      expect(items).toContain('Runes')
+      expect(items).not.toContain('Material Runes')
       const box = (await menu.boundingBox())!
       expect(box.x).toBeGreaterThanOrEqual(0)
       expect(box.x + box.width).toBeLessThanOrEqual(width)
 
-      await menu.getByRole('link', { name: 'Material Runes', exact: true }).click()
-      await expect(trigger).toHaveAccessibleName('Type: Material Runes')
-      await expect(trigger).toContainText('Material Runes')
+      await menu.getByRole('link', { name: 'Runes', exact: true }).click()
+      await expect(trigger).toHaveAccessibleName('Category: Runes')
+      const inside = page.getByTestId('lore-subtype-menu')
+      await expect(inside).toHaveAccessibleName('In Runes: All Runes')
+      await expect(cards(page)).toHaveCount(2)
+      await inside.click()
+      await page
+        .getByTestId('lore-subtype-menu-panel')
+        .getByRole('link', { name: 'Material Runes', exact: true })
+        .click()
+      await expect(inside).toHaveAccessibleName('In Runes: Material Runes')
+      await expect(trigger).toHaveAccessibleName('Category: Runes')
       await expect(cards(page)).toHaveCount(1)
       expect(await sideways(page)).toBeLessThanOrEqual(0)
     })

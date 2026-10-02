@@ -134,7 +134,6 @@ export default function LorePage() {
   const selectedNode = (typeParam && tree.byId.get(typeParam)) || null
   const selectedType = selectedNode?.type ?? null
   const isUnknownType = typeParam !== null && types !== null && selectedType === null
-  const orderedTypes = useMemo(() => tree.ordered.map((node) => node.type), [tree])
 
   // A type this universe does not have is taken out of the address in place, which leaves nothing chosen.
   useEffect(() => {
@@ -375,7 +374,7 @@ export default function LorePage() {
             list - Select, a page size - shares this row, so the types have the same width whichever type is open and their
             links never move from one row to another as the author goes between a type with entries and one without. */}
         <div className="lore__nav">
-          <TypeSwitcher types={orderedTypes} selected={selectedType} hrefFor={typeHref} />
+          <TypeSwitcher tree={tree} selected={selectedNode} hrefFor={typeHref} />
           {selectedType ? (
             <button
               className="button button--secondary lore__filtertoggle"
@@ -414,7 +413,8 @@ export default function LorePage() {
               id="lore-search"
               className="field__input lore__searchinput"
               type="search"
-              placeholder="Filter by name, alias, summary or article"
+              placeholder={selectedType ? `Search ${selectedType.name}` : 'Search'}
+              title="Searches names, aliases, summaries and articles"
               value={search}
               onChange={(event) => update({ q: event.target.value }, true)}
             />
@@ -493,6 +493,22 @@ export default function LorePage() {
           <ActionIcon icon={Check} />
           Created {massCreated} {massCreated === 1 ? 'entry' : 'entries'}.
         </p>
+      ) : null}
+
+      {/* Nothing chosen yet: the categories above are the way in, and this says so - with the one create action. Nothing is
+          read for it (ADR 0007 amendment). */}
+      {types !== null && types.length > 0 && !selectedType && !isUnknownType ? (
+        <EmptyState
+          testId="lore-no-category"
+          title="Choose a category to browse your lore."
+          hint="A category shows its own entries and everything filed inside it."
+          action={
+            <Link className="button" to={createTo} data-testid="empty-new-entity">
+              <ActionIcon icon={Plus} />
+              New entry
+            </Link>
+          }
+        />
       ) : null}
 
       {/* No types at all leaves nothing to choose: one line to where types are made, not a panel. */}
@@ -590,16 +606,20 @@ export default function LorePage() {
       {selectedType && result && result.items.length === 0 && !isFiltered ? (
         <EmptyState
           testId="entity-empty"
-          title={
-            selectedType ? (
+          title="No entries in this category yet."
+          hint={
+            selectedNode && selectedNode.children.length > 0 ? (
               <>
-                Nothing filed under <bdi>{selectedType.name}</bdi> yet.
+                Nothing is filed under <bdi>{selectedType.name}</bdi> or anything inside it. Write
+                the first one, and the rest will have something to point at.
               </>
             ) : (
-              'This world has no entries yet.'
+              <>
+                Nothing is filed under <bdi>{selectedType.name}</bdi> yet. Write the first one, and
+                the rest will have something to point at.
+              </>
             )
           }
-          hint="Write the first one, and the rest will have something to point at."
           action={
             <Link className="button" to={createTo} data-testid="empty-new-entity">
               <ActionIcon icon={Plus} />
