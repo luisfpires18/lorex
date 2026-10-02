@@ -394,3 +394,5 @@ nothing is ever inferred from names like "Location" or "Kingdom".
 Export is the owner's alone: the route asks `UniverseAccess` for `Backup`, so an Editor, Reviewer or Viewer is refused with
 403 `universe_permission_denied` and anyone else still gets the 404 of a missing universe. Memberships are account access,
 not the world: no membership, collaborator id or name is ever written to an archive. The format stays at version 19.
+
+Invitations (refinement 030) are the same: account access metadata, never in an archive.

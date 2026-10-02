@@ -8,7 +8,9 @@ import { UniverseSearch } from '../components/UniverseSearch'
 import { getChronology } from '../chronology/api'
 import type { Chronology } from '../chronology/types'
 import { getUniverse } from '../universes/api'
-import { SECTION_GROUPS, UPKEEP } from '../universes/sections'
+import { offered, SECTION_GROUPS, UPKEEP } from '../universes/sections'
+import { capabilitiesOf, ROLE_LABELS, UniverseAccessContext } from '../universes/access'
+import { UniverseRole } from '../universes/types'
 import { useDocumentTitle } from '../lib/useDocumentTitle'
 import type { UniverseDetail } from '../universes/types'
 import { EmptyState } from '../components/EmptyState'
@@ -152,6 +154,13 @@ export default function UniverseWorkspace() {
   const { universe, chronology } = state
   const accent = universe.accentColor ?? undefined
 
+  // What this account may do here, for what is drawn: the API decides every request on its own (ADR 0041).
+  const access = capabilitiesOf(universe.accessRole)
+  const shared = universe.accessRole !== UniverseRole.Owner
+  const groups = SECTION_GROUPS.map((group) => offered(group, access)).filter(
+    (group) => group.length > 0,
+  )
+
   return (
     <div
       className="workspace"
@@ -226,17 +235,24 @@ export default function UniverseWorkspace() {
           <p className="sidebar__name" data-testid="workspace-name">
             <bdi>{universe.name}</bdi>
           </p>
+          {shared ? (
+            <span className="sidebar__role" data-testid="workspace-role">
+              Shared · {ROLE_LABELS[universe.accessRole]}
+            </span>
+          ) : null}
           {universe.isArchived ? <span className="sidebar__archived">Archived</span> : null}
         </div>
 
         <ul className="sidebar__nav">
-          {SECTION_GROUPS.map((group) => (
+          {groups.map((group) => (
             <li
               className={
-                group === UPKEEP ? 'sidebar__group sidebar__group--upkeep' : 'sidebar__group'
+                UPKEEP.includes(group[0])
+                  ? 'sidebar__group sidebar__group--upkeep'
+                  : 'sidebar__group'
               }
               key={group[0].segment}
-              data-testid={group === UPKEEP ? 'sidebar-upkeep' : undefined}
+              data-testid={UPKEEP.includes(group[0]) ? 'sidebar-upkeep' : undefined}
             >
               <ul className="sidebar__links">
                 {group.map(({ segment, label, testId, icon: Icon }) => (
@@ -272,9 +288,11 @@ export default function UniverseWorkspace() {
         </div>
 
         <main className="canvas" id={MAIN_CONTENT_ID} tabIndex={-1}>
-          <Outlet
-            context={{ universe, refresh, chronology, setChronology } satisfies WorkspaceContext}
-          />
+          <UniverseAccessContext.Provider value={access}>
+            <Outlet
+              context={{ universe, refresh, chronology, setChronology } satisfies WorkspaceContext}
+            />
+          </UniverseAccessContext.Provider>
         </main>
       </div>
     </div>

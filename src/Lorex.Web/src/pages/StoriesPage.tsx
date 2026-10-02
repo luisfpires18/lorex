@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useUniverseAccess } from '../universes/access'
 import { Plus } from 'lucide-react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { ActionIcon } from '../components/ActionIcon'
@@ -23,6 +24,7 @@ type LoadState =
  * manuscript and the workspace itself, rather than passing on whatever the request failed with.
  */
 export default function StoriesPage() {
+  const access = useUniverseAccess()
   const { universe } = useOutletContext<WorkspaceContext>()
   const navigate = useNavigate()
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
@@ -50,15 +52,17 @@ export default function StoriesPage() {
         title="Stories"
         lede="Narratives told with this world’s lore, scene by scene."
         actions={
-          <button
-            className="button"
-            type="button"
-            onClick={() => setIsCreating(true)}
-            data-testid="new-story"
-          >
-            <ActionIcon icon={Plus} />
-            New story
-          </button>
+          access.editContent ? (
+            <button
+              className="button"
+              type="button"
+              onClick={() => setIsCreating(true)}
+              data-testid="new-story"
+            >
+              <ActionIcon icon={Plus} />
+              New story
+            </button>
+          ) : undefined
         }
       />
 
@@ -112,15 +116,17 @@ export default function StoriesPage() {
           title="No stories yet."
           hint="A story tells something in this world, scene by scene. It draws on the lore and never changes it."
           action={
-            <button
-              className="button"
-              type="button"
-              onClick={() => setIsCreating(true)}
-              data-testid="empty-new-story"
-            >
-              <ActionIcon icon={Plus} />
-              New story
-            </button>
+            access.editContent ? (
+              <button
+                className="button"
+                type="button"
+                onClick={() => setIsCreating(true)}
+                data-testid="empty-new-story"
+              >
+                <ActionIcon icon={Plus} />
+                New story
+              </button>
+            ) : undefined
           }
         />
       ) : null}

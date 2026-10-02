@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useUniverseAccess } from '../universes/access'
 import { Field } from './Field'
 import { ApiError } from '../lib/api'
 import {
@@ -121,6 +122,7 @@ function constraintSummary(constraints: RelationshipCanonConstraints) {
 }
 
 export function RelationshipTypeManager({ universeId }: { universeId: string }) {
+  const access = useUniverseAccess()
   const [types, setTypes] = useState<RelationshipType[] | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isAdding, setIsAdding] = useState(false)
@@ -449,7 +451,7 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
         <h2 className="settings__heading" id="reltypes-heading">
           Relation kinds
         </h2>
-        {!isAdding && !editingId ? (
+        {access.editContent && !isAdding && !editingId ? (
           <button
             className="button button--secondary"
             type="button"
@@ -509,21 +511,23 @@ export function RelationshipTypeManager({ universeId }: { universeId: string }) 
                       ? '1 relation'
                       : `${type.relationshipCount} relations`}
                   </span>
-                  <button
-                    className="button button--secondary button--sm"
-                    type="button"
-                    onClick={() => {
-                      setMessage(null)
-                      setFieldErrors({})
-                      setIsAdding(false)
-                      setEditingId(type.id)
-                      setDraft(draftFrom(type))
-                    }}
-                    data-testid={`edit-reltype-${type.name}`}
-                  >
-                    Edit
-                  </button>
-                  {type.relationshipCount === 0 ? (
+                  {access.editContent ? (
+                    <button
+                      className="button button--secondary button--sm"
+                      type="button"
+                      onClick={() => {
+                        setMessage(null)
+                        setFieldErrors({})
+                        setIsAdding(false)
+                        setEditingId(type.id)
+                        setDraft(draftFrom(type))
+                      }}
+                      data-testid={`edit-reltype-${type.name}`}
+                    >
+                      Edit
+                    </button>
+                  ) : null}
+                  {access.editContent && type.relationshipCount === 0 ? (
                     <button
                       className="button button--secondary button--sm"
                       type="button"

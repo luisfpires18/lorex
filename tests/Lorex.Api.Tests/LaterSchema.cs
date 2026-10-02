@@ -21,6 +21,11 @@ internal static class LaterSchema
     [
         "sqlite_autoindex_UniverseMemberships_1",
         "IX_UniverseMemberships_UserId",
+
+        // Invitations (AddUniverseInvitations, 2026-10-02, ADR 0041 amendment).
+        "sqlite_autoindex_UniverseInvitations_1",
+        "IX_UniverseInvitations_NormalizedEmail",
+        "IX_UniverseInvitations_UniverseId_NormalizedEmail",
     ];
 
     /// <summary>Whether an index or trigger name (or "name on table") predates nested types - and so everything after them.</summary>

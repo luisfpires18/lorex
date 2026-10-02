@@ -1,6 +1,6 @@
 import { apiFetch } from '../lib/api'
 import { listUniverses } from '../universes/api'
-import type { UniverseSummary } from '../universes/types'
+import { UniverseRole, type UniverseSummary } from '../universes/types'
 import {
   IdeaReferenceKind,
   type IdeaDetail,
@@ -69,7 +69,8 @@ export async function listAllUniverses(signal?: AbortSignal) {
   const all: UniverseSummary[] = []
   for (let page = 1; ; page++) {
     const result = await listUniverses({ search: '', includeArchived: true, page }, signal, 50)
-    all.push(...result.items)
+    // Owned only: an idea may point into a universe its author owns, never one shared with them (ADR 0030 amendment).
+    all.push(...result.items.filter((universe) => universe.accessRole === UniverseRole.Owner))
     if (page >= result.totalPages) break
   }
   return all.sort((a, b) => a.name.localeCompare(b.name))

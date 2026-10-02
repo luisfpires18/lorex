@@ -1,4 +1,5 @@
 import { useId } from 'react'
+import { useUniverseAccess } from '../universes/access'
 import { ArrowDown, ArrowUp, Pencil, Trash } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ActionIcon } from './ActionIcon'
@@ -46,6 +47,7 @@ export function PlotBeatItem({
   onEdit,
   onDelete,
 }: PlotBeatItemProps) {
+  const access = useUniverseAccess()
   const titleId = useId()
   const scenesLabelId = useId()
   const loreLabelId = useId()
@@ -122,52 +124,54 @@ export function PlotBeatItem({
         ) : null}
       </div>
 
-      <div className="beat__tools rowtools">
-        <button
-          className="button button--text"
-          type="button"
-          onClick={() => onEdit(beat)}
-          aria-describedby={titleId}
-          data-testid="plot-beat-edit"
-        >
-          <ActionIcon icon={Pencil} />
-          Edit beat
-        </button>
-        <ActionMenu label={`More actions for ${beat.title}`} triggerTestId="plot-beat-actions">
-          {index > 0 ? (
-            <button
-              className="actionmenu__item"
-              type="button"
-              onClick={() => onMove(beat, -1)}
-              data-testid="plot-beat-move-up"
-            >
-              <ActionIcon icon={ArrowUp} />
-              Move up
-            </button>
-          ) : null}
-          {index < count - 1 ? (
-            <button
-              className="actionmenu__item"
-              type="button"
-              onClick={() => onMove(beat, 1)}
-              data-testid="plot-beat-move-down"
-            >
-              <ActionIcon icon={ArrowDown} />
-              Move down
-            </button>
-          ) : null}
-          {count > 1 ? <hr className="actionmenu__divider" /> : null}
+      {access.editContent ? (
+        <div className="beat__tools rowtools">
           <button
-            className="actionmenu__item actionmenu__item--danger"
+            className="button button--text"
             type="button"
-            onClick={() => onDelete(beat)}
-            data-testid="plot-beat-delete"
+            onClick={() => onEdit(beat)}
+            aria-describedby={titleId}
+            data-testid="plot-beat-edit"
           >
-            <ActionIcon icon={Trash} />
-            Delete beat
+            <ActionIcon icon={Pencil} />
+            Edit beat
           </button>
-        </ActionMenu>
-      </div>
+          <ActionMenu label={`More actions for ${beat.title}`} triggerTestId="plot-beat-actions">
+            {index > 0 ? (
+              <button
+                className="actionmenu__item"
+                type="button"
+                onClick={() => onMove(beat, -1)}
+                data-testid="plot-beat-move-up"
+              >
+                <ActionIcon icon={ArrowUp} />
+                Move up
+              </button>
+            ) : null}
+            {index < count - 1 ? (
+              <button
+                className="actionmenu__item"
+                type="button"
+                onClick={() => onMove(beat, 1)}
+                data-testid="plot-beat-move-down"
+              >
+                <ActionIcon icon={ArrowDown} />
+                Move down
+              </button>
+            ) : null}
+            {count > 1 ? <hr className="actionmenu__divider" /> : null}
+            <button
+              className="actionmenu__item actionmenu__item--danger"
+              type="button"
+              onClick={() => onDelete(beat)}
+              data-testid="plot-beat-delete"
+            >
+              <ActionIcon icon={Trash} />
+              Delete beat
+            </button>
+          </ActionMenu>
+        </div>
+      ) : null}
     </li>
   )
 }

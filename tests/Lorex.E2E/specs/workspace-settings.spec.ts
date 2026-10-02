@@ -203,7 +203,13 @@ test.describe('the sidebar, Chronology and the theme control (014 follow-up)', (
     await expect(page.getByTestId('chronology-status')).toHaveText('Saved')
 
     await page.getByTestId('workspace-settings').click()
-    await expect(page.getByRole('tab')).toHaveText(['General', 'Appearance', 'Data', 'Advanced'])
+    await expect(page.getByRole('tab')).toHaveText([
+      'General',
+      'Appearance',
+      'Collaborators',
+      'Data',
+      'Advanced',
+    ])
     await expect(page.getByTestId('chronology-settings')).toHaveCount(0)
 
     // Browser history moves between the two pages as it does between any sections.
@@ -324,7 +330,7 @@ test.describe('the sidebar, Chronology and the theme control (014 follow-up)', (
 })
 
 test.describe('Settings', () => {
-  test('four keyboard tabs under the page header, forms in a readable column, and destructive ones in Advanced', async ({
+  test('five keyboard tabs under the page header, forms in a readable column, and destructive ones in Advanced', async ({
     page,
   }) => {
     await signUp(page)
@@ -333,7 +339,7 @@ test.describe('Settings', () => {
     await page.goto(`/app/universes/${w.id}/settings`)
 
     const tabs = page.getByRole('tab')
-    await expect(tabs).toHaveText(['General', 'Appearance', 'Data', 'Advanced'])
+    await expect(tabs).toHaveText(['General', 'Appearance', 'Collaborators', 'Data', 'Advanced'])
     await expect(page.getByRole('tab', { name: 'General' })).toHaveAttribute(
       'aria-selected',
       'true',
@@ -376,7 +382,7 @@ test.describe('Settings', () => {
     await page.getByRole('tab', { name: 'Advanced' }).click()
     await advanced.getByTestId('toggle-archive').click()
     await expect(advanced.getByTestId('danger-section')).toBeVisible()
-    for (const other of ['General', 'Appearance', 'Data']) {
+    for (const other of ['General', 'Appearance', 'Collaborators', 'Data']) {
       await expect(
         page
           .getByRole('tabpanel', { name: other, includeHidden: true })

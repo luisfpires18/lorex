@@ -5,6 +5,7 @@ import { ActionIcon } from './ActionIcon'
 import { LoreArticle, LoreEditor } from './LoreEditor'
 import { RecoveredDraft } from './RecoveredDraft'
 import { useAuth } from '../auth/useAuth'
+import { useUniverseAccess } from '../universes/access'
 import { ApiError } from '../lib/api'
 import { formatDateTime } from '../lib/dates'
 import { useLeaveGuard } from '../lib/leaveGuard'
@@ -90,6 +91,8 @@ export function EntityArticleSection({
   const noteId = useId()
 
   const { user } = useAuth()
+  // A Viewer or Reviewer reads the article and nothing more: no Edit, no Write, no history (ADR 0041 amendment).
+  const access = useUniverseAccess()
   const { found, keep, forget, discard, settle, failed } = useLocalDraft(
     user ? { accountId: user.id, universeId, kind: 'article', contentId: entityId } : null,
   )
@@ -362,7 +365,7 @@ export function EntityArticleSection({
         <h2 className="article__title" id={headingId} tabIndex={-1} data-arrival-focus>
           Article
         </h2>
-        {isReady && !isEditing && hasArticle ? (
+        {isReady && !isEditing && hasArticle && access.editContent ? (
           <button
             ref={startButton}
             className="button button--secondary"
@@ -379,7 +382,7 @@ export function EntityArticleSection({
       </div>
 
       {/* Beside the control it explains, not after the whole article. */}
-      {isReady && !isEditing && note ? (
+      {isReady && !isEditing && note && access.editContent ? (
         <p className="article__note" id={noteId} data-testid="article-note">
           {note}
         </p>
@@ -411,7 +414,7 @@ export function EntityArticleSection({
         </div>
       ) : null}
 
-      {offer ? (
+      {offer && access.editContent ? (
         <RecoveredDraft
           what="this article"
           draft={offer}
@@ -435,21 +438,26 @@ export function EntityArticleSection({
         ) : (
           <div className="article__empty" data-testid="article-empty">
             <p className="article__emptyline">No article yet.</p>
-            <p className="article__emptyhint">
-              Everything worth telling about <bdi>{entityName}</bdi> beyond its facts belongs here.
-            </p>
-            <button
-              ref={startButton}
-              className="button"
-              type="button"
-              onClick={() => startEditing()}
-              disabled={!canStart}
-              aria-describedby={note ? noteId : undefined}
-              data-testid="article-write"
-            >
-              <ActionIcon icon={Pencil} />
-              Write the article
-            </button>
+            {access.editContent ? (
+              <>
+                <p className="article__emptyhint">
+                  Everything worth telling about <bdi>{entityName}</bdi> beyond its facts belongs
+                  here.
+                </p>
+                <button
+                  ref={startButton}
+                  className="button"
+                  type="button"
+                  onClick={() => startEditing()}
+                  disabled={!canStart}
+                  aria-describedby={note ? noteId : undefined}
+                  data-testid="article-write"
+                >
+                  <ActionIcon icon={Pencil} />
+                  Write the article
+                </button>
+              </>
+            ) : null}
           </div>
         )
       ) : null}
@@ -559,7 +567,10 @@ export function EntityArticleSection({
         </div>
       ) : null}
 
-      {load.kind !== 'missing' && !isEditing && stored.updatedAt !== null ? (
+      {load.kind !== 'missing' &&
+      !isEditing &&
+      stored.updatedAt !== null &&
+      access.manageHistory ? (
         <ArticleHistory
           universeId={universeId}
           entityId={entityId}

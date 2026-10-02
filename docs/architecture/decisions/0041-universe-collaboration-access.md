@@ -88,3 +88,53 @@ exposure, collaboration, backups and irreversible destruction:
   check it replaced. The list is one count and one page, with no per-row lookup. Nothing is cached.
 - Not built: invitations, membership management routes or screens, a role picker, comments, suggestions, attribution
   of who changed what, activity, concurrent-edit protection, ownership transfer, teams, per-item permissions.
+
+## Amendment: invitations and collaborator management (2026-10-02, refinement 030)
+
+**An invitation targets an email address, never an account.** `UniverseInvitations` (migration `AddUniverseInvitations`):
+random `Guid` id minted by the server, `UniverseId` (cascade), `Email` as typed and `NormalizedEmail` by Identity's own
+`ILookupNormalizer` - the same normalization `AspNetUsers.NormalizedEmail` carries, so `Ana@Example.com` meets
+`ana@example.com` - `Role` (Viewer, Reviewer, Editor by check constraint), `CreatedAt`, `ExpiresAt`. One row per universe
+and normalized address (unique index); an index on `NormalizedEmail` for the invitee's list. Only pending invitations
+exist: accepting, declining and revoking delete the row. No history.
+
+**The owner learns nothing about accounts.** `POST .../invitations` answers 201 with the same shape whether an account
+holds the address or not, and nothing searches accounts. Refused: the owner's own address (400), an address already
+collaborating here (400, the owner can see them anyway), a live invitation to the same address (409 `invitation_pending`
+naming its id, to change, copy or revoke - never a second row), and any role but Viewer, Reviewer or Editor (400).
+
+**Lorex sends no email.** An invitation is found two ways, both behind sign-in: in My workspace, by any account whose
+normalized email it names (`GET /api/invitations`), and by a link the owner copies and sends by hand,
+`/invite/{id}`, built from the page's own origin. **The id is a locator, not a secret**: every invitee route requires a
+signed-in account whose `NormalizedEmail` - read from the account, never from the request - matches. Signed out, the link
+page says only that someone was invited and offers Sign in and Create account, which return to it through the existing
+router-state return path. Another account learns only "for a different account" (403 `invitation_other_account`), never
+which; a missing, revoked or spent one is 404 `invitation_not_found`; a lapsed one, to its own account, 410
+`invitation_expired`. A future email sender can deliver the same link without changing any of this.
+
+**Expiry** is one value, `InvitationLimits.Lifetime`, 30 days from creation; a role change does not extend it. A lapsed
+invitation is ignored everywhere, cannot be accepted, and is deleted by the next invitation to its universe, which takes
+its place. No cleanup job.
+
+**Accepting** is one transaction (Microsoft.Data.Sqlite begins it IMMEDIATE): resolve the invitation, check email and
+expiry, refuse the owner (409 `invitation_own_universe`), create the membership with the role the invitation holds at
+that moment, delete the invitation. An account already a member only spends it. A second accept, a revoke or a role
+change racing it is serialised behind it; the composite membership key and a caught unique or concurrency failure keep
+any race at one membership and a 404, never a 500. **Declining** deletes it and notifies nobody.
+
+**Collaborator management is the owner's** - new capability `ManageCollaborators`: `GET .../collaborators` (members by
+username, role and joined date - no email, nothing else of the account - and live invitations apart), `PUT`/`DELETE
+.../collaborators/{userId}`, `PUT`/`DELETE .../invitations/{id}`. A role change applies on the next request; removal
+deletes only the membership - content, history, Trash, the account and its ideas are untouched - and the person is an
+outsider again (404). The owner has no membership row, so their id answers 404 on these routes; nothing can make anyone
+Owner, and ownership is not transferred.
+
+**Backups**: invitations, like memberships, are account access metadata - never exported, never restored. Format 19.
+
+**The frontend is role-aware, for presentation only.** `universes/access.ts` mirrors the capabilities
+(`capabilitiesOf(accessRole)`, `canEditContent`, ...) and the workspace provides them to every screen; components ask a
+named capability, never compare roles. Viewers and Reviewers get a read-only universe - content, search, family tree and
+Canon findings, with no create, edit, Trash, history, publication or Canon actions, and read-only chronology, world rule
+and manuscript views. Editors keep every creative control and the Trash without permanent delete. Trash, Publish,
+Settings and Ideas leave the navigation for roles that cannot use them, and a typed address shows "not available" rather
+than a form that would fail. The API stays the only authority.

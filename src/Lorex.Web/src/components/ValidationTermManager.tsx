@@ -1,4 +1,5 @@
 import { useEffect, useId, useState, type KeyboardEvent } from 'react'
+import { useUniverseAccess } from '../universes/access'
 import { Quoted } from './NameList'
 import { ApiError } from '../lib/api'
 import {
@@ -34,6 +35,7 @@ function usage(term: ValidationTerm) {
  * added here or straight from a rule or a moment. Not a workspace of its own - a vocabulary for checks, next to the others.
  */
 export function ValidationTermManager({ universeId }: { universeId: string }) {
+  const access = useUniverseAccess()
   const headingId = useId()
   const newNameErrorId = useId()
 
@@ -241,18 +243,22 @@ export function ValidationTermManager({ universeId }: { universeId: string }) {
                               <bdi>{term.name}</bdi>
                             </span>
                             <span className="types__count">{usage(term)}</span>
-                            <button
-                              className="button button--secondary button--sm"
-                              type="button"
-                              aria-label={`Rename ${term.name}`}
-                              onClick={() =>
-                                setRenaming({ id: term.id, text: term.name, error: null })
-                              }
-                              data-testid={`rename-term-${term.name}`}
-                            >
-                              Rename
-                            </button>
-                            {term.ruleCount === 0 && term.momentCount === 0 ? (
+                            {access.editContent ? (
+                              <button
+                                className="button button--secondary button--sm"
+                                type="button"
+                                aria-label={`Rename ${term.name}`}
+                                onClick={() =>
+                                  setRenaming({ id: term.id, text: term.name, error: null })
+                                }
+                                data-testid={`rename-term-${term.name}`}
+                              >
+                                Rename
+                              </button>
+                            ) : null}
+                            {access.editContent &&
+                            term.ruleCount === 0 &&
+                            term.momentCount === 0 ? (
                               <button
                                 className="button button--secondary button--sm"
                                 type="button"
@@ -275,65 +281,74 @@ export function ValidationTermManager({ universeId }: { universeId: string }) {
           })
         : null}
 
-      <div className="types__new terms__new">
-        <div className="field">
-          <label className="field__label" htmlFor={`${headingId}-new-kind`}>
-            Event kind or method
-          </label>
-          <select
-            id={`${headingId}-new-kind`}
-            className="field__input field__input--select"
-            value={newKind}
-            onChange={(event) => setNewKind(Number(event.target.value) as ValidationTermKindValue)}
-            data-testid="new-term-kind"
-          >
-            {TERM_KIND_ORDER.map((kind) => (
-              <option key={kind} value={kind}>
-                {TERM_KIND_LABELS[kind]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label className="field__label" htmlFor={`${headingId}-new-name`}>
-            Name
-          </label>
-          <input
-            id={`${headingId}-new-name`}
-            className="field__input"
-            type="text"
-            dir="auto"
-            maxLength={TERM_NAME_MAX_LENGTH}
-            placeholder={
-              newKind === ValidationTermKind.EventKind
-                ? 'Coronation, Resurrection…'
-                : 'By the Salt Crown…'
-            }
-            value={newName}
-            onChange={(event) => {
-              setNewName(event.target.value)
-              setNewError(null)
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault()
-                void add()
+      {access.editContent ? (
+        <div className="types__new terms__new">
+          <div className="field">
+            <label className="field__label" htmlFor={`${headingId}-new-kind`}>
+              Event kind or method
+            </label>
+            <select
+              id={`${headingId}-new-kind`}
+              className="field__input field__input--select"
+              value={newKind}
+              onChange={(event) =>
+                setNewKind(Number(event.target.value) as ValidationTermKindValue)
               }
-            }}
-            aria-invalid={newError ? true : undefined}
-            aria-describedby={newError ? newNameErrorId : undefined}
-            data-testid="new-term-name"
-          />
-          {newError ? (
-            <p className="field__error" id={newNameErrorId} role="alert">
-              {newError}
-            </p>
-          ) : null}
+              data-testid="new-term-kind"
+            >
+              {TERM_KIND_ORDER.map((kind) => (
+                <option key={kind} value={kind}>
+                  {TERM_KIND_LABELS[kind]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label className="field__label" htmlFor={`${headingId}-new-name`}>
+              Name
+            </label>
+            <input
+              id={`${headingId}-new-name`}
+              className="field__input"
+              type="text"
+              dir="auto"
+              maxLength={TERM_NAME_MAX_LENGTH}
+              placeholder={
+                newKind === ValidationTermKind.EventKind
+                  ? 'Coronation, Resurrection…'
+                  : 'By the Salt Crown…'
+              }
+              value={newName}
+              onChange={(event) => {
+                setNewName(event.target.value)
+                setNewError(null)
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  void add()
+                }
+              }}
+              aria-invalid={newError ? true : undefined}
+              aria-describedby={newError ? newNameErrorId : undefined}
+              data-testid="new-term-name"
+            />
+            {newError ? (
+              <p className="field__error" id={newNameErrorId} role="alert">
+                {newError}
+              </p>
+            ) : null}
+          </div>
+          <button
+            className="button"
+            type="button"
+            onClick={() => void add()}
+            data-testid="add-term"
+          >
+            Add {TERM_KIND_WORDS[newKind]}
+          </button>
         </div>
-        <button className="button" type="button" onClick={() => void add()} data-testid="add-term">
-          Add {TERM_KIND_WORDS[newKind]}
-        </button>
-      </div>
+      ) : null}
     </section>
   )
 }

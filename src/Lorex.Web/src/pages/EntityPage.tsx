@@ -51,6 +51,8 @@ import {
   type FieldValueInput,
 } from '../lore/types'
 import { typeChoices } from '../lore/typeTree'
+import { StatusBadge } from '../components/StatusBadge'
+import { useUniverseAccess } from '../universes/access'
 import type { WorkspaceContext } from './UniverseWorkspace'
 import { EmptyState } from '../components/EmptyState'
 
@@ -117,6 +119,7 @@ type EntryView = 'article' | 'relations' | 'history'
  */
 export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
   const { universe, chronology } = useOutletContext<WorkspaceContext>()
+  const access = useUniverseAccess()
   const { entityId } = useParams<{ entityId: string }>()
   const navigate = useNavigate()
   const location = useLocation()
@@ -456,8 +459,15 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
         title="That entry is not here."
         hint={
           <>
-            It may be in the <Link to={`/app/universes/${universe.id}/trash`}>Trash</Link>, where it
-            can be restored. <Link to={`/app/universes/${universe.id}/lore`}>Back to the lore</Link>
+            {access.manageTrash ? (
+              <>
+                It may be in the <Link to={`/app/universes/${universe.id}/trash`}>Trash</Link>,
+                where it can be restored.{' '}
+              </>
+            ) : (
+              'It may have been moved to the Trash. '
+            )}
+            <Link to={`/app/universes/${universe.id}/lore`}>Back to the lore</Link>
           </>
         }
       />
@@ -562,22 +572,31 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
 
           {/* How settled the entry is, changed in one press. A choice, not an action: the chosen step is
               raised paper with its glyph and word, never a filled block louder than the name. */}
-          <div className="canon" role="group" aria-label="Canon status">
-            {CANON_ORDER.map((option) => (
-              <button
-                key={option}
-                type="button"
-                className="canon__step"
-                aria-pressed={draft.canonStatus === option}
-                data-canon={option}
-                disabled={isSaving}
-                onClick={() => changeCanon(option)}
-                data-testid={`canon-${CANON_LABELS[option].toLowerCase()}`}
-              >
-                {CANON_LABELS[option]}
-              </button>
-            ))}
-          </div>
+          {access.editContent || isNew ? (
+            <div className="canon" role="group" aria-label="Canon status">
+              {CANON_ORDER.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  className="canon__step"
+                  aria-pressed={draft.canonStatus === option}
+                  data-canon={option}
+                  disabled={isSaving}
+                  onClick={() => changeCanon(option)}
+                  data-testid={`canon-${CANON_LABELS[option].toLowerCase()}`}
+                >
+                  {CANON_LABELS[option]}
+                </button>
+              ))}
+            </div>
+          ) : (
+            // Read only: the status, stated, with nothing to press.
+            <StatusBadge
+              step={draft.canonStatus}
+              label={CANON_LABELS[draft.canonStatus]}
+              testId="entry-canon-status"
+            />
+          )}
         </div>
 
         {isEditing ? (
@@ -647,37 +666,43 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
             >
               Relations
             </NavLink>
-            <NavLink
-              to={`${entryPath}/history`}
-              className="views__link"
-              data-testid="entry-view-history"
-            >
-              History
-            </NavLink>
+            {access.manageHistory ? (
+              <NavLink
+                to={`${entryPath}/history`}
+                className="views__link"
+                data-testid="entry-view-history"
+              >
+                History
+              </NavLink>
+            ) : null}
           </nav>
 
           {isWritingArticle ? null : (
             <div className="entry__tools">
               {/* Whether the entry is public, said in a word, and the way to change it - before Edit, because it is
                   state the author should see on arrival, not a tool buried in the menu. */}
-              <ContentPublication
-                key={entityId}
-                universeId={universe.id}
-                kind="entry"
-                id={entityId!}
-                name={detail?.name ?? ''}
-                placement="bar"
-              />
-              <button
-                className="button button--secondary"
-                type="button"
-                onClick={startEditing}
-                disabled={isSaving}
-                data-testid="edit-entity"
-              >
-                <ActionIcon icon={Pencil} />
-                Edit
-              </button>
+              {access.publish ? (
+                <ContentPublication
+                  key={entityId}
+                  universeId={universe.id}
+                  kind="entry"
+                  id={entityId!}
+                  name={detail?.name ?? ''}
+                  placement="bar"
+                />
+              ) : null}
+              {access.editContent ? (
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  onClick={startEditing}
+                  disabled={isSaving}
+                  data-testid="edit-entity"
+                >
+                  <ActionIcon icon={Pencil} />
+                  Edit
+                </button>
+              ) : null}
               {/* Offered on an entry whose type the author enabled for Family Tree, and on any entry
                   already holding a family link - never decided by what the type is called (ADR 0040). */}
               {offersFamilyTree ? (
@@ -690,21 +715,23 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
                   Family tree
                 </Link>
               ) : null}
-              <ActionMenu
-                label={`More actions for ${detail?.name ?? 'this entry'}`}
-                triggerTestId="entity-actions"
-              >
-                <button
-                  className="actionmenu__item actionmenu__item--danger"
-                  type="button"
-                  onClick={() => void moveToTrash()}
-                  disabled={isSaving}
-                  data-testid="trash-entity"
+              {access.manageTrash ? (
+                <ActionMenu
+                  label={`More actions for ${detail?.name ?? 'this entry'}`}
+                  triggerTestId="entity-actions"
                 >
-                  <ActionIcon icon={Trash} />
-                  Move to Trash
-                </button>
-              </ActionMenu>
+                  <button
+                    className="actionmenu__item actionmenu__item--danger"
+                    type="button"
+                    onClick={() => void moveToTrash()}
+                    disabled={isSaving}
+                    data-testid="trash-entity"
+                  >
+                    <ActionIcon icon={Trash} />
+                    Move to Trash
+                  </button>
+                </ActionMenu>
+              ) : null}
             </div>
           )}
         </div>

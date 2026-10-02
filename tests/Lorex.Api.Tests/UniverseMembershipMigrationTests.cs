@@ -72,7 +72,7 @@ public sealed class UniverseMembershipMigrationTests : IDisposable
             await db.GetService<IMigrator>().MigrateAsync(Before);
 
             Assert.Empty(await Strings(db, "SELECT name AS Value FROM sqlite_master WHERE name = 'UniverseMemberships'"));
-            Assert.Equal(indexes.Where(index => !index.EndsWith(" on UniverseMemberships", StringComparison.Ordinal)), await Indexes(db));
+            Assert.Equal(indexes.Where(index => !index.EndsWith(" on UniverseMemberships", StringComparison.Ordinal) && !index.EndsWith(" on UniverseInvitations", StringComparison.Ordinal)), await Indexes(db));
             Assert.Equal(triggers, await Strings(db, "SELECT name AS Value FROM sqlite_master WHERE type = 'trigger' ORDER BY name"));
             content = await Content(db);
         }

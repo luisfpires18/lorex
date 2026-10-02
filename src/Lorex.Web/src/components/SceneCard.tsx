@@ -1,5 +1,6 @@
 import { useId, type ReactNode } from 'react'
-import { ArrowDown, ArrowRightLeft, ArrowUp, PenLine, Pencil, Trash } from 'lucide-react'
+import { useUniverseAccess } from '../universes/access'
+import { ArrowDown, ArrowRightLeft, ArrowUp, BookOpen, PenLine, Pencil, Trash } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ActionIcon } from './ActionIcon'
 import { ActionMenu } from './ActionMenu'
@@ -71,6 +72,7 @@ export function SceneCard({
   onDelete,
   publication,
 }: SceneCardProps) {
+  const access = useUniverseAccess()
   const titleId = useId()
   const Title = titleLevel === 4 ? 'h4' : 'h3'
 
@@ -108,75 +110,77 @@ export function SceneCard({
           aria-describedby={titleId}
           data-testid="scene-write"
         >
-          <ActionIcon icon={PenLine} />
-          Write
+          <ActionIcon icon={access.editContent ? PenLine : BookOpen} />
+          {access.editContent ? 'Write' : 'Read'}
         </Link>
-        <ActionMenu
-          label={`More actions for ${scene.title}`}
-          triggerTestId="scene-actions"
-          panelClassName="actionmenu__panel--wide"
-        >
-          <button
-            className="actionmenu__item"
-            type="button"
-            onClick={() => onEdit(scene)}
-            data-testid="scene-edit"
+        {access.editContent ? (
+          <ActionMenu
+            label={`More actions for ${scene.title}`}
+            triggerTestId="scene-actions"
+            panelClassName="actionmenu__panel--wide"
           >
-            <ActionIcon icon={Pencil} />
-            Edit scene
-          </button>
-          {index > 0 ? (
             <button
               className="actionmenu__item"
               type="button"
-              onClick={() => onMove(scene, -1)}
-              data-testid="scene-move-up"
+              onClick={() => onEdit(scene)}
+              data-testid="scene-edit"
             >
-              <ActionIcon icon={ArrowUp} />
-              Move up
+              <ActionIcon icon={Pencil} />
+              Edit scene
             </button>
-          ) : null}
-          {index < count - 1 ? (
+            {index > 0 ? (
+              <button
+                className="actionmenu__item"
+                type="button"
+                onClick={() => onMove(scene, -1)}
+                data-testid="scene-move-up"
+              >
+                <ActionIcon icon={ArrowUp} />
+                Move up
+              </button>
+            ) : null}
+            {index < count - 1 ? (
+              <button
+                className="actionmenu__item"
+                type="button"
+                onClick={() => onMove(scene, 1)}
+                data-testid="scene-move-down"
+              >
+                <ActionIcon icon={ArrowDown} />
+                Move down
+              </button>
+            ) : null}
+            {moveTargets.map((target) => (
+              <button
+                key={target.chapterId ?? 'unchaptered'}
+                className="actionmenu__item"
+                type="button"
+                onClick={() => onMoveTo(scene, target.chapterId)}
+                data-testid="scene-move-to-option"
+                data-target={
+                  target.chapter
+                    ? chapterLabel(target.chapter.index, target.chapter.title)
+                    : UNCHAPTERED
+                }
+              >
+                <ActionIcon icon={ArrowRightLeft} />
+                <span className="actionmenu__text">
+                  Move to <ContainerName chapter={target.chapter} />
+                </span>
+              </button>
+            ))}
+            <hr className="actionmenu__divider" />
             <button
-              className="actionmenu__item"
+              className="actionmenu__item actionmenu__item--danger"
               type="button"
-              onClick={() => onMove(scene, 1)}
-              data-testid="scene-move-down"
+              onClick={() => onDelete(scene)}
+              data-testid="scene-delete"
             >
-              <ActionIcon icon={ArrowDown} />
-              Move down
+              <ActionIcon icon={Trash} />
+              Delete scene
             </button>
-          ) : null}
-          {moveTargets.map((target) => (
-            <button
-              key={target.chapterId ?? 'unchaptered'}
-              className="actionmenu__item"
-              type="button"
-              onClick={() => onMoveTo(scene, target.chapterId)}
-              data-testid="scene-move-to-option"
-              data-target={
-                target.chapter
-                  ? chapterLabel(target.chapter.index, target.chapter.title)
-                  : UNCHAPTERED
-              }
-            >
-              <ActionIcon icon={ArrowRightLeft} />
-              <span className="actionmenu__text">
-                Move to <ContainerName chapter={target.chapter} />
-              </span>
-            </button>
-          ))}
-          <hr className="actionmenu__divider" />
-          <button
-            className="actionmenu__item actionmenu__item--danger"
-            type="button"
-            onClick={() => onDelete(scene)}
-            data-testid="scene-delete"
-          >
-            <ActionIcon icon={Trash} />
-            Delete scene
-          </button>
-        </ActionMenu>
+          </ActionMenu>
+        ) : null}
       </div>
     </li>
   )

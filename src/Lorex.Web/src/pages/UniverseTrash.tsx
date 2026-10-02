@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useUniverseAccess } from '../universes/access'
 import {
   ArchiveRestore,
   BookOpen,
@@ -184,6 +185,7 @@ function eraseText(kind: TrashKindValue) {
  * deleted.
  */
 export default function UniverseTrash() {
+  const access = useUniverseAccess()
   const { universe } = useOutletContext<WorkspaceContext>()
   const { user } = useAuth()
 
@@ -568,21 +570,32 @@ export default function UniverseTrash() {
         title="Trash"
         lede={
           <>
-            <p>
-              What you removed from your lore, your stories and your world rules. Everything here
-              can be restored with everything it held, until you choose to delete it permanently.
-            </p>
-            <p data-testid="trash-ideas-pointer">
-              Deleted ideas are not here: they belong to your account, and wait in{' '}
-              <Link to={`/app/universes/${universe.id}/ideas?view=deleted`}>
-                Ideas, under Recently deleted
-              </Link>
-              .
-            </p>
+            {access.permanentlyDelete ? (
+              <p>
+                What you removed from your lore, your stories and your world rules. Everything here
+                can be restored with everything it held, until you choose to delete it permanently.
+              </p>
+            ) : (
+              <p>
+                What was removed from this universe&rsquo;s lore, stories and world rules.
+                Everything here can be restored with everything it held. Only the owner can delete
+                anything permanently.
+              </p>
+            )}
+            {access.keepIdeas ? (
+              <p data-testid="trash-ideas-pointer">
+                Deleted ideas are not here: they belong to your account, and wait in{' '}
+                <Link to={`/app/universes/${universe.id}/ideas?view=deleted`}>
+                  Ideas, under Recently deleted
+                </Link>
+                .
+              </p>
+            ) : null}
           </>
         }
         actions={
-          pageItems.length > 0 || isSelecting ? (
+          // Selecting is for erasing in bulk, which is the owner's alone (ADR 0041).
+          access.permanentlyDelete && (pageItems.length > 0 || isSelecting) ? (
             <button
               ref={selectToggleRef}
               className="button button--secondary trash__select"
@@ -726,27 +739,29 @@ export default function UniverseTrash() {
                     <ActionIcon icon={ArchiveRestore} />
                     {restoring === item.id ? 'Restoring…' : 'Restore'}
                   </button>
-                  <button
-                    ref={(node) => {
-                      if (node) eraseButtons.current.set(item.id, node)
-                      else eraseButtons.current.delete(item.id)
-                    }}
-                    className="button button--text trash__erase"
-                    type="button"
-                    disabled={busy}
-                    aria-label={`Delete permanently: ${kind.toLowerCase()} “${item.name}”`}
-                    onClick={() => askToErase(item)}
-                    data-testid={`erase-${item.name}`}
-                  >
-                    Delete permanently…
-                  </button>
+                  {access.permanentlyDelete ? (
+                    <button
+                      ref={(node) => {
+                        if (node) eraseButtons.current.set(item.id, node)
+                        else eraseButtons.current.delete(item.id)
+                      }}
+                      className="button button--text trash__erase"
+                      type="button"
+                      disabled={busy}
+                      aria-label={`Delete permanently: ${kind.toLowerCase()} “${item.name}”`}
+                      onClick={() => askToErase(item)}
+                      data-testid={`erase-${item.name}`}
+                    >
+                      Delete permanently…
+                    </button>
+                  ) : null}
                 </div>
                 {confirming?.id === item.id && confirming.kind === item.kind ? (
                   <RestorePublicConfirm
                     item={item}
                     panelRef={confirmRef}
                     onRestore={() => void restore(item)}
-                    onRestorePrivate={() => void restore(item, true)}
+                    onRestorePrivate={access.publish ? () => void restore(item, true) : undefined}
                     onCancel={cancelConfirming}
                   />
                 ) : null}
@@ -882,7 +897,8 @@ function RestorePublicConfirm({
   item: TrashItem
   panelRef: React.RefObject<HTMLDivElement | null>
   onRestore: () => void
-  onRestorePrivate: () => void
+  /** Absent for anyone who cannot change publication: they restore the owner's selection as it was. */
+  onRestorePrivate?: () => void
   onCancel: () => void
 }) {
   const noun = item.kind === TrashKind.Entry ? 'entry' : 'story'
@@ -925,6 +941,9 @@ function RestorePublicConfirm({
                 : 'this universe is public'
             }.`}
       </p>
+      {onRestorePrivate ? null : (
+        <p className="trash__confirmtext">Only the owner can change whether it is public.</p>
+      )}
       <div className="form__actions">
         <button
           className="button"
@@ -932,16 +951,22 @@ function RestorePublicConfirm({
           onClick={onRestore}
           data-testid="trash-confirm-restore"
         >
-          {visible ? 'Restore and publish' : 'Restore, keep selected'}
+          {onRestorePrivate
+            ? visible
+              ? 'Restore and publish'
+              : 'Restore, keep selected'
+            : 'Restore'}
         </button>
-        <button
-          className="button button--secondary"
-          type="button"
-          onClick={onRestorePrivate}
-          data-testid="trash-confirm-private"
-        >
-          Restore as private
-        </button>
+        {onRestorePrivate ? (
+          <button
+            className="button button--secondary"
+            type="button"
+            onClick={onRestorePrivate}
+            data-testid="trash-confirm-private"
+          >
+            Restore as private
+          </button>
+        ) : null}
         <button
           className="button button--text"
           type="button"

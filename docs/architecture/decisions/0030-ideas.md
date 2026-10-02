@@ -194,3 +194,6 @@ new idea started in a universe but saved to another, or to none, opens among all
 Ideas stay the account's. Being a member of someone else's universe shares nobody's ideas: lists, reads and universe search
 return the caller's own only. An idea may still be assigned to, and point into, only a universe its author **owns**; letting
 a collaborator's idea point into a shared universe would widen what an idea can see, and is left as a follow-up.
+
+Since refinement 030 the universe picker of an idea offers only universes the account owns, so a shared universe is never
+offered where it would be refused, and Ideas is not a section of a universe shared with the account.

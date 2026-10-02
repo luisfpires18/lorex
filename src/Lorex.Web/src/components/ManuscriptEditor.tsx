@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { useUniverseAccess } from '../universes/access'
 import { SaveAction } from './SaveAction'
 import { History, Info, LocateFixed, Pencil } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -82,6 +83,7 @@ export function ManuscriptEditor({
   onEditScene,
   publication,
 }: ManuscriptEditorProps) {
+  const access = useUniverseAccess()
   const sceneId = scene.id
   const titleId = useId()
   const editorId = useId()
@@ -307,7 +309,7 @@ export function ManuscriptEditor({
                 <span className="visually-hidden">Scene details</span>
               </button>
             ) : null}
-            {stored.updatedAt !== null || isHistoryOpen ? (
+            {access.manageHistory && (stored.updatedAt !== null || isHistoryOpen) ? (
               <button
                 className="button button--text"
                 type="button"
@@ -328,15 +330,17 @@ export function ManuscriptEditor({
               label={`More actions for ${scene.title}`}
               triggerTestId="manuscript-scene-actions"
             >
-              <button
-                className="actionmenu__item"
-                type="button"
-                onClick={() => onEditScene(scene)}
-                data-testid="manuscript-edit-scene"
-              >
-                <ActionIcon icon={Pencil} />
-                Edit scene
-              </button>
+              {access.editContent ? (
+                <button
+                  className="actionmenu__item"
+                  type="button"
+                  onClick={() => onEditScene(scene)}
+                  data-testid="manuscript-edit-scene"
+                >
+                  <ActionIcon icon={Pencil} />
+                  Edit scene
+                </button>
+              ) : null}
               <Link
                 className="actionmenu__item"
                 to={`/app/universes/${universeId}/stories/${storyId}#scene-${scene.id}`}
@@ -372,7 +376,7 @@ export function ManuscriptEditor({
         ) : null}
       </header>
 
-      {isHistoryOpen ? (
+      {isHistoryOpen && access.manageHistory ? (
         <ManuscriptHistory
           id={historyId}
           universeId={universeId}
@@ -428,7 +432,7 @@ export function ManuscriptEditor({
 
       {isReady ? (
         <>
-          {offer ? (
+          {offer && access.editContent ? (
             <div id={recoveryId} className="manuscript__recovery">
               <RecoveredDraft
                 what="this scene's manuscript"
@@ -503,8 +507,9 @@ export function ManuscriptEditor({
             className="manuscript__text"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            readOnly={isHeld}
-            placeholder="Write the scene."
+            // Read only for a collaborator who reads (ADR 0041 amendment): the prose, with no Save under it.
+            readOnly={isHeld || !access.editContent}
+            placeholder={access.editContent ? 'Write the scene.' : 'Nothing written yet.'}
             spellCheck
             aria-describedby={describedBy}
             aria-invalid={isTooLong ? true : undefined}
@@ -513,42 +518,44 @@ export function ManuscriptEditor({
             data-held={isHeld ? 'true' : 'false'}
           />
 
-          <div className="manuscript__bar">
-            {isTooLong ? (
-              <p
-                className="field__error manuscript__toolong"
-                id={tooLongId}
-                data-testid="manuscript-too-long"
-              >
-                Too long to save: {count.format(draft.length)} of{' '}
-                {count.format(MANUSCRIPT_MAX_LENGTH)} characters. Split it into more scenes.
-              </p>
-            ) : null}
-            {failed && isDirty ? (
-              <p
-                className="recovery__warning"
-                role="status"
-                data-testid="manuscript-recovery-warning"
-              >
-                This device could not keep a recovery copy of these changes. Save to keep them.
-              </p>
-            ) : null}
-            {publication ? <div className="manuscript__publication">{publication}</div> : null}
-            <SaveAction
-              label="Save changes"
-              isDirty={isDirty}
-              isSaving={isSaving}
-              isBlocked={isTooLong}
-              saves={saves}
-              restingStatus={stored.updatedAt === null ? 'Nothing saved yet' : 'Saved'}
-              statusId={statusId}
-              statusTestId="manuscript-status"
-              testId="manuscript-save"
-              type="button"
-              onSave={() => void save(stored.updatedAt)}
-              keyShortcuts="Control+S Meta+S"
-            />
-          </div>
+          {access.editContent ? (
+            <div className="manuscript__bar">
+              {isTooLong ? (
+                <p
+                  className="field__error manuscript__toolong"
+                  id={tooLongId}
+                  data-testid="manuscript-too-long"
+                >
+                  Too long to save: {count.format(draft.length)} of{' '}
+                  {count.format(MANUSCRIPT_MAX_LENGTH)} characters. Split it into more scenes.
+                </p>
+              ) : null}
+              {failed && isDirty ? (
+                <p
+                  className="recovery__warning"
+                  role="status"
+                  data-testid="manuscript-recovery-warning"
+                >
+                  This device could not keep a recovery copy of these changes. Save to keep them.
+                </p>
+              ) : null}
+              {publication ? <div className="manuscript__publication">{publication}</div> : null}
+              <SaveAction
+                label="Save changes"
+                isDirty={isDirty}
+                isSaving={isSaving}
+                isBlocked={isTooLong}
+                saves={saves}
+                restingStatus={stored.updatedAt === null ? 'Nothing saved yet' : 'Saved'}
+                statusId={statusId}
+                statusTestId="manuscript-status"
+                testId="manuscript-save"
+                type="button"
+                onSave={() => void save(stored.updatedAt)}
+                keyShortcuts="Control+S Meta+S"
+              />
+            </div>
+          ) : null}
         </>
       ) : null}
 

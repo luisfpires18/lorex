@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react'
+import { useUniverseAccess } from '../universes/access'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { ActionIcon } from '../components/ActionIcon'
@@ -41,6 +42,7 @@ type LoadState =
  * a type not enabled still opens here by its address, with a note that says so: nothing recorded is hidden.
  */
 export default function FamilyTreePage() {
+  const access = useUniverseAccess()
   const { universe } = useOutletContext<WorkspaceContext>()
   const { entityId } = useParams<{ entityId: string }>()
   const navigate = useNavigate()
@@ -173,15 +175,17 @@ export default function FamilyTreePage() {
             Create one here, or give a meaning to an existing kind under{' '}
             <Link to={relationKindsPath}>Types → Relation Kinds</Link>.
           </p>
-          <button
-            className="button button--secondary"
-            type="button"
-            onClick={() => setIsCreatingKind(true)}
-            data-testid="family-new-kind"
-          >
-            <ActionIcon icon={Plus} />
-            New family relationship kind
-          </button>
+          {access.editContent ? (
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => setIsCreatingKind(true)}
+              data-testid="family-new-kind"
+            >
+              <ActionIcon icon={Plus} />
+              New family relationship kind
+            </button>
+          ) : null}
         </div>
       ) : null}
 
@@ -329,7 +333,7 @@ export default function FamilyTreePage() {
             </section>
           ) : null}
 
-          {familyKinds.length > 0 ? (
+          {access.editContent && familyKinds.length > 0 ? (
             isAdding ? (
               <FamilyLinkForm
                 universeId={universe.id}

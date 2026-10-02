@@ -365,6 +365,28 @@ textarea,
   font-size: 0.925rem;
 }
 
+/* An invitation's page (030) borrows the sign-in canvas: its choices sit where a form's button would. */
+.invite__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.invite__role {
+  margin: -1.75rem 0 var(--space-6);
+  color: var(--muted);
+  max-width: 34rem;
+}
+
+.auth__heading:focus {
+  outline: none;
+}
+
+.auth__heading:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 4px;
+}
+
 /* ---------- Forms ----------
 
    One field: a label, an optional hint, a boxed control, an error under it. The box is raised
@@ -1788,6 +1810,242 @@ a.button--danger:visited {
   font-size: 0.72rem;
 }
 
+/* A shared universe's role, and its archive mark beside it: grouped at the meta line's end, wrapping before they crowd. */
+.plate__marks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.plate__role {
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* A read-only collaborator's chronology (030): the period's name, and how its years run, without the form around it. */
+.era__readname {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* A world rule read, not edited (030): its words as written, line breaks kept. */
+.rule__reading {
+  max-width: 46rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.rule__meta {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+/* ---------- Collaborators (Settings, 030) ---------- */
+
+/* A ruled list, not a member table: name and its small meta on the left, the row's own controls on the right, wrapping
+   under the name on a narrow screen. Long addresses break anywhere rather than widen the page. */
+.collab__section {
+  max-width: 46rem;
+}
+
+.collab__invite {
+  max-width: 34rem;
+}
+
+.collab__rolehint {
+  margin-top: var(--space-2);
+}
+
+.collab__created {
+  margin-top: var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+}
+
+.collab__createdtitle {
+  margin: 0 0 var(--space-2);
+  font-weight: 600;
+}
+
+.collab__email {
+  overflow-wrap: anywhere;
+}
+
+.collab__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.collab__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--rule);
+}
+
+.collab__row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.collab__row--highlight {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: var(--radius-xs);
+}
+
+.collab__who {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.collab__name {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.collab__meta {
+  margin: var(--space-1) 0 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.collab__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.collab__role {
+  width: auto;
+  min-width: 8.5rem;
+}
+
+.collab__copy {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+}
+
+.collab__copystatus:empty {
+  display: none;
+}
+
+.collab__copystatus {
+  color: var(--accent);
+  font-size: var(--text-sm);
+}
+
+.collab__manual {
+  display: grid;
+  gap: var(--space-1);
+  flex-basis: 100%;
+  min-width: 0;
+}
+
+.collab__confirm,
+.collab__error {
+  flex-basis: 100%;
+}
+
+@media (max-width: 640px) {
+  .collab__controls {
+    width: 100%;
+  }
+
+  .collab__role {
+    flex: 1 1 8.5rem;
+  }
+}
+
+/* ---------- Invitations (My workspace, 030) ---------- */
+
+/* Only drawn while one is waiting. A quiet bordered plate above the universes - the same plate an inline confirmation
+   is drawn on - not a banner, and never a side stripe (retired in design refactor 007). */
+.invitations {
+  margin-top: var(--space-7);
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+}
+
+.invitations__heading {
+  margin: 0 0 var(--space-3);
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: var(--text-item);
+}
+
+.invitations__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.invitations__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--rule);
+}
+
+.invitations__item:first-child {
+  border-top: 0;
+}
+
+.invitations__what {
+  min-width: 0;
+  flex: 1 1 14rem;
+}
+
+.invitations__name {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.invitations__role {
+  margin: var(--space-1) 0 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.invitations__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.invitations__error {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .invitations {
+    padding: var(--space-4);
+  }
+}
+
 /* ---------- States ---------- */
 
 .notice {
@@ -2078,6 +2336,14 @@ a.button--danger:visited {
   line-height: 1.25;
   margin: var(--space-2) 0 0;
   overflow-wrap: anywhere;
+}
+
+/* A shared universe's role under its name (030): the same small muted type as the meta, no box, so it reads as a fact. */
+.sidebar__role {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--muted);
 }
 
 .sidebar__archived {

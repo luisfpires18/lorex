@@ -40,6 +40,7 @@ import {
 } from '../lore/types'
 import { buildTypeTree } from '../lore/typeTree'
 import type { MassCreatedState } from './MassCreatePage'
+import { useUniverseAccess } from '../universes/access'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
 type LoadState =
@@ -74,6 +75,7 @@ function readPage(value: string | null) {
  */
 export default function LorePage() {
   const { universe } = useOutletContext<WorkspaceContext>()
+  const access = useUniverseAccess()
   const [params, setParams] = useSearchParams()
   const filtersId = useId()
   const location = useLocation()
@@ -345,29 +347,31 @@ export default function LorePage() {
         }
         title={selectedType ? <bdi>{selectedType.name}</bdi> : 'Lore'}
         actions={
-          <>
-            {/* Many names at once: beside New, never above it - the everyday way in stays the primary one. */}
-            <Link
-              className="button button--secondary lore__masscreate"
-              to={massCreateTo}
-              title="Mass create"
-              data-testid="mass-create"
-            >
-              <ActionIcon icon={ListPlus} />
-              <span className="lore__masscreatelabel">Mass create</span>
-            </Link>
-            <Link
-              className="button lore__create"
-              to={createTo}
-              aria-label={selectedType ? `New ${selectedType.name}` : 'New entry'}
-              data-testid="new-entity"
-            >
-              <ActionIcon icon={Plus} />
-              <span className="lore__createlabel">
-                New {selectedType ? <bdi>{selectedType.name}</bdi> : 'entry'}
-              </span>
-            </Link>
-          </>
+          access.editContent ? (
+            <>
+              {/* Many names at once: beside New, never above it - the everyday way in stays the primary one. */}
+              <Link
+                className="button button--secondary lore__masscreate"
+                to={massCreateTo}
+                title="Mass create"
+                data-testid="mass-create"
+              >
+                <ActionIcon icon={ListPlus} />
+                <span className="lore__masscreatelabel">Mass create</span>
+              </Link>
+              <Link
+                className="button lore__create"
+                to={createTo}
+                aria-label={selectedType ? `New ${selectedType.name}` : 'New entry'}
+                data-testid="new-entity"
+              >
+                <ActionIcon icon={Plus} />
+                <span className="lore__createlabel">
+                  New {selectedType ? <bdi>{selectedType.name}</bdi> : 'entry'}
+                </span>
+              </Link>
+            </>
+          ) : undefined
         }
       >
         {/* Navigation only: the types, and on a phone the Filters button beside them. Nothing that comes and goes with the
@@ -443,7 +447,7 @@ export default function LorePage() {
           </div>
         </div>
 
-        {offerPageSize || pageItems.length > 0 || isSelecting ? (
+        {offerPageSize || (access.manageTrash && pageItems.length > 0) || isSelecting ? (
           <div className="lore__resultactions" data-testid="lore-result-actions">
             {offerPageSize ? (
               <div className="lore__pagesize">
@@ -465,7 +469,7 @@ export default function LorePage() {
                 </select>
               </div>
             ) : null}
-            {pageItems.length > 0 || isSelecting ? (
+            {access.manageTrash && (pageItems.length > 0 || isSelecting) ? (
               <button
                 className="button button--secondary lore__select"
                 type="button"
@@ -503,10 +507,12 @@ export default function LorePage() {
           title="Choose a category to browse your lore."
           hint="A category shows its own entries and everything filed inside it."
           action={
-            <Link className="button" to={createTo} data-testid="empty-new-entity">
-              <ActionIcon icon={Plus} />
-              New entry
-            </Link>
+            access.editContent ? (
+              <Link className="button" to={createTo} data-testid="empty-new-entity">
+                <ActionIcon icon={Plus} />
+                New entry
+              </Link>
+            ) : undefined
           }
         />
       ) : null}
@@ -621,10 +627,12 @@ export default function LorePage() {
             )
           }
           action={
-            <Link className="button" to={createTo} data-testid="empty-new-entity">
-              <ActionIcon icon={Plus} />
-              New {selectedType ? <bdi>{selectedType.name}</bdi> : 'entry'}
-            </Link>
+            access.editContent ? (
+              <Link className="button" to={createTo} data-testid="empty-new-entity">
+                <ActionIcon icon={Plus} />
+                New {selectedType ? <bdi>{selectedType.name}</bdi> : 'entry'}
+              </Link>
+            ) : undefined
           }
         />
       ) : null}

@@ -33,6 +33,9 @@ public enum UniverseCapability
 
     /// <summary>Export the whole universe as a backup.</summary>
     Backup,
+
+    /// <summary>Invite people, change their roles and remove them.</summary>
+    ManageCollaborators,
 }
 
 /// <summary>
@@ -74,7 +77,7 @@ public static class UniverseAccess
         UniverseCapability.EditContent or UniverseCapability.ManageTrash or UniverseCapability.ManageHistory =>
             role is UniverseRole.Owner or UniverseRole.Editor,
         UniverseCapability.PermanentlyDelete or UniverseCapability.ManageUniverse or UniverseCapability.Publish
-            or UniverseCapability.Backup =>
+            or UniverseCapability.Backup or UniverseCapability.ManageCollaborators =>
             role is UniverseRole.Owner,
         _ => false,
     };
