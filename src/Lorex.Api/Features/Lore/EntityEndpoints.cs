@@ -116,9 +116,9 @@ public static class EntityEndpoints
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = DefaultPageSize)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Read, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         page = Math.Max(page, 1);
@@ -264,9 +264,9 @@ public static class EntityEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Read, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         // A trashed entry is not reachable through the ordinary entity surface at all. It is
@@ -289,9 +289,9 @@ public static class EntityEndpoints
         CanonPromotionGate gate,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         if (RefusedLegacyArticle(request) is { } refused)
@@ -339,9 +339,9 @@ public static class EntityEndpoints
         CanonPromotionGate gate,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         if (await ValidateBatchAsync(db, universeId, request, cancellationToken) is { } errors)
@@ -524,9 +524,9 @@ public static class EntityEndpoints
         CanonPromotionGate gate,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         if (RefusedLegacyArticle(request) is { } refused)
@@ -674,9 +674,9 @@ public static class EntityEndpoints
         CanonPromotionGate canon,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageTrash, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         return await canon.RecordAsync(
@@ -702,9 +702,9 @@ public static class EntityEndpoints
         CanonPromotionGate canon,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageTrash, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var ids = request.EntityIds;
@@ -806,9 +806,9 @@ public static class EntityEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Read, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         // Counted over live entries only, because this list is the browse filter: a tag

@@ -388,3 +388,9 @@ place, then name, then id - so a file reads top-down and two exports of unchange
 ignorable member: the hierarchy is how the author organised their lore and how Lore is browsed, and a version 18 reader would
 restore every type flat. A file at version 18 or earlier has no `parentId`: every type is a root, in its stored order, and
 nothing is ever inferred from names like "Location" or "Kingdom".
+
+## Amendment: collaboration (2026-10-02, ADR 0041)
+
+Export is the owner's alone: the route asks `UniverseAccess` for `Backup`, so an Editor, Reviewer or Viewer is refused with
+403 `universe_permission_denied` and anyone else still gets the 404 of a missing universe. Memberships are account access,
+not the world: no membership, collaborator id or name is ever written to an archive. The format stays at version 19.

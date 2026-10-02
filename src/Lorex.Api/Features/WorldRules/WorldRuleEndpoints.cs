@@ -12,8 +12,8 @@ namespace Lorex.Api.Features.WorldRules;
 /// <summary>
 /// A universe's world rules: explicit statements, in the author's own words, about how that world works (ADR 0033).
 ///
-/// <b>Universe-scoped and owner-gated, first and always.</b> Every route proves the caller owns the universe through
-/// <see cref="LoreAccess"/> before anything is read, and finds a rule only by its id and that universe together - so another
+/// <b>Universe-scoped and gated, first and always.</b> Every route passes <see cref="UniverseAccess"/> (ADR 0041) before
+/// anything is read, and finds a rule only by its id and that universe together - so another
 /// account's universe, a rule of another universe and a guessed id all answer the same 404 as one that does not exist.
 ///
 /// <b>A rule's words touch nothing.</b> No route passes the Canon promotion gate, reindexes lore or writes an entry,
@@ -67,9 +67,9 @@ public static class WorldRuleEndpoints
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = DefaultPageSize)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Read, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         page = Math.Max(page, 1);
@@ -117,9 +117,9 @@ public static class WorldRuleEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Read, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var rule = await db.WorldRules.AsNoTracking().FirstOrDefaultAsync(
@@ -137,9 +137,9 @@ public static class WorldRuleEndpoints
         CanonIntegrityEvaluator evaluator,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         if (await ValidateAsync(db, universeId, request, cancellationToken) is { } errors)
@@ -181,9 +181,9 @@ public static class WorldRuleEndpoints
         CanonIntegrityEvaluator evaluator,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         // One transaction for the comparison and the write, so nothing can land between them: SQLite has one writer.
@@ -250,9 +250,9 @@ public static class WorldRuleEndpoints
         CanonIntegrityEvaluator evaluator,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageTrash, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var rule = await db.WorldRules
@@ -285,9 +285,9 @@ public static class WorldRuleEndpoints
         CanonIntegrityEvaluator evaluator,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageTrash, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var rule = await db.WorldRules

@@ -47,9 +47,9 @@ public static class StoryEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Read, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var stories = await db.Stories.AsNoTracking()
@@ -76,9 +76,9 @@ public static class StoryEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Read, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var story = await LoadDetailAsync(db, universeId, storyId, cancellationToken);
@@ -92,9 +92,9 @@ public static class StoryEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         if (StoryValidation.ValidateStory(request) is { } errors)
@@ -129,9 +129,9 @@ public static class StoryEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var story = await FindAsync(db, universeId, storyId, cancellationToken);
@@ -169,9 +169,9 @@ public static class StoryEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageTrash, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var story = await FindAsync(db, universeId, storyId, cancellationToken);
@@ -200,19 +200,29 @@ public static class StoryEndpoints
             cancellationToken);
 
     /// <summary>
-    /// Whether the caller owns the universe and the story is live in it. For reads; a write finds the story
-    /// tracked instead, with <see cref="FindAsync"/>.
+    /// Null when the caller may do this in the universe and the story is live in it; otherwise the answer to send - the
+    /// universe gate's 404 or 403, or 404 for a story that is not there. A write finds the story tracked instead, with
+    /// <see cref="FindAsync"/>.
     /// </summary>
-    internal static async Task<bool> OwnsStoryAsync(
+    internal static async Task<IResult?> DenyStoryAsync(
         LorexDbContext db,
         Guid universeId,
         Guid storyId,
         ClaimsPrincipal principal,
-        CancellationToken cancellationToken) =>
-        await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken)
-        && await db.Stories.AnyAsync(
+        UniverseCapability capability,
+        CancellationToken cancellationToken)
+    {
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, capability, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
+        return await db.Stories.AnyAsync(
             story => story.Id == storyId && story.UniverseId == universeId && story.DeletedAt == null,
-            cancellationToken);
+            cancellationToken)
+            ? null
+            : Results.NotFound();
+    }
 
     /// <summary>
     /// The story, its live chapters and every live scene in it. A fixed number of queries whatever the story

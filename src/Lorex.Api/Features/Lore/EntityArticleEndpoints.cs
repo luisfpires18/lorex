@@ -52,8 +52,12 @@ public static class EntityArticleEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken)
-            || !await IsLiveAsync(db, universeId, entityId, cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Read, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
+        if (!await IsLiveAsync(db, universeId, entityId, cancellationToken))
         {
             return Results.NotFound();
         }
@@ -77,9 +81,9 @@ public static class EntityArticleEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         // One transaction for the comparison and the write, so nothing can land between them: SQLite has one writer.
@@ -110,8 +114,12 @@ public static class EntityArticleEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken)
-            || !await IsLiveAsync(db, universeId, entityId, cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageHistory, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
+        if (!await IsLiveAsync(db, universeId, entityId, cancellationToken))
         {
             return Results.NotFound();
         }
@@ -147,9 +155,9 @@ public static class EntityArticleEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageHistory, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var revision = await FindRevisionAsync(db, universeId, entityId, revisionId, cancellationToken);
@@ -179,9 +187,9 @@ public static class EntityArticleEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageHistory, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);

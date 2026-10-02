@@ -19,8 +19,14 @@ internal sealed class CommandCounter : IObserver<DiagnosticListener>, IObserver<
     private int _count;
 
     public CommandCounter(IReadOnlyCollection<Guid> ids)
+        : this([.. ids.Select(id => id.ToString())])
     {
-        _keys = [.. ids.Select(id => id.ToString())];
+    }
+
+    /// <summary>Counts by any parameter text - an account id, say, which is not a <see cref="Guid"/> to Identity.</summary>
+    public CommandCounter(IReadOnlyCollection<string> keys)
+    {
+        _keys = [.. keys];
         var all = DiagnosticListener.AllListeners.Subscribe(this);
 
         lock (_subscriptions)

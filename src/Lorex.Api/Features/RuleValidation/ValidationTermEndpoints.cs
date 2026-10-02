@@ -12,7 +12,7 @@ namespace Lorex.Api.Features.RuleValidation;
 /// A universe's event kinds and methods: the small vocabulary world rule checks and moments point at by id (ADR 0034). Listed,
 /// created, renamed and deleted while nothing names them - nothing more. No hierarchy, no description, no workspace of its own.
 ///
-/// Universe-scoped and owner-gated first, through <see cref="LoreAccess"/>; a term is only ever found by its id and that universe
+/// Universe-scoped and gated first, through <see cref="UniverseAccess"/> (ADR 0041); a term is only ever found by its id and that universe
 /// together, so another account's term, another universe's and a guessed id all answer the same 404.
 /// </summary>
 public static class ValidationTermEndpoints
@@ -41,9 +41,9 @@ public static class ValidationTermEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Read, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         return Results.Ok(await LoadAsync(db, universeId, null, cancellationToken));
@@ -56,9 +56,9 @@ public static class ValidationTermEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         if (!Enum.IsDefined(request.Kind))
@@ -124,9 +124,9 @@ public static class ValidationTermEndpoints
         CanonPromotionGate canon,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var term = await db.ValidationTerms.FirstOrDefaultAsync(
@@ -197,9 +197,9 @@ public static class ValidationTermEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var term = await db.ValidationTerms.FirstOrDefaultAsync(

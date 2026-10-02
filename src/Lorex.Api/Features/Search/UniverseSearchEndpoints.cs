@@ -62,9 +62,9 @@ public static class UniverseSearchEndpoints
     {
         var ownerId = principal.RequireUserId();
 
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, ownerId, cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Read, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         // Nothing typed, or nothing with a letter or a digit in it: there is no word to look for, so nothing is found. The

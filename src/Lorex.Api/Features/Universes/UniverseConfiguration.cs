@@ -25,8 +25,8 @@ public sealed class UniverseConfiguration : IEntityTypeConfiguration<Universe>
             .IsRequired()
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Every read is owner-scoped and usually filtered by archived state, so the index
-        // leads with those two columns.
+        // The universe list starts from the owner (and, through UniverseMemberships, from members) and is usually
+        // filtered by archived state, so the index leads with those two columns.
         builder.HasIndex(universe => new { universe.OwnerId, universe.IsArchived, universe.UpdatedAt });
 
         // One owner cannot hold two universes with the same name, which keeps the list

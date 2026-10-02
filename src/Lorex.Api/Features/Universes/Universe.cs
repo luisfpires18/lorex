@@ -4,8 +4,9 @@ using Lorex.Api.Features.Publishing;
 namespace Lorex.Api.Features.Universes;
 
 /// <summary>
-/// A private world owned by exactly one user. Ownership is the privacy invariant of
-/// Lorex: every query and mutation is scoped by <see cref="OwnerId"/>.
+/// A private world owned by exactly one user, <see cref="OwnerId"/> - the one source of ownership. Others reach it only
+/// through a <see cref="UniverseMembership"/>, and every private route asks <see cref="UniverseAccess"/> first (ADR 0041).
+/// No membership row ever stands for the owner.
 ///
 /// The one exception is its public shell, readable by anyone while <see cref="Visibility"/> is
 /// public, and only through the allow-listed projection in <c>Features/Publishing</c> (ADR 0036).

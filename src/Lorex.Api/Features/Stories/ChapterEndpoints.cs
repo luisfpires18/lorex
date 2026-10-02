@@ -53,9 +53,9 @@ public static class ChapterEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await StoryEndpoints.OwnsStoryAsync(db, universeId, storyId, principal, cancellationToken))
+        if (await StoryEndpoints.DenyStoryAsync(db, universeId, storyId, principal, UniverseCapability.Read, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         return Results.Ok(await LoadChaptersAsync(db, storyId, cancellationToken));
@@ -69,9 +69,9 @@ public static class ChapterEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await StoryEndpoints.OwnsStoryAsync(db, universeId, storyId, principal, cancellationToken))
+        if (await StoryEndpoints.DenyStoryAsync(db, universeId, storyId, principal, UniverseCapability.Read, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var chapter = await db.Chapters.AsNoTracking()
@@ -91,9 +91,9 @@ public static class ChapterEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var story = await StoryEndpoints.FindAsync(db, universeId, storyId, cancellationToken);
@@ -153,9 +153,9 @@ public static class ChapterEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var story = await StoryEndpoints.FindAsync(db, universeId, storyId, cancellationToken);
@@ -206,9 +206,9 @@ public static class ChapterEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageTrash, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -280,9 +280,9 @@ public static class ChapterEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);

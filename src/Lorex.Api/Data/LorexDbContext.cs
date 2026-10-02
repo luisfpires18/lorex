@@ -26,6 +26,8 @@ public class LorexDbContext(DbContextOptions<LorexDbContext> options)
 {
     public DbSet<Universe> Universes => Set<Universe>();
 
+    public DbSet<UniverseMembership> UniverseMemberships => Set<UniverseMembership>();
+
     public DbSet<UniverseArtwork> UniverseArtworks => Set<UniverseArtwork>();
 
     public DbSet<EntityType> EntityTypes => Set<EntityType>();

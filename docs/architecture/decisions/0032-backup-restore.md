@@ -266,3 +266,8 @@ ordered by name, as the app orders them), so a valid file is never rearranged. R
 nested in a second write of the same transaction, because the database checks a parent as each row is written and one save
 does not promise parents first. Two restores of one file make two independent, identical trees. Files at version 18 and
 earlier restore flat.
+
+## Amendment: collaboration (2026-10-02, ADR 0041)
+
+A restored universe belongs to the restoring account alone, whoever exported it and whoever could reach the original. A
+restore never creates a membership and the archive holds none to restore; its answer carries `accessRole` Owner.

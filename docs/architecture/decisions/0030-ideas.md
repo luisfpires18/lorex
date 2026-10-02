@@ -188,3 +188,9 @@ A universe's Ideas open only that universe's ideas. An address `/app/universes/{
 ideas that belongs to another universe, or to none, shows nothing of it - "This idea is not in …" with a link to open it in
 all ideas; another account's idea, or none, is the existing "not here". An idea moved out while open keeps its notice, and a
 new idea started in a universe but saved to another, or to none, opens among all ideas.
+
+## Amendment - collaboration (2026-10-02, ADR 0041)
+
+Ideas stay the account's. Being a member of someone else's universe shares nobody's ideas: lists, reads and universe search
+return the caller's own only. An idea may still be assigned to, and point into, only a universe its author **owns**; letting
+a collaborator's idea point into a shared universe would widen what an idea can see, and is left as a follow-up.

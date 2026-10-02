@@ -9,9 +9,9 @@ namespace Lorex.Api.Features.Publishing;
 /// <summary>
 /// An owner preparing, publishing and unpublishing one universe's public shell (ADR 0036).
 ///
-/// <para><b>Owner-scoped like every universe route.</b> Each one finds the universe by its id and the
-/// session's user id together, so another account's universe is a 404, exactly like one that does
-/// not exist. Nothing here is anonymous: the anonymous side is <see cref="PublicUniverseEndpoints"/>,
+/// <para><b>The owner's alone.</b> Each route passes <see cref="UniverseAccess"/>'s Publish capability, so a member is
+/// refused with 403 and any other account gets a 404, exactly like a universe that does not exist (ADR 0041); each still
+/// finds the universe by its id and the owner's id together. Nothing here is anonymous: the anonymous side is <see cref="PublicUniverseEndpoints"/>,
 /// which only reads.</para>
 ///
 /// <para><b>A public universe is never incomplete.</b> Publishing refuses until every requirement
@@ -118,6 +118,11 @@ public static class PublicationEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Publish, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
         var state = await ReadStateAsync(db, universeId, principal.RequireUserId(), cancellationToken);
         return state is null ? Results.NotFound() : Results.Ok(state);
     }
@@ -129,6 +134,11 @@ public static class PublicationEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Publish, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
         var ownerId = principal.RequireUserId();
 
         var errors = new Dictionary<string, string[]>();
@@ -277,6 +287,11 @@ public static class PublicationEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Publish, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
         var ownerId = principal.RequireUserId();
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -347,6 +362,11 @@ public static class PublicationEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Publish, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
         var ownerId = principal.RequireUserId();
 
         var universe = await db.Universes.FirstOrDefaultAsync(
