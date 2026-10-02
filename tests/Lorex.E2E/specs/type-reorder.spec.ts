@@ -219,18 +219,16 @@ test.describe('reordering types on a wide screen', () => {
       ids.get('Primal Runes'),
     )
 
-    // Lore's type row reads the same order.
-    await page.goto(`/app/universes/${u}/lore`)
-    await page.getByTestId('lore-type').first().waitFor()
-    const lore = await page
-      .getByRole('navigation', { name: 'Lore types' })
-      .getByTestId('lore-type')
-      .evaluateAll((all) => all.map((link) => link.getAttribute('data-type-name')))
-    expect(lore.slice(lore.indexOf('Runes'), lore.indexOf('Runes') + 3)).toEqual([
-      'Runes',
-      'Technic Runes',
-      'Corrupted Runes',
-    ])
+    // Lore lists what is inside Runes in the same order, beneath the categories (refinement 028).
+    await page.goto(`/app/universes/${u}/lore?type=${ids.get('Runes')}`)
+    const inside = page.locator(
+      '[data-testid="lore-subtypes"][data-parent-name="Runes"] [data-testid="lore-type"]',
+    )
+    await inside.first().waitFor()
+    const lore = await inside.evaluateAll((all) =>
+      all.map((link) => link.getAttribute('data-type-name')),
+    )
+    expect(lore.slice(0, 2)).toEqual(['Technic Runes', 'Corrupted Runes'])
   })
 
   test('a branch moves whole, a drop lands only between siblings, and nothing changes parent', async ({

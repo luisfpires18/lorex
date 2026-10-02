@@ -399,7 +399,7 @@ test.describe('Lore types', () => {
       } else {
         await expect(page.getByTestId('lore-types')).toBeHidden()
         const trigger = page.getByTestId('lore-type-menu')
-        await expect(trigger).toHaveAccessibleName('Choose type')
+        await expect(trigger).toHaveAccessibleName('Choose category')
         await trigger.click()
         const menu = page.getByTestId('lore-type-menu-panel')
         await expect(menu.getByRole('link')).toHaveCount(all)

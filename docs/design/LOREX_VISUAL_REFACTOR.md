@@ -354,6 +354,10 @@ one-off component per screen.
   universe's order - the hierarchy's preorder since 022, and no All since 022; with none chosen,
   nothing is current and nothing is read (refinement 025, ADR 0007). Current = `--accent-wash`. Arrow keys, Home and End as today. On a
   desktop it wraps; on a phone, Decision 1.
+- **Categories, then what is inside (refinement 028).** The types' row lists top-level categories only, with a quiet
+  count on one that holds subtypes. Choosing it opens an inset row beneath - "All <category>" parted by a hairline, then its
+  subtypes, smaller - and so on down the chosen path. Current: accent wash and accent rule; the category a choice sits in:
+  ink, weight and a neutral rule. Phone: a Category menu beside Filters, then one full-width menu per level beneath.
 - **Navigation and list actions are apart (refinement 027).** The types' row is the header's local navigation and
   nothing else (a phone adds Filters beside the type menu). Under it, the list's own controls: search and status, then -
   at the row's far end - Items per page and **Select**. Select comes and goes with the entries on screen, so it never

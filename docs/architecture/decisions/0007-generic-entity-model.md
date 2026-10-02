@@ -93,6 +93,16 @@ via `@dnd-kit/core`; the drop is computed from sibling branches, so it can never
 parent) and a keyboard lifts, moves and drops it from the same grip; Move up / Move down sit in the row's menu. At 640px and
 under there is no grip and no touch drag: Up and Down stay on the row. Reparenting stays Edit's Parent type.
 
+**Amendment (2026-10-02, Product refinement 028): Lore browses categories, not a flat list.** 025's flat preorder row is
+replaced by the hierarchy's own shape, from the same `ParentId` tree - no schema change. The top row lists root types only;
+choosing one that holds others opens a quieter row beneath it, "All <parent>" (the parent itself, which already includes its
+whole branch) and then its direct children; each deeper chosen level that holds types adds one more row. Nested types never
+sit beside the top-level ones. The exact choice is `aria-current="page"`, a category it sits in `aria-current="true"`. A phone
+gets one menu per level ("Category", then "In <parent>"). Bare Lore still reads nothing and still has no "All" at the top; it
+now says "Choose a category to browse your lore." with New entry. An empty category says "No entries in this category
+yet." with its own create. Scope drives the breadcrumb, title, search placeholder ("Search Runes") and New label, which uses
+the type's name as written ("New Runes"). Addresses stay `?type=<id>`.
+
 **Contracts.** `EntityTypeResponse.parentId`; the list stays a flat array, and clients build the tree from ids. The type
 request's `parent` is a wrapper - absent keeps the stored parent, so an older client saving a name cannot detach a type;
 `{ "id": null }` is a root, `{ "id": "…" }` beneath that type. A parent not of this universe is a 400 on `parent`; a cycle is

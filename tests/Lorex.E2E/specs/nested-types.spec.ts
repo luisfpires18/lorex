@@ -91,8 +91,12 @@ const panel = (page: Page) => page.getByTestId('lore-type-menu-panel')
 const row = (page: Page) => page.getByRole('navigation', { name: 'Lore types' })
 const linkIn = (scope: ReturnType<Page['getByTestId']>, name: string) =>
   scope.locator(`[data-type-name="${name}"]`)
-const rowOrder = (page: Page) =>
-  row(page)
+/** The type names one row of the navigation lists - the categories, or what is inside `parent` - in order. */
+const rowOrder = (page: Page, parent?: string) =>
+  (parent
+    ? row(page).locator(`[data-testid="lore-subtypes"][data-parent-name="${parent}"]`)
+    : row(page).getByTestId('lore-categories')
+  )
     .getByTestId('lore-type')
     .evaluateAll((links) => links.map((link) => link.getAttribute('data-type-name')))
 
@@ -144,25 +148,31 @@ test.describe('Lore with nested types', () => {
     await page.waitForURL(/\/lore\/mass-create$/)
   })
 
-  test('the type row lists every type parent-first; a chosen type shows its branch and its path', async ({
+  test('categories first, what is inside a category beneath it; a chosen type shows its branch and its path', async ({
     page,
   }) => {
     await signUp(page)
     const w = await runeWorld(page)
     await page.goto(lore(w.u))
 
-    // Every type, flat and in the hierarchy's order: a parent, then what is nested in it, at any depth.
-    await expect
-      .poll(async () => {
-        const order = await rowOrder(page)
-        return order.slice(order.indexOf('Runes'), order.indexOf('Runes') + 5)
-      })
-      .toEqual(['Runes', 'Material Runes', 'Metal Runes', 'Stone Runes', 'Animal Runes'])
+    // Only the top-level categories at first: nothing nested is listed beside them (refinement 028).
+    await expect.poll(() => rowOrder(page)).toContain('Runes')
+    const top = await rowOrder(page)
+    for (const nested of ['Material Runes', 'Metal Runes', 'Stone Runes', 'Animal Runes']) {
+      expect(top).not.toContain(nested)
+    }
+    await expect(row(page).getByTestId('lore-subtypes')).toHaveCount(0)
 
-    // A parent shows its whole branch - its own entries and every type beneath - and never a sibling branch.
-    await linkIn(row(page), 'Runes').click()
+    // A parent shows its whole branch - its own entries and every type beneath - and never a sibling branch; what is
+    // inside it opens beneath, "All Runes" first and current.
+    await row(page).getByTestId('lore-categories').locator('[data-type-name="Runes"]').click()
     await expect(heading(page)).toHaveText('Runes')
-    await expect(linkIn(row(page), 'Runes')).toHaveAttribute('aria-current', 'page')
+    await expect(
+      row(page).getByTestId('lore-categories').locator('[data-type-name="Runes"]'),
+    ).toHaveAttribute('aria-current', 'page')
+    await expect(row(page).getByTestId('lore-type-all')).toHaveText('All Runes')
+    await expect(row(page).getByTestId('lore-type-all')).toHaveAttribute('aria-current', 'page')
+    expect(await rowOrder(page, 'Runes')).toEqual(['Material Runes', 'Animal Runes'])
     await expect
       .poll(() => names(page))
       .toEqual(['Granite rune', 'Iron rune', 'Rune of beginnings', 'Silver rune', 'Wolf rune'])
@@ -171,13 +181,26 @@ test.describe('Lore with nested types', () => {
     // Cards still name each entry's own type.
     await expect(cards(page).filter({ hasText: 'Silver rune' })).toContainText('Metal Runes')
 
-    // A nested choice says its path above the title; only it is current.
-    await linkIn(row(page), 'Metal Runes').click()
+    // A nested choice, a level at a time: Material opens its own row; Metal says its path above the title. Only it is the
+    // page; the categories it sits in are marked as such on the rows above.
+    await row(page)
+      .locator('[data-testid="lore-subtypes"][data-parent-name="Runes"] [data-testid="lore-type"]')
+      .filter({ hasText: 'Material Runes' })
+      .click()
+    await expect(heading(page)).toHaveText('Material Runes')
+    expect(await rowOrder(page, 'Material Runes')).toEqual(['Metal Runes', 'Stone Runes'])
+    await row(page)
+      .locator('[data-testid="lore-subtypes"][data-parent-name="Material Runes"]')
+      .locator('[data-testid="lore-type"][data-type-name="Metal Runes"]')
+      .click()
     await expect(heading(page)).toHaveText('Metal Runes')
     await expect(page.getByTestId('lore-path')).toHaveText('Lore›Runes›Material Runes')
     await expect.poll(() => names(page)).toEqual(['Silver rune'])
     await expect(row(page).locator('[aria-current="page"]')).toHaveCount(1)
-    await expect(linkIn(row(page), 'Metal Runes')).toHaveAttribute('aria-current', 'page')
+    await expect(
+      row(page).locator('[data-testid="lore-type"][data-type-name="Metal Runes"]'),
+    ).toHaveAttribute('aria-current', 'page')
+    await expect(row(page).locator('[aria-current="true"]')).toHaveCount(2)
 
     // A crumb goes up a level, to that type's branch.
     await page.getByTestId('lore-path').getByRole('link', { name: 'Material Runes' }).click()
@@ -355,24 +378,17 @@ test.describe('Types screen with nested types', () => {
     await page.reload()
     await expect.poll(order).toEqual(moved)
 
-    // Lore's type row, New entry and Mass create all read the same order.
-    // Lore's wrapped type row is a wide screen's.
+    // Lore's rows, New entry and Mass create all read the same order.
+    // Lore's wrapped rows are a wide screen's.
     await page.setViewportSize({ width: 1280, height: 720 })
-    await page.goto(lore(w.u))
+    await page.goto(lore(w.u, `?type=${w.runes}`))
     await expect
       .poll(async () => {
         const lored = await rowOrder(page)
-        return lored.slice(lored.indexOf('Species'), lored.indexOf('Species') + 7)
+        return lored.slice(lored.indexOf('Species'), lored.indexOf('Species') + 3)
       })
-      .toEqual([
-        'Species',
-        'Runes',
-        'Animal Runes',
-        'Material Runes',
-        'Metal Runes',
-        'Stone Runes',
-        'Concept',
-      ])
+      .toEqual(['Species', 'Runes', 'Concept'])
+    expect(await rowOrder(page, 'Runes')).toEqual(['Animal Runes', 'Material Runes'])
 
     const inOrder = [
       'Character',
@@ -485,15 +501,20 @@ async function everySize(
         expect(inRow, at).toBe(true)
       } else {
         await expect(row(page), at).toBeHidden()
-        const trigger = page.getByTestId('lore-type-menu')
-        await expect(trigger, at).toHaveAccessibleName('Type: Outpost')
-        await trigger.click()
-        await expect(linkIn(panel(page), 'Outpost'), at).toHaveAttribute('aria-current', 'page')
-        const box = await panel(page).boundingBox()
+        // One menu per level: the category, then each level down to the deepest, which names the choice.
+        await expect(page.getByTestId('lore-type-menu'), at).toHaveAccessibleName(
+          'Category: Location',
+        )
+        const deepest = page.getByTestId('lore-subtype-menu').last()
+        await expect(deepest, at).toHaveAccessibleName('In District: Outpost')
+        await deepest.click()
+        const sub = page.getByTestId('lore-subtype-menu-panel')
+        await expect(linkIn(sub, 'Outpost'), at).toHaveAttribute('aria-current', 'page')
+        const box = await sub.boundingBox()
         expect(box!.x, at).toBeGreaterThanOrEqual(0)
         expect(box!.x + box!.width, at).toBeLessThanOrEqual(size.width)
         await page.keyboard.press('Escape')
-        await expect(panel(page)).toHaveCount(0)
+        await expect(sub).toHaveCount(0)
       }
       expect(await sideways(page), at).toBeLessThanOrEqual(0)
 
