@@ -51,9 +51,9 @@ public static class RevisionEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageHistory, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         // Reached through the entry, so a trashed entry's history is not reachable either.
@@ -95,9 +95,9 @@ public static class RevisionEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageHistory, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var revision = await LoadAsync(db, universeId, entityId, revisionId, cancellationToken);
@@ -128,9 +128,9 @@ public static class RevisionEndpoints
         CanonPromotionGate gate,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageHistory, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var revision = await LoadAsync(db, universeId, entityId, revisionId, cancellationToken);

@@ -170,9 +170,9 @@ internal static class TrashPermanentDelete
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.PermanentlyDelete, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var items = request.Items;
@@ -245,9 +245,9 @@ internal static class TrashPermanentDelete
         Func<Erased, IResult> answer,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.PermanentlyDelete, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         return await EraseAsync(

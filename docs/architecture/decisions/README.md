@@ -9,7 +9,7 @@ One ADR per durable decision. Rationale lives in the ADR, never here.
 | 0003 | Identity foundation deferred to the auth phase | [0003-identity-foundation.md](0003-identity-foundation.md) |
 | 0004 | PowerShell launcher instead of a custom executable | [0004-local-launcher.md](0004-local-launcher.md) |
 | 0005 | Cookie sessions over token auth | [0005-cookie-authentication.md](0005-cookie-authentication.md) |
-| 0006 | Universe ownership is enforced in every query | [0006-universe-ownership.md](0006-universe-ownership.md) |
+| 0006 | Universe ownership is enforced in every query (access rule superseded by 0041) | [0006-universe-ownership.md](0006-universe-ownership.md) |
 | 0007 | One generic entity model, with relational custom fields (amended 020: starter types seeded once) | [0007-generic-entity-model.md](0007-generic-entity-model.md) |
 | 0008 | A relationship is one row, read from either end | [0008-relationship-direction.md](0008-relationship-direction.md) |
 | 0009 | Fictional chronology is stored as signed integer components | [0009-fictional-chronology.md](0009-fictional-chronology.md) |
@@ -45,7 +45,9 @@ One ADR per durable decision. Rationale lives in the ADR, never here.
 | 0039 | A story's parts are published one by one on its own page; a world may credit the work it is based on | [0039-story-content-publication-and-attribution.md](0039-story-content-publication-and-attribution.md) |
 | 0040 | A type may be enabled for the Family Tree, and a relation kind may mean family without ancestry (supersedes two statements of 0035) | [0040-family-tree-type-semantics.md](0040-family-tree-type-semantics.md) |
 
-All accepted. Next number: `0041`.
+| 0041 | A universe has one owner and may have collaborators, and one gate decides what each may do (supersedes 0006's access rule) | [0041-universe-collaboration-access.md](0041-universe-collaboration-access.md) |
+
+All accepted. Next number: `0042`.
 
 Known limitations are recorded in the ADR that owns them - cross-era ordering on the plain
 reckoning in 0009 and 0011, and years written before a universe named its eras, the listing's

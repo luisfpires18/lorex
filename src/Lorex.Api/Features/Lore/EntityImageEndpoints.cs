@@ -40,8 +40,8 @@ namespace Lorex.Api.Features.Lore;
 /// turns that into a 503 problem carrying Lorex's own sentence. An SDK exception never reaches
 /// the response, and a write that fails part-way sweeps what it had written.</para>
 ///
-/// <para>Every route is universe-owner scoped through <see cref="LoreAccess"/>, so an entry in
-/// someone else's world answers 404 and stays indistinguishable from one that is not there.
+/// <para>Every route passes <see cref="UniverseAccess"/> first: members read, Editors and the owner change (ADR
+/// 0041), and an entry in a world the caller has no access to answers 404, indistinguishable from one that is not there.
 /// Nothing in a response, an error or a log carries a bucket name, an endpoint or a
 /// credential.</para>
 /// </summary>
@@ -126,9 +126,9 @@ public static partial class EntityImageEndpoints
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         // Trashed is not editable, exactly as the entity update path has it.
@@ -319,9 +319,9 @@ public static partial class EntityImageEndpoints
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         // Trashed is not editable here either: a thumbnail is part of the image.
@@ -508,9 +508,9 @@ public static partial class EntityImageEndpoints
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var image = await db.EntityImages
@@ -607,9 +607,9 @@ public static partial class EntityImageEndpoints
         HttpContext context,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Read, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var image = await db.EntityImages.AsNoTracking()

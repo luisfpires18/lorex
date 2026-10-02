@@ -25,7 +25,7 @@ namespace Lorex.Api.Features.Trash;
 /// its container back on its own. A story holds nothing that can refuse it.
 ///
 /// <b>No Canon.</b> Story content contributes no facts (ADR 0024), so no restore passes the promotion gate. Each is one
-/// transaction, owner-gated through the universe, and finds its row only through that universe: another world's id, or
+/// transaction, gated by <see cref="UniverseAccess"/>'s ManageTrash capability, and finds its row only through that universe: another world's id, or
 /// one not in the Trash, answers as missing.
 /// </summary>
 internal static class StoryContentRestore
@@ -40,9 +40,9 @@ internal static class StoryContentRestore
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageTrash, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var story = await db.Stories.FirstOrDefaultAsync(
@@ -68,9 +68,9 @@ internal static class StoryContentRestore
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageTrash, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -118,9 +118,9 @@ internal static class StoryContentRestore
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageTrash, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -178,9 +178,9 @@ internal static class StoryContentRestore
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageTrash, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -228,9 +228,9 @@ internal static class StoryContentRestore
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageTrash, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);

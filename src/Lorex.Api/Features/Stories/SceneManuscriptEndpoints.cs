@@ -60,8 +60,12 @@ public static class SceneManuscriptEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await StoryEndpoints.OwnsStoryAsync(db, universeId, storyId, principal, cancellationToken)
-            || !await SceneInStoryAsync(db, storyId, sceneId, cancellationToken))
+        if (await StoryEndpoints.DenyStoryAsync(db, universeId, storyId, principal, UniverseCapability.Read, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
+        if (!await SceneInStoryAsync(db, storyId, sceneId, cancellationToken))
         {
             return Results.NotFound();
         }
@@ -90,9 +94,9 @@ public static class SceneManuscriptEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         // One transaction for the comparison and the write, so nothing can land between them: SQLite has one writer.
@@ -132,8 +136,12 @@ public static class SceneManuscriptEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await StoryEndpoints.OwnsStoryAsync(db, universeId, storyId, principal, cancellationToken)
-            || !await SceneInStoryAsync(db, storyId, sceneId, cancellationToken))
+        if (await StoryEndpoints.DenyStoryAsync(db, universeId, storyId, principal, UniverseCapability.ManageHistory, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
+        if (!await SceneInStoryAsync(db, storyId, sceneId, cancellationToken))
         {
             return Results.NotFound();
         }
@@ -170,9 +178,9 @@ public static class SceneManuscriptEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await StoryEndpoints.OwnsStoryAsync(db, universeId, storyId, principal, cancellationToken))
+        if (await StoryEndpoints.DenyStoryAsync(db, universeId, storyId, principal, UniverseCapability.ManageHistory, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var revision = await FindRevisionAsync(db, storyId, sceneId, revisionId, cancellationToken);
@@ -203,9 +211,9 @@ public static class SceneManuscriptEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageHistory, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);

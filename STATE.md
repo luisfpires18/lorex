@@ -50,8 +50,26 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
-- **Product refinement 028 - Lore categories** (`feat/lore-category-hierarchy` off `dev` at `19e4cff`, committed, not
-  merged, not pushed). Frontend only; the `ParentId` hierarchy (022) already held the taxonomy. No migration, backup **19**.
+- **Product refinement 029 - collaboration authorization foundation** (`feat/universe-collaboration-foundation` off `dev`
+  at `c58e718`, committed, not merged, not pushed). Security/data foundation only: no invitations, collaborator UI,
+  membership routes, comments, attribution or realtime. ADR 0041 (supersedes 0006's access rule); 0014, 0030, 0032 amended.
+  - `UniverseMemberships` (`AddUniverseMemberships`): key `(UniverseId, UserId)`, `Role` 1-3 by check constraint (Owner is
+    never stored - `Universe.OwnerId` stays the one owner), timestamps, both FKs cascade, `UserId` index. Additive; no row
+    written or rewritten. Rows exist only through tests until invitations.
+  - `Features/Universes/UniverseAccess.cs` replaces `LoreAccess`: role (owner > membership > none, one query), named
+    capabilities (`Read`, `EditContent`, `ManageTrash`, `ManageHistory`, `PermanentlyDelete`, `ManageUniverse`,
+    `Publish`, `Backup`), `DenyAsync` - 404 without access, 403 `universe_permission_denied` without the capability. All ~150
+    routes under a universe gated; Ideas stay owner-only on purpose.
+  - Editor: content, types, media, Canon evaluate/dismiss, Trash + restore, history. Owner only: erase from Trash, universe
+    settings/archive/delete, every publication route, artwork, export. Reviewer = Viewer = read live content.
+  - Universe list/detail: owned + member universes, `accessRole` (numeric enum, TS `UniverseRole`); nothing about others.
+    Backup stays **19**, carries no membership; restore owned by the restorer, no membership.
+  - Tests: API 1251 -> 1271 (`UniverseAccessMatrixTests` 4 - a hand catalog of every universe route x every role, failing
+    on an uncatalogued route; `UniverseCollaborationTests` 15; `UniverseMembershipMigrationTests` 1). `LaterSchema` knows
+    the new table. Playwright: no new spec (no collaboration UI); full run on a fresh database, two workers, retries 0:
+    **370/370** first time, 16.9 min. Release build clean apart from the existing CA1859, no pending model changes.
+- **Product refinement 028 - Lore categories** (`feat/lore-category-hierarchy` off `dev` at `19e4cff`, merged into `dev`
+  at `c58e718`). Frontend only; the `ParentId` hierarchy (022) already held the taxonomy. No migration, backup **19**.
   ADR 0007 amended.
   - `TypeSwitcher`: top-level types only; a chosen type that holds others opens an inset row ("All Runes", then its
     subtypes); deeper levels add rows. Phone: Category menu + Filters, then one menu per level. Cards, filters, Select,
@@ -61,7 +79,7 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - Tests: Playwright 365 -> 370 (`lore-categories.spec.ts`, 5); nested-types, type-filter, types-and-trash,
     lore-type-browser, type-reorder and `support/lore.ts` moved to the category rows and menus.
 - **Product refinement 027 - type drag reorder and stable Lore controls** (`feat/type-drag-reorder-lore-controls` off `dev`
-  at `75517d7`, committed, not merged, not pushed). No migration, backup stays **19**. ADR 0007 amended.
+  at `75517d7`, merged into `dev` at `19e4cff`). No migration, backup stays **19**. ADR 0007 amended.
   - Lore: Select (and Items per page) left the types' row for the list's controls (`lore__controls`: filters, then
     `lore__resultactions`), so the type links no longer re-wrap between a type with entries and one without. Phone: Filters
     folds search and status only; Select keeps its own row.
@@ -1134,7 +1152,9 @@ A public, read-only discovery experience beside the workspace, in the same appli
     fails as a failure instead of telling the author a free name is taken.
 - Under a full parallel Playwright run, `auth.spec.ts` "rejects a wrong password" intermittently
   times out (it navigates to `/login` without awaiting sign-out).
-- 36 migrations, latest `AddEntityTypeFamilyTreeEligibility` - one additive column, `EntityTypes.FamilyTreeEligible`
+- 38 migrations, latest `AddUniverseMemberships` (029) - one additive table, nothing copied, `DROP TABLE` rollback;
+  `UniverseMembershipMigrationTests` walks it on a file. Before it, `AddEntityTypeHierarchy` (nested types). Before that,
+  `AddEntityTypeFamilyTreeEligibility` - one additive column, `EntityTypes.FamilyTreeEligible`
   (false), then on for the untouched starter Character only; native `DROP COLUMN` rollback;
   `EntityTypeFamilyTreeMigrationTests` walks it on a file. Before it, `AddStoryContentPublication` - additive: `Scenes.Visibility`, `Scenes.ManuscriptVisibility`,
   `PlotArcs.Visibility` (0, Private), `Universes.OriginalCreator`/`OriginalWork` (null); nothing public after the upgrade;
@@ -1238,6 +1258,10 @@ tool has changed the picture.
 - **ImageSharp's licence.** `SixLabors.ImageSharp` is under the Six Labors Split License - free
   for personal use and for organisations under $1M revenue, which is true of Lorex today. Worth
   revisiting if that ever stops being true. ADR 0019.
+- **Collaboration, after 029** (ADR 0041) - not gaps: invitations and pending invites, membership routes and the
+  collaborator screen, a role picker, Reviewer comments (planned as a quiet eye action opening a modal), suggestions,
+  attribution (created/edited/trashed/restored by) and activity, concurrent-edit protection, ownership transfer, public
+  collaborator credit; a collaborator's idea pointing into a shared universe; the public page's workspace link for members.
 - **Permanent deletion.** Deferred by Phase 019, so nothing removes an entry - or, since content recovery, a story,
   chapter, scene, arc or beat - for good short of deleting the universe. Two dead ends follow: a type used only by trashed
   entries cannot be deleted until the entry is restored, moved to another type and trashed again (ADR 0015), and an era a

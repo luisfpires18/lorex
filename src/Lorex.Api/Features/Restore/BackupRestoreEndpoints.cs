@@ -256,7 +256,10 @@ public static partial class BackupRestoreEndpoints
                     universe.AccentColor,
                     universe.IsArchived,
                     universe.CreatedAt,
-                    universe.UpdatedAt));
+                    universe.UpdatedAt,
+
+                    // A restored universe is the restoring account's alone: no membership is ever restored (ADR 0041).
+                    UniverseRole.Owner));
         }
         catch (BackupRejectedException rejected)
         {

@@ -1,3 +1,16 @@
+/**
+ * Mirrors the backend enum: the caller's effective role in a universe. Owner comes from the universe itself; the
+ * others from a membership. Not a ladder - what a role may do is decided by the API, capability by capability.
+ */
+export const UniverseRole = {
+  Owner: 0,
+  Viewer: 1,
+  Reviewer: 2,
+  Editor: 3,
+} as const
+
+export type UniverseRoleValue = (typeof UniverseRole)[keyof typeof UniverseRole]
+
 export interface UniverseSummary {
   id: string
   name: string
@@ -5,6 +18,7 @@ export interface UniverseSummary {
   accentColor: string | null
   isArchived: boolean
   updatedAt: string
+  accessRole: UniverseRoleValue
 }
 
 export interface UniverseDetail extends UniverseSummary {

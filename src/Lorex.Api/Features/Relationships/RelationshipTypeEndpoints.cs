@@ -35,9 +35,9 @@ public static class RelationshipTypeEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Read, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         return Results.Ok(await LoadTypesAsync(db, universeId, cancellationToken));
@@ -50,9 +50,9 @@ public static class RelationshipTypeEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var constraints = request.CanonConstraints ?? RelationshipTypeCanonConstraints.None;
@@ -141,7 +141,12 @@ public static class RelationshipTypeEndpoints
         CanonPromotionGate canon,
         CancellationToken cancellationToken)
     {
-        var relationshipType = await FindTypeAsync(db, universeId, typeId, principal, cancellationToken);
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
+        var relationshipType = await FindTypeAsync(db, universeId, typeId, cancellationToken);
         if (relationshipType is null)
         {
             return Results.NotFound();
@@ -211,7 +216,12 @@ public static class RelationshipTypeEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        var relationshipType = await FindTypeAsync(db, universeId, typeId, principal, cancellationToken);
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
+        var relationshipType = await FindTypeAsync(db, universeId, typeId, cancellationToken);
         if (relationshipType is null)
         {
             return Results.NotFound();
@@ -241,22 +251,15 @@ public static class RelationshipTypeEndpoints
 
     // ---------- Helpers ----------
 
+    /// <summary>The type, tracked, found by its id and its universe together. The caller has passed the universe gate.</summary>
     private static async Task<RelationshipType?> FindTypeAsync(
         LorexDbContext db,
         Guid universeId,
         Guid typeId,
-        ClaimsPrincipal principal,
-        CancellationToken cancellationToken)
-    {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
-        {
-            return null;
-        }
-
-        return await db.RelationshipTypes.FirstOrDefaultAsync(
+        CancellationToken cancellationToken) =>
+        await db.RelationshipTypes.FirstOrDefaultAsync(
             type => type.Id == typeId && type.UniverseId == universeId,
             cancellationToken);
-    }
 
     private static async Task<List<RelationshipTypeResponse>> LoadTypesAsync(
         LorexDbContext db,

@@ -14,9 +14,9 @@ namespace Lorex.Api.Features.Export;
 /// <summary>
 /// One route: hand the owner a portable copy of their universe.
 ///
-/// Read-only, authenticated, and gated by the same <see cref="LoreAccess"/> check the rest of
-/// the lore surface uses, so a universe someone else owns is a 404 and stays indistinguishable
-/// from one that does not exist. Archiving does not change any of this: an archived universe
+/// Read-only, authenticated, and the owner's alone through <see cref="UniverseAccess"/> (ADR 0041): a member is
+/// refused with 403, and a universe the caller has no access to is a 404, indistinguishable from one that does not
+/// exist. Archiving does not change any of this: an archived universe
 /// stays owned and readable (ADR 0006), and a backup taken just before deleting one is exactly
 /// when a backup is worth most.
 ///
@@ -57,9 +57,9 @@ public static partial class UniverseExportEndpoints
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Backup, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var snapshot = await new UniverseBackupBuilder(db).BuildAsync(universeId, cancellationToken);

@@ -83,9 +83,9 @@ public static class EntityTypeEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Read, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         // A read only reads. The starter types are written once, when the universe is created (UniverseEndpoints); from
@@ -102,9 +102,9 @@ public static class EntityTypeEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         if (LoreValidation.ValidateEntityType(request) is { } errors)
@@ -176,7 +176,12 @@ public static class EntityTypeEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        var entityType = await FindTypeAsync(db, universeId, typeId, principal, cancellationToken);
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
+        var entityType = await FindTypeAsync(db, universeId, typeId, cancellationToken);
         if (entityType is null)
         {
             return Results.NotFound();
@@ -292,9 +297,9 @@ public static class EntityTypeEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var step = request.Direction?.Trim().ToLowerInvariant() switch
@@ -341,9 +346,9 @@ public static class EntityTypeEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         if (request.Index is not { } index || index < 0)
@@ -482,7 +487,12 @@ public static class EntityTypeEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        var entityType = await FindTypeAsync(db, universeId, typeId, principal, cancellationToken);
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
+        var entityType = await FindTypeAsync(db, universeId, typeId, cancellationToken);
         if (entityType is null)
         {
             return Results.NotFound();
@@ -535,7 +545,12 @@ public static class EntityTypeEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        var entityType = await FindTypeAsync(db, universeId, typeId, principal, cancellationToken);
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
+        var entityType = await FindTypeAsync(db, universeId, typeId, cancellationToken);
         if (entityType is null)
         {
             return Results.NotFound();
@@ -613,7 +628,12 @@ public static class EntityTypeEndpoints
         CanonPromotionGate gate,
         CancellationToken cancellationToken)
     {
-        var entityType = await FindTypeAsync(db, universeId, typeId, principal, cancellationToken);
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
+        var entityType = await FindTypeAsync(db, universeId, typeId, cancellationToken);
         if (entityType is null)
         {
             return Results.NotFound();
@@ -762,7 +782,12 @@ public static class EntityTypeEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        var entityType = await FindTypeAsync(db, universeId, typeId, principal, cancellationToken);
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.EditContent, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
+        var entityType = await FindTypeAsync(db, universeId, typeId, cancellationToken);
         if (entityType is null)
         {
             return Results.NotFound();
@@ -801,21 +826,14 @@ public static class EntityTypeEndpoints
 
     // ---------- Helpers ----------
 
+    /// <summary>The type, tracked, found by its id and its universe together. The caller has passed the universe gate.</summary>
     private static async Task<EntityType?> FindTypeAsync(
         LorexDbContext db,
         Guid universeId,
         Guid typeId,
-        ClaimsPrincipal principal,
-        CancellationToken cancellationToken)
-    {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
-        {
-            return null;
-        }
-
-        return await db.EntityTypes
+        CancellationToken cancellationToken) =>
+        await db.EntityTypes
             .FirstOrDefaultAsync(type => type.Id == typeId && type.UniverseId == universeId, cancellationToken);
-    }
 
     private static void AddOptions(EntityFieldDefinition definition, IReadOnlyList<string>? options)
     {

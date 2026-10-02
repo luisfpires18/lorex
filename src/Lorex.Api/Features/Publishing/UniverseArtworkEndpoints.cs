@@ -67,9 +67,9 @@ public static partial class UniverseArtworkEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Publish, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var artwork = await db.UniverseArtworks.AsNoTracking()
@@ -93,9 +93,9 @@ public static partial class UniverseArtworkEndpoints
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Publish, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         if (file is null || file.Length == 0)
@@ -223,9 +223,9 @@ public static partial class UniverseArtworkEndpoints
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Publish, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var artwork = await db.UniverseArtworks.AsNoTracking()
@@ -378,6 +378,11 @@ public static partial class UniverseArtworkEndpoints
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Publish, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
         var ownerId = principal.RequireUserId();
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -459,6 +464,11 @@ public static partial class UniverseArtworkEndpoints
         HttpContext context,
         CancellationToken cancellationToken)
     {
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Publish, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
         var ownerId = principal.RequireUserId();
 
         var artwork = await db.UniverseArtworks.AsNoTracking()

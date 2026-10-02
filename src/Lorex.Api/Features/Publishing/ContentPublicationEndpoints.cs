@@ -17,8 +17,9 @@ namespace Lorex.Api.Features.Publishing;
 /// may select items while the universe is still private, and making the universe private hides every one of them
 /// without clearing what was selected.</para>
 ///
-/// <para><b>Owner-scoped like every route under a universe.</b> Ownership first, then the item by its id and that
-/// universe together, live only: another account's item, one from another universe and one in the Trash all answer
+/// <para><b>The owner's alone.</b> <see cref="UniverseAccess"/>'s Publish capability first - a member is refused with 403,
+/// and nobody else learns the universe exists (ADR 0041) - then the item by its id and that universe together, live only:
+/// another account's item, one from another universe and one in the Trash all answer
 /// 404. The item in the Trash keeps its selection and its address; restoring it lets it be read again if it and its
 /// universe are still public.</para>
 ///
@@ -149,8 +150,12 @@ public static class ContentPublicationEndpoints
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken)
-            || await StoryEndpoints.FindAsync(db, universeId, storyId, cancellationToken) is not { } story)
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Publish, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
+        if (await StoryEndpoints.FindAsync(db, universeId, storyId, cancellationToken) is not { } story)
         {
             return Results.NotFound();
         }
@@ -183,8 +188,8 @@ public static class ContentPublicationEndpoints
     // ---------- A story's parts (ADR 0039) ----------
 
     /// <summary>
-    /// Selects a scene's outline, or its manuscript, for the story's public page, or takes it back. Idempotent; owner-scoped
-    /// like the story routes - ownership, then the live story, then the live scene in it, so another account's scene, one of
+    /// Selects a scene's outline, or its manuscript, for the story's public page, or takes it back. Idempotent; the owner's
+    /// alone - the Publish capability, then the live story, then the live scene in it, so another account's scene, one of
     /// another story and one in the Trash are all 404. Nothing is minted - a part is read on its story's page - and, like
     /// every selection, it is not an edit: no <c>UpdatedAt</c>, history or search change.
     /// </summary>
@@ -198,8 +203,12 @@ public static class ContentPublicationEndpoints
         ContentVisibility to,
         CancellationToken cancellationToken)
     {
-        if (!await StoryEndpoints.OwnsStoryAsync(db, universeId, storyId, principal, cancellationToken)
-            || await db.Scenes.FirstOrDefaultAsync(
+        if (await StoryEndpoints.DenyStoryAsync(db, universeId, storyId, principal, UniverseCapability.Publish, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
+        if (await db.Scenes.FirstOrDefaultAsync(
                 scene => scene.Id == sceneId && scene.StoryId == storyId && scene.DeletedAt == null,
                 cancellationToken) is not { } scene)
         {
@@ -229,8 +238,12 @@ public static class ContentPublicationEndpoints
         ContentVisibility to,
         CancellationToken cancellationToken)
     {
-        if (!await StoryEndpoints.OwnsStoryAsync(db, universeId, storyId, principal, cancellationToken)
-            || await db.PlotArcs.FirstOrDefaultAsync(
+        if (await StoryEndpoints.DenyStoryAsync(db, universeId, storyId, principal, UniverseCapability.Publish, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
+        if (await db.PlotArcs.FirstOrDefaultAsync(
                 arc => arc.Id == plotArcId && arc.StoryId == storyId && arc.DeletedAt == null,
                 cancellationToken) is not { } arc)
         {
@@ -269,9 +282,9 @@ public static class ContentPublicationEndpoints
         // A read takes no write lock: SQLite has one writer, and a GET should not queue behind it.
         await using var transaction = to is null ? null : await db.Database.BeginTransactionAsync(cancellationToken);
 
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Publish, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         var item = await find();

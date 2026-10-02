@@ -9,9 +9,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Lorex.Api.Features.Universes;
 
 /// <summary>
-/// Universe CRUD. Every route in this group requires authentication, and every query
-/// starts from the caller's own universes: there is no code path that reads or writes a
-/// universe without an <c>OwnerId</c> filter.
+/// Universe CRUD. Every route in this group requires authentication. The list and a read reach the universes the
+/// caller owns or is a member of; changing the universe itself is the owner's alone, through
+/// <see cref="UniverseAccess"/> (ADR 0041).
 /// </summary>
 public static partial class UniverseEndpoints
 {
@@ -44,12 +44,15 @@ public static partial class UniverseEndpoints
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = DefaultPageSize)
     {
-        var ownerId = principal.RequireUserId();
+        var userId = principal.RequireUserId();
 
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
-        var query = db.Universes.AsNoTracking().Where(universe => universe.OwnerId == ownerId);
+        // Owned or shared, as one filter on Universes rather than a join, so a universe appears once even if a malformed
+        // membership row also names its owner. The membership test is an EXISTS on the (UniverseId, UserId) key.
+        var query = db.Universes.AsNoTracking().Where(universe => universe.OwnerId == userId
+            || db.UniverseMemberships.Any(membership => membership.UniverseId == universe.Id && membership.UserId == userId));
 
         if (!includeArchived)
         {
@@ -80,7 +83,13 @@ public static partial class UniverseEndpoints
                 universe.Description,
                 universe.AccentColor,
                 universe.IsArchived,
-                universe.UpdatedAt))
+                universe.UpdatedAt,
+                universe.OwnerId == userId
+                    ? UniverseRole.Owner
+                    : db.UniverseMemberships
+                        .Where(membership => membership.UniverseId == universe.Id && membership.UserId == userId)
+                        .Select(membership => membership.Role)
+                        .First()))
             .ToListAsync(cancellationToken);
 
         var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize);
@@ -94,10 +103,14 @@ public static partial class UniverseEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        var ownerId = principal.RequireUserId();
+        // 404 for no access at all: someone else's universe must not be distinguishable from one that does not exist.
+        if (await UniverseAccess.RoleAsync(db, id, principal.RequireUserId(), cancellationToken) is not { } role)
+        {
+            return Results.NotFound();
+        }
 
         var universe = await db.Universes.AsNoTracking()
-            .Where(candidate => candidate.Id == id && candidate.OwnerId == ownerId)
+            .Where(candidate => candidate.Id == id)
             .Select(candidate => new UniverseDetail(
                 candidate.Id,
                 candidate.Name,
@@ -105,11 +118,10 @@ public static partial class UniverseEndpoints
                 candidate.AccentColor,
                 candidate.IsArchived,
                 candidate.CreatedAt,
-                candidate.UpdatedAt))
+                candidate.UpdatedAt,
+                role))
             .FirstOrDefaultAsync(cancellationToken);
 
-        // 404 rather than 403: someone else's universe must not be distinguishable from
-        // one that does not exist.
         return universe is null ? Results.NotFound() : Results.Ok(universe);
     }
 
@@ -173,6 +185,11 @@ public static partial class UniverseEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
+        if (await UniverseAccess.DenyAsync(db, id, principal, UniverseCapability.ManageUniverse, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
         var ownerId = principal.RequireUserId();
 
         if (Validate(request.Name, request.Description, request.AccentColor) is { } errors)
@@ -234,6 +251,11 @@ public static partial class UniverseEndpoints
         bool archived,
         CancellationToken cancellationToken)
     {
+        if (await UniverseAccess.DenyAsync(db, id, principal, UniverseCapability.ManageUniverse, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
         var ownerId = principal.RequireUserId();
 
         var universe = await FindOwnedAsync(db, id, ownerId, cancellationToken);
@@ -258,6 +280,11 @@ public static partial class UniverseEndpoints
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
+        if (await UniverseAccess.DenyAsync(db, id, principal, UniverseCapability.ManageUniverse, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
         var ownerId = principal.RequireUserId();
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -299,9 +326,10 @@ public static partial class UniverseEndpoints
             universe => universe.Id == id && universe.OwnerId == ownerId,
             cancellationToken);
 
+    /// <summary>Only ever answered to the owner: every route that returns it is the owner's.</summary>
     private static UniverseDetail ToDetail(Universe universe) =>
         new(universe.Id, universe.Name, universe.Description, universe.AccentColor,
-            universe.IsArchived, universe.CreatedAt, universe.UpdatedAt);
+            universe.IsArchived, universe.CreatedAt, universe.UpdatedAt, UniverseRole.Owner);
 
     /// <summary>Also answered by a restore, which creates a universe under the same rule (ADR 0032).</summary>
     internal static IResult NameTakenProblem() =>

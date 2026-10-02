@@ -16,7 +16,14 @@ internal static class LaterSchema
         "EntityTypes_KeepsChildren_Delete",
     ];
 
-    /// <summary>Whether an index or trigger name (or "name on table") predates nested types.</summary>
+    /// <summary>Memberships (AddUniverseMemberships, 2026-10-02, ADR 0041): a table, its key's index and one index.</summary>
+    private static readonly string[] Memberships =
+    [
+        "sqlite_autoindex_UniverseMemberships_1",
+        "IX_UniverseMemberships_UserId",
+    ];
+
+    /// <summary>Whether an index or trigger name (or "name on table") predates nested types - and so everything after them.</summary>
     public static bool BeforeNestedTypes(string name) =>
-        !NestedTypes.Any(later => name == later || name.StartsWith($"{later} ", StringComparison.Ordinal));
+        !NestedTypes.Concat(Memberships).Any(later => name == later || name.StartsWith($"{later} ", StringComparison.Ordinal));
 }

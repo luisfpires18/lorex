@@ -335,7 +335,7 @@ public static class IdeaEndpoints
         CancellationToken cancellationToken,
         [FromQuery] string? search = null)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (!await OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
         {
             return Results.NotFound();
         }
@@ -465,7 +465,7 @@ public static class IdeaEndpoints
                 };
         }
 
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId.Value, ownerId, cancellationToken))
+        if (!await OwnsUniverseAsync(db, universeId.Value, ownerId, cancellationToken))
         {
             return new Dictionary<string, string[]>
             {
@@ -530,6 +530,17 @@ public static class IdeaEndpoints
                 ["code"] = ChangedCode,
                 ["updatedAt"] = Utc(current),
             });
+
+    /// <summary>
+    /// Whether the caller owns the universe. Deliberately owner-only, not <c>UniverseAccess</c>: an idea is account data,
+    /// and membership of someone else's universe does not let one's ideas point into it (ADR 0041).
+    /// </summary>
+    private static Task<bool> OwnsUniverseAsync(
+        LorexDbContext db,
+        Guid universeId,
+        string ownerId,
+        CancellationToken cancellationToken) =>
+        db.Universes.AnyAsync(universe => universe.Id == universeId && universe.OwnerId == ownerId, cancellationToken);
 
     /// <summary>Escapes the LIKE wildcards so a search for "100%" cannot match everything.</summary>
     internal static string EscapeLike(string value) =>

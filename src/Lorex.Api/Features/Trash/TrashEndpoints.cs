@@ -22,8 +22,10 @@ namespace Lorex.Api.Features.Trash;
 /// action removed (a relationship, a moment), a derived record nothing authors (a Canon conflict), or a configuration
 /// object whose deletion is already refused while anything depends on it.
 ///
-/// Universe-scoped and owner-gated on every route, through the same <see cref="LoreAccess"/> check as the rest of the
-/// workspace, so another author's Trash answers 404 and stays indistinguishable from a universe that does not exist. Every
+/// Universe-scoped and gated on every route by <see cref="UniverseAccess"/> (ADR 0041): Editors and the owner list,
+/// restore and trash; erasing for good is the owner's alone, because the Trash is the owner's recovery copy. A Viewer or
+/// Reviewer is refused with 403, and another author's Trash answers 404, indistinguishable from a universe that does not
+/// exist. Every
 /// restore finds its row through its own universe, so an id from another world answers as missing.
 /// </summary>
 public static class TrashEndpoints
@@ -88,9 +90,9 @@ public static class TrashEndpoints
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = DefaultPageSize)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageTrash, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         page = Math.Max(page, 1);
@@ -297,9 +299,9 @@ public static class TrashEndpoints
         CanonPromotionGate gate,
         CancellationToken cancellationToken)
     {
-        if (!await LoreAccess.OwnsUniverseAsync(db, universeId, principal.RequireUserId(), cancellationToken))
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageTrash, cancellationToken) is { } denied)
         {
-            return Results.NotFound();
+            return denied;
         }
 
         return await gate.RunAsync(
