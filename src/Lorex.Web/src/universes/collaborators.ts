@@ -9,13 +9,14 @@ export interface Collaborator {
   joinedAt: string
 }
 
-/** A pending invitation, as its owner sees it. */
+/** A pending invitation, as its owner sees it, with a freshly protected token for its link. */
 export interface PendingInvitation {
   id: string
   email: string
   role: UniverseRoleValue
   createdAt: string
   expiresAt: string
+  claimToken: string
 }
 
 export interface Collaborators {
@@ -92,9 +93,20 @@ export function listMyInvitations(signal?: AbortSignal) {
   return apiFetch<ReceivedInvitation[]>('/api/invitations', { signal })
 }
 
-export function getMyInvitation(invitationId: string, signal?: AbortSignal) {
-  return apiFetch<ReceivedInvitation>(`/api/invitations/${invitationId}`, { signal })
+/** An invitation reached through its link. Only the account it is for gets an answer (ADR 0041 amendment). */
+export function getClaimedInvitation(token: string, signal?: AbortSignal) {
+  return apiFetch<ReceivedInvitation>(claimPath(token), { signal })
 }
+
+export function acceptClaimedInvitation(token: string) {
+  return apiFetch<AcceptedInvitation>(`${claimPath(token)}/accept`, { method: 'POST' })
+}
+
+export function declineClaimedInvitation(token: string) {
+  return apiFetch<void>(`${claimPath(token)}/decline`, { method: 'POST' })
+}
+
+const claimPath = (token: string) => `/api/invitations/claim/${encodeURIComponent(token)}`
 
 export function acceptInvitation(invitationId: string) {
   return apiFetch<AcceptedInvitation>(`/api/invitations/${invitationId}/accept`, { method: 'POST' })
@@ -104,7 +116,11 @@ export function declineInvitation(invitationId: string) {
   return apiFetch<void>(`/api/invitations/${invitationId}/decline`, { method: 'POST' })
 }
 
-/** The link an owner sends by hand. Built from this page's own origin: no hostname is written into Lorex. */
-export function invitationLink(invitationId: string) {
-  return `${window.location.origin}/invite/${invitationId}`
+/**
+ * The link an owner sends by hand, carrying the invitation's protected claim token: Lorex verifies no email address, so
+ * the link - not the address - is what lets an invitation nobody was bound to be claimed. Built from this page's own
+ * origin: no hostname is written into Lorex.
+ */
+export function invitationLink(claimToken: string) {
+  return `${window.location.origin}/invite/${encodeURIComponent(claimToken)}`
 }

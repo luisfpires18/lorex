@@ -124,7 +124,7 @@ function Root() {
 
           {/* An invitation link: outside both guards, because signed out it must still say what it is - and only that -
               and offer a way in that comes back here (ADR 0041 amendment). */}
-          <Route path="/invite/:invitationId" element={asScreen('invite', <InvitationPage />)} />
+          <Route path="/invite/:token" element={asScreen('invite', <InvitationPage />)} />
 
           <Route element={<RequireGuest />}>
             <Route path="/login" element={asScreen('login', <LoginPage />)} />

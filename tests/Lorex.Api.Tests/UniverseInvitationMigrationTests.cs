@@ -73,9 +73,9 @@ public sealed class UniverseInvitationMigrationTests : IDisposable
             Assert.Equal(before, after);
             Assert.Equal(0, await db.UniverseInvitations.CountAsync());
             Assert.Equal(
-                ["Id", "UniverseId", "Email", "NormalizedEmail", "Role", "CreatedAt", "ExpiresAt"],
+                ["Id", "UniverseId", "Email", "NormalizedEmail", "TargetUserId", "Role", "CreatedAt", "ExpiresAt"],
                 await Strings(db, "SELECT name AS Value FROM pragma_table_info('UniverseInvitations') ORDER BY cid"));
-            Assert.Equal(["Universes CASCADE"], await Strings(db, "SELECT \"table\" || ' ' || on_delete AS Value FROM pragma_foreign_key_list('UniverseInvitations')"));
+            Assert.Equal(["AspNetUsers CASCADE", "Universes CASCADE"], await Strings(db, "SELECT \"table\" || ' ' || on_delete AS Value FROM pragma_foreign_key_list('UniverseInvitations') ORDER BY \"table\""));
 
             await Insert(db, Guid.NewGuid(), universeId, "ANA@EXAMPLE.TEST", (int)UniverseRole.Editor);
             await Assert.ThrowsAsync<SqliteException>(() => Insert(db, Guid.NewGuid(), universeId, "ANA@EXAMPLE.TEST", (int)UniverseRole.Viewer));
@@ -105,14 +105,15 @@ public sealed class UniverseInvitationMigrationTests : IDisposable
         var invitation = (await invites.Single(response => response.StatusCode == HttpStatusCode.Created)
             .Content.ReadFromJsonAsync<PendingInvitationResponse>())!;
 
-        // The invitee accepts from two tabs at once: one membership, one success, the other told it is spent.
+        // The invitee - no account when invited, so the invitation is unbound - accepts its link from two tabs at once: one
+        // membership, one success, the other told it is spent.
         var (ana, anaId) = await Register(host, "user-invrace-ana", "invrace-ana@example.test");
         var second = host.CreateHttpsClient();
         (await second.PostAsJsonAsync("/api/auth/login", new LoginRequest("user-invrace-ana", Password))).EnsureSuccessStatusCode();
 
         var accepts = await Task.WhenAll(
-            ana.PostAsync($"/api/invitations/{invitation.Id}/accept", null),
-            second.PostAsync($"/api/invitations/{invitation.Id}/accept", null),
+            ana.PostAsync($"{CollaboratorInvitationTests.Claim(invitation.ClaimToken)}/accept", null),
+            second.PostAsync($"{CollaboratorInvitationTests.Claim(invitation.ClaimToken)}/accept", null),
             ana.PostAsync($"/api/invitations/{invitation.Id}/accept", null));
         Assert.Equal(1, accepts.Count(response => response.StatusCode == HttpStatusCode.OK));
         Assert.All(accepts, response => Assert.Contains(response.StatusCode, new[] { HttpStatusCode.OK, HttpStatusCode.NotFound }));
@@ -122,7 +123,7 @@ public sealed class UniverseInvitationMigrationTests : IDisposable
             .Content.ReadFromJsonAsync<PendingInvitationResponse>())!;
         var (ben, benId) = await Register(host, "user-invrace-ben", "invrace-ben@example.test");
         var raced = await Task.WhenAll(
-            ben.PostAsync($"/api/invitations/{late.Id}/accept", null),
+            ben.PostAsync($"{CollaboratorInvitationTests.Claim(late.ClaimToken)}/accept", null),
             owner.DeleteAsync($"/api/universes/{universeId}/invitations/{late.Id}"));
         Assert.All(raced, response => Assert.True((int)response.StatusCode < 500, $"{(int)response.StatusCode}"));
 

@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Lorex.Api.Data.Migrations
 {
     [DbContext(typeof(LorexDbContext))]
-    [Migration("20261002195409_AddUniverseInvitations")]
+    [Migration("20261003004411_AddUniverseInvitations")]
     partial class AddUniverseInvitations
     {
         /// <inheritdoc />
@@ -1802,12 +1802,15 @@ namespace Lorex.Api.Data.Migrations
                     b.Property<int>("Role")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("TargetUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("UniverseId")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("NormalizedEmail");
+                    b.HasIndex("TargetUserId");
 
                     b.HasIndex("UniverseId", "NormalizedEmail")
                         .IsUnique();
@@ -2712,11 +2715,18 @@ namespace Lorex.Api.Data.Migrations
 
             modelBuilder.Entity("Lorex.Api.Features.Universes.UniverseInvitation", b =>
                 {
+                    b.HasOne("Lorex.Api.Features.Auth.LorexUser", "TargetUser")
+                        .WithMany()
+                        .HasForeignKey("TargetUserId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("Lorex.Api.Features.Universes.Universe", "Universe")
                         .WithMany()
                         .HasForeignKey("UniverseId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("TargetUser");
 
                     b.Navigation("Universe");
                 });

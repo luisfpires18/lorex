@@ -19,6 +19,7 @@ namespace Lorex.Api.Data.Migrations
                     UniverseId = table.Column<Guid>(type: "TEXT", nullable: false),
                     Email = table.Column<string>(type: "TEXT", maxLength: 256, nullable: false),
                     NormalizedEmail = table.Column<string>(type: "TEXT", maxLength: 256, nullable: false),
+                    TargetUserId = table.Column<string>(type: "TEXT", nullable: true),
                     Role = table.Column<int>(type: "INTEGER", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
                     ExpiresAt = table.Column<DateTime>(type: "TEXT", nullable: false)
@@ -28,6 +29,12 @@ namespace Lorex.Api.Data.Migrations
                     table.PrimaryKey("PK_UniverseInvitations", x => x.Id);
                     table.CheckConstraint("CK_UniverseInvitations_Role", "\"Role\" IN (1, 2, 3)");
                     table.ForeignKey(
+                        name: "FK_UniverseInvitations_AspNetUsers_TargetUserId",
+                        column: x => x.TargetUserId,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
                         name: "FK_UniverseInvitations_Universes_UniverseId",
                         column: x => x.UniverseId,
                         principalTable: "Universes",
@@ -36,9 +43,9 @@ namespace Lorex.Api.Data.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_UniverseInvitations_NormalizedEmail",
+                name: "IX_UniverseInvitations_TargetUserId",
                 table: "UniverseInvitations",
-                column: "NormalizedEmail");
+                column: "TargetUserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_UniverseInvitations_UniverseId_NormalizedEmail",

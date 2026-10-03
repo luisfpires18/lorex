@@ -306,7 +306,8 @@ export default function UniverseTrash() {
   }, [outcome])
 
   function askToRestore(item: TrashItem) {
-    if (item.publication === TrashPublication.None) {
+    // Someone who cannot publish has no choice to make: the server restores whatever was selected as private (ADR 0041).
+    if (item.publication === TrashPublication.None || !access.publish) {
       void restore(item)
       return
     }
@@ -328,7 +329,9 @@ export default function UniverseTrash() {
     try {
       await restoreFromTrash(universe.id, item)
       let privateNote: ReactNode = null
-      if (keepPrivate) {
+      if (!access.publish && item.publication !== TrashPublication.None) {
+        privateNote = ' It was restored privately: only the owner can publish it again.'
+      } else if (keepPrivate) {
         try {
           await unpublishContent(
             universe.id,
@@ -578,8 +581,8 @@ export default function UniverseTrash() {
             ) : (
               <p>
                 What was removed from this universe&rsquo;s lore, stories and world rules.
-                Everything here can be restored with everything it held. Only the owner can delete
-                anything permanently.
+                Everything here can be restored with everything it held. Restored items that were
+                public will be restored privately. Only the owner can delete anything permanently.
               </p>
             )}
             {access.keepIdeas ? (
@@ -761,7 +764,7 @@ export default function UniverseTrash() {
                     item={item}
                     panelRef={confirmRef}
                     onRestore={() => void restore(item)}
-                    onRestorePrivate={access.publish ? () => void restore(item, true) : undefined}
+                    onRestorePrivate={() => void restore(item, true)}
                     onCancel={cancelConfirming}
                   />
                 ) : null}
@@ -897,8 +900,7 @@ function RestorePublicConfirm({
   item: TrashItem
   panelRef: React.RefObject<HTMLDivElement | null>
   onRestore: () => void
-  /** Absent for anyone who cannot change publication: they restore the owner's selection as it was. */
-  onRestorePrivate?: () => void
+  onRestorePrivate: () => void
   onCancel: () => void
 }) {
   const noun = item.kind === TrashKind.Entry ? 'entry' : 'story'
@@ -941,9 +943,6 @@ function RestorePublicConfirm({
                 : 'this universe is public'
             }.`}
       </p>
-      {onRestorePrivate ? null : (
-        <p className="trash__confirmtext">Only the owner can change whether it is public.</p>
-      )}
       <div className="form__actions">
         <button
           className="button"
@@ -951,22 +950,16 @@ function RestorePublicConfirm({
           onClick={onRestore}
           data-testid="trash-confirm-restore"
         >
-          {onRestorePrivate
-            ? visible
-              ? 'Restore and publish'
-              : 'Restore, keep selected'
-            : 'Restore'}
+          {visible ? 'Restore and publish' : 'Restore, keep selected'}
         </button>
-        {onRestorePrivate ? (
-          <button
-            className="button button--secondary"
-            type="button"
-            onClick={onRestorePrivate}
-            data-testid="trash-confirm-private"
-          >
-            Restore as private
-          </button>
-        ) : null}
+        <button
+          className="button button--secondary"
+          type="button"
+          onClick={onRestorePrivate}
+          data-testid="trash-confirm-private"
+        >
+          Restore as private
+        </button>
         <button
           className="button button--text"
           type="button"

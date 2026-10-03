@@ -117,7 +117,7 @@ public sealed class CollaboratorInvitationTests(LorexApiFactory factory) : IClas
         Assert.Equal(HttpStatusCode.Created, known.StatusCode);
         Assert.Equal(HttpStatusCode.Created, unknown.StatusCode);
         Assert.Equal(Shape(await known.Content.ReadAsStringAsync()), Shape(await unknown.Content.ReadAsStringAsync()));
-        Assert.Equal(["createdAt", "email", "expiresAt", "id", "role"], Shape(await known.Content.ReadAsStringAsync()));
+        Assert.Equal(["claimToken", "createdAt", "email", "expiresAt", "id", "role"], Shape(await known.Content.ReadAsStringAsync()));
     }
 
     [Fact]
@@ -136,9 +136,11 @@ public sealed class CollaboratorInvitationTests(LorexApiFactory factory) : IClas
         Assert.Equal(UniverseRole.Viewer, only.Role);
         Assert.Equal("Inv-Norm.Ana@Example.test", only.Email);
 
-        // An account registered in lower case finds the invitation typed in mixed case.
+        // An account registered afterwards in lower case is not shown it - an unverified address proves nothing - but its
+        // link, for an address typed in mixed case, opens for that account.
         var (ana, _) = await Register(_factory, "inv-norm-ana", "inv-norm.ana@example.test");
-        Assert.Equal(first.Id, Assert.Single(await Mine(ana)).Id);
+        Assert.Empty(await Mine(ana));
+        Assert.Equal(first.Id, (await ana.GetFromJsonAsync<ReceivedInvitationResponse>(Claim(first.ClaimToken)))!.Id);
     }
 
     [Fact]
@@ -162,12 +164,12 @@ public sealed class CollaboratorInvitationTests(LorexApiFactory factory) : IClas
     public async Task A_role_changed_while_pending_is_the_role_accepting_gives()
     {
         var w = await NewSharedWorld(_factory, "inv-change");
+        var (ana, anaId) = await Register(_factory, "inv-change-ana", "inv-change-ana@example.test");
         var invitation = await Invited(w.Owner, w.U, "inv-change-ana@example.test", UniverseRole.Viewer);
 
         var changed = await w.Owner.PutAsJsonAsync($"/api/universes/{w.U}/invitations/{invitation.Id}", new CollaboratorRoleRequest(UniverseRole.Editor));
         Assert.Equal(UniverseRole.Editor, (await changed.Content.ReadFromJsonAsync<PendingInvitationResponse>())!.Role);
 
-        var (ana, anaId) = await Register(_factory, "inv-change-ana", "inv-change-ana@example.test");
         Assert.Equal(UniverseRole.Editor, Assert.Single(await Mine(ana)).Role);
 
         var accepted = await ana.PostAsync($"/api/invitations/{invitation.Id}/accept", null);
@@ -179,15 +181,16 @@ public sealed class CollaboratorInvitationTests(LorexApiFactory factory) : IClas
     public async Task A_revoked_invitation_is_simply_gone()
     {
         var w = await NewSharedWorld(_factory, "inv-revoke");
-        var invitation = await Invited(w.Owner, w.U, "inv-revoke-ana@example.test", UniverseRole.Editor);
         var (ana, anaId) = await Register(_factory, "inv-revoke-ana", "inv-revoke-ana@example.test");
+        var invitation = await Invited(w.Owner, w.U, "inv-revoke-ana@example.test", UniverseRole.Editor);
 
         Assert.Equal(HttpStatusCode.NoContent, (await w.Owner.DeleteAsync($"/api/universes/{w.U}/invitations/{invitation.Id}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await w.Owner.DeleteAsync($"/api/universes/{w.U}/invitations/{invitation.Id}")).StatusCode);
 
         Assert.Empty((await Collaborators(w.Owner, w.U)).Invitations);
         Assert.Empty(await Mine(ana));
-        await AssertCode(await ana.GetAsync($"/api/invitations/{invitation.Id}"), HttpStatusCode.NotFound, InvitationEndpoints.NotFoundCode);
+        await AssertCode(await ana.GetAsync(Claim(invitation.ClaimToken)), HttpStatusCode.NotFound, InvitationEndpoints.NotFoundCode);
+        await AssertCode(await ana.PostAsync($"{Claim(invitation.ClaimToken)}/accept", null), HttpStatusCode.NotFound, InvitationEndpoints.NotFoundCode);
         await AssertCode(await ana.PostAsync($"/api/invitations/{invitation.Id}/accept", null), HttpStatusCode.NotFound, InvitationEndpoints.NotFoundCode);
         await AssertNotMember(w.U, anaId);
     }
@@ -196,16 +199,17 @@ public sealed class CollaboratorInvitationTests(LorexApiFactory factory) : IClas
     public async Task An_expired_invitation_cannot_be_used_and_never_blocks_a_fresh_one()
     {
         var w = await NewSharedWorld(_factory, "inv-expire");
-        var stale = await Invited(w.Owner, w.U, "inv-expire-ana@example.test", UniverseRole.Editor);
         var (ana, anaId) = await Register(_factory, "inv-expire-ana", "inv-expire-ana@example.test");
+        var stale = await Invited(w.Owner, w.U, "inv-expire-ana@example.test", UniverseRole.Editor);
         await Expire(stale.Id);
 
         Assert.Empty(await Mine(ana));
         Assert.Empty((await Collaborators(w.Owner, w.U)).Invitations);
-        var read = await ana.GetAsync($"/api/invitations/{stale.Id}");
+        var read = await ana.GetAsync(Claim(stale.ClaimToken));
         await AssertCode(read, HttpStatusCode.Gone, InvitationEndpoints.ExpiredCode);
         Assert.DoesNotContain("Shared inv-expire", await read.Content.ReadAsStringAsync(), StringComparison.Ordinal);
         await AssertCode(await ana.PostAsync($"/api/invitations/{stale.Id}/accept", null), HttpStatusCode.Gone, InvitationEndpoints.ExpiredCode);
+        await AssertCode(await ana.PostAsync($"{Claim(stale.ClaimToken)}/accept", null), HttpStatusCode.Gone, InvitationEndpoints.ExpiredCode);
         Assert.Equal(HttpStatusCode.NotFound, (await w.Owner.PutAsJsonAsync($"/api/universes/{w.U}/invitations/{stale.Id}", new CollaboratorRoleRequest(UniverseRole.Viewer))).StatusCode);
         await AssertNotMember(w.U, anaId);
 
@@ -227,8 +231,9 @@ public sealed class CollaboratorInvitationTests(LorexApiFactory factory) : IClas
     {
         var (owner, _) = await PublishingTestClient.Account(_factory, "inv-cascade");
         var universe = await CreateUniverse(owner, "Inv cascade");
-        var invitation = await Invited(owner, universe.Id, "inv-cascade-ana@example.test", UniverseRole.Editor);
         var (ana, _) = await Register(_factory, "inv-cascade-ana", "inv-cascade-ana@example.test");
+        var invitation = await Invited(owner, universe.Id, "inv-cascade-ana@example.test", UniverseRole.Editor);
+        Assert.Single(await Mine(ana));
 
         await Ok(owner.PostAsync($"/api/universes/{universe.Id}/archive", null));
         await Ok(owner.DeleteAsync($"/api/universes/{universe.Id}"));
@@ -243,13 +248,13 @@ public sealed class CollaboratorInvitationTests(LorexApiFactory factory) : IClas
     public async Task The_matching_account_sees_accepts_and_works_in_the_universe()
     {
         var w = await NewSharedWorld(_factory, "inv-accept");
-        var invitation = await Invited(w.Owner, w.U, "inv-accept-ana@example.test", UniverseRole.Editor);
         var (ana, anaId) = await Register(_factory, "inv-accept-ana", "inv-accept-ana@example.test");
+        var invitation = await Invited(w.Owner, w.U, "inv-accept-ana@example.test", UniverseRole.Editor);
         var (stranger, _) = await Register(_factory, "inv-accept-other", "inv-accept-other@example.test");
 
         var offered = Assert.Single(await Mine(ana));
         Assert.Equal(new ReceivedInvitationResponse(invitation.Id, w.U, "Shared inv-accept", UniverseRole.Editor, invitation.ExpiresAt), offered);
-        Assert.Equal(offered, await ana.GetFromJsonAsync<ReceivedInvitationResponse>($"/api/invitations/{invitation.Id}"));
+        Assert.Equal(offered, await ana.GetFromJsonAsync<ReceivedInvitationResponse>(Claim(invitation.ClaimToken)));
         Assert.Empty(await Mine(stranger));
         Assert.Empty(await Mine(w.Editor));
 
@@ -277,8 +282,8 @@ public sealed class CollaboratorInvitationTests(LorexApiFactory factory) : IClas
     public async Task Declining_spends_the_invitation_and_makes_nothing()
     {
         var w = await NewSharedWorld(_factory, "inv-decline");
-        var invitation = await Invited(w.Owner, w.U, "inv-decline-ana@example.test", UniverseRole.Editor);
         var (ana, anaId) = await Register(_factory, "inv-decline-ana", "inv-decline-ana@example.test");
+        var invitation = await Invited(w.Owner, w.U, "inv-decline-ana@example.test", UniverseRole.Editor);
 
         Assert.Equal(HttpStatusCode.NoContent, (await ana.PostAsync($"/api/invitations/{invitation.Id}/decline", null)).StatusCode);
 
@@ -296,13 +301,14 @@ public sealed class CollaboratorInvitationTests(LorexApiFactory factory) : IClas
         var invitation = await Invited(w.Owner, w.U, "inv-wrong-ana@example.test", UniverseRole.Editor);
         var (other, otherId) = await Register(_factory, "inv-wrong-other", "inv-wrong-other@example.test");
 
+        var link = Claim(invitation.ClaimToken);
         foreach (var response in new[]
         {
-            await other.GetAsync($"/api/invitations/{invitation.Id}"),
-            await other.PostAsync($"/api/invitations/{invitation.Id}/accept", null),
-            await other.PostAsync($"/api/invitations/{invitation.Id}/decline", null),
-            await w.Editor.PostAsync($"/api/invitations/{invitation.Id}/accept", null),
-            await w.Owner.PostAsync($"/api/invitations/{invitation.Id}/accept", null),
+            await other.GetAsync(link),
+            await other.PostAsync($"{link}/accept", null),
+            await other.PostAsync($"{link}/decline", null),
+            await w.Editor.PostAsync($"{link}/accept", null),
+            await w.Owner.PostAsync($"{link}/accept", null),
         })
         {
             var body = await response.Content.ReadAsStringAsync();
@@ -313,17 +319,23 @@ public sealed class CollaboratorInvitationTests(LorexApiFactory factory) : IClas
             }
         }
 
+        // By id - without the link - it is not there for anyone, bound to no one as it is.
+        foreach (var who in new[] { other, w.Editor, w.Owner })
+        {
+            await AssertCode(await who.PostAsync($"/api/invitations/{invitation.Id}/accept", null), HttpStatusCode.NotFound, InvitationEndpoints.NotFoundCode);
+        }
+
         // Expired makes no difference to what another account is told.
         await Expire(invitation.Id);
-        await AssertCode(await other.GetAsync($"/api/invitations/{invitation.Id}"), HttpStatusCode.Forbidden, InvitationEndpoints.OtherAccountCode);
+        await AssertCode(await other.GetAsync(link), HttpStatusCode.Forbidden, InvitationEndpoints.OtherAccountCode);
 
         await AssertNotMember(w.U, otherId);
         await WithDb(_factory, async db => Assert.True(await db.UniverseInvitations.AnyAsync(row => row.Id == invitation.Id)));
 
         // Nobody signed out learns anything at all.
         var anonymous = _factory.CreateClient();
-        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"/api/invitations/{invitation.Id}")).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.PostAsync($"/api/invitations/{invitation.Id}/accept", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync(link)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.PostAsync($"{link}/accept", null)).StatusCode);
     }
 
     [Fact]
@@ -339,7 +351,7 @@ public sealed class CollaboratorInvitationTests(LorexApiFactory factory) : IClas
             db.UniverseInvitations.Add(new UniverseInvitation
             {
                 Id = id, UniverseId = w.U, Email = "inv-ownacc-owner@example.test", NormalizedEmail = "INV-OWNACC-OWNER@EXAMPLE.TEST",
-                Role = UniverseRole.Editor, CreatedAt = now, ExpiresAt = now.AddDays(30),
+                TargetUserId = w.OwnerId, Role = UniverseRole.Editor, CreatedAt = now, ExpiresAt = now.AddDays(30),
             });
             await db.SaveChangesAsync();
         });
@@ -457,6 +469,9 @@ public sealed class CollaboratorInvitationTests(LorexApiFactory factory) : IClas
 
     private static async Task<CollaboratorsResponse> Collaborators(HttpClient owner, Guid universeId) =>
         (await owner.GetFromJsonAsync<CollaboratorsResponse>($"/api/universes/{universeId}/collaborators"))!;
+
+    /// <summary>The claim routes of an invitation's protected link.</summary>
+    internal static string Claim(string token) => $"/api/invitations/claim/{Uri.EscapeDataString(token)}";
 
     private static async Task<List<ReceivedInvitationResponse>> Mine(HttpClient client) =>
         (await client.GetFromJsonAsync<List<ReceivedInvitationResponse>>("/api/invitations"))!;

@@ -6,9 +6,9 @@ import { ApiError } from '../lib/api'
 import { useDocumentTitle } from '../lib/useDocumentTitle'
 import { ROLE_DESCRIPTIONS, ROLE_LABELS } from '../universes/access'
 import {
-  acceptInvitation,
-  declineInvitation,
-  getMyInvitation,
+  acceptClaimedInvitation,
+  declineClaimedInvitation,
+  getClaimedInvitation,
   INVITATION_EXPIRED,
   INVITATION_OTHER_ACCOUNT,
   type ReceivedInvitation,
@@ -24,7 +24,8 @@ type State =
   | { kind: 'error'; message: string }
 
 /**
- * `/invite/:invitationId` - the link an owner sends by hand (ADR 0041 amendment).
+ * `/invite/:token` - the link an owner sends by hand, carrying the invitation's protected claim token (ADR 0041
+ * amendment).
  *
  * The id finds an invitation; it opens nothing. Signed out, this page says only that someone was invited to collaborate
  * - no universe, owner, role or address - and offers Sign in and Create account, both of which come back here (the
@@ -32,7 +33,7 @@ type State =
  * invitation names; anyone else is told it is for a different account, and not which.
  */
 export default function InvitationPage() {
-  const { invitationId = '' } = useParams<{ invitationId: string }>()
+  const { token = '' } = useParams<{ token: string }>()
   const { user, isLoading } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
@@ -46,7 +47,7 @@ export default function InvitationPage() {
   useEffect(() => {
     if (!user) return
     const controller = new AbortController()
-    getMyInvitation(invitationId, controller.signal)
+    getClaimedInvitation(token, controller.signal)
       .then((invitation) => setState({ kind: 'ready', invitation }))
       .catch((problem: unknown) => {
         if (controller.signal.aborted) return
@@ -55,18 +56,18 @@ export default function InvitationPage() {
     return () => {
       controller.abort()
     }
-  }, [invitationId, user])
+  }, [token, user])
 
   // Each settled state replaces the heading in place, so the reader is taken to it rather than left where they were.
   useEffect(() => {
     if (state.kind !== 'loading') heading.current?.focus()
   }, [state.kind])
 
-  async function accept(invitation: ReceivedInvitation) {
+  async function accept() {
     setBusy(true)
     setActionError(null)
     try {
-      const accepted = await acceptInvitation(invitation.id)
+      const accepted = await acceptClaimedInvitation(token)
       await navigate(`/app/universes/${accepted.universeId}`, { replace: true })
     } catch (problem: unknown) {
       setBusy(false)
@@ -74,11 +75,11 @@ export default function InvitationPage() {
     }
   }
 
-  async function decline(invitation: ReceivedInvitation) {
+  async function decline() {
     setBusy(true)
     setActionError(null)
     try {
-      await declineInvitation(invitation.id)
+      await declineClaimedInvitation(token)
       setState({ kind: 'declined' })
     } catch (problem: unknown) {
       settleOrSay(problem)
@@ -168,7 +169,7 @@ export default function InvitationPage() {
               <button
                 className="button"
                 type="button"
-                onClick={() => void accept(invitation)}
+                onClick={() => void accept()}
                 disabled={busy}
                 data-testid="invitation-accept"
               >
@@ -177,7 +178,7 @@ export default function InvitationPage() {
               <button
                 className="button button--secondary"
                 type="button"
-                onClick={() => void decline(invitation)}
+                onClick={() => void decline()}
                 disabled={busy}
                 data-testid="invitation-decline"
               >

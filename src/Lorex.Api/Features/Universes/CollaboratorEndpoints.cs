@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using Lorex.Api.Data;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,9 +13,11 @@ namespace Lorex.Api.Features.Universes;
 /// invitations. Every route asks <see cref="UniverseAccess"/> for <see cref="UniverseCapability.ManageCollaborators"/>, so
 /// a collaborator is refused with 403 and anyone else gets the 404 of a missing universe.
 ///
-/// <para><b>An invitation names an address, never an account.</b> Creating one answers the same whether an account
-/// holds that address or not, and nothing here searches accounts. The only account it ever matches against is one
-/// already collaborating on this universe, which the owner can see anyway.</para>
+/// <para><b>An invitation names an address; the owner never learns about accounts.</b> Creating one answers the same,
+/// field for field, whether an account holds that address or not, and nothing here searches accounts. When one does, the
+/// invitation is privately bound to that account's id (<see cref="UniverseInvitation.TargetUserId"/>) - never by email
+/// again afterwards - and no response says so. The only account ever named back is one already collaborating here, which
+/// the owner can see anyway.</para>
 ///
 /// <para>The owner is <see cref="Universe.OwnerId"/> and has no membership row, so none of these routes can reach, change
 /// or remove them: their id answers 404 like any id that collaborates on nothing here.</para>
@@ -46,6 +49,7 @@ public static class CollaboratorEndpoints
         ClaimsPrincipal principal,
         LorexDbContext db,
         TimeProvider clock,
+        IDataProtectionProvider protection,
         CancellationToken cancellationToken)
     {
         if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageCollaborators, cancellationToken) is { } denied)
@@ -62,11 +66,12 @@ public static class CollaboratorEndpoints
                 membership.UserId, membership.User!.UserName!, membership.Role, membership.CreatedAt))
             .ToListAsync(cancellationToken);
 
-        var invitations = await db.UniverseInvitations.AsNoTracking()
+        var invitations = (await db.UniverseInvitations.AsNoTracking()
             .Where(invitation => invitation.UniverseId == universeId && invitation.ExpiresAt > now)
             .OrderByDescending(invitation => invitation.CreatedAt)
-            .Select(invitation => ToResponse(invitation))
-            .ToListAsync(cancellationToken);
+            .ToListAsync(cancellationToken))
+            .Select(invitation => ToResponse(invitation, protection))
+            .ToList();
 
         return Results.Ok(new CollaboratorsResponse(members, invitations));
     }
@@ -78,6 +83,7 @@ public static class CollaboratorEndpoints
         LorexDbContext db,
         ILookupNormalizer normalizer,
         TimeProvider clock,
+        IDataProtectionProvider protection,
         CancellationToken cancellationToken)
     {
         if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageCollaborators, cancellationToken) is { } denied)
@@ -141,12 +147,20 @@ public static class CollaboratorEndpoints
             .Where(invitation => invitation.UniverseId == universeId && invitation.ExpiresAt <= now)
             .ExecuteDeleteAsync(cancellationToken);
 
+        // Private: an account that already holds the address is who the invitation is for, by id from now on. Read here
+        // and never answered - the response below is the same either way.
+        var targetUserId = await db.Users
+            .Where(user => user.NormalizedEmail == normalized)
+            .Select(user => user.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
         var created = new UniverseInvitation
         {
             Id = Guid.NewGuid(),
             UniverseId = universeId,
             Email = email,
             NormalizedEmail = normalized,
+            TargetUserId = targetUserId,
             Role = request.Role!.Value,
             CreatedAt = now,
             ExpiresAt = now + InvitationLimits.Lifetime,
@@ -167,7 +181,7 @@ public static class CollaboratorEndpoints
         }
 
         // The same answer whether or not an account holds the address: the owner learns nothing about accounts.
-        return Results.Created((string?)null, ToResponse(created));
+        return Results.Created((string?)null, ToResponse(created, protection));
     }
 
     private static async Task<IResult> ChangeInvitationRoleAsync(
@@ -177,6 +191,7 @@ public static class CollaboratorEndpoints
         ClaimsPrincipal principal,
         LorexDbContext db,
         TimeProvider clock,
+        IDataProtectionProvider protection,
         CancellationToken cancellationToken)
     {
         if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageCollaborators, cancellationToken) is { } denied)
@@ -205,7 +220,7 @@ public static class CollaboratorEndpoints
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        return Results.Ok(ToResponse(invitation));
+        return Results.Ok(ToResponse(invitation, protection));
     }
 
     /// <summary>Withdraws an invitation, expired or not. Whoever holds its link is told it is no longer available.</summary>
@@ -311,8 +326,9 @@ public static class CollaboratorEndpoints
             .Select(invitation => (Guid?)invitation.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
-    private static PendingInvitationResponse ToResponse(UniverseInvitation invitation) =>
-        new(invitation.Id, invitation.Email, invitation.Role, invitation.CreatedAt, invitation.ExpiresAt);
+    private static PendingInvitationResponse ToResponse(UniverseInvitation invitation, IDataProtectionProvider protection) =>
+        new(invitation.Id, invitation.Email, invitation.Role, invitation.CreatedAt, invitation.ExpiresAt,
+            InvitationClaims.Issue(protection, invitation.Id, invitation.NormalizedEmail));
 
     private static IResult EmailProblem(string message) =>
         Results.ValidationProblem(new Dictionary<string, string[]> { ["email"] = [message] });

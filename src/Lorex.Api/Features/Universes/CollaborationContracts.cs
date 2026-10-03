@@ -14,8 +14,18 @@ public sealed record CollaboratorRoleRequest(UniverseRole? Role);
 /// </summary>
 public sealed record CollaboratorResponse(string UserId, string Username, UniverseRole Role, DateTime JoinedAt);
 
-/// <summary>A pending invitation, as its owner sees it: the address they typed, the role, and when it lapses.</summary>
-public sealed record PendingInvitationResponse(Guid Id, string Email, UniverseRole Role, DateTime CreatedAt, DateTime ExpiresAt);
+/// <summary>
+/// A pending invitation, as its owner sees it: the address they typed, the role, when it lapses, and a freshly protected
+/// <see cref="ClaimToken"/> for its link. Identical in shape whether or not an account held the address: whether it is
+/// bound to one is never said.
+/// </summary>
+public sealed record PendingInvitationResponse(
+    Guid Id,
+    string Email,
+    UniverseRole Role,
+    DateTime CreatedAt,
+    DateTime ExpiresAt,
+    string ClaimToken);
 
 /// <summary>Who works on a universe besides its owner, and who has been asked to. Expired invitations are left out.</summary>
 public sealed record CollaboratorsResponse(

@@ -56,6 +56,15 @@ async function share(owner: Page, universeId: string, member: Person, role: numb
   expect(accepted.ok()).toBe(true)
 }
 
+/** An invitation as the owner's API answers it: its id and the protected token its link carries. */
+async function invite(owner: Page, universeId: string, email: string, role: number) {
+  const response = await owner.request.post(`/api/universes/${universeId}/invitations`, {
+    data: { email, role },
+  })
+  expect(response.ok()).toBe(true)
+  return (await response.json()) as { id: string; claimToken: string }
+}
+
 async function entry(page: Page, universeId: string, name: string) {
   const types = (await (
     await page.request.get(`/api/universes/${universeId}/entity-types`)
@@ -141,7 +150,10 @@ test.describe('collaborators', () => {
     await pending.getByTestId('copy-invite-link').click()
     await expect(pending.getByTestId('copy-invite-link-status')).toHaveText('Invite link copied.')
     const link = await owner.page.evaluate(() => navigator.clipboard.readText())
-    expect(link).toMatch(new RegExp(`^${new URL(owner.page.url()).origin}/invite/[0-9a-f-]{36}$`))
+    // A protected claim token, not the invitation's id: the link is what lets an invitation be claimed.
+    expect(link).toMatch(
+      new RegExp(`^${new URL(owner.page.url()).origin}/invite/[A-Za-z0-9_-]{40,}$`),
+    )
 
     // The invitee, in their own browser, is offered it as Editor - the role it holds now.
     await invitee.page.reload()
@@ -230,14 +242,11 @@ test.describe('collaborators', () => {
     const world = await universe(owner.page)
     const username = unique('linknew')
     const email = `${username}@example.test`
-    const invitationId = await post(owner.page, `/api/universes/${world.id}/invitations`, {
-      email,
-      role: Role.Reviewer,
-    })
+    const { claimToken } = await invite(owner.page, world.id, email, Role.Reviewer)
 
     const context = await browser.newContext()
     const page = await context.newPage()
-    await page.goto(`/invite/${invitationId}`)
+    await page.goto(`/invite/${claimToken}`)
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(
       "You've been invited to collaborate in LoreX.",
     )
@@ -252,7 +261,10 @@ test.describe('collaborators', () => {
     await fillRegistration(page, username, email)
 
     // Back to the invitation, now addressed to this account.
-    await page.waitForURL(`/invite/${invitationId}`)
+    await page.waitForURL(`/invite/${claimToken}`)
+
+    // The address is unverified, so nothing was offered to the new account on its own: only the link opens it.
+    expect(await (await page.request.get('/api/invitations')).json()).toEqual([])
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(world.name)
     await expect(page.getByRole('heading', { level: 1 })).toBeFocused()
     await expect(page.getByText("You've been invited as Reviewer.")).toBeVisible()
@@ -272,12 +284,9 @@ test.describe('collaborators', () => {
     const stranger = await person(browser, 'wrongstranger')
     const world = await universe(owner.page)
     const invited = `${unique('wronginvited')}@example.test`
-    const invitationId = await post(owner.page, `/api/universes/${world.id}/invitations`, {
-      email: invited,
-      role: Role.Editor,
-    })
+    const { claimToken } = await invite(owner.page, world.id, invited, Role.Editor)
 
-    await stranger.page.goto(`/invite/${invitationId}`)
+    await stranger.page.goto(`/invite/${claimToken}`)
     await expect(stranger.page.getByRole('heading', { level: 1 })).toHaveText(
       'This invitation is for a different account.',
     )
@@ -331,6 +340,48 @@ test.describe('collaborators', () => {
 
     await owner.context.close()
     await ana.context.close()
+  })
+})
+
+test.describe('an Editor restores from the Trash', () => {
+  test('something the owner had selected for publication comes back private, without a question', async ({
+    browser,
+  }) => {
+    const owner = await person(browser, 'restoreowner')
+    const editor = await person(browser, 'restoreeditor')
+    const world = await universe(owner.page)
+    await share(owner.page, world.id, editor, Role.Editor)
+    const selected = await entry(owner.page, world.id, 'Selected Heir')
+    const u = `/api/universes/${world.id}`
+    expect((await owner.page.request.post(`${u}/entities/${selected}/publish`)).ok()).toBe(true)
+    expect((await owner.page.request.delete(`${u}/entities/${selected}`)).status()).toBe(204)
+
+    await editor.page.goto(`/app/universes/${world.id}/trash`)
+    await expect(
+      editor.page.getByText('Restored items that were public will be restored privately.'),
+    ).toBeVisible()
+    await editor.page.getByTestId('restore-Selected Heir').click()
+
+    // No publication question for someone who cannot publish: it is simply restored, private, and says so.
+    await expect(editor.page.getByTestId('trash-publication-confirm')).toHaveCount(0)
+    await expect(editor.page.getByTestId('trash-message')).toContainText('restored privately')
+    const state = (await (
+      await owner.page.request.get(`${u}/entities/${selected}/publication`)
+    ).json()) as {
+      visibility: number
+    }
+    expect(state.visibility).toBe(0)
+
+    // The owner's own restore still asks, as it always has.
+    expect((await owner.page.request.post(`${u}/entities/${selected}/publish`)).ok()).toBe(true)
+    expect((await owner.page.request.delete(`${u}/entities/${selected}`)).status()).toBe(204)
+    await owner.page.goto(`/app/universes/${world.id}/trash`)
+    await owner.page.getByTestId('restore-Selected Heir').click()
+    await expect(owner.page.getByTestId('trash-publication-confirm')).toBeVisible()
+    await expect(owner.page.getByTestId('trash-confirm-private')).toBeVisible()
+
+    await owner.context.close()
+    await editor.context.close()
   })
 })
 
@@ -464,10 +515,7 @@ test.describe('collaboration on a phone', () => {
       const world = await universe(owner.page)
       await share(owner.page, world.id, ana, Role.Editor)
       const long = `${unique('a-very-long-invited-address-that-keeps-going-')}.and-going@an-equally-long-domain-name.example.test`
-      const invitationId = await post(owner.page, `/api/universes/${world.id}/invitations`, {
-        email: long,
-        role: Role.Viewer,
-      })
+      const { claimToken } = await invite(owner.page, world.id, long, Role.Viewer)
 
       await owner.page.setViewportSize({ width, height: 800 })
       await owner.page.goto(`/app/universes/${world.id}/settings?tab=collaborators`)
@@ -511,7 +559,7 @@ test.describe('collaboration on a phone', () => {
       expect(await sideways(ana.page)).toBeLessThanOrEqual(1)
 
       // The link's page on a phone, as someone else.
-      await ana.page.goto(`/invite/${invitationId}`)
+      await ana.page.goto(`/invite/${claimToken}`)
       await expect(ana.page.getByRole('heading', { level: 1 })).toHaveText(
         'This invitation is for a different account.',
       )

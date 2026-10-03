@@ -91,33 +91,51 @@ exposure, collaboration, backups and irreversible destruction:
 
 ## Amendment: invitations and collaborator management (2026-10-02, refinement 030)
 
-**An invitation targets an email address, never an account.** `UniverseInvitations` (migration `AddUniverseInvitations`):
-random `Guid` id minted by the server, `UniverseId` (cascade), `Email` as typed and `NormalizedEmail` by Identity's own
+**An invitation targets an email address.** `UniverseInvitations` (migration `AddUniverseInvitations`): random `Guid`
+id minted by the server, `UniverseId` (cascade), `Email` as typed and `NormalizedEmail` by Identity's own
 `ILookupNormalizer` - the same normalization `AspNetUsers.NormalizedEmail` carries, so `Ana@Example.com` meets
-`ana@example.com` - `Role` (Viewer, Reviewer, Editor by check constraint), `CreatedAt`, `ExpiresAt`. One row per universe
-and normalized address (unique index); an index on `NormalizedEmail` for the invitee's list. Only pending invitations
-exist: accepting, declining and revoking delete the row. No history.
+`ana@example.com` - an optional `TargetUserId` (cascade with the account; indexed), `Role` (Viewer, Reviewer, Editor by
+check constraint), `CreatedAt`, `ExpiresAt`. One row per universe and normalized address (unique index). Only pending
+invitations exist: accepting, declining and revoking delete the row. No history.
 
-**The owner learns nothing about accounts.** `POST .../invitations` answers 201 with the same shape whether an account
-holds the address or not, and nothing searches accounts. Refused: the owner's own address (400), an address already
+**An email address is not an identity.** Lorex does not verify the address an account registers with; a unique address
+is not a verified one. So email equality alone never entitles anyone to an invitation (corrected before 030 merged - the
+first cut listed and accepted by email match). An invitation is claimed in exactly two ways:
+
+- **Bound.** When an account already holds the address at invite time, the invitation is privately bound to that
+  account's id (`TargetUserId`). Only that id lists it in My workspace (`GET /api/invitations`) and accepts or declines it
+  there by id (`POST /api/invitations/{id}/accept|decline`); every other caller is told it is not there (404).
+- **By its protected link.** Every invitation's link carries a claim token, `/invite/{token}`, issued with ASP.NET Core
+  Data Protection on the host's own key ring, purpose `Lorex.UniverseInvitation.Claim.v1`, payload the invitation id and
+  its normalized address (`InvitationClaims`). The token is the proof for an invitation nobody was bound to: with it, the
+  signed-in account whose normalized email matches may read, accept or decline it (`/api/invitations/claim/{token}`,
+  `/accept`, `/decline`) - the email a consistency check, never the permission. A bound invitation's link still opens only
+  for its bound account. A missing, forged, edited or truncated token is 404, exactly like a revoked invitation.
+
+An unbound invitation is never shown automatically - not even to an account registered later with the same address. Its
+recipient follows the link the owner sends. A future verified-email system could safely restore email-only discovery;
+until then it would be an account-takeover path.
+
+**The owner learns nothing about accounts.** `POST .../invitations` answers 201 with the same fields whether an account
+holds the address or not - the binding is read and stored privately, never answered, and no response carries an account
+id - and nothing searches accounts. Refused: the owner's own address (400), an address already
 collaborating here (400, the owner can see them anyway), a live invitation to the same address (409 `invitation_pending`
 naming its id, to change, copy or revoke - never a second row), and any role but Viewer, Reviewer or Editor (400).
 
-**Lorex sends no email.** An invitation is found two ways, both behind sign-in: in My workspace, by any account whose
-normalized email it names (`GET /api/invitations`), and by a link the owner copies and sends by hand,
-`/invite/{id}`, built from the page's own origin. **The id is a locator, not a secret**: every invitee route requires a
-signed-in account whose `NormalizedEmail` - read from the account, never from the request - matches. Signed out, the link
-page says only that someone was invited and offers Sign in and Create account, which return to it through the existing
-router-state return path. Another account learns only "for a different account" (403 `invitation_other_account`), never
-which; a missing, revoked or spent one is 404 `invitation_not_found`; a lapsed one, to its own account, 410
-`invitation_expired`. A future email sender can deliver the same link without changing any of this.
+**Lorex sends no email.** The owner copies the link (`Copy invite link`, built from the page's own origin; each list read
+mints a fresh, equivalent token) and sends it by hand. Signed out, the link page says only that someone was invited and
+offers Sign in and Create account, which return to it through the existing router-state return path. Another account
+learns only "for a different account" (403 `invitation_other_account`), never which; a missing, revoked or spent
+invitation, or a bad token, is 404 `invitation_not_found`; a lapsed one, to its own account, 410 `invitation_expired`. The
+database stays the authority for pending state, role, expiry and revocation, so revoking, expiry, accepting or declining
+ends every token ever issued. A future email sender can deliver the same link without changing any of this.
 
 **Expiry** is one value, `InvitationLimits.Lifetime`, 30 days from creation; a role change does not extend it. A lapsed
 invitation is ignored everywhere, cannot be accepted, and is deleted by the next invitation to its universe, which takes
 its place. No cleanup job.
 
-**Accepting** is one transaction (Microsoft.Data.Sqlite begins it IMMEDIATE): resolve the invitation, check email and
-expiry, refuse the owner (409 `invitation_own_universe`), create the membership with the role the invitation holds at
+**Accepting** is one transaction (Microsoft.Data.Sqlite begins it IMMEDIATE): resolve the invitation (bound id, or token
+and matching email), check expiry, refuse the owner (409 `invitation_own_universe`), create the membership with the role the invitation holds at
 that moment, delete the invitation. An account already a member only spends it. A second accept, a revoke or a role
 change racing it is serialised behind it; the composite membership key and a caught unique or concurrency failure keep
 any race at one membership and a 404, never a 500. **Declining** deletes it and notifies nobody.
@@ -138,3 +156,11 @@ Canon findings, with no create, edit, Trash, history, publication or Canon actio
 and manuscript views. Editors keep every creative control and the Trash without permanent delete. Trash, Publish,
 Settings and Ideas leave the navigation for roles that cannot use them, and a typed address shows "not available" rather
 than a form that would fail. The API stays the only authority.
+
+**Restoring never publishes for someone who cannot publish.** Entries, stories, scenes (outline and manuscript) and plot
+arcs keep their publication selection while in the Trash. When a caller without `Publish` - an Editor - restores one,
+the server clears that selection to private on the restored row (`UniverseAccess.AuthorizeAsync` gives the restore the
+caller's role), whatever the request says; the address and first publication date stay, as an unpublish keeps them. A
+restored story is private, so nothing in it is read publicly whatever its parts still select. Chapters and world rules
+have no public surface; a plot beat has no selection of its own and is read as part of its arc, like a beat an Editor
+creates. The owner's restore is unchanged: the selection comes back, or "Restore as private" takes it back at once.

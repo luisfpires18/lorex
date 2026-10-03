@@ -90,16 +90,28 @@ public static class UniverseAccess
         Guid universeId,
         ClaimsPrincipal principal,
         UniverseCapability capability,
+        CancellationToken cancellationToken) =>
+        (await AuthorizeAsync(db, universeId, principal, capability, cancellationToken)).Denied;
+
+    /// <summary>
+    /// <see cref="DenyAsync"/>, and the caller's role when they may go on - for a route whose effect depends on what else
+    /// the role carries (an Editor's restore never publishes). One query.
+    /// </summary>
+    public static async Task<(IResult? Denied, UniverseRole Role)> AuthorizeAsync(
+        LorexDbContext db,
+        Guid universeId,
+        ClaimsPrincipal principal,
+        UniverseCapability capability,
         CancellationToken cancellationToken)
     {
         var role = await RoleAsync(db, universeId, principal.RequireUserId(), cancellationToken);
 
         if (role is not { } effective)
         {
-            return Results.NotFound();
+            return (Results.NotFound(), default);
         }
 
-        return Allows(effective, capability) ? null : PermissionDenied();
+        return Allows(effective, capability) ? (null, effective) : (PermissionDenied(), effective);
     }
 
     /// <summary>The single refusal for a member lacking a capability. It names nothing about what the role lacks.</summary>

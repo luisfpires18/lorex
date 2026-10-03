@@ -24,7 +24,7 @@ internal static class LaterSchema
 
         // Invitations (AddUniverseInvitations, 2026-10-02, ADR 0041 amendment).
         "sqlite_autoindex_UniverseInvitations_1",
-        "IX_UniverseInvitations_NormalizedEmail",
+        "IX_UniverseInvitations_TargetUserId",
         "IX_UniverseInvitations_UniverseId_NormalizedEmail",
     ];
 

@@ -94,7 +94,7 @@ export function CollaboratorsPanel({ universeId }: { universeId: string }) {
               link:
             </p>
             <CopyLink
-              invitationId={created.id}
+              claimToken={created.claimToken}
               label="Copy invite link"
               testId="copy-created-link"
             />
@@ -543,7 +543,11 @@ function InvitationRow({
           disabled={busy}
           testId="invitation-role"
         />
-        <CopyLink invitationId={invitation.id} label="Copy invite link" testId="copy-invite-link" />
+        <CopyLink
+          claimToken={invitation.claimToken}
+          label="Copy invite link"
+          testId="copy-invite-link"
+        />
         <button
           className="button button--secondary"
           type="button"
@@ -606,15 +610,15 @@ function RoleSelect({
  * served over https - the link is shown selected instead, so it can be copied by hand. Never a silent failure.
  */
 function CopyLink({
-  invitationId,
+  claimToken,
   label,
   testId,
 }: {
-  invitationId: string
+  claimToken: string
   label: string
   testId: string
 }) {
-  const link = invitationLink(invitationId)
+  const link = invitationLink(claimToken)
   const [status, setStatus] = useState<'idle' | 'copied' | 'manual'>('idle')
   const manualInput = useRef<HTMLInputElement>(null)
   const inputId = useId()

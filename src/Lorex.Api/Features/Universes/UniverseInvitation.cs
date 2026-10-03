@@ -1,3 +1,4 @@
+using Lorex.Api.Features.Auth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -14,13 +15,16 @@ public static class InvitationLimits
 }
 
 /// <summary>
-/// A pending offer to join one universe as a collaborator, addressed to an email address rather than to an account, so
-/// the owner never learns whether one exists (ADR 0041 amendment). Only pending invitations exist: accepting turns one
-/// into a <see cref="UniverseMembership"/> and deletes it, declining or revoking deletes it, and an expired one is
-/// ignored until it is replaced or removed. Account access metadata, never part of a backup.
+/// A pending offer to join one universe as a collaborator, addressed to an email address, so the owner never learns
+/// whether an account holds it (ADR 0041 amendment). Only pending invitations exist: accepting turns one into a
+/// <see cref="UniverseMembership"/> and deletes it, declining or revoking deletes it, and an expired one is ignored until
+/// it is replaced or removed. Account access metadata, never part of a backup.
 ///
-/// Its id is a locator, not a secret: reading or accepting one needs a signed-in account whose normalized email is
-/// <see cref="NormalizedEmail"/>.
+/// <para><b>An email address is not an identity here</b>: Lorex does not verify one at registration. So an invitation is
+/// claimed in one of two ways only - by the account it was bound to (<see cref="TargetUserId"/>, set privately when an
+/// account already held the address at invite time), or through its protected link (<see cref="InvitationClaims"/>),
+/// which an unbound invitation needs. Matching an account's email to <see cref="NormalizedEmail"/> is an extra check on a
+/// link, never permission on its own.</para>
 /// </summary>
 public sealed class UniverseInvitation
 {
@@ -36,6 +40,14 @@ public sealed class UniverseInvitation
 
     /// <summary>Identity's normalization of <see cref="Email"/>, compared with an account's <c>NormalizedEmail</c>.</summary>
     public required string NormalizedEmail { get; set; }
+
+    /// <summary>
+    /// The account that already held <see cref="NormalizedEmail"/> when the owner invited it, or null. Never shown to the
+    /// owner. Only this account sees a bound invitation in My workspace and accepts it there.
+    /// </summary>
+    public string? TargetUserId { get; set; }
+
+    public LorexUser? TargetUser { get; set; }
 
     /// <summary>Viewer, Reviewer or Editor - the role accepting gives. Never Owner.</summary>
     public UniverseRole Role { get; set; }
@@ -67,10 +79,16 @@ public sealed class UniverseInvitationConfiguration : IEntityTypeConfiguration<U
             .HasForeignKey(invitation => invitation.UniverseId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // Bound to an account that existed at invite time, and gone with it.
+        builder.HasOne(invitation => invitation.TargetUser)
+            .WithMany()
+            .HasForeignKey(invitation => invitation.TargetUserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         // One invitation per universe and address. An expired one is deleted by the create that replaces it.
         builder.HasIndex(invitation => new { invitation.UniverseId, invitation.NormalizedEmail }).IsUnique();
 
-        // "Which invitations are addressed to this account", for My workspace.
-        builder.HasIndex(invitation => invitation.NormalizedEmail);
+        // "Which invitations are bound to this account", for My workspace.
+        builder.HasIndex(invitation => invitation.TargetUserId);
     }
 }
