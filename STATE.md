@@ -50,8 +50,35 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **Product refinement 030 - invitations and collaborator management** (`feat/collaborator-invitations` off `dev` at
+  `98e47f6`: `402bfa2`, then the review correction; committed, not merged, not pushed). ADR 0041 amended; 0014, 0030 notes.
+  Migration `AddUniverseInvitations` (regenerated with `TargetUserId`, one migration); backup stays **19**.
+  - Invitations target an email (Identity `NormalizedEmail`); same 201 and fields whether an account exists, no user
+    search. Pending only (accept/decline/revoke delete), one per universe + address (409 `invitation_pending` names it),
+    30-day `InvitationLimits.Lifetime`, lapsed ones ignored and replaced. No email is sent.
+  - **Unverified email is never permission** (review correction). An account holding the address at invite time is bound
+    privately (`TargetUserId`): only it lists it in My workspace and accepts by id. Anything else needs the link,
+    `/invite/{token}` - a Data Protection claim token (`InvitationClaims`, purpose `Lorex.UniverseInvitation.Claim.v1`,
+    invitation id + address) - plus a matching email. An account registered later with the address is offered nothing.
+    Bad/forged token 404, other account 403, expired 410; revoke, expiry, accept, decline end every token.
+  - Owner-only `ManageCollaborators`: `.../collaborators` (username, role, joined; no member email), role change, removal
+    (content untouched, person becomes 404), pending role change, revoke.
+  - **An Editor's restore never publishes** (review correction): entry, story, scene (outline and manuscript) and arc come
+    back private when restored without `Publish`, enforced on the server; a private story hides all its parts. Owner
+    restore unchanged. Editor Trash restores without the publication question and says so.
+  - Frontend: Settings → Collaborators; My workspace Invitations (bound only); `/invite/:token` page (signed out says
+    nothing private, register/sign in return to it); "Shared · Role" on cards, sidebar and Overview. Role-aware UI via
+    `universes/access.ts` (presentation only): Viewer/Reviewer read-only everywhere (read-only chronology, rule and
+    manuscript views); Editor without permanent delete, Publish, Settings; Trash/Publish/Settings/Ideas out of nav and
+    "not available" by address. Idea universe picker owned-only.
+  - Tests: API 1271 -> **1300/1300** (`CollaboratorInvitationTests` 18, `InvitationClaimTests` 5,
+    `EditorRestorePublicationTests` 4, `UniverseInvitationMigrationTests` 2 incl. real-file races, matrix catalog +6
+    routes). Playwright 370 -> 380 (`collaboration.spec.ts` 10; Settings tab pins to five). Final full run, fresh database,
+    two workers, retries 0: **379/380**, 17.3 min - `workspace-settings.spec.ts` colour test met a blank page (the known
+    dev-server signature), green 3/3 alone. Linux/DejaVu batch (collaboration, universes, workspace-settings) 26/26. Release
+    build clean apart from the existing CA1859, no pending model changes.
 - **Product refinement 029 - collaboration authorization foundation** (`feat/universe-collaboration-foundation` off `dev`
-  at `c58e718`, committed, not merged, not pushed). Security/data foundation only: no invitations, collaborator UI,
+  at `c58e718`, merged into `dev` at `98e47f6`). Security/data foundation only: no invitations, collaborator UI,
   membership routes, comments, attribution or realtime. ADR 0041 (supersedes 0006's access rule); 0014, 0030, 0032 amended.
   - `UniverseMemberships` (`AddUniverseMemberships`): key `(UniverseId, UserId)`, `Role` 1-3 by check constraint (Owner is
     never stored - `Universe.OwnerId` stays the one owner), timestamps, both FKs cascade, `UserId` index. Additive; no row
@@ -1152,7 +1179,8 @@ A public, read-only discovery experience beside the workspace, in the same appli
     fails as a failure instead of telling the author a free name is taken.
 - Under a full parallel Playwright run, `auth.spec.ts` "rejects a wrong password" intermittently
   times out (it navigates to `/login` without awaiting sign-out).
-- 38 migrations, latest `AddUniverseMemberships` (029) - one additive table, nothing copied, `DROP TABLE` rollback;
+- 39 migrations, latest `AddUniverseInvitations` (030) - one additive table, `DROP TABLE` rollback;
+  `UniverseInvitationMigrationTests`. Before it, `AddUniverseMemberships` (029) - one additive table, nothing copied, `DROP TABLE` rollback;
   `UniverseMembershipMigrationTests` walks it on a file. Before it, `AddEntityTypeHierarchy` (nested types). Before that,
   `AddEntityTypeFamilyTreeEligibility` - one additive column, `EntityTypes.FamilyTreeEligible`
   (false), then on for the untouched starter Character only; native `DROP COLUMN` rollback;
@@ -1258,10 +1286,11 @@ tool has changed the picture.
 - **ImageSharp's licence.** `SixLabors.ImageSharp` is under the Six Labors Split License - free
   for personal use and for organisations under $1M revenue, which is true of Lorex today. Worth
   revisiting if that ever stops being true. ADR 0019.
-- **Collaboration, after 029** (ADR 0041) - not gaps: invitations and pending invites, membership routes and the
-  collaborator screen, a role picker, Reviewer comments (planned as a quiet eye action opening a modal), suggestions,
+- **Collaboration, after 030** (ADR 0041) - not gaps: outbound email delivery of invitations (the link and model are
+  ready for it), notifications, Reviewer comments (planned as a quiet eye action opening a modal), suggestions,
   attribution (created/edited/trashed/restored by) and activity, concurrent-edit protection, ownership transfer, public
-  collaborator credit; a collaborator's idea pointing into a shared universe; the public page's workspace link for members.
+  collaborator credit; a collaborator's idea pointing into a shared universe; the public page's workspace link for
+  members. An Editor restoring a previously public item from the Trash brings back the owner's selection as it was.
 - **Permanent deletion.** Deferred by Phase 019, so nothing removes an entry - or, since content recovery, a story,
   chapter, scene, arc or beat - for good short of deleting the universe. Two dead ends follow: a type used only by trashed
   entries cannot be deleted until the entry is restored, moved to another type and trashed again (ADR 0015), and an era a

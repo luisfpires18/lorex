@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
+import { CollaboratorsPanel } from '../components/CollaboratorsPanel'
 import { UniverseForm } from '../components/UniverseForm'
 import { downloadUniverseBackup } from '../export/api'
 import { discardUniverseDrafts } from '../lib/localDrafts'
@@ -15,6 +16,7 @@ import type { WorkspaceContext } from './UniverseWorkspace'
 const TABS = [
   { id: 'general', label: 'General' },
   { id: 'appearance', label: 'Appearance' },
+  { id: 'collaborators', label: 'Collaborators' },
   { id: 'data', label: 'Data' },
   { id: 'advanced', label: 'Advanced' },
 ] as const
@@ -22,7 +24,7 @@ const TABS = [
 type TabId = (typeof TABS)[number]['id']
 
 /**
- * A universe's Settings (UI refinement 014): four tabs rather than one long page, in the workspace's one page shell - the
+ * A universe's Settings (UI refinement 014; Collaborators since 030): five tabs rather than one long page, in the workspace's one page shell - the
  * title where every section's is, the tabs under it - with only the forms kept to a readable column. Publishing has a
  * page of its own, Publish, and the chronology is worldbuilding, not configuration - it is its own section, Chronology.
  *
@@ -163,7 +165,10 @@ export default function UniverseSettings() {
 
   return (
     <article className="settings settings--tabbed">
-      <PageHeader title="Settings" lede={<p>This universe’s name, colour, backups and archive.</p>}>
+      <PageHeader
+        title="Settings"
+        lede={<p>This universe’s name, colour, collaborators, backups and archive.</p>}
+      >
         <QueryTabList
           label="Settings"
           idPrefix="settings"
@@ -238,6 +243,10 @@ export default function UniverseSettings() {
               }}
             />
           </section>
+        </Panel>
+
+        <Panel id="collaborators" tab={tab}>
+          <CollaboratorsPanel universeId={universe.id} />
         </Panel>
 
         <Panel id="data" tab={tab}>

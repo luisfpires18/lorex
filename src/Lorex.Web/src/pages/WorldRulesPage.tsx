@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from 'react'
+import { useUniverseAccess } from '../universes/access'
 import { Plus } from 'lucide-react'
 import { Link, useLocation, useOutletContext, useSearchParams } from 'react-router-dom'
 import { ActionIcon } from '../components/ActionIcon'
@@ -27,6 +28,7 @@ export interface WorldRulesListNotice {
  * reload keep it.
  */
 export default function WorldRulesPage() {
+  const access = useUniverseAccess()
   const { universe } = useOutletContext<WorkspaceContext>()
   const [params, setParams] = useSearchParams()
   const location = useLocation()
@@ -75,10 +77,12 @@ export default function WorldRulesPage() {
         titleId={headingId}
         lede="Explicit statements about how this universe works, kept exactly as you write them. Lorex never reads their words; only a timeline check you give a rule is counted."
         actions={
-          <Link className="button" to={`${basePath}/new`} data-testid="new-world-rule">
-            <ActionIcon icon={Plus} />
-            New rule
-          </Link>
+          access.editContent ? (
+            <Link className="button" to={`${basePath}/new`} data-testid="new-world-rule">
+              <ActionIcon icon={Plus} />
+              New rule
+            </Link>
+          ) : undefined
         }
       />
 
@@ -154,10 +158,12 @@ export default function WorldRulesPage() {
           title="No world rules yet."
           hint="World Rules define explicit constraints for how this universe works: “Teleportation cannot cross the Veil.” “A bonded dragon dies if its rider dies.”"
           action={
-            <Link className="button" to={`${basePath}/new`} data-testid="empty-new-world-rule">
-              <ActionIcon icon={Plus} />
-              New rule
-            </Link>
+            access.editContent ? (
+              <Link className="button" to={`${basePath}/new`} data-testid="empty-new-world-rule">
+                <ActionIcon icon={Plus} />
+                New rule
+              </Link>
+            ) : undefined
           }
         />
       ) : null}

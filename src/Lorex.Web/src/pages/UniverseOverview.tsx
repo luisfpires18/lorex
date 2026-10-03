@@ -1,7 +1,9 @@
 import { Link, useOutletContext } from 'react-router-dom'
 import { PageHeader } from '../components/PageHeader'
 import { formatDate } from '../lib/dates'
-import { KEEPING, WORLD, WRITING } from '../universes/sections'
+import { ROLE_DESCRIPTIONS, ROLE_LABELS, useUniverseAccess } from '../universes/access'
+import { KEEPING, offered, WORLD, WRITING } from '../universes/sections'
+import { UniverseRole } from '../universes/types'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
 /** The contents page's three parts: the sidebar's worldbuilding groups, between the front page and the upkeep. */
@@ -19,6 +21,8 @@ const CONTENTS = [
  */
 export default function UniverseOverview() {
   const { universe } = useOutletContext<WorkspaceContext>()
+  const access = useUniverseAccess()
+  const shared = universe.accessRole !== UniverseRole.Owner
 
   return (
     <article className="overview">
@@ -29,6 +33,8 @@ export default function UniverseOverview() {
           <>
             {universe.description ? (
               <p className="overview__description prose">{universe.description}</p>
+            ) : shared ? (
+              <p className="overview__description">No description yet.</p>
             ) : (
               <p className="overview__description">
                 No description yet. <Link to="settings">Settings</Link> is where you give this world
@@ -39,33 +45,41 @@ export default function UniverseOverview() {
               Created {formatDate(universe.createdAt)}, last changed{' '}
               {formatDate(universe.updatedAt)}
             </p>
+            {shared ? (
+              <p className="overview__meta" data-testid="overview-role">
+                Shared with you as {ROLE_LABELS[universe.accessRole]}.{' '}
+                {ROLE_DESCRIPTIONS[universe.accessRole]}
+              </p>
+            ) : null}
           </>
         }
       />
 
-      {CONTENTS.map(({ heading, sections }) => (
-        <section className="contents" key={heading} aria-labelledby={`contents-${heading}`}>
-          <h2 className="contents__heading" id={`contents-${heading}`}>
-            {heading}
-          </h2>
-          <ul className="contents__list">
-            {sections.map(({ segment, label, icon: Icon, purpose }) => (
-              <li key={segment}>
-                <Link className="doorway" to={segment} data-testid={`overview-${segment}`}>
-                  <Icon
-                    className="doorway__icon"
-                    aria-hidden="true"
-                    focusable="false"
-                    strokeWidth={1.75}
-                  />
-                  <span className="doorway__name">{label}</span>
-                  <span className="doorway__purpose">{purpose}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
+      {CONTENTS.map(({ heading, sections }) => ({ heading, sections: offered(sections, access) }))
+        .filter(({ sections }) => sections.length > 0)
+        .map(({ heading, sections }) => (
+          <section className="contents" key={heading} aria-labelledby={`contents-${heading}`}>
+            <h2 className="contents__heading" id={`contents-${heading}`}>
+              {heading}
+            </h2>
+            <ul className="contents__list">
+              {sections.map(({ segment, label, icon: Icon, purpose }) => (
+                <li key={segment}>
+                  <Link className="doorway" to={segment} data-testid={`overview-${segment}`}>
+                    <Icon
+                      className="doorway__icon"
+                      aria-hidden="true"
+                      focusable="false"
+                      strokeWidth={1.75}
+                    />
+                    <span className="doorway__name">{label}</span>
+                    <span className="doorway__purpose">{purpose}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
     </article>
   )
 }

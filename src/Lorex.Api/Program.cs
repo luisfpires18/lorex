@@ -77,6 +77,8 @@ app.MapHealthEndpoints();
 app.MapAuthEndpoints();
 app.MapProfileImageEndpoints();
 app.MapUniverseEndpoints();
+app.MapCollaboratorEndpoints();
+app.MapInvitationEndpoints();
 app.MapPublicationEndpoints();
 app.MapContentPublicationEndpoints();
 app.MapUniverseArtworkEndpoints();

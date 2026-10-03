@@ -5,6 +5,8 @@ using Lorex.Api.Features.Stories;
 using Lorex.Api.Features.Universes;
 using Microsoft.EntityFrameworkCore;
 
+using Lorex.Api.Features.Publishing;
+
 namespace Lorex.Api.Features.Trash;
 
 /// <summary>
@@ -40,10 +42,15 @@ internal static class StoryContentRestore
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageTrash, cancellationToken) is { } denied)
+        var (denied, role) = await UniverseAccess.AuthorizeAsync(db, universeId, principal, UniverseCapability.ManageTrash, cancellationToken);
+        if (denied is not null)
         {
             return denied;
         }
+
+        // Whoever may restore but not publish (an Editor) never brings anything back public: what the owner had selected
+        // is restored private, here on the server, whatever the request asked (ADR 0041 amendment).
+        var keepPublication = UniverseAccess.Allows(role, UniverseCapability.Publish);
 
         var story = await db.Stories.FirstOrDefaultAsync(
             candidate => candidate.Id == storyId && candidate.UniverseId == universeId && candidate.DeletedAt != null,
@@ -56,6 +63,12 @@ internal static class StoryContentRestore
 
         // Only the marker: everything inside was left exactly where it was. Titles are not unique, so nothing is renamed.
         story.DeletedAt = null;
+        if (!keepPublication)
+        {
+            // A private story hides every scene, manuscript and arc in it, so nothing it holds is read publicly either.
+            story.Visibility = ContentVisibility.Private;
+        }
+
         await db.SaveChangesAsync(cancellationToken);
 
         return Results.Ok(new TrashRestored(TrashItemKind.Story, story.Id, story.Id));
@@ -118,10 +131,15 @@ internal static class StoryContentRestore
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageTrash, cancellationToken) is { } denied)
+        var (denied, role) = await UniverseAccess.AuthorizeAsync(db, universeId, principal, UniverseCapability.ManageTrash, cancellationToken);
+        if (denied is not null)
         {
             return denied;
         }
+
+        // Whoever may restore but not publish (an Editor) never brings anything back public: what the owner had selected
+        // is restored private, here on the server, whatever the request asked (ADR 0041 amendment).
+        var keepPublication = UniverseAccess.Allows(role, UniverseCapability.Publish);
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
@@ -160,6 +178,12 @@ internal static class StoryContentRestore
         scene.ChapterId = container;
         scene.SortOrder = (last ?? -1) + 1;
         scene.DeletedAt = null;
+        if (!keepPublication)
+        {
+            scene.Visibility = ContentVisibility.Private;
+            scene.ManuscriptVisibility = ContentVisibility.Private;
+        }
+
         story.UpdatedAt = DateTime.UtcNow;
 
         if (!await SavedAsync(db, cancellationToken))
@@ -178,10 +202,15 @@ internal static class StoryContentRestore
         LorexDbContext db,
         CancellationToken cancellationToken)
     {
-        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageTrash, cancellationToken) is { } denied)
+        var (denied, role) = await UniverseAccess.AuthorizeAsync(db, universeId, principal, UniverseCapability.ManageTrash, cancellationToken);
+        if (denied is not null)
         {
             return denied;
         }
+
+        // Whoever may restore but not publish (an Editor) never brings anything back public: what the owner had selected
+        // is restored private, here on the server, whatever the request asked (ADR 0041 amendment).
+        var keepPublication = UniverseAccess.Allows(role, UniverseCapability.Publish);
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
@@ -210,6 +239,11 @@ internal static class StoryContentRestore
 
         arc.SortOrder = (last ?? -1) + 1;
         arc.DeletedAt = null;
+        if (!keepPublication)
+        {
+            arc.Visibility = ContentVisibility.Private;
+        }
+
         story.UpdatedAt = DateTime.UtcNow;
 
         if (!await SavedAsync(db, cancellationToken))

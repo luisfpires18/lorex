@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { useUniverseAccess } from '../universes/access'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom'
 import { ActionIcon } from '../components/ActionIcon'
@@ -25,6 +26,7 @@ type LoadState =
 type FormState = { mode: 'closed' } | { mode: 'new' } | { mode: 'edit'; entry: TimelineEntry }
 
 export default function TimelinePage() {
+  const access = useUniverseAccess()
   const { universe, chronology } = useOutletContext<WorkspaceContext>()
 
   const [canonStatus, setCanonStatus] = useState<CanonStatusValue | null>(null)
@@ -153,42 +155,48 @@ export default function TimelinePage() {
             </span>
             <StatusBadge step={entry.canonStatus} label={CANON_LABELS[entry.canonStatus]} />
           </p>
-          <ActionMenu
-            label={`More actions for ${entry.title}`}
-            triggerTestId={`moment-actions-${entry.title}`}
-          >
-            <button
-              className="actionmenu__item"
-              type="button"
-              onClick={() => setForm({ mode: 'edit', entry })}
-              data-testid={`menu-edit-moment-${entry.title}`}
+          {access.editContent ? (
+            <ActionMenu
+              label={`More actions for ${entry.title}`}
+              triggerTestId={`moment-actions-${entry.title}`}
             >
-              <ActionIcon icon={Pencil} />
-              Edit moment
-            </button>
-            <hr className="actionmenu__divider" />
-            <button
-              className="actionmenu__item actionmenu__item--danger"
-              type="button"
-              onClick={() => void remove(entry)}
-              data-testid={`delete-moment-${entry.title}`}
-            >
-              <ActionIcon icon={Trash2} />
-              Delete moment
-            </button>
-          </ActionMenu>
+              <button
+                className="actionmenu__item"
+                type="button"
+                onClick={() => setForm({ mode: 'edit', entry })}
+                data-testid={`menu-edit-moment-${entry.title}`}
+              >
+                <ActionIcon icon={Pencil} />
+                Edit moment
+              </button>
+              <hr className="actionmenu__divider" />
+              <button
+                className="actionmenu__item actionmenu__item--danger"
+                type="button"
+                onClick={() => void remove(entry)}
+                data-testid={`delete-moment-${entry.title}`}
+              >
+                <ActionIcon icon={Trash2} />
+                Delete moment
+              </button>
+            </ActionMenu>
+          ) : null}
         </div>
 
         {/* The title is the way in: it opens the moment's drawer. */}
         <h3 className="moment__title">
-          <button
-            className="moment__open"
-            type="button"
-            onClick={() => setForm({ mode: 'edit', entry })}
-            data-testid={`edit-moment-${entry.title}`}
-          >
-            <bdi>{entry.title}</bdi>
-          </button>
+          {access.editContent ? (
+            <button
+              className="moment__open"
+              type="button"
+              onClick={() => setForm({ mode: 'edit', entry })}
+              data-testid={`edit-moment-${entry.title}`}
+            >
+              <bdi>{entry.title}</bdi>
+            </button>
+          ) : (
+            <bdi data-testid={`moment-title-${entry.title}`}>{entry.title}</bdi>
+          )}
         </h3>
 
         {entry.description ? <p className="moment__account prose">{entry.description}</p> : null}
@@ -264,15 +272,17 @@ export default function TimelinePage() {
         title="Timeline"
         lede="Everything that has happened here, in the order it happened."
         actions={
-          <button
-            className="button"
-            type="button"
-            onClick={() => setForm({ mode: 'new' })}
-            data-testid="new-moment"
-          >
-            <ActionIcon icon={Plus} />
-            New moment
-          </button>
+          access.editContent ? (
+            <button
+              className="button"
+              type="button"
+              onClick={() => setForm({ mode: 'new' })}
+              data-testid="new-moment"
+            >
+              <ActionIcon icon={Plus} />
+              New moment
+            </button>
+          ) : undefined
         }
       />
 
@@ -429,7 +439,7 @@ export default function TimelinePage() {
               : 'A timeline holds the moments of this world in order — a founding, a betrayal, the year someone was born. Give a date you are sure of, one you only half remember, or none at all.'
           }
           action={
-            isFiltered ? null : (
+            isFiltered || !access.editContent ? null : (
               <button
                 className="button"
                 type="button"

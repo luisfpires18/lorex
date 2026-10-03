@@ -233,6 +233,14 @@ public sealed class UniverseAccessMatrixTests(LorexApiFactory factory) : IClassF
 
             // ---------- Backup ----------
             new("export", Get, $"{u}/export", May.Own),
+
+            // ---------- Collaborators (030) ----------
+            new("collaborators", Get, $"{u}/collaborators", May.Own),
+            new("change collaborator role", Put, $"{u}/collaborators/{w.EditorId}", May.Own, Json(new CollaboratorRoleRequest(UniverseRole.Viewer))),
+            new("remove collaborator", Delete, $"{u}/collaborators/{w.ViewerId}", May.Own),
+            new("invite", Post, $"{u}/invitations", May.Own, Json(new InvitationRequest("someone-new@example.test", UniverseRole.Editor))),
+            new("change invitation role", Put, $"{u}/invitations/{any}", May.Own, Json(new CollaboratorRoleRequest(UniverseRole.Viewer))),
+            new("revoke invitation", Delete, $"{u}/invitations/{any}", May.Own),
         ];
     }
 

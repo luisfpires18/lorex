@@ -1,3 +1,4 @@
+import type { UniverseCapabilities } from './access'
 import {
   BadgeCheck,
   Blocks,
@@ -22,6 +23,11 @@ export interface Section {
   icon: LucideIcon
   /** What the section holds, in a line: the Overview's contents page reads it. */
   purpose: string
+  /**
+   * The capability a role needs to be offered the section at all (ADR 0041 amendment). Presentation only: the API refuses
+   * the rest regardless. Absent means every member reads it.
+   */
+  requires?: keyof UniverseCapabilities
 }
 
 /** The front page. */
@@ -89,6 +95,7 @@ export const WRITING: readonly Section[] = [
     testId: 'workspace-ideas',
     icon: StickyNote,
     purpose: 'Possibilities, kept apart from the lore.',
+    requires: 'keepIdeas',
   },
 ]
 
@@ -121,6 +128,7 @@ export const UPKEEP: readonly Section[] = [
     testId: 'workspace-trash',
     icon: Trash2,
     purpose: 'What was removed, waiting to be restored.',
+    requires: 'manageTrash',
   },
   {
     segment: 'publish',
@@ -128,13 +136,15 @@ export const UPKEEP: readonly Section[] = [
     testId: 'workspace-publish',
     icon: Globe,
     purpose: 'How this universe appears on the public portal.',
+    requires: 'publish',
   },
   {
     segment: 'settings',
     label: 'Settings',
     testId: 'workspace-settings',
     icon: Settings,
-    purpose: 'Name, colour, backups and archive.',
+    purpose: 'Name, colour, collaborators, backups and archive.',
+    requires: 'manageUniverse',
   },
 ]
 
@@ -147,6 +157,11 @@ export const UPKEEP: readonly Section[] = [
  * One icon per section, none shared with an entry type's, each decorative: the label names the destination and is what a
  * screen reader reads.
  */
+/** The sections a role is offered: those it needs nothing for, and those whose capability it has. */
+export function offered(sections: readonly Section[], access: UniverseCapabilities) {
+  return sections.filter((section) => !section.requires || access[section.requires])
+}
+
 export const SECTION_GROUPS: readonly (readonly Section[])[] = [
   FRONT,
   WORLD,

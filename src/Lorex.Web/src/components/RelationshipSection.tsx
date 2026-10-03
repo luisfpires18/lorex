@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useUniverseAccess } from '../universes/access'
 import { EntityPicker } from './EntityPicker'
 import { ApiError } from '../lib/api'
 import { payloadKey } from '../lib/drawerGuard'
@@ -92,6 +93,7 @@ export function RelationshipSection({
   entityId,
   entityName,
 }: RelationshipSectionProps) {
+  const access = useUniverseAccess()
   const [views, setViews] = useState<RelationshipView[] | null>(null)
   const [types, setTypes] = useState<RelationshipType[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -391,7 +393,7 @@ export function RelationshipSection({
         <h2 className="relations__title" id="relations-heading">
           Relations
         </h2>
-        {types.length > 0 && !isAdding && !editingId ? (
+        {access.editContent && types.length > 0 && !isAdding && !editingId ? (
           <button
             className="button button--secondary"
             type="button"
@@ -475,31 +477,33 @@ export function RelationshipSection({
                         {view.notes ? <p className="relation__notes prose">{view.notes}</p> : null}
                       </div>
 
-                      <ActionMenu
-                        className="relation__menu"
-                        label={`More actions for ${view.label} ${view.relatedEntityName}`}
-                        triggerTestId={`relationship-actions-${view.relatedEntityName}`}
-                      >
-                        <button
-                          className="actionmenu__item"
-                          type="button"
-                          onClick={() => openEdit(view)}
-                          data-testid={`edit-relationship-${view.relatedEntityName}`}
+                      {access.editContent ? (
+                        <ActionMenu
+                          className="relation__menu"
+                          label={`More actions for ${view.label} ${view.relatedEntityName}`}
+                          triggerTestId={`relationship-actions-${view.relatedEntityName}`}
                         >
-                          <ActionIcon icon={Pencil} />
-                          Edit relation
-                        </button>
-                        <hr className="actionmenu__divider" />
-                        <button
-                          className="actionmenu__item actionmenu__item--danger"
-                          type="button"
-                          onClick={() => void remove(view)}
-                          data-testid={`delete-relationship-${view.relatedEntityName}`}
-                        >
-                          <ActionIcon icon={Trash} />
-                          Remove relation
-                        </button>
-                      </ActionMenu>
+                          <button
+                            className="actionmenu__item"
+                            type="button"
+                            onClick={() => openEdit(view)}
+                            data-testid={`edit-relationship-${view.relatedEntityName}`}
+                          >
+                            <ActionIcon icon={Pencil} />
+                            Edit relation
+                          </button>
+                          <hr className="actionmenu__divider" />
+                          <button
+                            className="actionmenu__item actionmenu__item--danger"
+                            type="button"
+                            onClick={() => void remove(view)}
+                            data-testid={`delete-relationship-${view.relatedEntityName}`}
+                          >
+                            <ActionIcon icon={Trash} />
+                            Remove relation
+                          </button>
+                        </ActionMenu>
+                      ) : null}
                     </li>
                   ),
                 )}

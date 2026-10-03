@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ReactNode, Ref } from 'react'
 
 import { Link } from 'react-router-dom'
 import { BRAND_LINK_LABEL, BrandMark } from './BrandMark'
@@ -10,13 +10,15 @@ interface AuthLayoutProps {
   intro: string
   children: ReactNode
   footer: ReactNode
+  /** Given when the heading changes in place (an invitation's states), so focus can be moved to it; it is then focusable. */
+  headingRef?: Ref<HTMLHeadingElement>
 }
 
 /**
  * Two-part canvas: a graphite plate carrying the wordmark, and a paper column
  * carrying the form. The plate becomes a slim band on narrow screens.
  */
-export function AuthLayout({ heading, intro, children, footer }: AuthLayoutProps) {
+export function AuthLayout({ heading, intro, children, footer, headingRef }: AuthLayoutProps) {
   return (
     <div className="auth">
       <aside className="auth__plate">
@@ -44,7 +46,14 @@ export function AuthLayout({ heading, intro, children, footer }: AuthLayoutProps
 
       <main className="auth__panel" id={MAIN_CONTENT_ID} tabIndex={-1}>
         <div className="auth__form">
-          <h1 className="auth__heading">{heading}</h1>
+          <h1
+            className="auth__heading"
+            ref={headingRef}
+            tabIndex={headingRef ? -1 : undefined}
+            data-testid="auth-heading"
+          >
+            {heading}
+          </h1>
           <p className="auth__intro">{intro}</p>
           {children}
           <p className="auth__footer">{footer}</p>

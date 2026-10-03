@@ -299,14 +299,19 @@ public static class TrashEndpoints
         CanonPromotionGate gate,
         CancellationToken cancellationToken)
     {
-        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.ManageTrash, cancellationToken) is { } denied)
+        var (denied, role) = await UniverseAccess.AuthorizeAsync(db, universeId, principal, UniverseCapability.ManageTrash, cancellationToken);
+        if (denied is not null)
         {
             return denied;
         }
 
+        // Whoever may restore but not publish (an Editor) never brings anything back public: what the owner had selected
+        // is restored private, here on the server, whatever the request asked (ADR 0041 amendment).
+        var keepPublication = UniverseAccess.Allows(role, UniverseCapability.Publish);
+
         return await gate.RunAsync(
             universeId,
-            token => RestoreCoreAsync(universeId, entityId, db, token),
+            token => RestoreCoreAsync(universeId, entityId, db, keepPublication, token),
             cancellationToken);
     }
 
@@ -314,6 +319,7 @@ public static class TrashEndpoints
         Guid universeId,
         Guid entityId,
         LorexDbContext db,
+        bool keepPublication,
         CancellationToken cancellationToken)
     {
         var entity = await db.Entities.FirstOrDefaultAsync(
@@ -336,6 +342,12 @@ public static class TrashEndpoints
         // entry written while this one sat in the Trash cannot collide with it, and a restore
         // never renames what the author wrote.
         entity.DeletedAt = null;
+        if (!keepPublication)
+        {
+            // Its address and first publication date stay, as an unpublish keeps them; only the selection goes.
+            entity.Visibility = ContentVisibility.Private;
+        }
+
         await db.SaveChangesAsync(cancellationToken);
 
         var detail = await EntityEndpoints.LoadDetailAsync(db, universeId, entityId, cancellationToken);

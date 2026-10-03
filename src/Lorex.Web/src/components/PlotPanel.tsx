@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useUniverseAccess } from '../universes/access'
 import { Plus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ActionIcon } from './ActionIcon'
@@ -54,6 +55,7 @@ export function PlotPanel({
   announce,
   arcPublication,
 }: PlotPanelProps) {
+  const access = useUniverseAccess()
   const [arcForm, setArcForm] = useState<ArcFormState>({ mode: 'closed' })
   const [beatForm, setBeatForm] = useState<BeatFormState>({ mode: 'closed' })
   const [message, setMessage] = useState<string | null>(null)
@@ -215,9 +217,11 @@ export function PlotPanel({
             Arcs in the order you plan them, and the beats in each. Neither follows the order scenes
             are told in or when they happen.
           </p>
-          <div className="story__toolbaractions">
-            <span className="story__create">{newArc}</span>
-          </div>
+          {access.editContent ? (
+            <div className="story__toolbaractions">
+              <span className="story__create">{newArc}</span>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -250,7 +254,7 @@ export function PlotPanel({
               ) : null}
             </>
           }
-          action={newArc}
+          action={access.editContent ? newArc : undefined}
         />
       ) : null}
 

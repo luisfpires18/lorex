@@ -1,4 +1,5 @@
 import { useId, type ReactNode } from 'react'
+import { useUniverseAccess } from '../universes/access'
 import { ArrowDown, ArrowUp, Pencil, Plus, Trash } from 'lucide-react'
 import { ActionIcon } from './ActionIcon'
 import { ActionMenu } from './ActionMenu'
@@ -38,6 +39,7 @@ export function ChapterSection({
   onDelete,
   children,
 }: ChapterSectionProps) {
+  const access = useUniverseAccess()
   const headingId = useId()
 
   return (
@@ -65,64 +67,66 @@ export function ChapterSection({
           ) : null}
         </div>
 
-        <div className="chapter__tools rowtools">
-          <button
-            className="button button--text"
-            type="button"
-            onClick={() => onAddScene(chapter)}
-            aria-describedby={headingId}
-            data-testid="chapter-new-scene"
-          >
-            <ActionIcon icon={Plus} />
-            Add scene
-          </button>
-          <ActionMenu
-            label={`More actions for ${chapterLabel(index, chapter.title)}`}
-            triggerTestId="chapter-actions"
-          >
+        {access.editContent ? (
+          <div className="chapter__tools rowtools">
             <button
-              className="actionmenu__item"
+              className="button button--text"
               type="button"
-              onClick={() => onEdit(chapter, index)}
-              data-testid="chapter-edit"
+              onClick={() => onAddScene(chapter)}
+              aria-describedby={headingId}
+              data-testid="chapter-new-scene"
             >
-              <ActionIcon icon={Pencil} />
-              Edit chapter
+              <ActionIcon icon={Plus} />
+              Add scene
             </button>
-            {index > 0 ? (
+            <ActionMenu
+              label={`More actions for ${chapterLabel(index, chapter.title)}`}
+              triggerTestId="chapter-actions"
+            >
               <button
                 className="actionmenu__item"
                 type="button"
-                onClick={() => onMove(chapter, -1)}
-                data-testid="chapter-move-up"
+                onClick={() => onEdit(chapter, index)}
+                data-testid="chapter-edit"
               >
-                <ActionIcon icon={ArrowUp} />
-                Move up
+                <ActionIcon icon={Pencil} />
+                Edit chapter
               </button>
-            ) : null}
-            {index < count - 1 ? (
+              {index > 0 ? (
+                <button
+                  className="actionmenu__item"
+                  type="button"
+                  onClick={() => onMove(chapter, -1)}
+                  data-testid="chapter-move-up"
+                >
+                  <ActionIcon icon={ArrowUp} />
+                  Move up
+                </button>
+              ) : null}
+              {index < count - 1 ? (
+                <button
+                  className="actionmenu__item"
+                  type="button"
+                  onClick={() => onMove(chapter, 1)}
+                  data-testid="chapter-move-down"
+                >
+                  <ActionIcon icon={ArrowDown} />
+                  Move down
+                </button>
+              ) : null}
+              <hr className="actionmenu__divider" />
               <button
-                className="actionmenu__item"
+                className="actionmenu__item actionmenu__item--danger"
                 type="button"
-                onClick={() => onMove(chapter, 1)}
-                data-testid="chapter-move-down"
+                onClick={() => onDelete(chapter, index)}
+                data-testid="chapter-delete"
               >
-                <ActionIcon icon={ArrowDown} />
-                Move down
+                <ActionIcon icon={Trash} />
+                Delete chapter
               </button>
-            ) : null}
-            <hr className="actionmenu__divider" />
-            <button
-              className="actionmenu__item actionmenu__item--danger"
-              type="button"
-              onClick={() => onDelete(chapter, index)}
-              data-testid="chapter-delete"
-            >
-              <ActionIcon icon={Trash} />
-              Delete chapter
-            </button>
-          </ActionMenu>
-        </div>
+            </ActionMenu>
+          </div>
+        ) : null}
 
         {chapter.summary ? (
           <p className="chapter__summary prose" data-testid="chapter-summary">

@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate, Route, RouterProvider, Routes } from 're
 import { AuthProvider } from './auth/AuthProvider'
 import { RequireAuth, RequireGuest } from './auth/routes'
 import { PublicLayout } from './components/PublicLayout'
+import { RoleGate } from './components/RoleGate'
 import { RouteFocus, SkipLink } from './components/SkipLink'
 import { WorkspaceLayout } from './components/WorkspaceLayout'
 import { HistoryLeaveGuard } from './lib/leaveGuard'
@@ -28,6 +29,7 @@ const ExplorePage = lazy(() => import('./pages/ExplorePage'))
 const FamilyTreePage = lazy(() => import('./pages/FamilyTreePage'))
 const IdeaPage = lazy(() => import('./pages/IdeaPage'))
 const IdeasPage = lazy(() => import('./pages/IdeasPage'))
+const InvitationPage = lazy(() => import('./pages/InvitationPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const LorePage = lazy(() => import('./pages/LorePage'))
 const MassCreatePage = lazy(() => import('./pages/MassCreatePage'))
@@ -120,6 +122,10 @@ function Root() {
           {/* The front door is the portal, signed in or not; the workspace is a choice made from it. */}
           <Route path="/" element={<Navigate to="/explore" replace />} />
 
+          {/* An invitation link: outside both guards, because signed out it must still say what it is - and only that -
+              and offer a way in that comes back here (ADR 0041 amendment). */}
+          <Route path="/invite/:token" element={asScreen('invite', <InvitationPage />)} />
+
           <Route element={<RequireGuest />}>
             <Route path="/login" element={asScreen('login', <LoginPage />)} />
             <Route path="/register" element={asScreen('register', <RegisterPage />)} />
@@ -138,19 +144,50 @@ function Root() {
             <Route path="/app/universes/:id" element={<UniverseWorkspace />}>
               <Route index element={<UniverseOverview />} />
               <Route path="lore" element={asSection('lore', <LorePage />)} />
-              <Route path="lore/new" element={asSection('entry', <EntityPage />)} />
+              <Route
+                path="lore/new"
+                element={asSection(
+                  'entry',
+                  <RoleGate need="editContent">
+                    <EntityPage />
+                  </RoleGate>,
+                )}
+              />
               <Route
                 path="lore/mass-create"
-                element={asSection('mass-create', <MassCreatePage />)}
+                element={asSection(
+                  'mass-create',
+                  <RoleGate need="editContent">
+                    <MassCreatePage />
+                  </RoleGate>,
+                )}
               />
-              <Route path="lore/:entityId" element={asSection('entry', <EntityPage />)} />
+              <Route
+                path="lore/:entityId"
+                element={asSection(
+                  'entry',
+                  <RoleGate>
+                    <EntityPage />
+                  </RoleGate>,
+                )}
+              />
               <Route
                 path="lore/:entityId/relations"
-                element={asSection('entry', <EntityPage view="relations" />)}
+                element={asSection(
+                  'entry',
+                  <RoleGate>
+                    <EntityPage view="relations" />
+                  </RoleGate>,
+                )}
               />
               <Route
                 path="lore/:entityId/history"
-                element={asSection('entry', <EntityPage view="history" />)}
+                element={asSection(
+                  'entry',
+                  <RoleGate need="manageHistory">
+                    <EntityPage view="history" />
+                  </RoleGate>,
+                )}
               />
               <Route path="family-tree" element={asSection('family-tree', <FamilyTreePage />)} />
               <Route
@@ -160,8 +197,24 @@ function Root() {
               <Route path="timeline" element={asSection('timeline', <TimelinePage />)} />
               <Route path="world-rules" element={asSection('world-rules', <WorldRulesPage />)} />
               <Route path="chronology" element={asSection('chronology', <ChronologyPage />)} />
-              <Route path="world-rules/new" element={asSection('rule', <WorldRulePage isNew />)} />
-              <Route path="world-rules/:ruleId" element={asSection('rule', <WorldRulePage />)} />
+              <Route
+                path="world-rules/new"
+                element={asSection(
+                  'rule',
+                  <RoleGate need="editContent">
+                    <WorldRulePage isNew />
+                  </RoleGate>,
+                )}
+              />
+              <Route
+                path="world-rules/:ruleId"
+                element={asSection(
+                  'rule',
+                  <RoleGate>
+                    <WorldRulePage />
+                  </RoleGate>,
+                )}
+              />
               <Route path="stories" element={asSection('stories', <StoriesPage />)} />
               <Route
                 path="stories/:storyId"
@@ -175,14 +228,62 @@ function Root() {
                 path="stories/:storyId/manuscript/:sceneId?"
                 element={asSection('story', <StoryPage view="manuscript" />)}
               />
-              <Route path="ideas" element={asSection('ideas', <IdeasPage inUniverse />)} />
-              <Route path="ideas/new" element={asSection('idea', <IdeaPage inUniverse isNew />)} />
-              <Route path="ideas/:ideaId" element={asSection('idea', <IdeaPage inUniverse />)} />
+              <Route
+                path="ideas"
+                element={asSection(
+                  'ideas',
+                  <RoleGate need="keepIdeas">
+                    <IdeasPage inUniverse />
+                  </RoleGate>,
+                )}
+              />
+              <Route
+                path="ideas/new"
+                element={asSection(
+                  'idea',
+                  <RoleGate need="keepIdeas">
+                    <IdeaPage inUniverse isNew />
+                  </RoleGate>,
+                )}
+              />
+              <Route
+                path="ideas/:ideaId"
+                element={asSection(
+                  'idea',
+                  <RoleGate need="keepIdeas">
+                    <IdeaPage inUniverse />
+                  </RoleGate>,
+                )}
+              />
               <Route path="canon" element={asSection('canon', <CanonPage />)} />
               <Route path="types" element={asSection('types', <UniverseTypes />)} />
-              <Route path="trash" element={asSection('trash', <UniverseTrash />)} />
-              <Route path="publish" element={asSection('publish', <UniversePublish />)} />
-              <Route path="settings" element={asSection('settings', <UniverseSettings />)} />
+              <Route
+                path="trash"
+                element={asSection(
+                  'trash',
+                  <RoleGate need="manageTrash">
+                    <UniverseTrash />
+                  </RoleGate>,
+                )}
+              />
+              <Route
+                path="publish"
+                element={asSection(
+                  'publish',
+                  <RoleGate need="publish">
+                    <UniversePublish />
+                  </RoleGate>,
+                )}
+              />
+              <Route
+                path="settings"
+                element={asSection(
+                  'settings',
+                  <RoleGate need="manageUniverse">
+                    <UniverseSettings />
+                  </RoleGate>,
+                )}
+              />
             </Route>
           </Route>
 

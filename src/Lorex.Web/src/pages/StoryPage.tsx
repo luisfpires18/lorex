@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useUniverseAccess } from '../universes/access'
 import { BookPlus, Pencil, Plus, Trash } from 'lucide-react'
 import {
   Link,
@@ -118,6 +119,7 @@ export default function StoryPage({
  * its own - arcs, and the beats in each - which follows neither.
  */
 function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
+  const access = useUniverseAccess()
   const { universe, chronology } = useOutletContext<WorkspaceContext>()
   const { storyId, sceneId } = useParams<{ storyId: string; sceneId?: string }>()
   const navigate = useNavigate()
@@ -147,7 +149,8 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
   } | null>(null)
 
   useEffect(() => {
-    if (!storyId) return
+    // Publication is the owner's (ADR 0041): nobody else is shown a pill, so nobody else asks.
+    if (!storyId || !access.publish) return
     const controller = new AbortController()
     getContentPublication(universe.id, 'story', storyId, controller.signal)
       .then((state) => setPublication({ storyId, state }))
@@ -158,7 +161,7 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
     return () => {
       controller.abort()
     }
-  }, [universe.id, storyId])
+  }, [universe.id, storyId, access.publish])
 
   useEffect(() => {
     if (!storyId) return
@@ -557,16 +560,18 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
         onEdit={(target) => setSceneForm({ mode: 'edit', scene: target })}
         onDelete={(target) => void removeScene(target)}
         publication={
-          <StoryPartPublication
-            universeId={universe.id}
-            storyId={story.id}
-            kind="scene"
-            id={scene.id}
-            name={scene.title}
-            visibility={scene.visibility}
-            storyIsPublic={storyIsPublic}
-            onChange={(visibility) => patchScene(scene.id, { visibility })}
-          />
+          access.publish ? (
+            <StoryPartPublication
+              universeId={universe.id}
+              storyId={story.id}
+              kind="scene"
+              id={scene.id}
+              name={scene.title}
+              visibility={scene.visibility}
+              storyIsPublic={storyIsPublic}
+              onChange={(visibility) => patchScene(scene.id, { visibility })}
+            />
+          ) : null
         }
       />
     ))
@@ -654,31 +659,33 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
             </NavLink>
           </nav>
 
-          <ActionMenu
-            className="story__menu"
-            label={`Story actions for ${story.title}`}
-            triggerTestId="story-actions"
-          >
-            <button
-              className="actionmenu__item"
-              type="button"
-              onClick={() => setIsEditingStory(true)}
-              data-testid="edit-story"
+          {access.editContent ? (
+            <ActionMenu
+              className="story__menu"
+              label={`Story actions for ${story.title}`}
+              triggerTestId="story-actions"
             >
-              <ActionIcon icon={Pencil} />
-              Edit story
-            </button>
-            <hr className="actionmenu__divider" />
-            <button
-              className="actionmenu__item actionmenu__item--danger"
-              type="button"
-              onClick={() => void removeStory()}
-              data-testid="delete-story"
-            >
-              <ActionIcon icon={Trash} />
-              Delete story
-            </button>
-          </ActionMenu>
+              <button
+                className="actionmenu__item"
+                type="button"
+                onClick={() => setIsEditingStory(true)}
+                data-testid="edit-story"
+              >
+                <ActionIcon icon={Pencil} />
+                Edit story
+              </button>
+              <hr className="actionmenu__divider" />
+              <button
+                className="actionmenu__item actionmenu__item--danger"
+                type="button"
+                onClick={() => void removeStory()}
+                data-testid="delete-story"
+              >
+                <ActionIcon icon={Trash} />
+                Delete story
+              </button>
+            </ActionMenu>
+          ) : null}
         </div>
       </PageHeader>
 
@@ -699,18 +706,20 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
           onArcsChange={showArcs}
           onReload={reload}
           announce={setAnnouncement}
-          arcPublication={(arc) => (
-            <StoryPartPublication
-              universeId={universe.id}
-              storyId={story.id}
-              kind="arc"
-              id={arc.id}
-              name={arc.title}
-              visibility={arc.visibility}
-              storyIsPublic={storyIsPublic}
-              onChange={(visibility) => patchArc(arc.id, visibility)}
-            />
-          )}
+          arcPublication={(arc) =>
+            access.publish ? (
+              <StoryPartPublication
+                universeId={universe.id}
+                storyId={story.id}
+                kind="arc"
+                id={arc.id}
+                name={arc.title}
+                visibility={arc.visibility}
+                storyIsPublic={storyIsPublic}
+                onChange={(visibility) => patchArc(arc.id, visibility)}
+              />
+            ) : null
+          }
         />
       ) : view === 'manuscript' ? (
         <ManuscriptPanel
@@ -720,18 +729,20 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
           chronology={chronology}
           sceneId={sceneId}
           onEditScene={(scene) => setSceneForm({ mode: 'edit', scene })}
-          manuscriptPublication={(scene) => (
-            <StoryPartPublication
-              universeId={universe.id}
-              storyId={story.id}
-              kind="manuscript"
-              id={scene.id}
-              name={scene.title}
-              visibility={scene.manuscriptVisibility}
-              storyIsPublic={storyIsPublic}
-              onChange={(manuscriptVisibility) => patchScene(scene.id, { manuscriptVisibility })}
-            />
-          )}
+          manuscriptPublication={(scene) =>
+            access.publish ? (
+              <StoryPartPublication
+                universeId={universe.id}
+                storyId={story.id}
+                kind="manuscript"
+                id={scene.id}
+                name={scene.title}
+                visibility={scene.manuscriptVisibility}
+                storyIsPublic={storyIsPublic}
+                onChange={(manuscriptVisibility) => patchScene(scene.id, { manuscriptVisibility })}
+              />
+            ) : null
+          }
         />
       ) : (
         <section className="story__scenes" aria-labelledby="story-scenes-heading">
@@ -752,10 +763,12 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
                   ? 'Chapters in order, and the scenes in each in the order they are told. When each happens in the world never moves it.'
                   : 'In the order they are told. When each happens in the world never moves it.'}
               </p>
-              <div className="story__toolbaractions">
-                {newChapter}
-                <span className="story__create">{newScene}</span>
-              </div>
+              {access.editContent ? (
+                <div className="story__toolbaractions">
+                  {newChapter}
+                  <span className="story__create">{newScene}</span>
+                </div>
+              ) : null}
             </div>
           )}
 
@@ -771,10 +784,12 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
               title="No scenes yet."
               hint="Start with a scene: plot beats point at scenes, and the manuscript is written one scene at a time. Scenes are told in the order you set, whenever in the world each happens, and can be grouped into chapters whenever you like, or never."
               action={
-                <>
-                  {newScene}
-                  {newChapter}
-                </>
+                access.editContent ? (
+                  <>
+                    {newScene}
+                    {newChapter}
+                  </>
+                ) : undefined
               }
             />
           ) : null}

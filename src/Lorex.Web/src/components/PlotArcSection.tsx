@@ -1,4 +1,5 @@
 import { useId, type ReactNode } from 'react'
+import { useUniverseAccess } from '../universes/access'
 import { ArrowDown, ArrowUp, Pencil, Plus, Trash } from 'lucide-react'
 import { ActionIcon } from './ActionIcon'
 import { ActionMenu } from './ActionMenu'
@@ -38,6 +39,7 @@ export function PlotArcSection({
   children,
   publication,
 }: PlotArcSectionProps) {
+  const access = useUniverseAccess()
   const headingId = useId()
   const beatCount = arc.beats.length
 
@@ -68,62 +70,66 @@ export function PlotArcSection({
 
         <div className="plotarc__tools rowtools">
           {publication}
-          <button
-            className="button button--text"
-            type="button"
-            onClick={() => onAddBeat(arc)}
-            aria-describedby={headingId}
-            data-testid="plot-arc-new-beat"
-          >
-            <ActionIcon icon={Plus} />
-            Add beat
-          </button>
-          <ActionMenu
-            label={`More actions for ${arcLabel(index, arc.title)}`}
-            triggerTestId="plot-arc-actions"
-          >
-            <button
-              className="actionmenu__item"
-              type="button"
-              onClick={() => onEdit(arc, index)}
-              data-testid="plot-arc-edit"
-            >
-              <ActionIcon icon={Pencil} />
-              Edit arc
-            </button>
-            {index > 0 ? (
+          {access.editContent ? (
+            <>
               <button
-                className="actionmenu__item"
+                className="button button--text"
                 type="button"
-                onClick={() => onMove(arc, -1)}
-                data-testid="plot-arc-move-up"
+                onClick={() => onAddBeat(arc)}
+                aria-describedby={headingId}
+                data-testid="plot-arc-new-beat"
               >
-                <ActionIcon icon={ArrowUp} />
-                Move up
+                <ActionIcon icon={Plus} />
+                Add beat
               </button>
-            ) : null}
-            {index < count - 1 ? (
-              <button
-                className="actionmenu__item"
-                type="button"
-                onClick={() => onMove(arc, 1)}
-                data-testid="plot-arc-move-down"
+              <ActionMenu
+                label={`More actions for ${arcLabel(index, arc.title)}`}
+                triggerTestId="plot-arc-actions"
               >
-                <ActionIcon icon={ArrowDown} />
-                Move down
-              </button>
-            ) : null}
-            <hr className="actionmenu__divider" />
-            <button
-              className="actionmenu__item actionmenu__item--danger"
-              type="button"
-              onClick={() => onDelete(arc, index)}
-              data-testid="plot-arc-delete"
-            >
-              <ActionIcon icon={Trash} />
-              Delete arc
-            </button>
-          </ActionMenu>
+                <button
+                  className="actionmenu__item"
+                  type="button"
+                  onClick={() => onEdit(arc, index)}
+                  data-testid="plot-arc-edit"
+                >
+                  <ActionIcon icon={Pencil} />
+                  Edit arc
+                </button>
+                {index > 0 ? (
+                  <button
+                    className="actionmenu__item"
+                    type="button"
+                    onClick={() => onMove(arc, -1)}
+                    data-testid="plot-arc-move-up"
+                  >
+                    <ActionIcon icon={ArrowUp} />
+                    Move up
+                  </button>
+                ) : null}
+                {index < count - 1 ? (
+                  <button
+                    className="actionmenu__item"
+                    type="button"
+                    onClick={() => onMove(arc, 1)}
+                    data-testid="plot-arc-move-down"
+                  >
+                    <ActionIcon icon={ArrowDown} />
+                    Move down
+                  </button>
+                ) : null}
+                <hr className="actionmenu__divider" />
+                <button
+                  className="actionmenu__item actionmenu__item--danger"
+                  type="button"
+                  onClick={() => onDelete(arc, index)}
+                  data-testid="plot-arc-delete"
+                >
+                  <ActionIcon icon={Trash} />
+                  Delete arc
+                </button>
+              </ActionMenu>
+            </>
+          ) : null}
         </div>
 
         {arc.description ? (

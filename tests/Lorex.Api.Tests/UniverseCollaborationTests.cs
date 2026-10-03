@@ -31,7 +31,7 @@ public sealed class UniverseCollaborationTests(LorexApiFactory factory) : IClass
     // ---------- The capability matrix itself ----------
 
     [Theory]
-    [InlineData(UniverseRole.Owner, "Read EditContent ManageTrash ManageHistory PermanentlyDelete ManageUniverse Publish Backup")]
+    [InlineData(UniverseRole.Owner, "Read EditContent ManageTrash ManageHistory PermanentlyDelete ManageUniverse Publish Backup ManageCollaborators")]
     [InlineData(UniverseRole.Editor, "Read EditContent ManageTrash ManageHistory")]
     [InlineData(UniverseRole.Reviewer, "Read")]
     [InlineData(UniverseRole.Viewer, "Read")]

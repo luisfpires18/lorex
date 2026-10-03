@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useUniverseAccess } from '../universes/access'
 import { useOutletContext } from 'react-router-dom'
 import {
   dismissCanonConflict,
@@ -49,6 +50,7 @@ const STATUS_TABS: CanonConflictStatusValue[] = [
  * record, and resolutions are evaluation's.
  */
 export default function CanonPage() {
+  const access = useUniverseAccess()
   const { universe } = useOutletContext<WorkspaceContext>()
 
   const [status, setStatus] = useState<CanonConflictStatusValue>(CanonConflictStatus.Pending)
@@ -130,16 +132,19 @@ export default function CanonPage() {
         title="Canon integrity"
         lede="What this world says twice, and differently. Findings are derived from your lore and change nothing in it."
         actions={
-          <button
-            className="button"
-            type="button"
-            onClick={() => void evaluate()}
-            disabled={isEvaluating}
-            aria-busy={isEvaluating}
-            data-testid="evaluate-canon"
-          >
-            {isEvaluating ? 'Evaluating…' : 'Evaluate'}
-          </button>
+          // Evaluating writes the findings, so it is editing (ADR 0041); everyone reads what the last one found.
+          access.editContent ? (
+            <button
+              className="button"
+              type="button"
+              onClick={() => void evaluate()}
+              disabled={isEvaluating}
+              aria-busy={isEvaluating}
+              data-testid="evaluate-canon"
+            >
+              {isEvaluating ? 'Evaluating…' : 'Evaluate'}
+            </button>
+          ) : undefined
         }
       />
 
@@ -256,7 +261,7 @@ export default function CanonPage() {
               : hint(status)
           }
           action={
-            severity === null && status === CanonConflictStatus.Pending ? (
+            access.editContent && severity === null && status === CanonConflictStatus.Pending ? (
               <button
                 className="button button--secondary"
                 type="button"

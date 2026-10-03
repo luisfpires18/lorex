@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useUniverseAccess } from '../universes/access'
 import {
   ArchiveRestore,
   BookOpen,
@@ -184,6 +185,7 @@ function eraseText(kind: TrashKindValue) {
  * deleted.
  */
 export default function UniverseTrash() {
+  const access = useUniverseAccess()
   const { universe } = useOutletContext<WorkspaceContext>()
   const { user } = useAuth()
 
@@ -304,7 +306,8 @@ export default function UniverseTrash() {
   }, [outcome])
 
   function askToRestore(item: TrashItem) {
-    if (item.publication === TrashPublication.None) {
+    // Someone who cannot publish has no choice to make: the server restores whatever was selected as private (ADR 0041).
+    if (item.publication === TrashPublication.None || !access.publish) {
       void restore(item)
       return
     }
@@ -326,7 +329,9 @@ export default function UniverseTrash() {
     try {
       await restoreFromTrash(universe.id, item)
       let privateNote: ReactNode = null
-      if (keepPrivate) {
+      if (!access.publish && item.publication !== TrashPublication.None) {
+        privateNote = ' It was restored privately: only the owner can publish it again.'
+      } else if (keepPrivate) {
         try {
           await unpublishContent(
             universe.id,
@@ -568,21 +573,32 @@ export default function UniverseTrash() {
         title="Trash"
         lede={
           <>
-            <p>
-              What you removed from your lore, your stories and your world rules. Everything here
-              can be restored with everything it held, until you choose to delete it permanently.
-            </p>
-            <p data-testid="trash-ideas-pointer">
-              Deleted ideas are not here: they belong to your account, and wait in{' '}
-              <Link to={`/app/universes/${universe.id}/ideas?view=deleted`}>
-                Ideas, under Recently deleted
-              </Link>
-              .
-            </p>
+            {access.permanentlyDelete ? (
+              <p>
+                What you removed from your lore, your stories and your world rules. Everything here
+                can be restored with everything it held, until you choose to delete it permanently.
+              </p>
+            ) : (
+              <p>
+                What was removed from this universe&rsquo;s lore, stories and world rules.
+                Everything here can be restored with everything it held. Restored items that were
+                public will be restored privately. Only the owner can delete anything permanently.
+              </p>
+            )}
+            {access.keepIdeas ? (
+              <p data-testid="trash-ideas-pointer">
+                Deleted ideas are not here: they belong to your account, and wait in{' '}
+                <Link to={`/app/universes/${universe.id}/ideas?view=deleted`}>
+                  Ideas, under Recently deleted
+                </Link>
+                .
+              </p>
+            ) : null}
           </>
         }
         actions={
-          pageItems.length > 0 || isSelecting ? (
+          // Selecting is for erasing in bulk, which is the owner's alone (ADR 0041).
+          access.permanentlyDelete && (pageItems.length > 0 || isSelecting) ? (
             <button
               ref={selectToggleRef}
               className="button button--secondary trash__select"
@@ -726,20 +742,22 @@ export default function UniverseTrash() {
                     <ActionIcon icon={ArchiveRestore} />
                     {restoring === item.id ? 'Restoring…' : 'Restore'}
                   </button>
-                  <button
-                    ref={(node) => {
-                      if (node) eraseButtons.current.set(item.id, node)
-                      else eraseButtons.current.delete(item.id)
-                    }}
-                    className="button button--text trash__erase"
-                    type="button"
-                    disabled={busy}
-                    aria-label={`Delete permanently: ${kind.toLowerCase()} “${item.name}”`}
-                    onClick={() => askToErase(item)}
-                    data-testid={`erase-${item.name}`}
-                  >
-                    Delete permanently…
-                  </button>
+                  {access.permanentlyDelete ? (
+                    <button
+                      ref={(node) => {
+                        if (node) eraseButtons.current.set(item.id, node)
+                        else eraseButtons.current.delete(item.id)
+                      }}
+                      className="button button--text trash__erase"
+                      type="button"
+                      disabled={busy}
+                      aria-label={`Delete permanently: ${kind.toLowerCase()} “${item.name}”`}
+                      onClick={() => askToErase(item)}
+                      data-testid={`erase-${item.name}`}
+                    >
+                      Delete permanently…
+                    </button>
+                  ) : null}
                 </div>
                 {confirming?.id === item.id && confirming.kind === item.kind ? (
                   <RestorePublicConfirm

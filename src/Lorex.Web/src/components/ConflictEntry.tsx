@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useUniverseAccess } from '../universes/access'
 import {
   CONFLICT_STATUS_LABELS,
   CanonConflictStatus,
@@ -26,6 +27,7 @@ interface Props {
  * backend's, and rephrasing it here would put two voices on the same finding.
  */
 export function ConflictEntry({ universeId, conflict, isBusy, onDismiss, onReopen }: Props) {
+  const access = useUniverseAccess()
   const isResolved = conflict.status === CanonConflictStatus.Resolved
   const isDismissed = conflict.status === CanonConflictStatus.Dismissed
 
@@ -71,7 +73,7 @@ export function ConflictEntry({ universeId, conflict, isBusy, onDismiss, onReope
             <p className="finding__note">
               Evaluation closed this. It comes back on its own if the problem does.
             </p>
-          ) : (
+          ) : !access.editContent ? null : (
             <button
               className="button button--secondary button--sm"
               type="button"
