@@ -1427,3 +1427,45 @@ centred frame.
   start, "Page X of Y" truly centred, Next at the end; both buttons always drawn, disabled at the ends, so the position
   never moves. Shown only with more than one page. Lore moves by the address's page, and a page past the end lands on the
   last one.
+
+## 22. Atmosphere and editorial polish (pre-031 UI polish pass)
+
+Owner-supplied image references studied with the Image To Code skill; the product's structure (refinements 024-030)
+wins over the mockups. **The palette is unchanged** - the owner kept the current colours - so everything below reads
+from the existing tokens and translates to Light and Dark on its own. No route, API, schema or backup change.
+
+- **Atmosphere** (`.atmosphere`, one element, out of the flow, `z-index: -1` inside an `isolation: isolate` parent):
+  artwork laid behind the head of a screen at `--atmosphere-opacity` (0.32 light, 0.44 dark) under a veil of
+  `--atmosphere-veil` (the canvas) that thins toward the top right and is whole at the foot and the start edge. Used by
+  the universe shell (every screen; `data-size="hero"` on Overview, taller and stronger) and My workspace. The source is
+  the world's own artwork card - **owner only**, since artwork is a Publish-capability read (ADR 0041) - else Lorex's
+  own `assets/atmosphere-citadel.webp`. The sign-in plate (login, register, an invitation) carries
+  `assets/atmosphere-ridge.webp` under the plate's own veil. Both are the owner's landing images as WebP (q60, ~160 and
+  ~195 KB), fetched once and cached; no filter or blur layer.
+- **Editorial headings.** `--text-page` and `--text-document` are `clamp()`s now (30-42px, 36-52px), tracked
+  `--title-tracking`, `text-wrap: balance`; the fixed one-step-down at 640 is gone. A document's front page - an entry,
+  a universe's Overview - carries `.titlerule`: a fine accent rule with a small diamond, masked over `--accent`.
+- **Section rules.** `.sectionrule` - the display face in small tracked capitals with a hairline running on - heads a
+  group of things: Overview's World / Writing / Keeping. `.sectionrule--accent` (smaller, in the accent) labels what is
+  read or filled in place: an entry's Article, its form's parts, the type editor's Identity / Hierarchy / Behaviour.
+  Capitals stay limited to these and the search panel's group headings.
+- **Article prose** is set in the display face (1.125rem / 1.72, 62ch) for reading and writing alike; Lorex's own
+  words stay in the UI sans.
+- **Cards share one DNA**: 10px radius, `--rule` edge, `--shadow-1` at rest; under the pointer `--shadow-2`, a 2px
+  lift (none under reduced motion) and an edge warmed toward the accent. A world's card (`.plate`) has its artwork
+  (owner's) or its own colour as a dusk with its initial drawn from `data-initial` by CSS - never part of the card's
+  text. Overview doorways have a ringed icon medallion and a way-through arrow; Lore leads the World group at double
+  width; Keeping's doorways lie flat. On a phone a doorway is one compact row.
+- **Forms are grouped, not nested**: an entry form's parts and the invitation form each sit on one quiet panel
+  (`--rule` edge, raised at ~55%), fields boxed inside; token fields are boxed like every field. A drawer form groups
+  with `.drawer__group` and section rules, no panels.
+- **Lists of managed things** (Types, collaborators, pending invitations) are one ruled panel with hairline rows. A
+  nested type hangs from a full-height rail with an elbow into its medallion; on a phone the rows go edge to edge as
+  before so a row's tools keep their line. Collaborators get a decorative monogram (`data-initial`).
+- **Picture on an entry** sits in a raised mount; Created / Last changed sit under a hairline below it.
+- **Current place**: tabs and the workspace bar's current link take the accent rule (was ink); the sidebar's current
+  section is the accent wash with an accent hairline and an accent icon.
+
+Not adopted from the references, on purpose: a global top bar, notification bell and ⌘K hint (no such features; 024's
+shell stands), corner brackets and frames on every panel, AI-painted section images on doorways (no fake imagery),
+disabled "future settings" controls in the type editor, and the references' navy/gold palette (owner's call).

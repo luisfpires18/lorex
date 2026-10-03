@@ -13,6 +13,8 @@ import { capabilitiesOf, ROLE_LABELS, UniverseAccessContext } from '../universes
 import { UniverseRole } from '../universes/types'
 import { useDocumentTitle } from '../lib/useDocumentTitle'
 import type { UniverseDetail } from '../universes/types'
+import { useUniverseArtwork } from '../universes/artwork'
+import type { UniverseArtworkRef } from '../publishing/types'
 import { EmptyState } from '../components/EmptyState'
 
 const SECTIONS = SECTION_GROUPS.flat()
@@ -34,6 +36,9 @@ export interface WorkspaceContext {
    */
   chronology: Chronology
   setChronology: (next: Chronology) => void
+
+  /** Hands the shell a changed artwork (Publish), so the world's atmosphere follows it without a reload. */
+  setArtwork: (next: UniverseArtworkRef | null) => void
 }
 
 /** The part of the URL below this universe, without its surrounding slashes. */
@@ -111,6 +116,13 @@ export default function UniverseWorkspace() {
     setState((current) => (current.kind === 'ready' ? { ...current, chronology } : current))
   }, [])
 
+  // The world's own artwork as the atmosphere at the head of every screen - the owner's only (ADR 0041); anyone else,
+  // and a world without artwork, gets Lorex's.
+  const [artwork, setArtwork] = useUniverseArtwork(
+    id ?? '',
+    state.kind === 'ready' && state.universe.accessRole === UniverseRole.Owner,
+  )
+
   // The tab names the section and then the universe - "Lore — Hollowmere | Lorex" - from the shell, which knows both;
   // an entry or a story inside a section is still that section here, and nothing beneath sets a title of its own.
   useDocumentTitle(
@@ -160,6 +172,7 @@ export default function UniverseWorkspace() {
   const groups = SECTION_GROUPS.map((group) => offered(group, access)).filter(
     (group) => group.length > 0,
   )
+  const section = currentSection(pathname, id)
 
   return (
     <div
@@ -189,7 +202,7 @@ export default function UniverseWorkspace() {
           <span className="rail__universe" dir="auto">
             {universe.name}
           </span>
-          <span className="rail__section">{currentSection(pathname, id)}</span>
+          <span className="rail__section">{section}</span>
           {universe.isArchived ? <span className="rail__archived">Archived</span> : null}
         </p>
 
@@ -231,10 +244,16 @@ export default function UniverseWorkspace() {
             <ArrowLeft className="sidebar__backicon" aria-hidden="true" focusable="false" />
             All universes
           </Link>
-          {/* A name, not the screen's heading: each screen's own title is its h1. */}
-          <p className="sidebar__name" data-testid="workspace-name">
-            <bdi>{universe.name}</bdi>
-          </p>
+          {/* The world's artwork in miniature beside its name, when its owner has given it one. Decorative. */}
+          <div className="sidebar__identity">
+            {artwork ? (
+              <img className="sidebar__art" src={artwork} alt="" width={44} height={44} />
+            ) : null}
+            {/* A name, not the screen's heading: each screen's own title is its h1. */}
+            <p className="sidebar__name" data-testid="workspace-name">
+              <bdi>{universe.name}</bdi>
+            </p>
+          </div>
           {shared ? (
             <span className="sidebar__role" data-testid="workspace-role">
               Shared · {ROLE_LABELS[universe.accessRole]}
@@ -280,6 +299,17 @@ export default function UniverseWorkspace() {
       </nav>
 
       <div className="workspace__column">
+        {/* The atmosphere: the world's artwork - or Lorex's own - behind the head of every screen, fading into the
+            working surface. Decorative, out of the flow, never a target; the front page takes it taller. */}
+        <div
+          className="atmosphere"
+          aria-hidden="true"
+          data-testid="workspace-atmosphere"
+          data-source={artwork ? 'world' : 'lorex'}
+          data-size={section === 'Overview' ? 'hero' : undefined}
+          style={artwork ? { ['--atmosphere-image' as string]: `url("${artwork}")` } : undefined}
+        />
+
         {/* The universe's search, above every screen in it rather than on any one of them. Keyed by the universe, so a
             search typed in one world is never left standing in the next. Search was the sidebar's last greyed section;
             it is not a section, it is how any section's content is reached. */}
@@ -290,7 +320,15 @@ export default function UniverseWorkspace() {
         <main className="canvas" id={MAIN_CONTENT_ID} tabIndex={-1}>
           <UniverseAccessContext.Provider value={access}>
             <Outlet
-              context={{ universe, refresh, chronology, setChronology } satisfies WorkspaceContext}
+              context={
+                {
+                  universe,
+                  refresh,
+                  chronology,
+                  setChronology,
+                  setArtwork,
+                } satisfies WorkspaceContext
+              }
             />
           </UniverseAccessContext.Provider>
         </main>

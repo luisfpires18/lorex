@@ -38,7 +38,7 @@ type Published = { slug: string; lore: number; stories: number } | null
  * them and links there.
  */
 export default function UniversePublish() {
-  const { universe } = useOutletContext<WorkspaceContext>()
+  const { universe, setArtwork } = useOutletContext<WorkspaceContext>()
   const universeId = universe.id
   const base = `/app/universes/${universeId}`
 
@@ -480,7 +480,10 @@ export default function UniversePublish() {
             universeId={universeId}
             artwork={state.artwork}
             isPublic={isPublic}
-            onChanged={() => void load()}
+            onChanged={(next) => {
+              setArtwork(next)
+              void load()
+            }}
           />
         </Section>
 

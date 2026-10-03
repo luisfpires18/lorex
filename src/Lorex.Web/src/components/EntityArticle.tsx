@@ -362,7 +362,12 @@ export function EntityArticleSection({
     >
       <div className="article__head">
         {/* Focusable by script only, so arriving at the article puts a keyboard and a screen reader on its heading. */}
-        <h2 className="article__title" id={headingId} tabIndex={-1} data-arrival-focus>
+        <h2
+          className="article__title sectionrule sectionrule--accent"
+          id={headingId}
+          tabIndex={-1}
+          data-arrival-focus
+        >
           Article
         </h2>
         {isReady && !isEditing && hasArticle && access.editContent ? (

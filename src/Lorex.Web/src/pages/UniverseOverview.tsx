@@ -1,16 +1,17 @@
 import { Link, useOutletContext } from 'react-router-dom'
+import { ArrowRight } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { formatDate } from '../lib/dates'
 import { ROLE_DESCRIPTIONS, ROLE_LABELS, useUniverseAccess } from '../universes/access'
-import { KEEPING, offered, WORLD, WRITING } from '../universes/sections'
+import { KEEPING, offered, WORLD, WRITING, type Section } from '../universes/sections'
 import { UniverseRole } from '../universes/types'
 import type { WorkspaceContext } from './UniverseWorkspace'
 
 /** The contents page's three parts: the sidebar's worldbuilding groups, between the front page and the upkeep. */
 const CONTENTS = [
-  { heading: 'World', sections: WORLD },
-  { heading: 'Writing', sections: WRITING },
-  { heading: 'Keeping', sections: KEEPING },
+  { heading: 'World', name: 'world', sections: WORLD },
+  { heading: 'Writing', name: 'writing', sections: WRITING },
+  { heading: 'Keeping', name: 'keeping', sections: KEEPING },
 ]
 
 /**
@@ -18,17 +19,26 @@ const CONTENTS = [
  * each part of it, grouped as the sidebar groups them. No feed, no recent items, no counts - a
  * count would mean reading every list just to print a number, and a contents page does not need
  * one to say where things are.
+ *
+ * The world's parts take the full width; writing and keeping, two short groups, sit side by side once there is room.
  */
 export default function UniverseOverview() {
   const { universe } = useOutletContext<WorkspaceContext>()
   const access = useUniverseAccess()
   const shared = universe.accessRole !== UniverseRole.Owner
 
+  const groups = CONTENTS.map((group) => ({
+    ...group,
+    sections: offered(group.sections, access),
+  })).filter(({ sections }) => sections.length > 0)
+  const [world, ...rest] = groups
+
   return (
     <article className="overview">
       <PageHeader
         title={<bdi>{universe.name}</bdi>}
         titleTestId="overview-name"
+        titleClassName="titlerule"
         lede={
           <>
             {universe.description ? (
@@ -55,31 +65,48 @@ export default function UniverseOverview() {
         }
       />
 
-      {CONTENTS.map(({ heading, sections }) => ({ heading, sections: offered(sections, access) }))
-        .filter(({ sections }) => sections.length > 0)
-        .map(({ heading, sections }) => (
-          <section className="contents" key={heading} aria-labelledby={`contents-${heading}`}>
-            <h2 className="contents__heading" id={`contents-${heading}`}>
-              {heading}
-            </h2>
-            <ul className="contents__list">
-              {sections.map(({ segment, label, icon: Icon, purpose }) => (
-                <li key={segment}>
-                  <Link className="doorway" to={segment} data-testid={`overview-${segment}`}>
-                    <Icon
-                      className="doorway__icon"
-                      aria-hidden="true"
-                      focusable="false"
-                      strokeWidth={1.75}
-                    />
-                    <span className="doorway__name">{label}</span>
-                    <span className="doorway__purpose">{purpose}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
+      {world ? <Contents {...world} /> : null}
+      {rest.length > 0 ? (
+        <div className="contents__pair">
+          {rest.map((group) => (
+            <Contents key={group.name} {...group} />
+          ))}
+        </div>
+      ) : null}
     </article>
+  )
+}
+
+function Contents({
+  heading,
+  name,
+  sections,
+}: {
+  heading: string
+  name: string
+  sections: readonly Section[]
+}) {
+  return (
+    <section className={`contents contents--${name}`} aria-labelledby={`contents-${heading}`}>
+      <h2 className="contents__heading sectionrule" id={`contents-${heading}`}>
+        {heading}
+      </h2>
+      <ul className="contents__list">
+        {sections.map(({ segment, label, icon: Icon, purpose }) => (
+          <li key={segment}>
+            <Link className="doorway" to={segment} data-testid={`overview-${segment}`}>
+              <span className="doorway__medallion" aria-hidden="true">
+                <Icon className="doorway__icon" focusable="false" strokeWidth={1.75} />
+              </span>
+              <span className="doorway__name">{label}</span>
+              <span className="doorway__purpose">{purpose}</span>
+              <span className="doorway__go" aria-hidden="true">
+                <ArrowRight focusable="false" strokeWidth={1.75} />
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }

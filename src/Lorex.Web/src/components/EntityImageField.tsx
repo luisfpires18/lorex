@@ -186,7 +186,7 @@ export function EntityImageField({
 
   return (
     <div className="imagefield" data-testid="entity-image-field">
-      <h2 className="entryform__heading">Picture</h2>
+      <h2 className="entryform__heading sectionrule sectionrule--accent">Picture</h2>
 
       <div className="imagefield__row">
         {pending && preview ? (
@@ -241,7 +241,7 @@ export function EntityImageField({
                 Edit thumbnail
               </button>
               <button
-                className="button button--secondary"
+                className="button button--secondary button--danger-quiet"
                 type="button"
                 disabled={busyOrDisabled}
                 onClick={() => void remove()}

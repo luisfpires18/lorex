@@ -392,6 +392,12 @@ function MemberRow({
 
   return (
     <li className="collab__row" data-testid="collaborator-row" data-username={member.username}>
+      {/* A monogram for the eye to find a person by; drawn from the attribute, so it is never part of the row's text. */}
+      <span
+        className="collab__mark"
+        aria-hidden="true"
+        data-initial={Array.from(member.username)[0]?.toUpperCase() ?? ''}
+      />
       <div className="collab__who">
         <p className="collab__name">
           <bdi>{member.username}</bdi>
