@@ -3768,6 +3768,8 @@ a.button--danger:visited {
   justify-content: flex-end;
   gap: var(--space-3);
   margin-left: auto;
+  /* With the first row of filters, however many field filters wrap beneath it. */
+  align-self: flex-start;
 }
 
 /* Entries per page, its word beside the select. */
@@ -3820,6 +3822,137 @@ a.button--danger:visited {
 
 .lore .segmented {
   align-self: center;
+}
+
+/* Field filters (034): Add field filter beside search and status, quieter than either; the filters in force and the open
+   editor on a row of their own beneath, read as short sentences rather than as a query. */
+.lore__addfilter {
+  display: flex;
+  align-items: center;
+}
+
+.lore__addfiltertrigger {
+  min-height: var(--control-sm);
+  padding-block: 0;
+  font-size: var(--text-ui);
+}
+
+.lore__filterlimit {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.lore__fieldfilters {
+  display: flex;
+  flex: 1 1 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.lore__activefilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lore__activefilter {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: var(--control-sm);
+  padding-left: var(--space-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-sm);
+  background: var(--raised);
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.lore__activefiltertext {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.lore__removefilter {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: var(--control-sm);
+  height: var(--control-sm);
+  margin-left: var(--space-1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.lore__removefilter svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.lore__removefilter:hover {
+  color: var(--ink);
+  background: var(--paper);
+}
+
+/* One line on a wide screen: the field's name, how, the value, Apply. Wraps when it must, the value taking the width. */
+.lore__fieldeditor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  max-width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--raised);
+}
+
+.lore__fieldeditorname {
+  font-size: var(--text-ui);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lore__fieldeditorop {
+  width: auto;
+}
+
+.lore__fieldeditorop--fixed {
+  font-size: var(--text-ui);
+  color: var(--muted);
+}
+
+.lore__fieldeditorvalue {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.lore__fieldeditorvalue .field {
+  margin: 0;
+}
+
+/* The field's name already labels the row; the picker keeps its label for assistive technology only. */
+.lore__fieldeditorvalue .field__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.lore__fieldeditoractions {
+  display: flex;
+  gap: var(--space-2);
 }
 
 /* The one line of the create label that can grow with an author's type name: cut, whole in the
@@ -4660,6 +4793,25 @@ a.button--danger:visited {
   .lore__search {
     flex-basis: 100%;
     max-width: none;
+  }
+
+  /* A phone: the editor stacks - name, how, value, then Apply - and every control takes the width; nothing is squeezed
+     onto one 360px line. A filter's remove button keeps a finger's size. */
+  .lore__fieldeditor {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .lore__fieldeditorop,
+  .lore__fieldeditorvalue {
+    flex-basis: auto;
+    width: 100%;
+  }
+
+  .lore__removefilter {
+    width: var(--control-touch);
+    height: var(--control-touch);
   }
 
   /* The header keeps the title and one icon action: Mass create keeps its name for assistive technology and its title. */

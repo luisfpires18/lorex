@@ -8,6 +8,8 @@ const MAX_RESULTS = 8
 export interface EntityChoice {
   id: string
   name: string
+  /** The entry's type, where a chooser keeps it to tell two of the same name apart. */
+  typeName?: string
 }
 
 /**
@@ -202,7 +204,7 @@ export function EntityPicker({
   })
 
   function choose(item: EntitySummary) {
-    onChange({ id: item.id, name: item.name })
+    onChange({ id: item.id, name: item.name, typeName: item.entityTypeName })
     setIsOpen(false)
     setQuery('')
   }

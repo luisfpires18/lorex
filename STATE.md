@@ -50,6 +50,11 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **Product refinement 034 - Lore custom-field filters** (`feat/lore-custom-field-filters` off `dev` at `e4bbfcc`;
+  committed, not merged, not pushed). No schema, migration or backup change (backup **19**).
+  - A type's entries narrowed by its own fields: text, number, yes or no, choose one, choose several, linked entry. ANDed,
+    at most 10, in the address (`field=<id>:<op>:<value>`), filtered in the database before count and paging; a missing
+    value never matches. Date deferred. ADR 0007 amendment.
 - **Product refinement 033 - app version, build-derived cache, public footer** (`feat/app-version-cache-footer` off `dev`
   at `e167a92`; committed, not merged, not pushed). No schema, migration, backend or backup change (backup **19**).
   - One version: `src/Lorex.Web/package.json`, now `0.1.0`; Vite writes it and a build id into the bundle, read only via

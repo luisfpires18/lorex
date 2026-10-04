@@ -1,3 +1,4 @@
+import { FIELD_FILTER_PARAM, encodeFieldFilter } from './fieldFilters'
 import { apiFetch } from '../lib/api'
 import type {
   BulkCreatedEntity,
@@ -164,6 +165,11 @@ export function listEntities(universeId: string, query: EntityQuery, signal?: Ab
   if (query.canonStatus !== null) params.set('canonStatus', String(query.canonStatus))
   if (query.tag) params.set('tag', query.tag)
   if (query.familyTreeEligible) params.set('familyTreeEligible', 'true')
+  if (query.entityTypeId) {
+    for (const filter of query.fieldFilters ?? []) {
+      params.append(FIELD_FILTER_PARAM, encodeFieldFilter(filter))
+    }
+  }
 
   return apiFetch<EntityPage>(`${base(universeId)}/entities?${params.toString()}`, { signal })
 }
