@@ -1,3 +1,4 @@
+import type { FieldFilter } from './fieldFilters'
 import type { ImageCrop } from '../lib/imageCrop'
 
 /** Mirrors the backend enum. Ordered from least to most committed. */
@@ -294,4 +295,6 @@ export interface EntityQuery {
   familyTreeEligible?: boolean
   /** With `entityTypeId`: that type and every type nested beneath it - Lore's browsing. Absent is the exact type. */
   includeDescendants?: boolean
+  /** With `entityTypeId`: custom-field filters on that type's own fields, all of which must hold (`lore/fieldFilters.ts`). */
+  fieldFilters?: FieldFilter[]
 }

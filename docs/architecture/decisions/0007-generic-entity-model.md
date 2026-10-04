@@ -127,3 +127,40 @@ request, no skeleton, no filters, no Select, no panel. The header path's "Lore" 
 child**, opening the same type drawer with that row's type as the starting parent (still editable); the drawer says "New
 child type" and "Inside …", and the focus comes back to that row's Add child after creating or cancelling. Frontend only:
 the create request already took `parent`.
+
+## Amendment - custom-field filters in Lore (2026-10-04, Product refinement 034)
+
+**A chosen type's entries can be narrowed by that type's own fields.** `GET .../entities` takes repeated
+`field=<fieldId>:<op>:<value>`, split at the first two colons only (a GUID and a fixed word hold none, so the value may hold
+anything). The Lore address carries the same values under the same name, so a link, a refresh, Back and Forward all keep them.
+No second endpoint; a listing without `field` is unchanged.
+
+| Kind | Operators (wire / words) | Value |
+| --- | --- | --- |
+| Short and long text | `contains` contains, `eq` is | text, trimmed, not blank |
+| Number | `gt` is more than, `lt` is less than, `eq` is | a finite number, decimals kept |
+| Yes or no | `is` | `true` or `false` (Yes / No) |
+| Choose one | `is`, `isNot` is not | an option id of that field |
+| Choose several | `contains` includes, `notContains` does not include | one option id of that field |
+| Link to an entity | `is`, `isNot` | an entry id of this universe |
+
+- **The type's own fields only.** Fields are not inherited, so a filter needs `entityTypeId` and names a field defined on
+  exactly that type. Branch browsing still lists nested types' entries; they carry none of the parent's fields, so any field
+  filter leaves them out.
+- **AND, everywhere.** Filters are ANDed with each other and with the type branch, search, status and tag. The same field may
+  appear more than once (`Age > 20` and `Age < 40`; two `includes` is "both"). At most **10**; an eleventh is a 400.
+- **A missing value never matches**, positive or negative: "is not Arkazia" needs a Kingdom; "does not include Fire" needs at
+  least one option chosen.
+- **Text** compares through SQLite's `lower()` on both sides (the parameter is lowered by the same A-Z rule in C#), so it is
+  case-insensitive for ASCII and exact otherwise; `contains` is `instr()`, so `%` and `_` are plain characters.
+- **In the database, before the count, order and page.** Each filter is one correlated `EXISTS` over `EntityFieldValues`
+  (served by its `(EntityId, FieldDefinitionId)` index), composed into the listing's query; ordering is untouched (recency, or
+  the full-text score when searching). One read resolves the fields and options, one more any linked entries; the number of
+  queries does not grow with the filters or the entries. No migration; cards carry no field values.
+- **Refused, never ignored.** A field that is not the type's (another type, another universe, deleted, unknown), a Date field,
+  an operator the kind lacks, a bad value, an option of another field, or an entry outside the universe is a 400 - dropping a
+  filter would widen the answer. Another universe's field, option or entry gets the same answer as a made-up id.
+- **Client** (`lore/fieldFilters.ts`): the one parser and serializer, the operators per kind and their words. Filters the
+  chosen type cannot answer are taken out of the address with replace before anything is read; adding or removing one is a
+  history entry and returns to page 1; another type starts with none; Clear filters clears them with search and status.
+- **Not here:** Date (it waits on each universe's own calendars), is empty / is not empty, OR, saved views, public Explore.

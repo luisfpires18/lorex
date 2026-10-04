@@ -20,6 +20,7 @@ import {
 import { ActionIcon } from '../components/ActionIcon'
 import { EmptyState } from '../components/EmptyState'
 import { EntityCard } from '../components/EntityCard'
+import { LoreFieldFilters } from '../components/LoreFieldFilters'
 import { PageHeader } from '../components/PageHeader'
 import { TypeSwitcher } from '../components/TypeSwitcher'
 import { ApiError } from '../lib/api'
@@ -38,6 +39,14 @@ import {
   type EntityPage,
   type EntityType,
 } from '../lore/types'
+import {
+  FIELD_FILTER_PARAM,
+  encodeFieldFilter,
+  isValidFor,
+  readFieldFilters,
+  withFieldFilters,
+  type FieldFilter,
+} from '../lore/fieldFilters'
 import { buildTypeTree } from '../lore/typeTree'
 import type { MassCreatedState } from './MassCreatePage'
 import { useUniverseAccess } from '../universes/access'
@@ -61,11 +70,13 @@ function readPage(value: string | null) {
 }
 
 /**
- * The Lore browser. Where the author is - which type, which status, what is typed in the filter,
- * which page - is the address and nothing else: `lore?type=<id>&status=<0|1|2>&q=<text>&page=<n>`.
+ * The Lore browser. Where the author is - which type, which status, what is typed in the filter, which of the type's own
+ * fields narrow it, which page - is the address and nothing else:
+ * `lore?type=<id>&status=<0|1|2>&q=<text>&field=<id>:<op>:<value>&page=<n>` (`field` once per filter, 034).
  *
  * Choosing a type or a page is a move, so it is a history entry Back returns through; typing and
- * the status replace the entry they are on, so a word typed is not twenty steps of Back.
+ * the status replace the entry they are on, so a word typed is not twenty steps of Back. Adding or removing a field filter
+ * is a move too. Field filters belong to the type whose fields they read: another type starts with none.
  *
  * A type is where browsing starts (ADR 0007 amendment, 2026-10-01). There is no "All": with no type chosen the page lists
  * nothing and reads nothing - a search or status in the address waits for a type. The type navigation above the list is
@@ -97,6 +108,7 @@ export default function LorePage() {
   const canonStatus = readStatus(params.get('status'))
   const search = params.get('q') ?? ''
   const page = readPage(params.get('page'))
+  const addressFilters = readFieldFilters(params)
 
   // Selecting, to move entries to the Trash together. A mode the author turns on, so ordinary browsing carries no
   // checkboxes. What is selected belongs to the page on screen: another page, filter, type or size is another list, so
@@ -145,11 +157,31 @@ export default function LorePage() {
         const next = new URLSearchParams(current)
         next.delete('type')
         next.delete('page')
+        next.delete(FIELD_FILTER_PARAM)
         return next
       },
       { replace: true },
     )
   }, [isUnknownType, setParams])
+
+  // Field filters the chosen type can still answer. One the address carries that it cannot - a field since deleted or
+  // changed, an option gone, a hand-edited value - is taken out in place, never read as another filter, and never sent.
+  const fieldFilters: FieldFilter[] = selectedType
+    ? addressFilters.filter((filter) => isValidFor(filter, selectedType))
+    : []
+  const hasStaleFilters = selectedType !== null && fieldFilters.length !== addressFilters.length
+  useEffect(() => {
+    if (!hasStaleFilters || !selectedType) return
+    setParams(
+      (current) =>
+        withFieldFilters(
+          current,
+          readFieldFilters(current).filter((filter) => isValidFor(filter, selectedType)),
+        ),
+      { replace: true },
+    )
+  }, [hasStaleFilters, selectedType, setParams])
+  const fieldFiltersKey = fieldFilters.map(encodeFieldFilter).join('&')
 
   // Only a type of this universe is ever asked for, and only once the types are known.
   const entityTypeId = selectedType?.id ?? null
@@ -160,7 +192,16 @@ export default function LorePage() {
     const timer = setTimeout(() => {
       listEntities(
         universe.id,
-        { search, entityTypeId, includeDescendants: true, canonStatus, tag: null, page, pageSize },
+        {
+          search,
+          entityTypeId,
+          includeDescendants: true,
+          canonStatus,
+          tag: null,
+          page,
+          pageSize,
+          fieldFilters,
+        },
         controller.signal,
       )
         .then((result) => setState({ kind: 'ready', page: result }))
@@ -173,7 +214,8 @@ export default function LorePage() {
       clearTimeout(timer)
       controller.abort()
     }
-  }, [universe.id, search, entityTypeId, canonStatus, page, pageSize, reads])
+    // fieldFilters is read through its key: a fresh array of the same filters is not a new list.
+  }, [universe.id, search, entityTypeId, canonStatus, page, pageSize, reads, fieldFiltersKey])
 
   /** The address with these changes, always back on the first page unless a page is given. */
   function changed(from: URLSearchParams, changes: Record<string, string | null>) {
@@ -198,8 +240,14 @@ export default function LorePage() {
     window.scrollTo({ top: 0 })
   }
 
+  /** Field filters are a move, like a page: Back undoes one. */
+  function setFieldFilters(next: FieldFilter[]) {
+    setParams((current) => withFieldFilters(current, next))
+  }
+
+  // Another type is another set of fields: its filters do not travel with the author.
   const hrefFor = (typeId: string | null): To => {
-    const next = withParams({ type: typeId }).toString()
+    const next = withParams({ type: typeId, [FIELD_FILTER_PARAM]: null }).toString()
     return { search: next ? `?${next}` : '' }
   }
 
@@ -317,8 +365,9 @@ export default function LorePage() {
   // Offered once there is more than the smallest page to cut, or once the author has chosen a size.
   const offerPageSize =
     (result?.totalCount ?? 0) > LORE_PAGE_SIZES[0] || pageSize !== LORE_PAGE_SIZES[0]
-  const isFiltered = search.trim().length > 0 || canonStatus !== null
-  const activeFilters = (search.trim() ? 1 : 0) + (canonStatus !== null ? 1 : 0)
+  const isFiltered = search.trim().length > 0 || canonStatus !== null || fieldFilters.length > 0
+  const activeFilters =
+    (search.trim() ? 1 : 0) + (canonStatus !== null ? 1 : 0) + fieldFilters.length
   const createTo = selectedType ? `new?type=${selectedType.id}` : 'new'
   const massCreateTo = selectedType ? `mass-create?type=${selectedType.id}` : 'mass-create'
 
@@ -445,6 +494,15 @@ export default function LorePage() {
               </button>
             ))}
           </div>
+
+          {selectedType ? (
+            <LoreFieldFilters
+              universeId={universe.id}
+              type={selectedType}
+              filters={fieldFilters}
+              onChange={setFieldFilters}
+            />
+          ) : null}
         </div>
 
         {offerPageSize || (access.manageTrash && pageItems.length > 0) || isSelecting ? (
@@ -585,10 +643,10 @@ export default function LorePage() {
           hint={
             selectedType ? (
               <>
-                No <bdi>{selectedType.name}</bdi> entry matches the filter and status chosen.
+                No <bdi>{selectedType.name}</bdi> entry matches these filters.
               </>
             ) : (
-              'No entry matches the filter and status chosen.'
+              'No entry matches these filters.'
             )
           }
           action={
@@ -596,7 +654,11 @@ export default function LorePage() {
               className="button button--secondary"
               to={{
                 search: (() => {
-                  const next = withParams({ q: null, status: null }).toString()
+                  const next = withParams({
+                    q: null,
+                    status: null,
+                    [FIELD_FILTER_PARAM]: null,
+                  }).toString()
                   return next ? `?${next}` : ''
                 })(),
               }}

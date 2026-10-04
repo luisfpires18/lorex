@@ -114,11 +114,20 @@ public static class EntityEndpoints
         [FromQuery] bool familyTreeEligible = false,
         [FromQuery] bool includeDescendants = false,
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = DefaultPageSize)
+        [FromQuery] int pageSize = DefaultPageSize,
+        [FromQuery(Name = "field")] string[]? field = null)
     {
         if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Read, cancellationToken) is { } denied)
         {
             return denied;
+        }
+
+        // Custom-field filters, all checked before anything is read: one that does not resolve is refused, never dropped.
+        var (fieldFilters, fieldErrors) = await EntityFieldFilters.ResolveAsync(
+            db, universeId, entityTypeId, field ?? [], cancellationToken);
+        if (fieldErrors is not null)
+        {
+            return Results.ValidationProblem(fieldErrors);
         }
 
         page = Math.Max(page, 1);
@@ -155,6 +164,9 @@ public static class EntityEndpoints
         {
             query = query.Where(entity => entity.CanonStatus == status);
         }
+
+        // Before the count, the order and the page, like every other condition here (ADR 0007 amendment, 034).
+        query = EntityFieldFilters.Apply(query, fieldFilters);
 
         // The Family Tree's pickers: only entries whose type the author made eligible, never by what the type is called.
         if (familyTreeEligible)
