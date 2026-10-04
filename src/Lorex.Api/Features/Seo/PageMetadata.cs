@@ -25,9 +25,9 @@ public sealed record PageMetadata(
     int StatusCode);
 
 /// <summary>
-/// The document head for a request to the app shell (Task 012, ADR 0038): each public portal page gets its own title,
-/// description, canonical address and Open Graph picture; everything else - the workspace, sign-in, the profile, any
-/// address Lorex does not know - is <c>noindex</c> with the product's own generic head.
+/// The document head for a request to the app shell (Task 012, ADR 0038): Lorex's home and each public portal page get
+/// their own title, description, canonical address and Open Graph picture; everything else - the workspace, sign-in,
+/// the profile, any address Lorex does not know - is <c>noindex</c> with the product's own generic head.
 ///
 /// <para><b>The public predicates decide, and nothing else.</b> Every lookup starts from
 /// <see cref="PublicationRules.Public"/>, <see cref="PublicationRules.PublicLore"/> or
@@ -47,6 +47,11 @@ public static class PageMetadataResolver
 
     public const string ExploreDescription =
         "Explore worlds their authors chose to share on Lorex: universes, their lore and their stories.";
+
+    public const string HomeTitle = "Lorex — Build connected fictional universes";
+
+    public const string HomeDescription =
+        "Build lore, relationships, timelines and stories in one connected workspace for fictional universes.";
 
     private const string GenericDescription =
         "A workroom for the worlds you keep — their people, places, history and the rules that hold them together.";
@@ -68,6 +73,19 @@ public static class PageMetadataResolver
 
         switch (segments)
         {
+            // Lorex's home (031): a page about Lorex, so its words are fixed ones Lorex writes, and its one address is "/".
+            case [""]:
+                return new PageMetadata(
+                    HomeTitle,
+                    HomeDescription,
+                    Indexable: !query.HasValue,
+                    FollowLinks: true,
+                    "/",
+                    "website",
+                    null,
+                    false,
+                    200);
+
             case ["explore"]:
                 // One canonical Explore. A search or filter state is a view of it, not a page of its own: its links are
                 // worth following, the state itself is not worth indexing.

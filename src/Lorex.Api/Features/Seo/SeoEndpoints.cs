@@ -85,10 +85,10 @@ public static partial class SeoEndpoints
     }
 
     /// <summary>
-    /// Every address the portal would have indexed, from the public predicates only: Explore, each public universe, each
-    /// effective-public entry and story, and each author who has a public universe. No id, no workspace address, no API.
-    /// Built fresh on every request, so an unpublished item is gone from the next one. 404 on a deployment not
-    /// configured for indexing.
+    /// Every address the portal would have indexed, from the public predicates only: the home page, Explore, each public
+    /// universe, each effective-public entry and story, and each author who has a public universe. No id, no workspace
+    /// address, no API. Built fresh on every request, so an unpublished item is gone from the next one. 404 on a
+    /// deployment not configured for indexing.
     /// </summary>
     private static async Task<IResult> SitemapAsync(PublicSite site, LorexDbContext db, HttpContext context, CancellationToken cancellationToken)
     {
@@ -126,6 +126,7 @@ public static partial class SeoEndpoints
 
         IEnumerable<string> paths =
         [
+            "/",
             "/explore",
             .. worlds.Select(slug => $"/worlds/{slug}"),
             .. lore.Select(entry => $"/worlds/{entry.World}/lore/{entry.Slug}"),

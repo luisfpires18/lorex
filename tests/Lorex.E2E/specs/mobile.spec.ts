@@ -202,13 +202,13 @@ test.describe('on a phone', () => {
     await expectNoSidewaysScroll(page, 'trash')
 
     // The way back to the universes is at the head of the Sections sheet; the bar's mark is Lorex's, and leads to
-    // the portal (014).
+    // Lorex's home (031).
     await page.getByTestId('workspace-nav-toggle').click()
     await page.getByRole('link', { name: 'All universes' }).click()
     await page.waitForURL('/app')
     expect(page.url()).not.toContain(universeId)
     await page.goBack()
     await page.locator('.rail__mark').click()
-    await page.waitForURL('/explore')
+    await page.waitForURL('/')
   })
 })

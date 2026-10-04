@@ -17,8 +17,8 @@ namespace Lorex.Api.Tests;
 /// <summary>
 /// Search and social metadata (Task 012, ADR 0038).
 ///
-/// The claims this file carries. The app shell's head is written on the server from the public predicates alone: a public
-/// universe, entry, story or author page has its own title, a description from public text only (a story's public summary,
+/// The claims this file carries. Lorex's home (031) is a page with its own fixed head, not a redirect. The app shell's head
+/// is written on the server from the public predicates alone: a public universe, entry, story or author page has its own title, a description from public text only (a story's public summary,
 /// never its premise), a canonical address and Open Graph on the configured origin - never the request's Host - while
 /// anything private, trashed, incomplete or missing is one 404 with a generic noindex head that names nothing. Workspace
 /// and sign-in pages are noindex. The sitemap lists exactly the effective-public addresses and loses an item the moment it
@@ -188,7 +188,7 @@ public sealed partial class SeoTests : IClassFixture<LorexApiFactory>, IDisposab
     }
 
     [Fact]
-    public async Task Workspace_sign_in_and_unknown_pages_are_noindex_and_Explore_has_one_canonical()
+    public async Task Workspace_sign_in_and_unknown_pages_are_noindex_and_home_and_Explore_have_one_canonical()
     {
         var anonymous = _site.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
@@ -212,9 +212,21 @@ public sealed partial class SeoTests : IClassFixture<LorexApiFactory>, IDisposab
         Assert.Equal("noindex,follow", Meta(searched, "name", "robots"));
         Assert.Equal($"{Origin}/explore", Canonical(searched));
 
+        // Lorex's home (031) is a page of its own, not a redirect to Explore: its own head and one canonical address, which
+        // a tracking query does not change.
         var root = await anonymous.GetAsync("/");
-        Assert.Equal(HttpStatusCode.Redirect, root.StatusCode);
-        Assert.Equal("/explore", root.Headers.Location?.ToString());
+        var home = await root.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, root.StatusCode);
+        Assert.Equal(PageMetadataResolver.HomeTitle, Meta(home, "property", "og:title"));
+        Assert.Contains("<title>Lorex — Build connected fictional universes</title>", home, StringComparison.Ordinal);
+        Assert.Equal(PageMetadataResolver.HomeDescription, Meta(home, "name", "description"));
+        Assert.Equal("index,follow", Meta(home, "name", "robots"));
+        Assert.Equal($"{Origin}/", Canonical(home));
+        Assert.Equal($"{Origin}/icon-512.png", Meta(home, "property", "og:image"));
+
+        var tagged = await anonymous.GetStringAsync("/?ref=elsewhere");
+        Assert.Equal("noindex,follow", Meta(tagged, "name", "robots"));
+        Assert.Equal($"{Origin}/", Canonical(tagged));
 
         // The API is not a page to index, and an unknown API path is still a 404, not the shell.
         var api = await anonymous.GetAsync("/api/public/universes");
@@ -253,6 +265,7 @@ public sealed partial class SeoTests : IClassFixture<LorexApiFactory>, IDisposab
         Assert.Equal("application/xml", map.Content.Headers.ContentType?.MediaType);
         var locations = Locations(await map.Content.ReadAsStringAsync());
 
+        Assert.Contains($"{Origin}/", locations);
         Assert.Contains($"{Origin}/explore", locations);
         Assert.Contains($"{Origin}/worlds/{world.PublicSlug}", locations);
         Assert.Contains($"{Origin}/worlds/{world.PublicSlug}/lore/lighthouse", locations);
@@ -298,6 +311,10 @@ public sealed partial class SeoTests : IClassFixture<LorexApiFactory>, IDisposab
 
         Assert.Equal("User-agent: *\nDisallow: /\n", await anonymous.GetStringAsync("/robots.txt"));
         Assert.Equal(HttpStatusCode.NotFound, (await anonymous.GetAsync("/sitemap.xml")).StatusCode);
+
+        var home = await anonymous.GetStringAsync("/");
+        Assert.Equal("noindex,nofollow", Meta(home, "name", "robots"));
+        Assert.Null(Canonical(home));
 
         var explore = await anonymous.GetStringAsync("/explore");
         Assert.Equal("noindex,nofollow", Meta(explore, "name", "robots"));

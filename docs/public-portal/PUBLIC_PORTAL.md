@@ -131,9 +131,10 @@ the owner's portal reference: a solid bar with the search in it, a compact panor
 category row, then a wide grid of dark card panels. Its metrics, ratings, avatars and extra nav items are not copied:
 no such data or destinations exist.
 
-- **Bar.** Brand, Explore (marked by a rule along the bar's foot), the search, then Log in and Create account - or
-  My workspace and the account menu. Below 52rem the search takes its own row; below 40rem the brand alone leads to
-  Explore.
+- **Bar.** Brand (to Lorex's home since 031), Explore (marked by a rule along the bar's foot), the search, then Log in
+  and Create account - or My workspace and the account menu. Below 52rem the search takes its own row; below 40rem the
+  brand and the way in share the first row and Explore opens the second, beside the search. The home page has no
+  search (section 23).
 - **Band.** The approved panorama behind "Explore Worlds", one line of support, the category pills and the genre and
   sort selects. On a wide screen the picture is drawn 1.3x from its left edge (a CSS transform; the file is
   untouched), which carries the castle out from under the title; narrower, it is cropped at 38% 35% and shaded
@@ -168,12 +169,14 @@ no such data or destinations exist.
 
 ## 14. Public and private navigation
 
-The portal is the front door: `/` opens `/explore`, and `/explore` and `/worlds/{slug}` answer without a session -
-directly, after a refresh, in a new browser. Signing in is a choice made from it, and it comes back:
+The portal is the front door: `/` is Lorex's home (031, section 23), and `/`, `/explore` and `/worlds/{slug}` answer
+without a session - directly, after a refresh, in a new browser. Signing in is a choice made from it, and it comes back:
 
 - **Log in** and **Create account** in the portal bar pass the current page (path and query) as router state
   (`{ from }`) - the same mechanism `RequireAuth` uses. Signing in or registering returns there, not to the workspace;
   the Login and Register screens' links to each other carry it along. Signing out from the portal stays on the page.
+  The home page is the exception: its Log in, Create account and Start building carry nothing, so they land in the
+  workspace as any sign-in does (031).
 - **My workspace** is the one way into the workspace from the portal; My workspace's bar's **Explore** (and the account
   menu's Go to on every screen) is the way back. Both are plain same-tab links - no outward arrow (refinement 024). Visibility belongs to universes; the two sides are the portal and the workspace, never "public
   mode" and "private mode".
@@ -298,8 +301,8 @@ an owner or an id; nobody else sees either link.
 with nothing public, an address nobody held: "This page is not available. Its address may be wrong, or it is not
 public." A page that fails to load says so, with Try again, and is never mistaken for missing.
 
-**Front door.** `/` opens Explore, and so does the installed app: the manifest's `start_url` is `/explore` (its `id`
-stays `/app`, the install's identity). Signed in or out, and whatever was used last, the portal comes first; My
+**Front door.** `/` is Lorex's home (031); the installed app opens Explore: the manifest's `start_url` is `/explore` (its
+`id` stays `/app`, the install's identity). Signed in or out, and whatever was used last, the portal comes first; My
 workspace is the way in. Deep links are unaffected.
 
 **Owner preview** of a still-private universe was planned for 011 and is not built: an owner sees the real public page
@@ -324,8 +327,8 @@ worlds - no bio, followers, contact or counts of anything private.
 ## 19. Final polish and hardening (012)
 
 **Route set, final.** Public: `/explore`, `/worlds/{slug}`, `/worlds/{slug}/lore/{loreSlug}`,
-`/worlds/{slug}/stories/{storySlug}`, `/authors/{slug}`; `/` redirects to `/explore`. Everything else is the workspace or
-sign-in and is never indexed.
+`/worlds/{slug}/stories/{storySlug}`, `/authors/{slug}`, and since 031 `/` (Lorex's home, no longer a redirect to
+`/explore`). Everything else is the workspace or sign-in and is never indexed.
 
 **SEO (ADR 0038).** The API writes each public page's head into the shell on the server: `<title>` ("Explore Worlds |
 Lorex", "World | Lorex", "Entry — World | Lorex", "Story — World | Lorex", "Author | Lorex"), description from public text
@@ -400,14 +403,14 @@ in both.
 
 ## 21. Front door and brand (UI refinement 014)
 
-- **Lorex's brand always leads to `/explore`**: the portal bar, the workspace rail's "L", My workspace's bar, and the
-  sign-in plate. It is not context-sensitive, and its accessible name says where it goes: "Lorex – Explore". **My
-  workspace** stays the deliberate way in. The universes are "All universes", at the head of the sidebar and of the
+- **Lorex's brand always leads to `/`, Lorex's home** (031; until then `/explore`): the portal bar, the workspace rail's
+  "L", My workspace's bar, and the sign-in plate. It is not context-sensitive, and its accessible name says where it
+  goes: "Lorex – Home". Explore is always a link of its own. **My workspace** stays the deliberate way in. The universes are "All universes", at the head of the sidebar and of the
   phone's Sections sheet.
 - **The installed app opens Explore**, signed in or out, whatever was used last. The cause of it opening the workspace
   or Login on real installs was the service worker keeping the pre-011 manifest (`start_url: /app`) - fixed in 014 by
-  never caching the manifest and bumping the worker's cache (ADR 0017 amendment). An unknown address now lands on
-  Explore rather than on the workspace's guard. Deep links - `/worlds/...`, `/authors/...`, `/app/...` - go where they
+  never caching the manifest and bumping the worker's cache (ADR 0017 amendment). An unknown address lands on Lorex's
+  home (Explore before 031) rather than on the workspace's guard. Deep links - `/worlds/...`, `/authors/...`, `/app/...` - go where they
   say, `/app/...` by the sign-in rules. A device check is in the DEV runbook ("The installed app's front door").
 - **Publishing moved** from Settings to its own workspace page, Publish (`/app/universes/{id}/publish`), just above
   Settings. Same API, same rules, same confirmations (section 14's "Settings' Public portal section" is now this page).
@@ -417,7 +420,7 @@ in both.
 The hierarchy, made visible rather than implied:
 
 ```
-Lorex
+Lorex                              home, / (031)
 ├── Explore                        public side (PublicLayout)
 └── My workspace                   signed-in side
     ├── Universes      /app        ┐ WorkspaceLayout: one bar, two tabs
@@ -496,3 +499,31 @@ is missing shows what and takes the focus there. The Status section and checklis
 
 **Not done:** chapter headings publicly, a per-scene reader address, and a Trash restore question for a selected scene or
 arc (ADR 0039).
+
+## 23. Lorex's home (Product refinement 031)
+
+`/` is Lorex's own page, a route of `PublicLayout` (`pages/LandingPage.tsx`), no longer a redirect: what Lorex is, what it
+does, who it is for, that published worlds can be read, and how to start. `/explore` is unchanged and remains where
+published worlds are found.
+
+- **Bar.** Brand (to `/`), Explore, then Appearance, Log in and Create account - or My workspace and the account menu.
+  No world search on `/`: `PublicLayout` leaves `PortalSearch` out there and nowhere else. A quiet footer on `/` only
+  (Explore, and Log in / Create account or My workspace).
+- **Actions.** Signed out: *Start building* (`/register`) and *Explore worlds*; at the foot *Start building your
+  universe* and *Log in*. Signed in: *Go to my workspace* (`/app`) and *Explore worlds*; at the foot *Open my
+  workspace*. Nothing is drawn until the session is known, so neither set flashes before the other.
+- **Content, all of it true today.** Hero (the owner's citadel painting under a veil of the page's ground; three
+  sentences, one line each); one real product picture; Build (Lore, Types, Family Tree, Timeline and Chronology, World
+  Rules); Connect (three things writing once does now: relationships read from both entries and drawn in the Family
+  Tree, Canon's lifespan checks, a scene's lore at hand); Write (stories, chapters, scenes, manuscripts, plot arcs and
+  beats, and the media a universe can serve); Explore (up to four real public worlds); trust (private until published,
+  collaborators by role, downloadable backups); a last call. No prices, trials, metrics, testimonials or AI.
+- **The product picture** is Lore of a demo world, *Hollowmere* - original, written for this - built through the API on a
+  fresh database and photographed at 1440 x 800, 2x, by `tests/Lorex.E2E/tools/landing-shot.mjs`, which uploads only
+  Lorex's own atmosphere paintings. Shipped as WebP per theme and width (`assets/landing-product-<theme>-<1440|2880>.webp`,
+  53-132 KB); the page loads the one for the theme in use.
+- **Worlds.** `GET /api/public/universes?page=1&pageSize=4`, rendered with Explore's `WorldCard`; two on a phone. None
+  published: a sentence and *Open Explore*, no placeholder card. A failed read: a sentence; Explore has them.
+- **Head.** "Lorex — Build connected fictional universes", a fixed description, canonical `/`, `index,follow` (any query
+  `noindex,follow`), Open Graph with the static icon; `/` is in the sitemap (ADR 0038 amendment).
+- **Unknown addresses** outside `/app` land on `/`; under `/app` on `/app`. The installed app still opens `/explore`.

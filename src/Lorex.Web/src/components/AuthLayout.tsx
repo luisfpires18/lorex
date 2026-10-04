@@ -26,10 +26,10 @@ export function AuthLayout({ heading, intro, children, footer, headingRef }: Aut
           {/* The one place the symbol is shown large. On the plate and unbacked: at this size
               the artwork's dark shading reads as modelling rather than as absence, which it
               does not at the size the workspace rail would draw it. */}
-          {/* Lorex's brand leads to its front door, the portal (014). */}
+          {/* Lorex's brand leads to its home (031). */}
           <Link
             className="auth__brand"
-            to="/explore"
+            to="/"
             aria-label={BRAND_LINK_LABEL}
             data-testid="auth-brand"
           >

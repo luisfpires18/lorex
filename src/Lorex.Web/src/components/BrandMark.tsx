@@ -1,9 +1,10 @@
 /**
  * The accessible name of every link Lorex's brand is drawn in - the bars' mark and wordmark, the auth plate's, the
- * workspace rail's `L`. The brand always leads to Explore, from everywhere (014), and the name says so, so nobody has
- * to recognise a logo, or hover for a tooltip, to know where it goes.
+ * workspace rail's `L`. The brand always leads to Lorex's home, `/`, from everywhere (031; it led to Explore while
+ * Explore was the front door), and the name says so, so nobody has to recognise a logo, or hover for a tooltip, to know
+ * where it goes. Explore is always a link of its own.
  */
-export const BRAND_LINK_LABEL = 'Lorex – Explore'
+export const BRAND_LINK_LABEL = 'Lorex – Home'
 
 /**
  * The Lorex symbol: three interlocking rings around a star, the owner's own artwork.

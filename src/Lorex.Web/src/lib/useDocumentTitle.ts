@@ -13,7 +13,11 @@ const BRAND = 'Lorex'
  */
 export function useDocumentTitle(...parts: string[]) {
   const named = parts.filter(Boolean)
-  const full = named.length > 0 ? `${named.join(' — ')} | ${BRAND}` : BRAND
+  useWholeTitle(named.length > 0 ? `${named.join(' — ')} | ${BRAND}` : BRAND)
+}
+
+/** The tab's whole title as given - for Lorex's home, the one page whose title leads with the brand (031). */
+export function useWholeTitle(full: string) {
   useEffect(() => {
     const previous = document.title
     document.title = full

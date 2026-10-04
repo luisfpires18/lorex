@@ -397,7 +397,7 @@ test.describe('reading a public universe', () => {
     await context.close()
   })
 
-  test('the front door is the portal, signed in or out, and the installed app opens it too', async ({
+  test('Lorex’s home is the front door, signed in or out, and the installed app opens Explore', async ({
     page,
     browser,
     request,
@@ -411,7 +411,8 @@ test.describe('reading a public universe', () => {
     await visitor.goto(manifest.start_url)
     await expect(visitor).toHaveURL(/\/explore$/)
     await visitor.goto('/')
-    await expect(visitor).toHaveURL(/\/explore$/)
+    await expect(visitor.getByTestId('landing')).toBeVisible()
+    await expect(visitor.getByTestId('portal-login')).toBeVisible()
     await context.close()
 
     // Signed in, and last seen in the workspace: still the portal first.
@@ -421,7 +422,8 @@ test.describe('reading a public universe', () => {
     await expect(page).toHaveURL(/\/explore$/)
     await expect(page.getByTestId('portal-workspace')).toBeVisible()
     await page.goto('/')
-    await expect(page).toHaveURL(/\/explore$/)
+    await expect(page.getByTestId('landing')).toBeVisible()
+    await expect(page.getByTestId('portal-workspace')).toBeVisible()
 
     // A deep link is still a deep link.
     const w = await world(page, unique('Deep '))

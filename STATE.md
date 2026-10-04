@@ -50,8 +50,27 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
-- **UI polish pass, pre-031 - image-reference visual system** (`feat/ui-polish-image-reference` off `dev` at `bf83e05`;
-  committed, not merged, not pushed). Presentation only: no route, API, schema, migration or backup change (backup **19**).
+- **Product refinement 031 - public Lorex landing page** (`feat/public-landing-page` off `dev` at `a3f7922`; committed,
+  not merged, not pushed). `/` is Lorex's home, no longer a redirect (client route and server `FrontendHosting`);
+  `/explore` unchanged. No schema, migration or backup change (backup **19**). `PUBLIC_PORTAL.md` section 23; ADR 0038
+  amendment (0036, visual contract: brand notes).
+  - Brand -> `/` everywhere ("Lorex – Home": portal bar, rail L, My workspace bar, sign-in plate). Explore a named link
+    on every width (phone: the bar's second row, beside the search). Unknown public address -> `/`; `/app/*` -> `/app`.
+    The installed app still opens `/explore` (manifest untouched).
+  - Home (`pages/LandingPage.tsx`): hero on the owner's citadel painting, veiled; one real product picture (Lore of the
+    original demo world Hollowmere, `tests/Lorex.E2E/tools/landing-shot.mjs`, WebP per theme, 53 KB / 128 KB at 2x);
+    Build, Connect, Write; up to four real public worlds (`pageSize=4`, two on a phone, empty and failed states); trust;
+    session-aware last call; home-only footer. No search on `/`. Home's Log in, Create account and Start building carry
+    no return path, so they land in `/app`. No pricing, trial, metrics or AI copy.
+  - Server head for `/`: "Lorex — Build connected fictional universes", canonical `/`, indexable (a query ->
+    `noindex,follow`); `/` first in the sitemap.
+  - CSS 178.1 -> 188.3 KB (gzip 31.9 -> 33.4); main JS +0.8 KB; landing chunk 11.0 KB; no new dependency.
+  - Tests: API 1300/1300 (`SeoTests`: home head, sitemap). Playwright 380 -> 398 (`landing.spec.ts` 18); explore,
+    global-navigation, mobile, public-reading and workspace-settings moved to brand -> `/`. Focused 18/18, neighbours
+    129/129, Linux/DejaVu 54/54. Full run, fresh database, two workers, retries 0: **397/398**, 18.3 min -
+    `shell.spec.ts` phone sheet met a wholly blank `/register` (the known dev-server signature), green 3/3 alone.
+- **UI polish pass, pre-031 - image-reference visual system** (`feat/ui-polish-image-reference` off `dev` at `bf83e05`,
+  merged into `dev` at `a3f7922`). Presentation only: no route, API, schema, migration or backup change (backup **19**).
   Contract section 22. Owner kept the current palette; references used for atmosphere, hierarchy and composition only.
   - Atmosphere layer behind the head of every universe screen and My workspace: the world's artwork card for its owner
     (artwork is a Publish read, ADR 0041 - collaborators never ask), else Lorex's own `assets/atmosphere-citadel.webp`;
@@ -67,7 +86,7 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
     fresh database, two workers, retries 0: **378/380**, 18.2 min - `type-reorder.spec.ts` met a blank `/register` and
     `universe-search.spec.ts` "The search could not be reached" (the known dev-server signatures), each green 3/3 alone.
 - **Product refinement 030 - invitations and collaborator management** (`feat/collaborator-invitations` off `dev` at
-  `98e47f6`: `402bfa2`, then the review correction; committed, not merged, not pushed). ADR 0041 amended; 0014, 0030 notes.
+  `98e47f6`: `402bfa2`, then the review correction; merged into `dev` at `bf83e05`). ADR 0041 amended; 0014, 0030 notes.
   Migration `AddUniverseInvitations` (regenerated with `TargetUserId`, one migration); backup stays **19**.
   - Invitations target an email (Identity `NormalizedEmail`); same 201 and fields whether an account exists, no user
     search. Pending only (accept/decline/revoke delete), one per universe + address (409 `invitation_pending` names it),
