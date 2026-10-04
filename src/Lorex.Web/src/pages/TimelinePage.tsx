@@ -436,7 +436,7 @@ export default function TimelinePage() {
           hint={
             isFiltered
               ? 'Clear the status or the entry you are following.'
-              : 'A timeline holds the moments of this world in order — a founding, a betrayal, the year someone was born. Give a date you are sure of, one you only half remember, or none at all.'
+              : 'A timeline holds the moments of this world in order: a founding, a betrayal, the year someone was born. Give a date you are sure of, one you only half remember, or none at all.'
           }
           action={
             isFiltered || !access.editContent ? null : (

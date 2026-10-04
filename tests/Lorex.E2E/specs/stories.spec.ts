@@ -222,7 +222,7 @@ function sceneOrder(page: Page) {
 
 /**
  * The story's structure as the page draws it, one line per group: "Unchaptered | a | b" while Unchaptered
- * is shown, then "Chapter 1 — Arrival | c" for each chapter, top to bottom.
+ * is shown, then "Chapter 1: Arrival | c" for each chapter, top to bottom.
  */
 function structure(page: Page) {
   return page.getByTestId('story-page').evaluate((root) => {
@@ -435,10 +435,10 @@ test.describe('stories', () => {
     await addChapter(page, 'Arrival', 'They reach the gate.')
     await addChapter(page, 'Ashes')
     await expect(chapter(page, 'Arrival').getByTestId('chapter-heading')).toHaveText(
-      'Chapter 1 — Arrival',
+      'Chapter 1: Arrival',
     )
     await expect(chapter(page, 'Ashes').getByTestId('chapter-heading')).toHaveText(
-      'Chapter 2 — Ashes',
+      'Chapter 2: Ashes',
     )
     await expect(chapter(page, 'Arrival').getByTestId('chapter-summary')).toHaveText(
       'They reach the gate.',
@@ -453,7 +453,7 @@ test.describe('stories', () => {
     // "Add scene" on a chapter starts the scene in that chapter.
     await chapter(page, 'Arrival').getByTestId('chapter-new-scene').click()
     await expect(page.getByTestId('scene-chapter-select').locator('option:checked')).toHaveText(
-      'Chapter 1 — Arrival',
+      'Chapter 1: Arrival',
     )
     await page.getByTestId('cancel-scene').click()
 
@@ -465,23 +465,23 @@ test.describe('stories', () => {
       .poll(() => structure(page))
       .toEqual([
         'Unchaptered | Loose thread',
-        'Chapter 1 — Arrival | At the gate | Inside the walls',
-        'Chapter 2 — Ashes | Embers',
+        'Chapter 1: Arrival | At the gate | Inside the walls',
+        'Chapter 2: Ashes | Embers',
       ])
 
     // Between chapters, without opening a form.
     await moveSceneTo(
       page,
       'Inside the walls',
-      'Chapter 2 — Ashes',
-      '“Inside the walls” moved to Chapter 2 — Ashes, scene 2 of 2.',
+      'Chapter 2: Ashes',
+      '“Inside the walls” moved to Chapter 2: Ashes, scene 2 of 2.',
     )
     await expect
       .poll(() => structure(page))
       .toEqual([
         'Unchaptered | Loose thread',
-        'Chapter 1 — Arrival | At the gate',
-        'Chapter 2 — Ashes | Embers | Inside the walls',
+        'Chapter 1: Arrival | At the gate',
+        'Chapter 2: Ashes | Embers | Inside the walls',
       ])
 
     // Out to Unchaptered.
@@ -490,8 +490,8 @@ test.describe('stories', () => {
       .poll(() => structure(page))
       .toEqual([
         'Unchaptered | Loose thread | Embers',
-        'Chapter 1 — Arrival | At the gate',
-        'Chapter 2 — Ashes | Inside the walls',
+        'Chapter 1: Arrival | At the gate',
+        'Chapter 2: Ashes | Inside the walls',
       ])
 
     // The chapters swap places, and renumber themselves.
@@ -505,32 +505,32 @@ test.describe('stories', () => {
       .poll(() => structure(page))
       .toEqual([
         'Unchaptered | Loose thread | Embers',
-        'Chapter 1 — Ashes | Inside the walls',
-        'Chapter 2 — Arrival | At the gate',
+        'Chapter 1: Ashes | Inside the walls',
+        'Chapter 2: Arrival | At the gate',
       ])
 
     // Back into a chapter, then reordered inside it.
     await moveSceneTo(
       page,
       'Embers',
-      'Chapter 1 — Ashes',
-      '“Embers” moved to Chapter 1 — Ashes, scene 2 of 2.',
+      'Chapter 1: Ashes',
+      '“Embers” moved to Chapter 1: Ashes, scene 2 of 2.',
     )
     await moveAndSave(
       page,
       () => chooseFromMenu(scene(page, 'Embers'), 'scene-move-up'),
-      '“Embers” is now scene 1 of 2 in Chapter 1 — Ashes.',
+      '“Embers” is now scene 1 of 2 in Chapter 1: Ashes.',
     )
 
     // And from the scene's own form: another chapter puts it last there.
     await chooseFromMenu(scene(page, 'Loose thread'), 'scene-edit')
-    await page.getByTestId('scene-chapter-select').selectOption({ label: 'Chapter 2 — Arrival' })
+    await page.getByTestId('scene-chapter-select').selectOption({ label: 'Chapter 2: Arrival' })
     await page.getByTestId('save-scene').click()
     await expect(page.getByTestId('scene-form')).toHaveCount(0)
 
     const arranged = [
-      'Chapter 1 — Ashes | Embers | Inside the walls',
-      'Chapter 2 — Arrival | At the gate | Loose thread',
+      'Chapter 1: Ashes | Embers | Inside the walls',
+      'Chapter 2: Arrival | At the gate | Loose thread',
     ]
     await expect.poll(() => structure(page)).toEqual(arranged)
 
@@ -549,7 +549,7 @@ test.describe('stories', () => {
       .poll(() => structure(page))
       .toEqual([
         'Unchaptered | At the gate | Loose thread',
-        'Chapter 1 — Ashes | Embers | Inside the walls',
+        'Chapter 1: Ashes | Embers | Inside the walls',
       ])
     expect(confirmation).toContain('The chapter will be removed.')
     expect(confirmation).toContain('Its 2 scenes will be moved to Unchaptered.')
@@ -560,7 +560,7 @@ test.describe('stories', () => {
       .poll(() => structure(page))
       .toEqual([
         'Unchaptered | At the gate | Loose thread',
-        'Chapter 1 — Ashes | Embers | Inside the walls',
+        'Chapter 1: Ashes | Embers | Inside the walls',
       ])
 
     // The scenes that moved twice still hold their point of view and their lore, as real links.
@@ -670,11 +670,11 @@ test.describe('stories', () => {
     await page.goto(`/app/universes/${universeId}/stories/${storyId}`)
     await expect
       .poll(() => structure(page))
-      .toEqual(['Chapter 1 — One | a | b', 'Chapter 2 — Two | c', 'Chapter 3 — Three'])
+      .toEqual(['Chapter 1: One | a | b', 'Chapter 2: Two | c', 'Chapter 3: Three'])
 
     // A chapter's menu is named with the chapter's heading.
     const menu = chapter(page, 'Three').getByRole('button', {
-      name: 'More actions for Chapter 3 — Three',
+      name: 'More actions for Chapter 3: Three',
     })
     await menu.focus()
     await page.keyboard.press('Enter')
@@ -719,7 +719,7 @@ test.describe('stories', () => {
     await moveAndSave(
       page,
       () => page.keyboard.press('Enter'),
-      '“b” is now scene 1 of 2 in Chapter 2 — One.',
+      '“b” is now scene 1 of 2 in Chapter 2: One.',
     )
     await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-actions', scene: 'b' })
 
@@ -731,8 +731,8 @@ test.describe('stories', () => {
     const options = scene(page, 'c').getByTestId('scene-move-to-option')
     await expect(options).toHaveText([
       'Move to Unchaptered',
-      'Move to Chapter 1 — Three',
-      'Move to Chapter 2 — One',
+      'Move to Chapter 1: Three',
+      'Move to Chapter 2: One',
     ])
     await page.keyboard.press('Escape')
     await expect(options).toHaveCount(0)
@@ -743,16 +743,16 @@ test.describe('stories', () => {
     await page.keyboard.press('ArrowUp')
     await expect
       .poll(() => page.evaluate(() => document.activeElement?.textContent))
-      .toBe('Move to Chapter 2 — One')
+      .toBe('Move to Chapter 2: One')
     await saveAndAnnounce(
       page,
       '/position',
       () => page.keyboard.press('Enter'),
-      '“c” moved to Chapter 2 — One, scene 3 of 3.',
+      '“c” moved to Chapter 2: One, scene 3 of 3.',
     )
     await expect.poll(() => focused(page)).toMatchObject({ control: 'scene-actions', scene: 'c' })
 
-    const moved = ['Chapter 1 — Three', 'Chapter 2 — One | b | a | c', 'Chapter 3 — Two']
+    const moved = ['Chapter 1: Three', 'Chapter 2: One | b | a | c', 'Chapter 3: Two']
     await expect.poll(() => structure(page)).toEqual(moved)
 
     await page.reload()

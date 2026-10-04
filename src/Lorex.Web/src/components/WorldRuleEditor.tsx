@@ -251,7 +251,7 @@ export function WorldRuleEditor({
         setConflict({ updatedAt: storedMomentOf(error.problem) })
       } else if (error instanceof ApiError && error.status === 404) {
         setFailure(
-          'This rule is no longer here — it may have been moved to the Trash in another window — so it could not be saved. Your writing is still here: copy it before you leave.',
+          'This rule is no longer here, so it could not be saved. It may have been moved to the Trash in another window. Your writing is still here: copy it before you leave.',
         )
       } else if (error instanceof ApiError && error.status === 400) {
         setFieldErrors(error.fieldErrors)
@@ -261,7 +261,7 @@ export function WorldRuleEditor({
             : 'Something needs a change before this rule can be saved.',
         )
       } else {
-        setFailure('The rule could not be saved. Your writing is still here — try again.')
+        setFailure('The rule could not be saved. Your writing is still here. Try again.')
       }
     } finally {
       inFlight.current = false
@@ -323,7 +323,7 @@ export function WorldRuleEditor({
     } catch (error: unknown) {
       setFailure(
         error instanceof ApiError && error.status === 404
-          ? 'This rule is no longer here — it may already be in the Trash.'
+          ? 'This rule is no longer here. It may already be in the Trash.'
           : 'The rule could not be moved to the Trash. Try again.',
       )
       setIsDeleting(false)
@@ -414,7 +414,7 @@ export function WorldRuleEditor({
       {conflict ? (
         <div className="manuscript__conflict" role="alert" data-testid="world-rule-conflict">
           <p className="manuscript__conflicttext">
-            This rule was saved somewhere else — another tab or device — after you opened it here.
+            This rule was saved in another tab or on another device after you opened it here.
             Nothing was overwritten, and your version below is not saved.
           </p>
           <div className="manuscript__conflictactions">

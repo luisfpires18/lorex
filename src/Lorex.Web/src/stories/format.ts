@@ -41,9 +41,9 @@ export function chapterNumber(index: number) {
   return `Chapter ${index + 1}`
 }
 
-/** "Chapter 3 — The Fall". */
+/** "Chapter 3: The Fall". */
 export function chapterLabel(index: number, title: string) {
-  return `${chapterNumber(index)} — ${title}`
+  return `${chapterNumber(index)}: ${title}`
 }
 
 /** "Chapter 3", or "Unchaptered": where a scene sits, short enough for a chip. */
@@ -61,9 +61,9 @@ export function arcNumber(index: number) {
   return `Arc ${index + 1}`
 }
 
-/** "Arc 2 — Fall of the King". */
+/** "Arc 2: Fall of the King". */
 export function arcLabel(index: number, title: string) {
-  return `${arcNumber(index)} — ${title}`
+  return `${arcNumber(index)}: ${title}`
 }
 
 export function beatCountLabel(count: number) {

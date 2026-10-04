@@ -359,7 +359,7 @@ export function IdeaEditor({
         setConflict({ updatedAt: storedMomentOf(error.problem) })
       } else if (error instanceof ApiError && error.status === 404) {
         setFailure(
-          'This idea is no longer here — it may have been deleted in another window — so it could not be saved. Your writing is still here: copy it before you leave.',
+          'This idea is no longer here, so it could not be saved. It may have been deleted in another window. Your writing is still here: copy it before you leave.',
         )
       } else if (error instanceof ApiError && error.status === 400) {
         setFieldErrors(error.fieldErrors)
@@ -369,7 +369,7 @@ export function IdeaEditor({
             : 'Something needs a change before this idea can be saved.',
         )
       } else {
-        setFailure('The idea could not be saved. Your writing is still here — try again.')
+        setFailure('The idea could not be saved. Your writing is still here. Try again.')
       }
     } finally {
       inFlight.current = false
@@ -494,7 +494,7 @@ export function IdeaEditor({
     } catch (error: unknown) {
       setFailure(
         error instanceof ApiError && error.status === 404
-          ? 'This idea is no longer here — it may already have been deleted in another window.'
+          ? 'This idea is no longer here. It may already have been deleted in another window.'
           : 'The idea could not be deleted. Try again.',
       )
       setIsDeleting(false)
@@ -644,7 +644,7 @@ export function IdeaEditor({
       {conflict ? (
         <div className="manuscript__conflict" role="alert" data-testid="idea-conflict">
           <p className="manuscript__conflicttext">
-            This idea was saved somewhere else — another tab or device — after you opened it here.
+            This idea was saved in another tab or on another device after you opened it here.
             Nothing was overwritten, and your version below is not saved.
           </p>
           <div className="manuscript__conflictactions">

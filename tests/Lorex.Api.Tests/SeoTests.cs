@@ -144,13 +144,13 @@ public sealed partial class SeoTests : IClassFixture<LorexApiFactory>, IDisposab
         var anonymous = _site.CreateClient();
 
         var lore = await anonymous.GetStringAsync($"/worlds/{world.PublicSlug}/lore/salt-warden");
-        Assert.Contains("<title>Salt Warden — Glass Ebb | Lorex</title>", lore, StringComparison.Ordinal);
+        Assert.Contains("<title>Salt Warden | Glass Ebb | Lorex</title>", lore, StringComparison.Ordinal);
         Assert.Equal("Keeper of the count.", Meta(lore, "name", "description"));
         Assert.Equal("article", Meta(lore, "property", "og:type"));
         Assert.Equal($"{Origin}/worlds/{world.PublicSlug}/lore/salt-warden", Canonical(lore));
 
         var page = await anonymous.GetStringAsync($"/worlds/{world.PublicSlug}/stories/the-tide-count");
-        Assert.Contains("<title>The Tide Count — Glass Ebb | Lorex</title>", page, StringComparison.Ordinal);
+        Assert.Contains("<title>The Tide Count | Glass Ebb | Lorex</title>", page, StringComparison.Ordinal);
         Assert.Equal("A tide that counts the drowned.", Meta(page, "name", "description"));
         Assert.Equal("A tide that counts the drowned.", Meta(page, "property", "og:description"));
         Assert.DoesNotContain("Premise secret", page, StringComparison.Ordinal);
@@ -218,7 +218,7 @@ public sealed partial class SeoTests : IClassFixture<LorexApiFactory>, IDisposab
         var home = await root.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, root.StatusCode);
         Assert.Equal(PageMetadataResolver.HomeTitle, Meta(home, "property", "og:title"));
-        Assert.Contains("<title>Lorex — Build connected fictional universes</title>", home, StringComparison.Ordinal);
+        Assert.Contains("<title>Lorex | Build connected fictional universes</title>", home, StringComparison.Ordinal);
         Assert.Equal(PageMetadataResolver.HomeDescription, Meta(home, "name", "description"));
         Assert.Equal("index,follow", Meta(home, "name", "robots"));
         Assert.Equal($"{Origin}/", Canonical(home));

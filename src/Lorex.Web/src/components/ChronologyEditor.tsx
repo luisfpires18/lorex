@@ -282,7 +282,7 @@ export function ChronologyEditor({ universeId, chronology, onSaved }: Chronology
                 ? 'Save to go back to plain numbered years.'
                 : 'This universe uses plain numbered years.'
             }
-            hint="Add date periods if its timeline has named stretches of time with their own year numbers — Ages, reigns, dynasties, or before and after an event. They are optional."
+            hint="Add date periods if its timeline has named stretches of time with their own year numbers, such as Ages, reigns, dynasties, or before and after an event. They are optional."
             action={
               <button className="button" type="button" onClick={add} data-testid="add-era-empty">
                 <ActionIcon icon={Plus} />

@@ -327,7 +327,7 @@ test.describe('universe search', () => {
     await search(page, 'Brackwater')
     const scene = result(page, 'Scene', 'The Council')
     await expect(scene).toContainText('In the summary')
-    await expect(scene).toContainText('Chapter 1 — Crossing the Veldmark')
+    await expect(scene).toContainText('Chapter 1: Crossing the Veldmark')
     await scene.click()
     await page.waitForURL(`${story}#scene-${world.sceneId}`)
     await expect(page.locator(`#scene-${world.sceneId}`)).toBeFocused()

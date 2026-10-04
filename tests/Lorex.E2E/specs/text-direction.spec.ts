@@ -390,9 +390,9 @@ test.describe('text direction', () => {
       'آكرون',
     ])
 
-    // A chapter heading is Lorex's words and the author's: "Chapter 1 — " stays first, the title isolated after it.
+    // A chapter heading is Lorex's words and the author's: "Chapter 1: " stays first, the title isolated after it.
     const chapterHeading = page.getByTestId('chapter-heading')
-    await expect(chapterHeading).toHaveAccessibleName(`Chapter 1 — ${Text.brackets}`)
+    await expect(chapterHeading).toHaveAccessibleName(`Chapter 1: ${Text.brackets}`)
     await expectIsolated(chapterHeading, Text.brackets)
     const [numberLeft, titleLeft] = await lefts(
       chapterHeading.locator('.chapter__number'),
@@ -432,7 +432,7 @@ test.describe('text direction', () => {
 
     await page.getByTestId('story-view-plot').click()
     await page.waitForURL(`${base}/plot`)
-    await expect(page.getByTestId('plot-arc-heading')).toHaveAccessibleName('Arc 1 — سقوط الملك 2')
+    await expect(page.getByTestId('plot-arc-heading')).toHaveAccessibleName('Arc 1: سقوط الملك 2')
     await expectIsolated(page.getByTestId('plot-arc-heading'), 'سقوط الملك 2')
     const beat = page.locator('[data-testid="plot-beat"][data-title="آكرون!"]')
     await expectIsolated(beat.locator('.beat__title'), 'آكرون!')
@@ -1015,10 +1015,10 @@ test.describe('authored prose direction', () => {
     await scene('Morning')
     await page.goto(`/app/universes/${universeId}/stories/${storyId}/manuscript/${first.id}`)
 
-    // ---- "Chapter 1 — … · Scene 1 of 2": Lorex's words first and last, the author's title isolated between ----
+    // ---- "Chapter 1: … · Scene 1 of 2": Lorex's words first and last, the author's title isolated between ----
 
     const where = page.getByTestId('manuscript-where')
-    await expect(where).toHaveText('Chapter 1 — آكرون (Wright) · Scene 1 of 2')
+    await expect(where).toHaveText('Chapter 1: آكرون (Wright) · Scene 1 of 2')
     await expectIsolated(where, 'آكرون (Wright)')
     // Left in one run with the words around it, the title's bracket went to the wrong side of its Latin name.
     expect(await drawnOrder(where, ['Chapter', 'Wright', 'آكرون', 'Scene'])).toEqual([

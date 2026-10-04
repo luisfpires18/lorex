@@ -27,3 +27,12 @@ export async function clickSignOut(page: Page) {
   await openAccountMenu(page)
   await page.getByRole('button', { name: 'Sign out' }).click()
 }
+
+/**
+ * A throwaway password for an account a test creates, made at run time so no credential-shaped literal sits in the
+ * repository for a secret scanner to flag. The prefix meets Lorex's rules (a digit, a lowercase letter, eight or more
+ * characters) whatever the random part turns out to be. Reuse the one value for an account's register and sign-in.
+ */
+export function makeTestPassword() {
+  return `e2e-${crypto.randomUUID()}`
+}

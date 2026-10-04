@@ -1,7 +1,7 @@
 {
     "name": "Lorex",
     "short_name": "Lorex",
-    "description": "A workroom for the worlds you keep — their people, places, history and the rules that hold them together.",
+    "description": "A workroom for the worlds you keep: their people, places, history and the rules that hold them together.",
     "id": "/app",
     "start_url": "/explore",
     "scope": "/",

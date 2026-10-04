@@ -48,13 +48,13 @@ public static class PageMetadataResolver
     public const string ExploreDescription =
         "Explore worlds their authors chose to share on Lorex: universes, their lore and their stories.";
 
-    public const string HomeTitle = "Lorex — Build connected fictional universes";
+    public const string HomeTitle = "Lorex | Build connected fictional universes";
 
     public const string HomeDescription =
         "Build lore, relationships, timelines and stories in one connected workspace for fictional universes.";
 
     private const string GenericDescription =
-        "A workroom for the worlds you keep — their people, places, history and the rules that hold them together.";
+        "A workroom for the worlds you keep: their people, places, history and the rules that hold them together.";
 
     /// <summary>The head for any address that is not a public page: the workspace, sign-in, the profile, unknown paths.</summary>
     public static PageMetadata Private { get; } =
@@ -173,7 +173,7 @@ public static class PageMetadataResolver
             : Describe(entry.Summary);
 
         return new PageMetadata(
-            $"{Clean(entry.Name)} — {Clean(entry.World)} | {Brand}",
+            $"{Clean(entry.Name)} | {Clean(entry.World)} | {Brand}",
             description,
             true,
             true,
@@ -204,7 +204,7 @@ public static class PageMetadataResolver
         return story is null
             ? null
             : new PageMetadata(
-                $"{Clean(story.Title)} — {Clean(story.World)} | {Brand}",
+                $"{Clean(story.Title)} | {Clean(story.World)} | {Brand}",
                 Describe(story.PublicSummary),
                 true,
                 true,

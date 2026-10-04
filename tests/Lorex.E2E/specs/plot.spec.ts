@@ -204,7 +204,7 @@ async function addBeat(page: Page, arcTitle: string, input: BeatInput) {
   await expect(beat(page, input.title)).toBeVisible()
 }
 
-/** The plot as the page draws it, one line per arc: "Arc 1 — Fall of the King | a | b". */
+/** The plot as the page draws it, one line per arc: "Arc 1: Fall of the King | a | b". */
 function plotStructure(page: Page) {
   return page
     .getByTestId('plot')
@@ -307,7 +307,7 @@ test.describe('plot', () => {
     )
     await expect
       .poll(() => plotStructure(page))
-      .toEqual(['Arc 1 — Fall of the King', "Arc 2 — Mira's Betrayal"])
+      .toEqual(['Arc 1: Fall of the King', "Arc 2: Mira's Betrayal"])
 
     // The arcs swap places and renumber themselves.
     await saveAndAnnounce(
@@ -318,7 +318,7 @@ test.describe('plot', () => {
     )
     await expect
       .poll(() => plotStructure(page))
-      .toEqual(["Arc 1 — Mira's Betrayal", 'Arc 2 — Fall of the King'])
+      .toEqual(["Arc 1: Mira's Betrayal", 'Arc 2: Fall of the King'])
 
     // Beats, one linked to scenes in two different chapters and to two entries.
     await addBeat(page, 'Fall of the King', { title: 'Capital is breached' })
@@ -338,12 +338,12 @@ test.describe('plot', () => {
       page,
       '/beats/order',
       () => chooseFromMenu(beat(page, 'Learns of the conspiracy'), 'plot-beat-move-up'),
-      '“Learns of the conspiracy” is now beat 1 of 3 in Arc 2 — Fall of the King.',
+      '“Learns of the conspiracy” is now beat 1 of 3 in Arc 2: Fall of the King.',
     )
 
     const planned = [
-      "Arc 1 — Mira's Betrayal | Reveals the gate route",
-      'Arc 2 — Fall of the King | Learns of the conspiracy | Capital is breached | Accepts exile',
+      "Arc 1: Mira's Betrayal | Reveals the gate route",
+      'Arc 2: Fall of the King | Learns of the conspiracy | Capital is breached | Accepts exile',
     ]
     await expect.poll(() => plotStructure(page)).toEqual(planned)
 
@@ -389,10 +389,10 @@ test.describe('plot', () => {
       async () => {
         await openMenuFor(scene(page, 'The Council'), 'scene-move-to-option')
         await scene(page, 'The Council')
-          .locator('[data-testid="scene-move-to-option"][data-target="Chapter 2 — Arrival"]')
+          .locator('[data-testid="scene-move-to-option"][data-target="Chapter 2: Arrival"]')
           .click()
       },
-      '“The Council” moved to Chapter 2 — Arrival, scene 2 of 2.',
+      '“The Council” moved to Chapter 2: Arrival, scene 2 of 2.',
     )
 
     await page.getByTestId('story-view-plot').click()
@@ -433,8 +433,8 @@ test.describe('plot', () => {
     await expect
       .poll(() => plotStructure(page))
       .toEqual([
-        "Arc 1 — Mira's Betrayal | Reveals the gate route",
-        'Arc 2 — Fall of the King | Capital is breached | Accepts exile',
+        "Arc 1: Mira's Betrayal | Reveals the gate route",
+        'Arc 2: Fall of the King | Capital is breached | Accepts exile',
       ])
     expect(confirmation).toContain('Its linked scenes and lore stay.')
 
@@ -457,7 +457,7 @@ test.describe('plot', () => {
     await chooseFromMenu(arc(page, "Mira's Betrayal"), 'plot-arc-delete')
     await expect
       .poll(() => plotStructure(page))
-      .toEqual(['Arc 1 — Fall of the King | Capital is breached | Accepts exile'])
+      .toEqual(['Arc 1: Fall of the King | Capital is breached | Accepts exile'])
     expect(confirmation).toContain('Its 1 beat will go with it.')
     expect(confirmation).toContain('No scene, chapter or lore is deleted.')
     expect(confirmation).toContain('restore the arc from the Trash')
@@ -465,7 +465,7 @@ test.describe('plot', () => {
     await page.reload()
     await expect
       .poll(() => plotStructure(page))
-      .toEqual(['Arc 1 — Fall of the King | Capital is breached | Accepts exile'])
+      .toEqual(['Arc 1: Fall of the King | Capital is breached | Accepts exile'])
 
     await page.getByTestId('story-view-scenes').click()
     await expect.poll(() => sceneOrder(page)).toEqual(['Escape', 'The Siege', 'The Council'])
@@ -490,7 +490,7 @@ test.describe('plot', () => {
 
     await expect(page.getByTestId('plot-empty')).toHaveCount(0)
     await expect(arc(page, 'Search for the Crown').getByTestId('plot-arc-heading')).toHaveText(
-      'Arc 1 — Search for the Crown',
+      'Arc 1: Search for the Crown',
     )
     await expect(arc(page, 'Search for the Crown').getByTestId('plot-arc-empty')).toHaveText(
       'No beats yet.',
@@ -527,10 +527,10 @@ test.describe('plot', () => {
     await page.goto(`/app/universes/${universeId}/stories/${storyId}/plot`)
     await expect
       .poll(() => plotStructure(page))
-      .toEqual(['Arc 1 — A | a1 | a2 | a3', 'Arc 2 — B', 'Arc 3 — C'])
+      .toEqual(['Arc 1: A | a1 | a2 | a3', 'Arc 2: B', 'Arc 3: C'])
 
     // An arc's menu is named with the arc's heading; its moves are in it, after Edit arc.
-    await arc(page, 'C').getByRole('button', { name: 'More actions for Arc 3 — C' }).focus()
+    await arc(page, 'C').getByRole('button', { name: 'More actions for Arc 3: C' }).focus()
     await page.keyboard.press('Enter')
     await page.keyboard.press('ArrowDown')
     await expect.poll(() => focused(page)).toMatchObject({ control: 'plot-arc-move-up', arc: 'C' })
@@ -571,7 +571,7 @@ test.describe('plot', () => {
       page,
       '/beats/order',
       () => page.keyboard.press('Enter'),
-      '“a3” is now beat 2 of 3 in Arc 2 — A.',
+      '“a3” is now beat 2 of 3 in Arc 2: A.',
     )
     await expect
       .poll(() => focused(page))
@@ -585,7 +585,7 @@ test.describe('plot', () => {
       page,
       '/beats/order',
       () => page.keyboard.press('Space'),
-      '“a3” is now beat 1 of 3 in Arc 2 — A.',
+      '“a3” is now beat 1 of 3 in Arc 2: A.',
     )
     await page.keyboard.press('Enter')
     await expect(beat(page, 'a3').getByTestId('plot-beat-move-up')).toHaveCount(0)
@@ -595,7 +595,7 @@ test.describe('plot', () => {
     await page.keyboard.press('Escape')
 
     // C went to the top past A, so A is second now, and B last; only A's beats moved inside it.
-    const moved = ['Arc 1 — C', 'Arc 2 — A | a3 | a1 | a2', 'Arc 3 — B']
+    const moved = ['Arc 1: C', 'Arc 2: A | a3 | a1 | a2', 'Arc 3: B']
     await expect.poll(() => plotStructure(page)).toEqual(moved)
 
     await page.reload()

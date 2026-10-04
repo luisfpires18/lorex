@@ -292,7 +292,7 @@ test.describe('world rule checks', () => {
     })
 
     await page.goto(`${base}/world-rules/${rule.id}`)
-    const none = page.getByLabel('No check — this rule is words only')
+    const none = page.getByLabel('No check: this rule is words only')
     const limit = page.getByLabel('Limit how many times one participant has an event by a method')
     const fields = page.getByTestId('world-rule-check-fields')
     await expect(none).toBeChecked()
@@ -466,8 +466,8 @@ test.describe('world rule checks', () => {
       '2 moments that may match could not be counted, so Lorex does not say this rule holds.',
     )
     await expect(uncounted.getByRole('listitem')).toHaveText([
-      'A return by no known means — no method recorded',
-      'Someone returns — no participant recorded',
+      'A return by no known means (no method recorded)',
+      'Someone returns (no participant recorded)',
     ])
 
     // Canon claims no conflict it cannot prove - and the rule does not claim to hold either.
@@ -483,7 +483,7 @@ test.describe('world rule checks', () => {
 
     await page.goto(`${base}/world-rules/${world.rule.id}`)
     await expect(uncounted.getByRole('listitem')).toHaveText([
-      'A return by no known means — no method recorded',
+      'A return by no known means (no method recorded)',
     ])
     await expect(state).toContainText('2 Canon moments counted.')
 

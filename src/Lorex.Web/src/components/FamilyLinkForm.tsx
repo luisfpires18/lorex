@@ -28,7 +28,7 @@ interface Props {
 /** How a kind is named in the Connection choice: a parent kind says which, any other family kind says nothing more. */
 function kindOption(kind: RelationshipType) {
   return isParentSemantic(kind.familySemantic)
-    ? `${kind.name} — ${FAMILY_SEMANTIC_WORDS[kind.familySemantic]} parent`
+    ? `${kind.name} (${FAMILY_SEMANTIC_WORDS[kind.familySemantic]} parent)`
     : kind.name
 }
 

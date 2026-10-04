@@ -288,7 +288,7 @@ export default function FamilyTreePage() {
           <p className="family__note">
             Relatives are worked out from the parent connections themselves, every time this page is
             opened. Nothing on it is stored as a connection of its own, and a sibling here means one
-            shared parent that somebody wrote down — no more than that.
+            shared parent that somebody wrote down, and nothing more.
           </p>
 
           {tree.connections.length > 0 ? (

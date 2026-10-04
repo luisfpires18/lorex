@@ -50,6 +50,16 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **Product refinement 032 - product copy humanization** (`feat/product-copy-humanization` off `dev` at `afe7b7f`;
+  committed, not merged, not pushed). No schema, migration or backup change (backup **19**).
+  - **Copy rule, standing:** any change to user-facing text goes through the `humanizer` skill. No spaced em dash in
+    visible copy; a bare `—` stays only as the empty-value glyph (custom field values, history, blank year inputs).
+  - Compound tab titles join with `|`, most specific first: `Overview | Hollowmere | Lorex`, `Salt Warden | Glass Ebb |
+    Lorex` (client `useDocumentTitle` and server `PageMetadata`, kept in step per ADR 0038). Home: `Lorex | Build
+    connected fictional universes`. Chapter and arc labels: `Chapter 2: Ashes`, `Arc 1: Fall of the King`.
+  - E2E: `makeTestPassword()` (`tests/Lorex.E2E/specs/support/account.ts`) generates throwaway passwords at run time;
+    the landing spec uses it. The other specs still carry the old literal; move them over when touched. GitGuardian's
+    historical alert is a test-credential false positive, handled outside the repository; history was not rewritten.
 - **Product refinement 031 - public Lorex landing page** (`feat/public-landing-page` off `dev` at `a3f7922`; committed,
   not merged, not pushed). `/` is Lorex's home, no longer a redirect (client route and server `FrontendHosting`);
   `/explore` unchanged. No schema, migration or backup change (backup **19**). `PUBLIC_PORTAL.md` section 23; ADR 0038

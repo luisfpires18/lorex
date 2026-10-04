@@ -422,8 +422,8 @@ export function RelationshipSection({
         <p className="relations__quiet" data-testid="relations-empty">
           {types.length === 0 ? (
             <>
-              Relations need a kind first — who rules what, who is married to whom. Name one under{' '}
-              <Link to={`/app/universes/${universeId}/types`}>Types</Link>.
+              Relations need a kind first, like who rules what or who is married to whom. Name one
+              under <Link to={`/app/universes/${universeId}/types`}>Types</Link>.
             </>
           ) : (
             'Nothing connects to this yet. Add the first relation.'

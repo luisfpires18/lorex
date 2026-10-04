@@ -247,20 +247,20 @@ test.describe('A universe: up is All universes, inside its navigation', () => {
       'aria-current',
       'page',
     )
-    await expect(page).toHaveTitle(`Overview — ${w.name} | Lorex`)
+    await expect(page).toHaveTitle(`Overview | ${w.name} | Lorex`)
 
     await nav.getByRole('link', { name: 'Lore', exact: true }).click()
     await expect(nav.getByRole('link', { name: 'Lore', exact: true })).toHaveAttribute(
       'aria-current',
       'page',
     )
-    await expect(page).toHaveTitle(`Lore — ${w.name} | Lorex`)
+    await expect(page).toHaveTitle(`Lore | ${w.name} | Lorex`)
 
     // A deep screen is still its section.
     await page.goto(`/app/universes/${w.id}/stories/${w.storyId}/manuscript`)
-    await expect(page).toHaveTitle(`Stories — ${w.name} | Lorex`)
+    await expect(page).toHaveTitle(`Stories | ${w.name} | Lorex`)
     await nav.getByRole('link', { name: 'Settings' }).click()
-    await expect(page).toHaveTitle(`Settings — ${w.name} | Lorex`)
+    await expect(page).toHaveTitle(`Settings | ${w.name} | Lorex`)
 
     await nav.getByRole('link', { name: 'All universes' }).click()
     await expect(page).toHaveURL('/app')

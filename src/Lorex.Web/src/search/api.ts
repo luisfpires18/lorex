@@ -57,7 +57,7 @@ export function resultPath(universeId: string, result: SearchResult) {
 export function resultContext(result: SearchResult) {
   const chapter =
     result.chapterNumber !== null && result.chapterTitle !== null
-      ? ` · Chapter ${result.chapterNumber} — ${result.chapterTitle}`
+      ? ` · Chapter ${result.chapterNumber}: ${result.chapterTitle}`
       : ''
 
   switch (result.kind) {

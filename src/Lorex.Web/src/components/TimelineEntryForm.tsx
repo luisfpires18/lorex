@@ -489,7 +489,7 @@ export function TimelineEntryForm({
               </label>
               <p className="field__hint">
                 Optional text shown beside the year: AC, Before the Flood. Lorex does not order by
-                it — to order dates by named periods, add date periods in Chronology.
+                it. To order dates by named periods, add date periods in Chronology.
               </p>
               <input
                 id="moment-era"

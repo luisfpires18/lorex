@@ -123,7 +123,7 @@ export default function UniverseWorkspace() {
     state.kind === 'ready' && state.universe.accessRole === UniverseRole.Owner,
   )
 
-  // The tab names the section and then the universe - "Lore — Hollowmere | Lorex" - from the shell, which knows both;
+  // The tab names the section and then the universe - "Lore | Hollowmere | Lorex" - from the shell, which knows both;
   // an entry or a story inside a section is still that section here, and nothing beneath sets a title of its own.
   useDocumentTitle(
     ...(state.kind === 'ready' ? [currentSection(pathname, id), state.universe.name] : []),

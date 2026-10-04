@@ -296,7 +296,7 @@ test.describe('search and social metadata', () => {
     expect(universe.html).not.toContain('Private description')
 
     const told = await head(page, `/worlds/${w.slug}/stories/the-glass-ebb`)
-    expect(told.title).toBe(`The Glass Ebb — ${w.name} | Lorex`)
+    expect(told.title).toBe(`The Glass Ebb | ${w.name} | Lorex`)
     expect(told.meta('name', 'description')).toBe('A tide that counts the drowned.')
     expect(told.meta('property', 'og:description')).toBe('A tide that counts the drowned.')
     expect(told.html).not.toContain('Private premise')

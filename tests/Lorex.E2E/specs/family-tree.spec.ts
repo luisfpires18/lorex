@@ -246,9 +246,9 @@ test.describe('family tree', () => {
     await expect(node(page, 'Mara')).toContainText('Biological parent')
     await expect(node(page, 'Oren')).toContainText('Adoptive parent')
     await expect(node(page, 'Nana')).toContainText("Mara's biological parent")
-    await expect(node(page, 'Tam')).toContainText('Shares Mara — biological for both')
+    await expect(node(page, 'Tam')).toContainText('Shares Mara (biological for both)')
     await expect(node(page, 'Tam')).toContainText(
-      'Shares Oren — adoptive for Lia, biological for Tam',
+      'Shares Oren (adoptive for Lia, biological for Tam)',
     )
     await expect(node(page, 'Cai')).toContainText('Biological child')
     await expect(node(page, 'Pip')).toContainText("Cai's adoptive child")
@@ -296,7 +296,7 @@ test.describe('family tree', () => {
     await page.getByTestId('add-family-link').click()
 
     const form = page.getByTestId('family-link-form')
-    await form.getByTestId('family-link-kind').selectOption({ label: 'bore — biological parent' })
+    await form.getByTestId('family-link-kind').selectOption({ label: 'bore (biological parent)' })
     await form.getByTestId('family-link-side').selectOption({ label: 'Lia is the parent' })
     await form.getByTestId('picker-input').click()
     await form.getByTestId('picker-input').fill('Wren')
@@ -450,7 +450,7 @@ test.describe('family tree', () => {
     await page.goto(treeUrl(restoredId, lia))
     await expect(node(page, 'Mara')).toContainText('Biological parent')
     await expect(node(page, 'Oren')).toContainText('Adoptive parent')
-    await expect(node(page, 'Tam')).toContainText('Shares Mara — biological for both')
+    await expect(node(page, 'Tam')).toContainText('Shares Mara (biological for both)')
     await expect(node(page, 'Nana')).toContainText("Mara's biological parent")
   })
 })

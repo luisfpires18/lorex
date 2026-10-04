@@ -70,7 +70,7 @@ export function WorldRuleCheckSection({
             onChange={() => onChange({ kind: WorldRuleValidationKind.None })}
             data-testid="world-rule-check-none"
           />
-          <span>No check — this rule is words only</span>
+          <span>No check: this rule is words only</span>
         </label>
         <label className="check">
           <input
@@ -253,7 +253,7 @@ function CheckState({
               <Link to={`/app/universes/${universeId}/timeline?moment=${moment.timelineEntryId}`}>
                 <bdi>{moment.title}</bdi>
               </Link>{' '}
-              — {UNCOUNTED_REASON_LABELS[moment.reason]}
+              ({UNCOUNTED_REASON_LABELS[moment.reason]})
             </li>
           ))}
           {found.uncountedMoments > found.uncounted.length ? (

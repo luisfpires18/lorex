@@ -322,13 +322,13 @@ test.describe('story drawers', () => {
 
     // Moving it to another chapter is a change.
     await chooseFromMenu(scene(page, 'The Gates'), 'scene-edit')
-    await page.getByTestId('scene-chapter-select').selectOption({ label: 'Chapter 2 — Ashes' })
+    await page.getByTestId('scene-chapter-select').selectOption({ label: 'Chapter 2: Ashes' })
     await page.getByTestId('cancel-scene').click()
     expect(asked).toEqual([DISCARD])
     await expect(form).toBeVisible()
 
     // So is letting go of an entry it links; choosing the chapter back leaves only that change.
-    await page.getByTestId('scene-chapter-select').selectOption({ label: 'Chapter 1 — Arrival' })
+    await page.getByTestId('scene-chapter-select').selectOption({ label: 'Chapter 1: Arrival' })
     await form.getByTestId('participant-remove-Arlen').click()
     await page.keyboard.press('Escape')
     expect(asked).toEqual([DISCARD, DISCARD])

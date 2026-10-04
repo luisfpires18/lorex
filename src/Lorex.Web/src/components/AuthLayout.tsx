@@ -38,7 +38,7 @@ export function AuthLayout({ heading, intro, children, footer, headingRef }: Aut
           </Link>
           <span className="auth__rule" aria-hidden="true" />
           <p className="auth__pitch">
-            A workroom for the worlds you keep — their people, places, history and the rules that
+            A workroom for the worlds you keep: their people, places, history and the rules that
             hold them together.
           </p>
         </div>

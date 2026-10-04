@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext, type Browser, type Page } from '@playwright/test'
+import { makeTestPassword } from './support/account'
 import { png } from './support/png'
 
 /**
@@ -11,8 +12,8 @@ import { png } from './support/png'
  * than against a world this test hopes is still the newest. The empty and failed states are the API's answers, stood in
  * for by the browser, because no test can make a shared database have no public worlds.
  */
-const PASSWORD = 'Test-password-123!'
-const HOME_TITLE = 'Lorex — Build connected fictional universes'
+const PASSWORD = makeTestPassword()
+const HOME_TITLE = 'Lorex | Build connected fictional universes'
 
 function unique(prefix: string) {
   return `${prefix}${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`
@@ -85,7 +86,7 @@ test.describe('Lorex’s home is /', () => {
     await expect(page.getByRole('contentinfo')).toHaveCount(1)
     await expect(page.getByRole('heading', { level: 2 })).toHaveText([
       'Hold a whole universe, not one long document.',
-      'A world, not a folder of notes.',
+      'Everything in it is connected.',
       'Write the story inside the world.',
       'Read the worlds others have shared.',
       'Your world stays yours.',
