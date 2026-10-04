@@ -8,6 +8,7 @@ import { PortalSearch } from './PortalSearch'
 import { ThemeSwitch } from './ThemeSwitch'
 import { MAIN_CONTENT_ID } from './SkipLink'
 import { Wordmark } from './Wordmark'
+import { VERSION_LABEL } from '../lib/buildInfo'
 
 /**
  * The public portal's frame: its own bar and its own `main`, and none of the workspace's chrome - no rail, no
@@ -105,21 +106,42 @@ export function PublicLayout() {
 
       {home ? (
         <footer className="portal__footer" data-testid="portal-footer">
-          <p className="portal__footerbrand">
-            <Wordmark />
-            <span>A workspace for fictional universes</span>
-          </p>
-          <nav className="portal__footernav" aria-label="Site">
-            <Link to="/explore">Explore</Link>
-            {isLoading ? null : user ? (
-              <Link to="/app">My workspace</Link>
-            ) : (
-              <>
-                <Link to="/login">Log in</Link>
-                <Link to="/register">Create account</Link>
-              </>
-            )}
-          </nav>
+          <div className="portal__footertop">
+            <div className="portal__footerbrand">
+              <Link className="portal__footerhome" to="/" aria-label={BRAND_LINK_LABEL}>
+                <Wordmark />
+              </Link>
+              <p>A workspace for fictional universes</p>
+            </div>
+            <nav className="portal__footernav" aria-labelledby="portal-footer-product">
+              <p className="portal__footerheading" id="portal-footer-product">
+                Product
+              </p>
+              <ul data-testid="portal-footer-links">
+                <li>
+                  <Link to="/explore">Explore</Link>
+                </li>
+                {isLoading ? null : user ? (
+                  <li>
+                    <Link to="/app">My workspace</Link>
+                  </li>
+                ) : (
+                  <>
+                    <li>
+                      <Link to="/register">Create account</Link>
+                    </li>
+                    <li>
+                      <Link to="/login">Log in</Link>
+                    </li>
+                  </>
+                )}
+              </ul>
+            </nav>
+          </div>
+          <div className="portal__footerbase">
+            <p data-testid="portal-footer-copyright">©&nbsp;{new Date().getFullYear()} LoreX</p>
+            <p data-testid="portal-footer-version">{VERSION_LABEL}</p>
+          </div>
         </footer>
       ) : null}
     </div>

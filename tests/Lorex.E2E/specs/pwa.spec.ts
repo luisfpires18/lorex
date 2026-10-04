@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { makeTestPassword } from './support/account'
 
 /**
  * What has to hold for Lorex to be installable, and what the worker is never allowed to do.
@@ -13,29 +14,40 @@ import { expect, test, type Page } from '@playwright/test'
  * registration is torn down again so nothing leaks into another spec.
  */
 
-const PASSWORD = 'Test-password-123!'
+const PASSWORD = makeTestPassword()
 
 function unique(prefix: string) {
   return `${prefix}${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`
 }
 
-/** Registers `/sw.js`, waits for it to take control, and returns nothing. */
-async function installWorker(page: Page) {
-  await page.evaluate(async () => {
-    const registration = await navigator.serviceWorker.register('/sw.js')
-    await navigator.serviceWorker.ready
-    // A worker that is active but not yet in control never sees a fetch.
-    if (!navigator.serviceWorker.controller) {
-      await new Promise<void>((resolve) => {
-        navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), {
-          once: true,
+/**
+ * Registers the worker - as a production build does, `/sw.js?build=<id>`, when given a build; bare otherwise - and waits
+ * until that very script controls the page. A second build replaces the first worker, so "some controller" is not enough.
+ */
+async function installWorker(page: Page, build?: string) {
+  await page.evaluate(
+    async (script) => {
+      await navigator.serviceWorker.register(script)
+      await navigator.serviceWorker.ready
+      // In control is not yet done: a worker controls the page from "activating", before its activate handler has swept
+      // the last build's cache. "activated" is after.
+      const controls = () => {
+        const worker = navigator.serviceWorker.controller
+        return (worker?.scriptURL.endsWith(script) ?? false) && worker?.state === 'activated'
+      }
+      // A worker that is active but not yet in control never sees a fetch.
+      while (!controls()) {
+        await new Promise<void>((resolve) => {
+          navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), {
+            once: true,
+          })
+          // clients.claim() may already have landed between the two checks.
+          setTimeout(resolve, 100)
         })
-        // clients.claim() may already have landed between the two checks.
-        if (navigator.serviceWorker.controller) resolve()
-      })
-    }
-    void registration
-  })
+      }
+    },
+    build ? `/sw.js?build=${build}` : '/sw.js',
+  )
 }
 
 /** Every URL the worker has put in a cache, across every cache it owns. */
@@ -377,6 +389,62 @@ test.describe('what the worker is allowed to keep', () => {
     expect(served.length).toBeGreaterThan(0)
     expect(served.every((fromWorker) => !fromWorker)).toBe(true)
     expect((await cachedUrls(page)).some((url) => url.endsWith('.webmanifest'))).toBe(false)
+  })
+
+  test('each build keeps its own cache: a new build drops the last one and reads stable root files afresh', async ({
+    page,
+  }) => {
+    await page.goto('/explore')
+    const first = `b${Date.now().toString(36)}a`
+    const second = `b${Date.now().toString(36)}b`
+
+    // Registered with no build id - only a test does that - the cache can never be a production build's.
+    await installWorker(page)
+    await page.evaluate(() => fetch('/favicon-16.png'))
+    // The worker keeps a copy after answering, not before: wait for it, so it cannot land after the next build's sweep.
+    await expect
+      .poll(() => page.evaluate(async () => Boolean(await caches.match('/favicon-16.png'))))
+      .toBe(true)
+    expect(await page.evaluate(() => caches.keys())).toEqual(['lorex-static-unbuilt'])
+
+    // A build: its own cache, and the bare registration's is gone.
+    await installWorker(page, first)
+    await page.evaluate(() => fetch('/favicon-16.png'))
+    expect(await page.evaluate(() => caches.keys())).toEqual([`lorex-static-${first}`])
+
+    // What a browser keeps between deployments for a file that keeps its name: whatever that build cached, served
+    // cache-first. A stand-in proves the pin.
+    await page.evaluate(async (name) => {
+      const cache = await caches.open(name)
+      await cache.put(
+        '/brand-mark.png',
+        new Response('previous build', { headers: { 'Content-Type': 'image/png' } }),
+      )
+    }, `lorex-static-${first}`)
+    expect(await page.evaluate(async () => (await fetch('/brand-mark.png')).text())).toBe(
+      'previous build',
+    )
+
+    // The next build: a new script URL, a new worker, a new cache, and the old one deleted on activate.
+    await installWorker(page, second)
+    expect(await page.evaluate(() => caches.keys())).not.toContain(`lorex-static-${first}`)
+
+    // So the stable file comes from the server again - the real mark - and is kept under the new build's name.
+    const mark = await page.evaluate(async () => {
+      const response = await fetch('/brand-mark.png')
+      return {
+        type: response.headers.get('content-type'),
+        size: (await response.arrayBuffer()).byteLength,
+      }
+    })
+    expect(mark.type).toContain('png')
+    expect(mark.size).toBeGreaterThan(1000)
+    const kept = await page.evaluate(async (name) => {
+      const cache = await caches.open(name)
+      return (await cache.keys()).map((request) => new URL(request.url).pathname)
+    }, `lorex-static-${second}`)
+    expect(kept).toContain('/brand-mark.png')
+    expect(await page.evaluate(() => caches.keys())).toEqual([`lorex-static-${second}`])
   })
 
   test('a navigation is never served from a cache', async ({ page }) => {

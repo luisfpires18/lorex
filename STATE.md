@@ -50,6 +50,14 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **Product refinement 033 - app version, build-derived cache, public footer** (`feat/app-version-cache-footer` off `dev`
+  at `e167a92`; committed, not merged, not pushed). No schema, migration, backend or backup change (backup **19**).
+  - One version: `src/Lorex.Web/package.json`, now `0.1.0`; Vite writes it and a build id into the bundle, read only via
+    `src/lib/buildInfo.ts`. Shown as "LoreX v0.1.0" in the home footer and at the foot of the account menu.
+  - `CACHE_VERSION` is gone: the worker is registered as `/sw.js?build=<id>` and names its cache after the build, so
+    every deployment drops the last cache. Nothing to bump by hand. ADR 0017 amendment.
+  - Home footer: brand, Product links (Explore; Create account and Log in, or My workspace), year and version. No
+    Community or Legal group until Lorex has a real destination for one.
 - **Product refinement 032 - product copy humanization** (`feat/product-copy-humanization` off `dev` at `afe7b7f`;
   committed, not merged, not pushed). No schema, migration or backup change (backup **19**).
   - **Copy rule, standing:** any change to user-facing text goes through the `humanizer` skill. No spaced em dash in

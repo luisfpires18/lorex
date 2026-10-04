@@ -1287,6 +1287,14 @@ a.button--danger:visited {
   overflow-wrap: break-word;
 }
 
+.accountmenu__version {
+  margin: var(--space-1) 0 0;
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  border-top: 1px solid var(--rule);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
 /* "Go to": Lorex's places, under a caption of their own, ruled off from the account above and below. */
 .accountmenu__goto {
   display: flex;
@@ -13611,41 +13619,66 @@ a.idearef__name {
   text-align: center;
 }
 
-/* -- The footer: where else there is to go, and nothing invented. -- */
+/* -- The footer: where else there is to go, and nothing invented. The brand and the real ways on above a hairline;
+   the year and the running version below it, quieter than any link. No Community or Legal column until Lorex has one. -- */
 
 .portal__footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4) var(--space-7);
-  padding: var(--space-7) 0 var(--space-8);
+  padding: var(--space-8) 0 var(--space-7);
   border-top: 1px solid var(--portal-line);
   color: var(--portal-muted);
   font-size: var(--text-ui);
 }
 
-.portal__footerbrand {
+.portal__footertop {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-2) var(--space-4);
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-7) var(--space-9);
+}
+
+.portal__footerbrand {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.portal__footerbrand p {
   margin: 0;
 }
 
-.portal__footerbrand .wordmark {
+.portal__footerhome {
+  justify-self: start;
   color: var(--portal-ink);
+  text-decoration: none;
+}
+
+.portal__footerhome .wordmark {
   font-size: 1.25rem;
 }
 
-.portal__footerbrand .wordmark__x {
+.portal__footerhome .wordmark__x {
   color: var(--accent);
 }
 
+/* A small gap: each link's tap height spaces it from the label; this keeps the focus ring clear of it. */
 .portal__footernav {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.portal__footerheading {
+  margin: 0;
+  color: var(--portal-muted);
+  font-size: var(--text-sm);
+}
+
+.portal__footernav ul {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-1) var(--space-6);
+  gap: 0 var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .portal__footernav a {
@@ -13660,6 +13693,21 @@ a.idearef__name {
   color: var(--portal-ink);
   text-decoration: underline;
   text-underline-offset: 0.3em;
+}
+
+.portal__footerbase {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-6);
+  margin-top: var(--space-7);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--portal-line);
+  font-size: var(--text-sm);
+}
+
+.portal__footerbase p {
+  margin: 0;
 }
 
 /* A tablet: the title reaches across the citadel, so the veil covers the whole painting a little. */

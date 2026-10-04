@@ -176,3 +176,21 @@ own manifest update check - on Android when the installed app is launched and it
 checks about daily and applies the update on a later launch), on desktop on a navigation within scope. Reinstalling
 applies it at once. What an operating system restores from its recent-apps list is the window it kept, not a launch,
 and a link the system hands the app is that link; neither is changed.
+
+## Amendment: the cache follows the build (2026-10-04, refinement 033)
+
+`CACHE_VERSION` is gone. Root files keep their names across builds (the icons twice needed a hand bump to stop browsers
+serving old bytes), and a constant somebody must remember to change is the failure that made both bumps necessary.
+
+- **The build names the cache.** Vite fixes a build id once per build (`LOREX_BUILD_ID`, else `GITHUB_SHA`, else random)
+  and `pwa.ts` registers `/sw.js?build=<id>`. A new id is a new script URL, so the browser installs a new worker, which
+  caches under `lorex-static-<id>` and on activate deletes every other `lorex-static-*` cache. Root static files are
+  therefore read afresh once per build. The hand-bumped constant this amendment replaces is the "update strategy" above.
+- **Unchanged:** what is cached (build output and root static files, cache-first), what never is (`/api`, `/health`,
+  navigations, the manifest, non-`GET`, cross-origin), the server's headers (`/assets` immutable, everything else
+  `no-cache`), Vite's hashed names, user media, and production-only registration.
+- **Bare `/sw.js`**, which only the E2E suite registers against the dev server, caches as `lorex-static-unbuilt`.
+- **A worker controls the page from `activating`, before its activate handler has swept the old cache.** Anything that
+  checks the sweep waits for `activated`; `pwa.spec.ts` does.
+- The semantic version (`package.json`, shown as "LoreX v0.1.0") is separate: it says which release is running and
+  never invalidates anything.

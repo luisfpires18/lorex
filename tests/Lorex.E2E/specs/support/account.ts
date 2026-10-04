@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { expect, type Page } from '@playwright/test'
 
 /**
@@ -35,4 +36,15 @@ export async function clickSignOut(page: Page) {
  */
 export function makeTestPassword() {
   return `e2e-${crypto.randomUUID()}`
+}
+
+/**
+ * How the running version should read, from the one place it is written: the web app's package.json. Read here
+ * rather than copied, so bumping the version never means editing a test.
+ */
+export function expectedVersionLabel() {
+  const pkg = JSON.parse(
+    readFileSync(new URL('../../../../src/Lorex.Web/package.json', import.meta.url), 'utf8'),
+  ) as { version: string }
+  return `LoreX v${pkg.version}`
 }
