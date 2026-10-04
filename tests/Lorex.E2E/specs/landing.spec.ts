@@ -102,12 +102,12 @@ test.describe('Lorex’s home is /', () => {
     await expect(page.getByTestId('portal-appearance')).toBeVisible()
     await expect(page.getByTestId('portal-workspace')).toHaveCount(0)
 
-    // The painting is decoration; the product picture says what it shows.
+    // The painting is decoration, and no workspace is pictured: the only other pictures are public worlds' cards.
     await expect(page.locator('.landing-hero__image')).toHaveAttribute('alt', '')
-    await expect(page.getByTestId('landing-shot').getByRole('img')).toHaveAttribute(
-      'alt',
-      /Lore of a universe called Hollowmere/,
-    )
+    await expect(page.getByTestId('landing-shot')).toHaveCount(0)
+    await expect(
+      page.locator('.landing img:not(.landing-hero__image):not(.worldcard__image)'),
+    ).toHaveCount(0)
 
     // Nothing the page does not offer: no prices, trials or artificial intelligence.
     const text = (await page.getByTestId('landing').innerText()).toLowerCase()
@@ -329,6 +329,16 @@ test.describe('Every width, both themes', () => {
         )
       expect(lines).toEqual([1, 1, 1])
 
+      // The four numbers: one row from a tablet up, two by two below it, never four stacked rows.
+      const tops = await page
+        .getByTestId('landing-metrics')
+        .locator('.landing-metric')
+        .evaluateAll((metrics) =>
+          metrics.map((metric) => Math.round(metric.getBoundingClientRect().top)),
+        )
+      expect(tops).toHaveLength(4)
+      expect(new Set(tops).size).toBe(width >= 768 ? 1 : 2)
+
       // The bar keeps brand, Explore, Appearance and both ways in reachable, and nothing in it overlaps.
       for (const id of ['portal-explore', 'portal-appearance', 'portal-login', 'portal-join']) {
         await expect(page.getByTestId(id)).toBeVisible()
@@ -349,40 +359,19 @@ test.describe('Every width, both themes', () => {
     })
   }
 
-  test('the product picture follows the theme, chosen from the Appearance menu, and the hero stays legible in both', async ({
+  test('Appearance turns the home page light, with graphite type on the parchment veil', async ({
     browser,
   }) => {
     const { context, page } = await stranger(browser, 1440)
     await page.addInitScript(() => localStorage.setItem('lorex-theme', 'dark'))
     await page.goto('/')
-    const shot = page.getByTestId('landing-shot').getByRole('img')
-    await expect
-      .poll(() => shot.evaluate((image: HTMLImageElement) => image.currentSrc))
-      .toContain('landing-product-dark')
-
     await page.getByTestId('portal-appearance').click()
     await page.getByTestId('theme-light').click()
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
-    await expect
-      .poll(() => shot.evaluate((image: HTMLImageElement) => image.currentSrc))
-      .toContain('landing-product-light')
-    await expect
-      .poll(() => shot.evaluate((image: HTMLImageElement) => image.naturalWidth))
-      .toBeGreaterThan(0)
-
-    // Light: graphite type on the parchment veil.
     const ink = await page
       .getByRole('heading', { level: 1 })
       .evaluate((heading) => getComputedStyle(heading).color)
     expect(ink).toBe('rgb(31, 28, 24)')
-    await context.close()
-  })
-
-  test('reduced motion: nothing moves', async ({ browser }) => {
-    const context = await browser.newContext({ reducedMotion: 'reduce' })
-    const page = await context.newPage()
-    await page.goto('/')
-    await expect(page.getByTestId('landing-shot')).toHaveCSS('animation-name', 'none')
     await context.close()
   })
 
@@ -413,6 +402,109 @@ test.describe('Every width, both themes', () => {
       .getByTestId('landing-primary')
       .evaluate((link) => getComputedStyle(link).outlineStyle)
     expect(outline).toBe('solid')
+    await context.close()
+  })
+})
+
+test.describe('Lorex in numbers', () => {
+  const metric = (page: Page, key: string) => page.getByTestId(`landing-metric-${key}`)
+  const KEYS = ['creators', 'universes', 'publishedWorlds', 'privateWorlds'] as const
+
+  async function shown(page: Page) {
+    return Promise.all(KEYS.map((key) => metric(page, key).innerText()))
+  }
+
+  test('the four live counts are the API’s, the same signed out and signed in', async ({
+    page,
+    browser,
+  }) => {
+    await account(page.request)
+
+    const { context, page: visitor } = await stranger(browser, 1280)
+    const answered = visitor.waitForResponse((response) =>
+      response.url().endsWith('/api/public/stats'),
+    )
+    await visitor.goto('/')
+    const stats = (await (await answered).json()) as Record<(typeof KEYS)[number], number>
+    const expected = KEYS.map((key) => new Intl.NumberFormat('en').format(stats[key]))
+    await expect(metric(visitor, 'privateWorlds')).not.toBeEmpty()
+    expect(await shown(visitor)).toEqual(expected)
+    await expect(visitor.getByTestId('landing-metrics').locator('dt')).toHaveText([
+      'Creators',
+      'Universes',
+      'Published worlds',
+      'Private worlds',
+    ])
+    expect(stats.universes).toBe(stats.publishedWorlds + stats.privateWorlds)
+    await context.close()
+
+    // Signed in: the same global numbers, not this account's.
+    const signedIn = page.waitForResponse((response) =>
+      response.url().endsWith('/api/public/stats'),
+    )
+    await page.goto('/')
+    const again = (await (await signedIn).json()) as Record<string, number>
+    await expect(metric(page, 'privateWorlds')).not.toBeEmpty()
+    expect(await shown(page)).toEqual(
+      KEYS.map((key) => new Intl.NumberFormat('en').format(again[key])),
+    )
+    expect(again.creators).toBeGreaterThanOrEqual(stats.creators)
+  })
+
+  test('whatever the API says is what is shown: zeros as zeros, large numbers in full', async ({
+    browser,
+  }) => {
+    for (const [answer, words] of [
+      [{ creators: 0, universes: 0, publishedWorlds: 0, privateWorlds: 0 }, ['0', '0', '0', '0']],
+      [
+        { creators: 1284, universes: 12500, publishedWorlds: 7, privateWorlds: 12493 },
+        ['1,284', '12,500', '7', '12,493'],
+      ],
+    ] as const) {
+      const { context, page } = await stranger(browser, 1280)
+      await page.route('**/api/public/stats', (route) => route.fulfill({ json: answer }))
+      await page.goto('/')
+      await expect(metric(page, 'creators')).toHaveText(words[0])
+      expect(await shown(page)).toEqual(words)
+      await context.close()
+    }
+  })
+
+  test('while the numbers load nothing says 0, and the row already holds its place', async ({
+    browser,
+  }) => {
+    const { context, page } = await stranger(browser, 1280)
+    let release: () => void = () => {}
+    const held = new Promise<void>((resolve) => (release = resolve))
+    await page.route('**/api/public/stats', async (route) => {
+      await held
+      await route.fulfill({
+        json: { creators: 5, universes: 9, publishedWorlds: 2, privateWorlds: 7 },
+      })
+    })
+    await page.goto('/')
+    await expect(page.getByTestId('landing-metrics').locator('dt')).toHaveCount(4)
+    expect(await shown(page)).toEqual(['', '', '', ''])
+    const before = (await page.getByTestId('landing-metrics').boundingBox())!.height
+    release()
+    await expect(metric(page, 'creators')).toHaveText('5')
+    const after = (await page.getByTestId('landing-metrics').boundingBox())!.height
+    expect(Math.abs(after - before)).toBeLessThan(2)
+    await context.close()
+  })
+
+  test('numbers that cannot be read leave quietly, and the page still works', async ({
+    browser,
+  }) => {
+    const { context, page } = await stranger(browser, 1280)
+    await page.route('**/api/public/stats', (route) => route.abort())
+    await page.goto('/')
+    await expect(page.getByTestId('landing-primary')).toHaveText('Start building')
+    await expect(page.getByTestId('landing-metrics')).toHaveCount(0)
+    await expect(page.getByRole('alert')).toHaveCount(0)
+    await expect(page.getByRole('heading', { level: 2 }).first()).toHaveText(
+      'Hold a whole universe, not one long document.',
+    )
     await context.close()
   })
 })

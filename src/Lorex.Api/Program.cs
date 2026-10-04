@@ -85,6 +85,7 @@ app.MapUniverseArtworkEndpoints();
 app.MapPublicNameEndpoints();
 app.MapPublicUniverseEndpoints();
 app.MapPublicAuthorEndpoints();
+app.MapPublicStatsEndpoints();
 app.MapChronologyEndpoints();
 app.MapEntityTypeEndpoints();
 app.MapEntityEndpoints();

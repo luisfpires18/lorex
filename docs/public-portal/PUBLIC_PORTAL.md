@@ -513,15 +513,18 @@ published worlds are found.
   universe* and *Log in*. Signed in: *Go to my workspace* (`/app`) and *Explore worlds*; at the foot *Open my
   workspace*. Nothing is drawn until the session is known, so neither set flashes before the other.
 - **Content, all of it true today.** Hero (the owner's citadel painting under a veil of the page's ground; three
-  sentences, one line each); one real product picture; Build (Lore, Types, Family Tree, Timeline and Chronology, World
+  sentences, one line each); Lorex in four live numbers; Build (Lore, Types, Family Tree, Timeline and Chronology, World
   Rules); Connect (three things writing once does now: relationships read from both entries and drawn in the Family
   Tree, Canon's lifespan checks, a scene's lore at hand); Write (stories, chapters, scenes, manuscripts, plot arcs and
   beats, and the media a universe can serve); Explore (up to four real public worlds); trust (private until published,
   collaborators by role, downloadable backups); a last call. No prices, trials, metrics, testimonials or AI.
-- **The product picture** is Lore of a demo world, *Hollowmere* - original, written for this - built through the API on a
-  fresh database and photographed at 1440 x 800, 2x, by `tests/Lorex.E2E/tools/landing-shot.mjs`, which uploads only
-  Lorex's own atmosphere paintings. Shipped as WebP per theme and width (`assets/landing-product-<theme>-<1440|2880>.webp`,
-  53-132 KB); the page loads the one for the theme in use.
+- **Numbers, not a picture of a workspace** (031 correction: the Lore screenshot and its capture script are gone). On the
+  hero's foot: Creators, Universes, Published worlds, Private worlds from anonymous `GET /api/public/stats`, as `en`
+  numbers in full, zeros included. Creators = registered accounts (each once). Universes = universe rows (archived
+  included; a deleted universe is gone). Published worlds = `PublicationRules.Public`, the portal's own predicate; an
+  entry published inside a private universe counts for nothing. Private worlds = universes - published. Counts only,
+  `no-cache` like the rest of the public API. No count-up; while loading quiet bars hold the row; unreadable, the row is
+  left out. Never in the page's head.
 - **Worlds.** `GET /api/public/universes?page=1&pageSize=4`, rendered with Explore's `WorldCard`; two on a phone. None
   published: a sentence and *Open Explore*, no placeholder card. A failed read: a sentence; Explore has them.
 - **Head.** "Lorex — Build connected fictional universes", a fixed description, canonical `/`, `index,follow` (any query

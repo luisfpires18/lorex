@@ -13085,10 +13085,9 @@ a.idearef__name {
 
    The portal's own page about Lorex itself, in the portal's look: night or parchment, the display serif for what is
    said and the interface face for what is done, the one ink-blue accent, artwork as atmosphere. One of the owner's two
-   landing paintings is the hero, under a veil of the page's own ground; the real product picture rises over the hero's
-   foot; then the sections, each laid out its own way rather than as a stack of cards. Pills are the interactive shape,
-   as in the bar; the picture and the world cards keep the portal's radius. Nothing moves unless motion is welcome, and
-   nothing depends on moving. */
+   landing paintings is the hero, under a veil of the page's own ground; Lorex's live numbers sit on the hero's foot;
+   then the sections, each laid out its own way rather than as a stack of cards. Pills are the interactive shape,
+   as in the bar; the world cards keep the portal's radius. Nothing on the page moves by itself. */
 
 .landing {
   --landing-width: 76rem;
@@ -13116,9 +13115,9 @@ a.idearef__name {
   isolation: isolate;
   display: flex;
   align-items: center;
-  min-height: clamp(34rem, 82svh, 50rem);
+  min-height: clamp(32rem, 74svh, 44rem);
   overflow: hidden;
-  padding: clamp(3rem, 7vw, 5.5rem) 0 clamp(9rem, 15vw, 13rem);
+  padding: clamp(3rem, 7vw, 5.5rem) 0 clamp(5rem, 9vw, 7.5rem);
 }
 
 .landing-hero__image {
@@ -13134,7 +13133,7 @@ a.idearef__name {
 }
 
 /* The page's own ground over the painting: whole along the reading edge, thin where the citadel stands, and whole
-   again at the foot, where the product picture rises out of it. */
+   again at the foot, where the numbers sit. */
 .landing-hero::after {
   content: '';
   position: absolute;
@@ -13256,26 +13255,81 @@ a.idearef__name {
   background: color-mix(in srgb, var(--portal-ink) 86%, var(--portal-bg));
 }
 
-/* -- The product picture: Lorex itself, rising over the hero's foot and fading into the page. -- */
+/* -- Lorex in numbers: four live counts on the hero's foot, read as type, not as a dashboard. -- */
 
-.landing-shot {
+.landing-metrics {
   position: relative;
-  z-index: 1;
-  width: min(100% - 2 * var(--portal-gutter), 72rem);
-  margin: calc(-1 * clamp(6.5rem, 12vw, 10.5rem)) auto 0;
-  overflow: hidden;
-  border-radius: var(--portal-radius);
-  background: var(--portal-card);
-  box-shadow:
-    0 0 0 1px rgb(var(--portal-ink-rgb) / 0.14),
-    0 40px 90px -40px rgb(var(--portal-drop-rgb) / 0.9);
-  mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
+  width: min(100% - 2 * var(--portal-gutter), var(--landing-width));
+  margin: calc(-1 * clamp(2.5rem, 5vw, 4rem)) auto 0;
 }
 
-.landing-shot__image {
+.landing-metrics__list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  border-block: 1px solid var(--portal-line);
+}
+
+.landing-metric {
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: clamp(1.25rem, 2.5vw, 2rem) clamp(1rem, 2.5vw, 2rem);
+}
+
+.landing-metric + .landing-metric {
+  border-left: 1px solid var(--portal-line);
+}
+
+.landing-metric:first-child {
+  padding-left: 0;
+}
+
+.landing-metric__value {
+  display: flex;
+  align-items: center;
+  min-height: 1.1em;
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(2.25rem, 1.6rem + 2.2vw, 3.5rem);
+  font-weight: 600;
+  font-variant-numeric: lining-nums tabular-nums;
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+  overflow-wrap: anywhere;
+}
+
+.landing-metric__label {
+  color: rgb(var(--portal-ink-rgb) / 0.78);
+  font-size: var(--text-ui);
+  letter-spacing: 0.01em;
+}
+
+/* Waiting: a quiet bar where the number will be, the row already its final height. */
+.landing-metric__wait {
   display: block;
-  width: 100%;
-  height: auto;
+  width: 2.5ch;
+  height: 0.62em;
+  border-radius: var(--radius-xs);
+  background: rgb(var(--portal-ink-rgb) / 0.08);
+}
+
+/* Two by two below a tablet: the rules become a cross, and the first column loses its inset. */
+@media (max-width: 48rem) {
+  .landing-metrics__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .landing-metric:nth-child(3) {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .landing-metric:nth-child(n + 3) {
+    border-top: 1px solid var(--portal-line);
+  }
 }
 
 /* -- Section type: one heading voice, one lede voice, for every section below. -- */
@@ -13628,7 +13682,7 @@ a.idearef__name {
   .landing-hero {
     align-items: flex-start;
     min-height: 0;
-    padding: var(--space-8) 0 7rem;
+    padding: var(--space-8) 0 4.5rem;
   }
 
   .landing-hero__image {
@@ -13649,8 +13703,8 @@ a.idearef__name {
     flex: 1 1 12rem;
   }
 
-  .landing-shot {
-    margin-top: -4.5rem;
+  .landing-metrics {
+    margin-top: -2rem;
   }
 
   .landing-explore__head {
@@ -13659,20 +13713,5 @@ a.idearef__name {
 
   .landing-more {
     margin-top: var(--space-3);
-  }
-}
-
-/* One moment of motion: the product rising into place over the hero's foot. The words never move, so nothing is
-   read late; the picture starts already visible, so nothing waits on it. */
-@media (prefers-reduced-motion: no-preference) {
-  .landing-shot {
-    animation: landing-rise 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-}
-
-@keyframes landing-rise {
-  from {
-    opacity: 0.55;
-    transform: translateY(28px);
   }
 }

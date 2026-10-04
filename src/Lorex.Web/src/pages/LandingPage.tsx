@@ -3,14 +3,14 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, Archive, Lock, Users } from 'lucide-react'
 import { useAuth } from '../auth/useAuth'
 import { WorldCard } from '../components/WorldCard'
-import { useTheme } from '../lib/theme'
 import { useWholeTitle } from '../lib/useDocumentTitle'
-import { listPublicUniverses, type PublicUniverse } from '../portal/api'
+import {
+  getPublicStats,
+  listPublicUniverses,
+  type PublicStats,
+  type PublicUniverse,
+} from '../portal/api'
 import heroImage from '../assets/atmosphere-citadel.webp'
-import shotDark1440 from '../assets/landing-product-dark-1440.webp'
-import shotDark2880 from '../assets/landing-product-dark-2880.webp'
-import shotLight1440 from '../assets/landing-product-light-1440.webp'
-import shotLight2880 from '../assets/landing-product-light-2880.webp'
 
 /** How many published worlds the home page shows. The rest are Explore's. */
 const PREVIEW_SIZE = 4
@@ -18,10 +18,17 @@ const PREVIEW_SIZE = 4
 /** The same words the server writes into this page's head (`PageMetadataResolver`, ADR 0038). */
 const HOME_TITLE = 'Lorex — Build connected fictional universes'
 
-const SHOTS = {
-  dark: `${shotDark1440} 1440w, ${shotDark2880} 2880w`,
-  light: `${shotLight1440} 1440w, ${shotLight2880} 2880w`,
-}
+/** The four numbers, in the order they are read, under the words Lorex uses for them. */
+const METRICS: { key: keyof PublicStats; label: string }[] = [
+  { key: 'creators', label: 'Creators' },
+  { key: 'universes', label: 'Universes' },
+  { key: 'publishedWorlds', label: 'Published worlds' },
+  { key: 'privateWorlds', label: 'Private worlds' },
+]
+
+const count = new Intl.NumberFormat('en')
+
+type Stats = { kind: 'ready'; value: PublicStats } | { kind: 'error' } | null
 
 type Worlds = { kind: 'ready'; items: PublicUniverse[] } | { kind: 'error' } | null
 
@@ -30,19 +37,25 @@ type Worlds = { kind: 'ready'; items: PublicUniverse[] } | { kind: 'error' } | n
  * then out, to Explore or into the workspace. A page of the portal, inside `PublicLayout`, so the bar, the session and
  * the theme are the portal's own; only its search stays on Explore, where it means something.
  *
- * Everything on it is real. The picture is a photograph of Lorex itself, taken from a demo world built through the API
- * (`tests/Lorex.E2E/tools/landing-shot.mjs`), in the theme the visitor is using. The worlds are the first page of the
- * public listing, as Explore would show them; with none published, the section says so rather than inventing any.
- * Nothing here claims a feature Lorex does not have today.
+ * Everything on it is real. Under the hero, Lorex in four live numbers (`/api/public/stats`): shown as they are, zeros
+ * included, never counted up and never guessed while they load; if they cannot be read the row simply is not there.
+ * The worlds are the first page of the public listing, as Explore would show them; with none published, the section
+ * says so rather than inventing any. Nothing here claims a feature Lorex does not have today, and no private workspace
+ * is pictured.
  */
 export default function LandingPage() {
   useWholeTitle(HOME_TITLE)
   const { user, isLoading } = useAuth()
-  const [theme] = useTheme()
+  const [stats, setStats] = useState<Stats>(null)
   const [worlds, setWorlds] = useState<Worlds>(null)
 
   useEffect(() => {
     const controller = new AbortController()
+    getPublicStats(controller.signal)
+      .then((value) => setStats({ kind: 'ready', value }))
+      .catch(() => {
+        if (!controller.signal.aborted) setStats({ kind: 'error' })
+      })
     listPublicUniverses({}, 1, controller.signal, PREVIEW_SIZE)
       .then((page) => setWorlds({ kind: 'ready', items: page.items }))
       .catch(() => {
@@ -104,18 +117,30 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <figure className="landing-shot" data-testid="landing-shot">
-        <img
-          className="landing-shot__image"
-          srcSet={SHOTS[theme]}
-          sizes="(min-width: 80rem) 72rem, calc(100vw - 2rem)"
-          src={theme === 'dark' ? shotDark1440 : shotLight1440}
-          alt="LoreX showing the Lore of a universe called Hollowmere: six characters as cards, each with a summary and whether it is canon or a draft, beside tabs for locations, organizations, events, items, species and concepts. The sidebar lists the universe's other sections: Family Tree, Timeline, Chronology, World Rules, Stories, Ideas, Canon and Types."
-          width={1440}
-          height={800}
-          decoding="async"
-        />
-      </figure>
+      {stats?.kind === 'error' ? null : (
+        <section
+          className="landing-metrics"
+          aria-label="LoreX in numbers"
+          data-testid="landing-metrics"
+        >
+          {/* While loading, the labels hold the row's place and the numbers are quiet bars - never a 0 that is not
+              true. */}
+          <dl className="landing-metrics__list" aria-busy={stats === null}>
+            {METRICS.map(({ key, label }) => (
+              <div className="landing-metric" key={key}>
+                <dt className="landing-metric__label">{label}</dt>
+                <dd className="landing-metric__value" data-testid={`landing-metric-${key}`}>
+                  {stats?.kind === 'ready' ? (
+                    count.format(stats.value[key])
+                  ) : (
+                    <span className="landing-metric__wait" aria-hidden="true" />
+                  )}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      )}
 
       <section className="landing-section landing-build" aria-labelledby="landing-build">
         <div className="landing-split">

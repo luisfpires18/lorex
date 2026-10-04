@@ -57,18 +57,20 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - Brand -> `/` everywhere ("Lorex – Home": portal bar, rail L, My workspace bar, sign-in plate). Explore a named link
     on every width (phone: the bar's second row, beside the search). Unknown public address -> `/`; `/app/*` -> `/app`.
     The installed app still opens `/explore` (manifest untouched).
-  - Home (`pages/LandingPage.tsx`): hero on the owner's citadel painting, veiled; one real product picture (Lore of the
-    original demo world Hollowmere, `tests/Lorex.E2E/tools/landing-shot.mjs`, WebP per theme, 53 KB / 128 KB at 2x);
-    Build, Connect, Write; up to four real public worlds (`pageSize=4`, two on a phone, empty and failed states); trust;
-    session-aware last call; home-only footer. No search on `/`. Home's Log in, Create account and Start building carry
-    no return path, so they land in `/app`. No pricing, trial, metrics or AI copy.
+  - Home (`pages/LandingPage.tsx`): hero on the owner's citadel painting, veiled; Lorex in four live numbers
+    (correction `fix: replace landing screenshot with live metrics`: the workspace screenshot, its four WebPs and its
+    capture script removed); Build, Connect, Write; up to four real public worlds (`pageSize=4`, two on a phone, empty
+    and failed states); trust; session-aware last call; home-only footer. No search on `/`. Home's Log in, Create account
+    and Start building carry no return path, so they land in `/app`. No pricing, trial or AI copy; no invented number.
   - Server head for `/`: "Lorex — Build connected fictional universes", canonical `/`, indexable (a query ->
     `noindex,follow`); `/` first in the sitemap.
-  - CSS 178.1 -> 188.3 KB (gzip 31.9 -> 33.4); main JS +0.8 KB; landing chunk 11.0 KB; no new dependency.
-  - Tests: API 1300/1300 (`SeoTests`: home head, sitemap). Playwright 380 -> 398 (`landing.spec.ts` 18); explore,
-    global-navigation, mobile, public-reading and workspace-settings moved to brand -> `/`. Focused 18/18, neighbours
-    129/129, Linux/DejaVu 54/54. Full run, fresh database, two workers, retries 0: **397/398**, 18.3 min -
-    `shell.spec.ts` phone sheet met a wholly blank `/register` (the known dev-server signature), green 3/3 alone.
+  - `GET /api/public/stats` (anonymous, `no-cache`): `{ creators, universes, publishedWorlds, privateWorlds }` - accounts,
+    universe rows (archived included), `PublicationRules.Public`, the difference; three COUNTs, nothing else exposed.
+  - CSS 178.1 -> 189.0 KB (gzip 31.9 -> 33.5); main JS +0.8 KB; landing chunk 11.0 KB; no new dependency.
+  - Tests: API 1304/1304 (`SeoTests`: home head, sitemap; `PublicStatsTests` 4). Playwright 380 -> 401 (`landing.spec.ts`
+    21); explore, global-navigation, mobile, public-reading and workspace-settings moved to brand -> `/`. After the
+    correction: focused 21/21, neighbours 105/105, Linux/DejaVu 57/57; full run, fresh database, two workers, retries 0:
+    **401/401**, 18.7 min. (First cut: 397/398, one known dev-server blank `/register`, green 3/3 alone.)
 - **UI polish pass, pre-031 - image-reference visual system** (`feat/ui-polish-image-reference` off `dev` at `bf83e05`,
   merged into `dev` at `a3f7922`). Presentation only: no route, API, schema, migration or backup change (backup **19**).
   Contract section 22. Owner kept the current palette; references used for atmosphere, hierarchy and composition only.
