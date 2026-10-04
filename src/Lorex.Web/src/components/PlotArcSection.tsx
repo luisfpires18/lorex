@@ -22,7 +22,7 @@ interface PlotArcSectionProps {
 }
 
 /**
- * One arc in a story's plot: a heading - "Arc 2 — Fall of the King", the number from its position and the name as
+ * One arc in a story's plot: a heading - "Arc 2: Fall of the King", the number from its position and the name as
  * written - its description, and its beats beneath it. Notes stay in the form.
  *
  * A heading and a rule rather than a box, so an arc groups its beats without a card around rows. Its one direct action
@@ -56,7 +56,7 @@ export function PlotArcSection({
         <div className="chapter__heading">
           <h3 className="plotarc__title" id={headingId} data-testid="plot-arc-heading">
             <span className="plotarc__number">{arcNumber(index)}</span>
-            <span className="plotarc__dash"> — </span>
+            <span className="plotarc__dash">: </span>
             <span className="plotarc__name">
               <bdi>{arc.title}</bdi>
             </span>

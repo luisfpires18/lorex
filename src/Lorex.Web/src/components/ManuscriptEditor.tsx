@@ -41,7 +41,7 @@ interface ManuscriptEditorProps {
   storyId: string
   scene: Scene
   chronology: Chronology
-  /** Where the scene is told: its container ("Chapter 2 — Arrival", none in a story without chapters) and "Scene 1 of 3". */
+  /** Where the scene is told: its container ("Chapter 2: Arrival", none in a story without chapters) and "Scene 1 of 3". */
   where: { container: ReactNode; position: string }
   /** The plot beats that point at this scene. Shown only: the plot owns those links. */
   beats: SceneBeatReference[]
@@ -191,12 +191,12 @@ export function ManuscriptEditor({
         setConflict({ updatedAt: storedMomentOf(error.problem) })
       } else if (error instanceof ApiError && error.status === 404) {
         setFailure(
-          'This scene is no longer in the story — it may have been moved to the Trash in another window — so its manuscript could not be saved. Your text is still here: copy it before you leave.',
+          'This scene is no longer in the story, so its manuscript could not be saved. It may have been moved to the Trash in another window. Your text is still here: copy it before you leave.',
         )
       } else if (error instanceof ApiError && error.status === 400) {
         setFailure(error.message)
       } else {
-        setFailure('The manuscript could not be saved. Your text is still here — try again.')
+        setFailure('The manuscript could not be saved. Your text is still here. Try again.')
       }
     } finally {
       inFlight.current = false
@@ -462,8 +462,8 @@ export function ManuscriptEditor({
           {conflict ? (
             <div className="manuscript__conflict" role="alert" data-testid="manuscript-conflict">
               <p className="manuscript__conflicttext">
-                This manuscript was saved somewhere else — another tab or device — after you opened
-                it here. Nothing was overwritten, and your text below is not saved.
+                This manuscript was saved in another tab or on another device after you opened it
+                here. Nothing was overwritten, and your text below is not saved.
               </p>
               <div className="manuscript__conflictactions">
                 <button

@@ -11,7 +11,7 @@ import {
 /** One recorded way of being a relative: the links it walks, what it reads as, and how settled it is. */
 export interface FamilyPathReading {
   linkIds: string[]
-  /** "Biological parent", "Shares Mara — biological for both", "Mara's adoptive parent". */
+  /** "Biological parent", "Shares Mara (biological for both)", "Mara's adoptive parent". */
   text: string
   /** The least settled link on the path, so a Draft connection is never read as Canon. */
   canonStatus: CanonStatusValue
@@ -129,8 +129,8 @@ function reading(
     if (position === 'siblings') {
       const shared = name(first?.parentEntityId ?? focalId)
       return word(first) === word(second)
-        ? `Shares ${shared} — ${word(first)} for both`
-        : `Shares ${shared} — ${word(first)} for ${name(focalId)}, ${word(second)} for ${name(relativeId)}`
+        ? `Shares ${shared} (${word(first)} for both)`
+        : `Shares ${shared} (${word(first)} for ${name(focalId)}, ${word(second)} for ${name(relativeId)})`
     }
 
     // The middle entry is on the tree too, so naming it says which line this one comes down: the parent the

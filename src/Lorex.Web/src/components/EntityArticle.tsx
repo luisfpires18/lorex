@@ -211,12 +211,12 @@ export function EntityArticleSection({
         setConflict({ updatedAt: storedMomentOf(error.problem) })
       } else if (error instanceof ApiError && error.status === 404) {
         setFailure(
-          'This entry is no longer here — it may have been moved to the Trash in another window — so the article could not be saved. Your text is still here: copy it before you leave.',
+          'This entry is no longer here, so the article could not be saved. It may have been moved to the Trash in another window. Your text is still here: copy it before you leave.',
         )
       } else if (error instanceof ApiError && error.status === 400) {
         setFailure(error.fieldErrors.content ?? error.message)
       } else {
-        setFailure('The article could not be saved. Your text is still here — try again.')
+        setFailure('The article could not be saved. Your text is still here. Try again.')
       }
     } finally {
       inFlight.current = false
@@ -472,8 +472,8 @@ export function EntityArticleSection({
           {conflict ? (
             <div className="article__conflict" role="alert" data-testid="article-conflict">
               <p className="article__conflicttext">
-                This article was saved somewhere else — another tab or device — after you opened it
-                here. Nothing was overwritten, and your text below is not saved.
+                This article was saved in another tab or on another device after you opened it here.
+                Nothing was overwritten, and your text below is not saved.
               </p>
               <div className="article__conflictactions">
                 <button

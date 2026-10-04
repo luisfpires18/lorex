@@ -8069,7 +8069,7 @@ a.lorechip--pov:focus-visible .lorechip__name {
   }
 }
 
-/* "Move to Chapter 2 — …": the chapter's title may be long, and wraps inside the menu item - in a panel wide enough
+/* "Move to Chapter 2: …": the chapter's title may be long, and wraps inside the menu item - in a panel wide enough
    that a long title takes two lines, not six. */
 .actionmenu__text {
   min-width: 0;

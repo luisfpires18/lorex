@@ -162,7 +162,7 @@ function chapter(page: Page, title: string) {
   return page.locator(`[data-testid="chapter"][data-title="${title}"]`)
 }
 
-/** The outline as the page draws it, one line per group: "Chapter 1 — Arrival | The Gates | The Council". */
+/** The outline as the page draws it, one line per group: "Chapter 1: Arrival | The Gates | The Council". */
 function outline(page: Page) {
   return page
     .getByTestId('manuscript-outline-list')
@@ -241,8 +241,8 @@ test.describe('manuscript', () => {
       .poll(() => outline(page))
       .toEqual([
         'Unchaptered | Prologue',
-        'Chapter 1 — Arrival | The Gates | The Council',
-        'Chapter 2 — Ashes | The Breach',
+        'Chapter 1: Arrival | The Gates | The Council',
+        'Chapter 2: Ashes | The Breach',
       ])
     await expect(outlineScene(page, 'Prologue')).toHaveAttribute('aria-current', 'page')
     await expect(page.getByTestId('manuscript-scene-title')).toHaveText('Prologue')
@@ -255,7 +255,7 @@ test.describe('manuscript', () => {
     await page.waitForURL(new RegExp(`/manuscript/${council}$`))
     await expect(outlineScene(page, 'The Council')).toHaveAttribute('aria-current', 'page')
     await expect(page.getByTestId('manuscript-scene-title')).toHaveText('The Council')
-    await expect(where).toHaveText('Chapter 1 — Arrival · Scene 2 of 2')
+    await expect(where).toHaveText('Chapter 1: Arrival · Scene 2 of 2')
 
     const councilProse =
       'The hall had emptied long before Arlen understood\nwhy Mira would not meet his eyes…\n\n\n“You knew,” he said.   \n\t‘Say it.’\n'
@@ -292,19 +292,19 @@ test.describe('manuscript', () => {
     await structural(page, `/scenes/${council}/position`, async () => {
       await openMenuFor(scene(page, 'The Council'), 'scene-move-to-option')
       await scene(page, 'The Council')
-        .locator('[data-testid="scene-move-to-option"][data-target="Chapter 2 — Ashes"]')
+        .locator('[data-testid="scene-move-to-option"][data-target="Chapter 2: Ashes"]')
         .click()
     })
 
     await page.goto(`${storyUrl}/manuscript/${council}`)
-    await expect(where).toHaveText('Chapter 2 — Ashes · Scene 2 of 2')
+    await expect(where).toHaveText('Chapter 2: Ashes · Scene 2 of 2')
     await expect(editor).toHaveValue(councilProse)
     await expect
       .poll(() => outline(page))
       .toEqual([
         'Unchaptered | Prologue',
-        'Chapter 1 — Arrival | The Gates',
-        'Chapter 2 — Ashes | The Breach | The Council',
+        'Chapter 1: Arrival | The Gates',
+        'Chapter 2: Ashes | The Breach | The Council',
       ])
 
     // Reordered inside its chapter: still the same prose.
@@ -313,11 +313,11 @@ test.describe('manuscript', () => {
       chooseFromMenu(scene(page, 'The Council'), 'scene-move-up'),
     )
     await expect(page.getByTestId('story-announcer')).toHaveText(
-      '“The Council” is now scene 1 of 2 in Chapter 2 — Ashes.',
+      '“The Council” is now scene 1 of 2 in Chapter 2: Ashes.',
     )
 
     await page.goto(`${storyUrl}/manuscript/${council}`)
-    await expect(where).toHaveText('Chapter 2 — Ashes · Scene 1 of 2')
+    await expect(where).toHaveText('Chapter 2: Ashes · Scene 1 of 2')
     await expect(editor).toHaveValue(councilProse)
 
     // Arrival is deleted: The Gates goes to Unchaptered with every word it had.
@@ -333,7 +333,7 @@ test.describe('manuscript', () => {
       .poll(() => outline(page))
       .toEqual([
         'Unchaptered | Prologue | The Gates',
-        'Chapter 1 — Ashes | The Council | The Breach',
+        'Chapter 1: Ashes | The Council | The Breach',
       ])
 
     // The Gates is deleted, and its prose with it. Its old address opens nothing.

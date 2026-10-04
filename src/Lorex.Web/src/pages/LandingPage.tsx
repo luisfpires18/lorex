@@ -16,7 +16,7 @@ import heroImage from '../assets/atmosphere-citadel.webp'
 const PREVIEW_SIZE = 4
 
 /** The same words the server writes into this page's head (`PageMetadataResolver`, ADR 0038). */
-const HOME_TITLE = 'Lorex — Build connected fictional universes'
+const HOME_TITLE = 'Lorex | Build connected fictional universes'
 
 /** The four numbers, in the order they are read, under the words Lorex uses for them. */
 const METRICS: { key: keyof PublicStats; label: string }[] = [
@@ -183,7 +183,7 @@ export default function LandingPage() {
       <section className="landing-connect" aria-labelledby="landing-connect">
         <div className="landing-connect__inner">
           <h2 className="landing-heading landing-heading--statement" id="landing-connect">
-            A world, not a folder of notes.
+            Everything in it is connected.
           </h2>
           <p className="landing-lede">
             Write something down once, and LoreX puts it to work wherever it applies.

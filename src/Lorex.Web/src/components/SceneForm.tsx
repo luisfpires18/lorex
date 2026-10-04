@@ -340,7 +340,7 @@ export function SceneForm({
           <fieldset className="scenechron">
             <legend className="field__label">When in the world</legend>
             <p className="field__hint">
-              Optional. Where this scene happens, not where it is told — it never moves the scene.
+              Optional. Where this scene happens, not where it is told. It never moves the scene.
             </p>
 
             <ChronologyPointFields

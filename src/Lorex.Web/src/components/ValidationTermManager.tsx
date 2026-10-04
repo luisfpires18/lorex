@@ -149,7 +149,7 @@ export function ValidationTermManager({ universeId }: { universeId: string }) {
 
       <p className="settings__note">
         What World Rule checks and moments point at. Two moments share a method only when they name
-        the same one here — never because their words match — so renaming one changes no match.
+        the same one here, never because their words match. Renaming one changes no match.
       </p>
 
       {message ? (

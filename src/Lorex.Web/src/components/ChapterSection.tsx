@@ -21,7 +21,7 @@ interface ChapterSectionProps {
 }
 
 /**
- * One chapter on its story's page: a modest heading - "Chapter 2 — Ashes", the number from its position
+ * One chapter on its story's page: a modest heading - "Chapter 2: Ashes", the number from its position
  * and the name as written - its summary, and its scenes beneath it. Notes stay in the form.
  *
  * A heading and a rule rather than a box, so a chapter groups its scenes without putting a card around
@@ -55,7 +55,7 @@ export function ChapterSection({
         <div className="chapter__heading">
           <h3 className="chapter__title" id={headingId} data-testid="chapter-heading">
             <span className="chapter__number">{chapterNumber(index)}</span>
-            <span className="chapter__dash"> — </span>
+            <span className="chapter__dash">: </span>
             <span className="chapter__name">
               <bdi>{chapter.title}</bdi>
             </span>

@@ -242,7 +242,7 @@ export function PlotPanel({
               {story.scenes.length === 0 ? (
                 <>
                   {' '}
-                  Most stories start with a scene —{' '}
+                  Most stories start with a scene:{' '}
                   <Link
                     to={`/app/universes/${universeId}/stories/${story.id}`}
                     data-testid="plot-empty-scenes"
