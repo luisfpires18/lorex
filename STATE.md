@@ -50,6 +50,22 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **UI polish pass, pre-031 - image-reference visual system** (`feat/ui-polish-image-reference` off `dev` at `bf83e05`;
+  committed, not merged, not pushed). Presentation only: no route, API, schema, migration or backup change (backup **19**).
+  Contract section 22. Owner kept the current palette; references used for atmosphere, hierarchy and composition only.
+  - Atmosphere layer behind the head of every universe screen and My workspace: the world's artwork card for its owner
+    (artwork is a Publish read, ADR 0041 - collaborators never ask), else Lorex's own `assets/atmosphere-citadel.webp`;
+    sign-in/invitation plate carries `assets/atmosphere-ridge.webp`. Owner's landing images as WebP q60 (163/196 KB).
+  - Editorial type: page/document titles on `clamp()`, `.titlerule` under an entry's and Overview's title,
+    `.sectionrule` group headings; article prose in the display face. Cards (world, entry, doorway) share one DNA; world
+    cards show the owner's artwork or the world's colour; Overview doorways get medallions, Lore leads World at double
+    width. Entry form parts, invite form, Types and collaborator lists on single quiet panels; type editor grouped
+    Identity / Hierarchy / Behaviour; tabs and current links take the accent rule.
+  - CSS 164.7 -> 177.4 KB minified (gzip 29.2 -> 31.7 KB); no new dependency; `src/universes/artwork.ts` new.
+  - Tests: no new spec; Playwright stays 380, API untouched (no backend change, suite not rerun). Focused 190 + neighbours
+    32 green (one real catch fixed: the current sidebar section kept its tinted ground). Linux/DejaVu batch 97/97. Full run,
+    fresh database, two workers, retries 0: **378/380**, 18.2 min - `type-reorder.spec.ts` met a blank `/register` and
+    `universe-search.spec.ts` "The search could not be reached" (the known dev-server signatures), each green 3/3 alone.
 - **Product refinement 030 - invitations and collaborator management** (`feat/collaborator-invitations` off `dev` at
   `98e47f6`: `402bfa2`, then the review correction; committed, not merged, not pushed). ADR 0041 amended; 0014, 0030 notes.
   Migration `AddUniverseInvitations` (regenerated with `TargetUserId`, one migration); backup stays **19**.

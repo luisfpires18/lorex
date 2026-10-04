@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { ArchiveRestore, Plus, Search } from 'lucide-react'
+import { ActionIcon } from '../components/ActionIcon'
 import { ReceivedInvitations } from '../components/ReceivedInvitations'
 import { RestoreBackup } from '../components/RestoreBackup'
 import { UniverseCard } from '../components/UniverseCard'
@@ -68,7 +70,10 @@ export default function UniversesPage() {
   return (
     <>
       <div className="home__heading">
-        <h1 className="home__title">Universes</h1>
+        <div>
+          <h1 className="home__title">Universes</h1>
+          <p className="home__lede">Your worlds, and any shared with you.</p>
+        </div>
         <div className="home__actions">
           <button
             className="button"
@@ -79,6 +84,7 @@ export default function UniversesPage() {
             }}
             data-testid="new-universe"
           >
+            <ActionIcon icon={Plus} />
             New universe
           </button>
           <button
@@ -88,6 +94,7 @@ export default function UniversesPage() {
             onClick={() => setRestoring(true)}
             data-testid="restore-backup"
           >
+            <ActionIcon icon={ArchiveRestore} />
             Restore backup
           </button>
         </div>
@@ -122,14 +129,17 @@ export default function UniversesPage() {
           <label className="field__label" htmlFor="universe-search">
             Filter universes
           </label>
-          <input
-            id="universe-search"
-            className="field__input"
-            type="search"
-            placeholder="Name of a world"
-            value={search}
-            onChange={(event) => changeSearch(event.target.value)}
-          />
+          <span className="controls__searchfield">
+            <Search className="controls__searchicon" aria-hidden="true" focusable="false" />
+            <input
+              id="universe-search"
+              className="field__input"
+              type="search"
+              placeholder="Name of a world"
+              value={search}
+              onChange={(event) => changeSearch(event.target.value)}
+            />
+          </span>
         </div>
 
         <div className="segmented" role="group" aria-label="Archive filter">

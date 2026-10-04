@@ -1156,65 +1156,81 @@ function TypeDialog({
             </p>
           ) : null}
 
-          <Field
-            label="Name"
-            name="type-name"
-            placeholder={type ? undefined : 'Starship, Language, Ritual…'}
-            dir="auto"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            error={fieldErrors.name}
-            data-testid="type-name"
-          />
+          {/* The form in three parts, as an author thinks of a type: what it is, where it sits, what it does. */}
+          <section className="drawer__group" aria-labelledby="type-identity">
+            <h3 className="sectionrule sectionrule--accent" id="type-identity">
+              Identity
+            </h3>
+            <Field
+              label="Name"
+              name="type-name"
+              placeholder={type ? undefined : 'Starship, Language, Ritual…'}
+              dir="auto"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              error={fieldErrors.name}
+              data-testid="type-name"
+            />
 
-          <div className="field">
-            <TypeIconPicker value={icon} onChange={setIcon} testId="type-icon" />
-            <p className="field__hint">
-              Optional, and only a picture: it marks the type on the Lore filter. Nothing is chosen
-              for you from the name.
-            </p>
-            {fieldErrors.icon ? <p className="field__error">{fieldErrors.icon}</p> : null}
-          </div>
+            <div className="field">
+              <TypeIconPicker value={icon} onChange={setIcon} testId="type-icon" />
+              <p className="field__hint">
+                Optional, and only a picture: it marks the type on the Lore filter. Nothing is
+                chosen for you from the name.
+              </p>
+              {fieldErrors.icon ? <p className="field__error">{fieldErrors.icon}</p> : null}
+            </div>
+          </section>
 
-          <div className="field">
-            <label className="field__label" htmlFor="type-parent">
-              Parent type
-            </label>
-            <select
-              id="type-parent"
-              className="field__input field__input--select"
-              value={parentId ?? ''}
-              onChange={(event) => setParentId(event.target.value || null)}
-              aria-describedby="type-parent-hint"
-              data-testid="type-parent"
-            >
-              <option value="">None – a top-level type</option>
-              {parents.map((node) => (
-                <option key={node.type.id} value={node.type.id}>
-                  {typePathLabel(node)}
-                </option>
-              ))}
-            </select>
-            <p className="field__hint" id="type-parent-hint">
-              Organises Lore: choosing a type there shows the entries of the types inside it too.
-              Nothing is inherited - each type keeps its own fields.
-            </p>
-            {fieldErrors.parent ? <p className="field__error">{fieldErrors.parent}</p> : null}
-          </div>
+          <section className="drawer__group" aria-labelledby="type-hierarchy">
+            <h3 className="sectionrule sectionrule--accent" id="type-hierarchy">
+              Hierarchy
+            </h3>
+            <div className="field">
+              <label className="field__label" htmlFor="type-parent">
+                Parent type
+              </label>
+              <select
+                id="type-parent"
+                className="field__input field__input--select"
+                value={parentId ?? ''}
+                onChange={(event) => setParentId(event.target.value || null)}
+                aria-describedby="type-parent-hint"
+                data-testid="type-parent"
+              >
+                <option value="">None – a top-level type</option>
+                {parents.map((node) => (
+                  <option key={node.type.id} value={node.type.id}>
+                    {typePathLabel(node)}
+                  </option>
+                ))}
+              </select>
+              <p className="field__hint" id="type-parent-hint">
+                Organises Lore: choosing a type there shows the entries of the types inside it too.
+                Nothing is inherited - each type keeps its own fields.
+              </p>
+              {fieldErrors.parent ? <p className="field__error">{fieldErrors.parent}</p> : null}
+            </div>
+          </section>
 
           {type ? null : (
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={familyTreeEligible}
-                onChange={(event) => setFamilyTreeEligible(event.target.checked)}
-                data-testid="type-family"
-              />
-              <span>
-                <span className="types__familylabel">Family Tree</span>
-                Entries of this type can appear in Family Tree
-              </span>
-            </label>
+            <section className="drawer__group" aria-labelledby="type-behaviour">
+              <h3 className="sectionrule sectionrule--accent" id="type-behaviour">
+                Behaviour
+              </h3>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={familyTreeEligible}
+                  onChange={(event) => setFamilyTreeEligible(event.target.checked)}
+                  data-testid="type-family"
+                />
+                <span>
+                  <span className="types__familylabel">Family Tree</span>
+                  Entries of this type can appear in Family Tree
+                </span>
+              </label>
+            </section>
           )}
         </div>
 

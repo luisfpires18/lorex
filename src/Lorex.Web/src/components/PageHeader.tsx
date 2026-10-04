@@ -12,6 +12,7 @@ export function PageHeader({
   title,
   titleId,
   titleTestId,
+  titleClassName,
   crumb,
   lede,
   actions,
@@ -21,6 +22,8 @@ export function PageHeader({
   /** For a section that names itself by its heading (`aria-labelledby`). */
   titleId?: string
   titleTestId?: string
+  /** An extra class on the h1 - `titlerule`, on a document's front page. */
+  titleClassName?: string
   crumb?: ReactNode
   /** One or two lines of what this screen is. Prose the author wrote belongs elsewhere. */
   lede?: ReactNode
@@ -33,7 +36,11 @@ export function PageHeader({
       {crumb ? <div className="pageheader__crumb">{crumb}</div> : null}
       <div className="pageheader__main">
         <div className="pageheader__text">
-          <h1 className="pageheader__title" id={titleId} data-testid={titleTestId}>
+          <h1
+            className={titleClassName ? `pageheader__title ${titleClassName}` : 'pageheader__title'}
+            id={titleId}
+            data-testid={titleTestId}
+          >
             {title}
           </h1>
           {lede ? <div className="pageheader__lede">{lede}</div> : null}

@@ -621,7 +621,7 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
             onChange={(event) => setDraft({ ...draft, name: event.target.value })}
           />
         ) : (
-          <h1 className="entry__name" data-testid="entry-name">
+          <h1 className="entry__name titlerule" data-testid="entry-name">
             <bdi>{detail?.name}</bdi>
           </h1>
         )}
@@ -769,7 +769,9 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
           </section>
 
           <section className="entryform__section">
-            <h2 className="entryform__heading">Other names and tags</h2>
+            <h2 className="entryform__heading sectionrule sectionrule--accent">
+              Other names and tags
+            </h2>
             <TokenInput
               label="Aliases"
               name="aliases"
@@ -788,7 +790,7 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
 
           {(selectedType?.fields.length ?? 0) > 0 ? (
             <section className="entryform__section">
-              <h2 className="entryform__heading">
+              <h2 className="entryform__heading sectionrule sectionrule--accent">
                 What a <bdi>{selectedType?.name}</bdi> records
               </h2>
               <div className="entryform__fields">

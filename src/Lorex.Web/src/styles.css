@@ -4,7 +4,9 @@
   A bound reference volume that is also a workbench. A graphite plate carries the wordmark, warm
   paper carries the work, and what can be opened rises off the page - lighter as it rises, in both
   schemes. One accent, an ink blue, for links, focus and "you are here"; the primary action is ink.
-  The design contract is docs/design/LOREX_VISUAL_REFACTOR.md; its section 9.3 is this token sheet.
+  The world's artwork - or Lorex's own, when a world has none to show - sits in the upper page as
+  atmosphere and fades into the working surface. The design contract is
+  docs/design/LOREX_VISUAL_REFACTOR.md; its section 9.3 is this token sheet, section 22 the polish pass.
 
   Tokens first, then the shared patterns every screen draws from (buttons, fields, menus, views,
   rows, callouts, bars), then each screen. A screen's own rule may still carry a raw size or gap
@@ -35,6 +37,8 @@
   --rule: #e2dacb;
   --rule-strong: #b3a996;
   --border-control: #8c8170;
+  /* The one ornamental line: a title's rule, a section heading's tail. Decorative only. */
+  --accent-rule: color-mix(in srgb, var(--accent) 40%, transparent);
 
   /* Action and state. Ink fill means act; accent wash means here. */
   --primary-bg: var(--ink);
@@ -43,6 +47,10 @@
   --hover-wash: color-mix(in srgb, var(--ink) 6%, transparent);
   --press-wash: color-mix(in srgb, var(--ink) 10%, transparent);
   --focus-ring: var(--accent);
+
+  /* Atmosphere: how strongly a page's artwork shows through its veil, and what it fades into. */
+  --atmosphere-opacity: 0.32;
+  --atmosphere-veil: var(--surface);
 
   /* Depth and shape */
   --shadow-1: 0 1px 2px rgb(58 44 22 / 0.08);
@@ -53,7 +61,7 @@
   --radius-md: 10px;
   --radius-full: 999px;
 
-  /* Type */
+  /* Type. The two large steps scale with the window between a phone's size and a laptop's. */
   --display: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
   --ui:
     Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', system-ui,
@@ -64,8 +72,9 @@
   --text-body: 1rem;
   --text-item: 1.125rem;
   --text-section: 1.375rem;
-  --text-page: 2.125rem;
-  --text-document: 2.75rem;
+  --text-page: clamp(1.875rem, 1.45rem + 1.25vw, 2.625rem);
+  --text-document: clamp(2.25rem, 1.6rem + 2vw, 3.25rem);
+  --title-tracking: -0.012em;
 
   /* Space and size */
   --space-1: 0.25rem;
@@ -117,6 +126,7 @@
   --rule: #34383c;
   --rule-strong: #4a4e52;
   --border-control: #72767b;
+  --accent-rule: color-mix(in srgb, var(--accent) 45%, transparent);
 
   /* Calmer than the ink itself, so the primary is not the brightest object on every screen. */
   --primary-bg: #d6d0c5;
@@ -124,6 +134,7 @@
   --accent-wash: color-mix(in srgb, var(--accent) 16%, var(--raised));
   --hover-wash: color-mix(in srgb, var(--ink) 8%, transparent);
   --press-wash: color-mix(in srgb, var(--ink) 13%, transparent);
+  --atmosphere-opacity: 0.44;
   --shadow-1: 0 1px 2px rgb(0 0 0 / 0.45);
   --shadow-2: 0 8px 20px -8px rgb(0 0 0 / 0.65);
   --shadow-3: 0 22px 50px -14px rgb(0 0 0 / 0.75);
@@ -144,8 +155,6 @@
 @media (max-width: 640px) {
   :root {
     --gutter: 1.25rem;
-    --text-page: 1.75rem;
-    --text-document: 2.125rem;
   }
 }
 
@@ -307,11 +316,41 @@ textarea,
 }
 
 .auth__plate {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   background: var(--plate);
   color: var(--plate-ink);
   padding: clamp(2rem, 5vw, 4.5rem);
   display: flex;
   align-items: flex-end;
+}
+
+/* Lorex's own art behind the plate, veiled to the plate's night from the foot up so the mark and its line read on it.
+   The plate is graphite in both schemes, so the veil is too. Decorative; one image, cached. */
+.auth__plate::before,
+.auth__plate::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.auth__plate::before {
+  background: url('./assets/atmosphere-ridge.webp') 30% 40% / cover no-repeat;
+  opacity: 0.55;
+}
+
+.auth__plate::after {
+  background:
+    linear-gradient(
+      to top,
+      var(--plate) 18%,
+      color-mix(in srgb, var(--plate) 55%, transparent) 60%,
+      color-mix(in srgb, var(--plate) 25%, transparent)
+    ),
+    linear-gradient(to right, color-mix(in srgb, var(--plate) 40%, transparent), transparent);
 }
 
 .auth__mark {
@@ -349,8 +388,9 @@ textarea,
 .auth__heading {
   font-family: var(--display);
   font-weight: 400;
-  font-size: clamp(1.9rem, 3vw, 2.4rem);
-  line-height: 1.15;
+  font-size: var(--text-page);
+  line-height: 1.1;
+  letter-spacing: var(--title-tracking);
   margin: 0;
 }
 
@@ -702,10 +742,17 @@ a.button--danger:visited {
 /* ---------- Universe home ---------- */
 
 .home {
+  position: relative;
+  isolation: isolate;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
   background: var(--surface);
+}
+
+/* My workspace's atmosphere is Lorex's own, under the bar as well as the heading. */
+.home > .atmosphere {
+  height: clamp(18rem, 34vw, 30rem);
 }
 
 /* My workspace's bar (`WorkspaceLayout`): the brand, the workspace by name and its two places, Explore, the account.
@@ -773,7 +820,7 @@ a.button--danger:visited {
 /* The place you are in: a rule along the bar's foot as well as the ink, so it is never colour alone. */
 .workspacebar__link[aria-current='page'] {
   color: var(--ink);
-  box-shadow: inset 0 -2px 0 var(--ink);
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 
 .workspacebar__link:focus-visible,
@@ -836,17 +883,28 @@ a.button--danger:visited {
 
 .home__heading {
   display: flex;
-  align-items: baseline;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 1.5rem;
+  gap: var(--space-5) var(--space-6);
   flex-wrap: wrap;
+  padding-top: clamp(0rem, 3vw, var(--space-7));
 }
 
 .home__title {
   font-family: var(--display);
   font-weight: 400;
-  font-size: clamp(1.9rem, 3vw, 2.4rem);
+  font-size: var(--text-document);
+  line-height: 1.05;
+  letter-spacing: var(--title-tracking);
   margin: 0;
+}
+
+.home__lede {
+  margin: var(--space-3) 0 0;
+  max-width: 52ch;
+  color: var(--muted);
+  font-size: 1.0625rem;
+  line-height: 1.55;
 }
 
 /* ---------- Profile ---------- */
@@ -1359,6 +1417,17 @@ a.button--danger:visited {
   color: var(--muted);
 }
 
+/* A crumb is a way back up, said quietly: muted until pointed at, underlined then. */
+.pageheader__crumb a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.pageheader__crumb a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
 .pageheader__main {
   display: flex;
   flex-wrap: wrap;
@@ -1377,16 +1446,73 @@ a.button--danger:visited {
   font-family: var(--display);
   font-size: var(--text-page);
   font-weight: 400;
-  line-height: 1.15;
+  line-height: 1.1;
+  letter-spacing: var(--title-tracking);
   overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 
 .pageheader__lede {
   max-width: 62ch;
   margin-top: var(--space-2);
-  font-size: var(--text-ui);
-  line-height: 1.5;
+  font-size: 0.9375rem;
+  line-height: 1.55;
   color: var(--muted);
+}
+
+/* The one ornament: a fine gold rule with a small diamond near its start, under a document's title - an entry, a
+   universe's front page. Drawn as a mask over the accent, so it takes the theme's gold (or bronze) and nothing else;
+   decorative, part of no text. */
+.titlerule::after {
+  content: '';
+  display: block;
+  width: min(13rem, 70%);
+  height: 9px;
+  margin-top: var(--space-3);
+  background: var(--accent);
+  opacity: 0.85;
+  -webkit-mask: var(--titlerule-mask) no-repeat left center / 100% 100%;
+  mask: var(--titlerule-mask) no-repeat left center / 100% 100%;
+}
+
+:root {
+  --titlerule-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='208' height='9' viewBox='0 0 208 9'%3E%3Cdefs%3E%3ClinearGradient id='f' x1='0' x2='1'%3E%3Cstop offset='0' stop-opacity='1'/%3E%3Cstop offset='1' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0 4.5h54' stroke='%23000'/%3E%3Cpath d='M70 4.5h138' stroke='url(%23f)'/%3E%3Cpath d='M62 0.5l4 4-4 4-4-4z'/%3E%3C/svg%3E");
+}
+
+/* A heading that opens a group of things - Overview's World, Writing and Keeping; the parts of an entry's form: the
+   display face in small tracked capitals, and a hairline running on to the end of the row. Kept to group headings so
+   that capitals stay rare. */
+.sectionrule {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-4);
+  font-family: var(--display);
+  font-size: 0.9375rem;
+  font-weight: 400;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ink) 78%, var(--muted));
+}
+
+.sectionrule::after {
+  content: '';
+  flex: 1 1 auto;
+  min-width: 2rem;
+  height: 1px;
+  background: linear-gradient(to right, var(--rule-strong), transparent);
+}
+
+/* In the accent, smaller: the label over something read or filled in place - an entry's article, its form's parts. */
+.sectionrule--accent {
+  font-size: 0.8125rem;
+  letter-spacing: 0.2em;
+  color: var(--accent);
+}
+
+.sectionrule--accent::after {
+  max-width: 6rem;
+  background: linear-gradient(to right, var(--accent-rule), transparent);
 }
 
 .pageheader__lede p {
@@ -1675,7 +1801,27 @@ a.button--danger:visited {
 
 .controls__search {
   flex: 1 1 18rem;
-  max-width: 26rem;
+  max-width: 30rem;
+}
+
+.controls__searchfield {
+  position: relative;
+  display: block;
+}
+
+.controls__searchicon {
+  position: absolute;
+  top: 50%;
+  left: 0.8rem;
+  width: 1.0625rem;
+  height: 1.0625rem;
+  color: var(--muted);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.controls__searchfield .field__input {
+  padding-left: 2.5rem;
 }
 
 /* `.segmented`: a choice among two to four values on this screen, `aria-pressed` on each - not a
@@ -1731,15 +1877,23 @@ a.button--danger:visited {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: var(--space-5);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16.5rem), 1fr));
 }
 
+/* A world's card: its artwork across the head - or its own colour as a dusk - fading into the card, the spine in its
+   colour down the edge, then its name, its opening line and when it last changed. Under the pointer it rises, its
+   edge warms and the picture leans in a little. */
 .plate {
   --plate-accent: var(--rule-strong);
 
-  display: flex;
-  min-height: 9.5rem;
+  position: relative;
+  display: grid;
+  grid-template-columns: 4px minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    'spine art'
+    'spine body';
   height: 100%;
   border: 1px solid var(--rule);
   border-radius: var(--radius-md);
@@ -1750,37 +1904,109 @@ a.button--danger:visited {
   text-decoration: none;
   transition:
     border-color var(--duration-1) var(--ease),
-    box-shadow var(--duration-2) var(--ease);
+    box-shadow var(--duration-2) var(--ease),
+    transform var(--duration-2) var(--ease);
 }
 
 .plate:hover {
-  border-color: var(--rule-strong);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--rule-strong));
   box-shadow: var(--shadow-2);
+  transform: translateY(-2px);
+}
+
+.plate:focus-visible {
+  outline-offset: 3px;
+}
+
+.plate__art {
+  grid-area: art;
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 7;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      120% 160% at 90% 0%,
+      color-mix(in srgb, var(--plate-accent) 45%, transparent),
+      transparent 65%
+    ),
+    radial-gradient(
+      90% 120% at 10% 100%,
+      color-mix(in srgb, var(--accent) 10%, transparent),
+      transparent 70%
+    ),
+    linear-gradient(160deg, color-mix(in srgb, var(--plate-accent) 18%, var(--paper)), var(--paper));
+}
+
+/* The picture's foot dissolves into the card, so the name reads as written under it rather than beside a photo. */
+.plate__art::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    to bottom,
+    transparent 55%,
+    color-mix(in srgb, var(--raised) 85%, transparent)
+  );
+}
+
+/* No artwork: the world's initial, large and faint, in the display face. Drawn here from the attribute, so it is never
+   part of the card's text. */
+.plate__art[data-initial]::after {
+  content: attr(data-initial);
+  position: absolute;
+  right: var(--space-5);
+  bottom: -0.35em;
+  font-family: var(--display);
+  font-size: 5.5rem;
+  line-height: 1;
+  color: var(--ink);
+  opacity: 0.2;
+}
+
+@media (max-width: 640px) {
+  .plate__art {
+    aspect-ratio: 16 / 6;
+  }
+}
+
+.plate__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--duration-3) var(--ease);
+}
+
+.plate:hover .plate__image {
+  transform: scale(1.03);
 }
 
 .plate__spine {
-  width: 6px;
-  flex: 0 0 6px;
+  grid-area: spine;
   background: var(--plate-accent);
 }
 
 .plate__body {
+  grid-area: body;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  padding: 1.15rem 1.25rem;
-  flex: 1;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5) var(--space-5);
   min-width: 0;
 }
 
 .plate__name {
   font-family: var(--display);
-  font-size: 1.2rem;
-  line-height: 1.25;
+  font-size: 1.375rem;
+  line-height: 1.2;
+  letter-spacing: -0.005em;
 }
 
 .plate__description {
-  font-size: 0.9rem;
+  font-size: var(--text-ui);
+  line-height: 1.55;
   color: var(--muted);
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -1795,19 +2021,40 @@ a.button--danger:visited {
 
 .plate__meta {
   margin-top: auto;
-  padding-top: 0.75rem;
+  padding-top: var(--space-3);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  font-size: 0.8rem;
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
   color: var(--muted);
+}
+
+.plate__updated {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.plate__clock {
+  flex: none;
+  width: 0.9375rem;
+  height: 0.9375rem;
 }
 
 .plate__archived {
   border: 1px solid var(--rule-strong);
-  padding: 0.1rem 0.45rem;
-  font-size: 0.72rem;
+  border-radius: var(--radius-full);
+  padding: 0.1rem var(--space-2);
+  font-size: var(--text-xs);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plate:hover,
+  .plate:hover .plate__image {
+    transform: none;
+  }
 }
 
 /* A shared universe's role, and its archive mark beside it: grouped at the meta line's end, wrapping before they crowd. */
@@ -1821,8 +2068,11 @@ a.button--danger:visited {
 }
 
 .plate__role {
-  font-size: 0.75rem;
-  letter-spacing: 0.02em;
+  padding: 0.1rem var(--space-2);
+  border: 1px solid var(--accent-rule);
+  border-radius: var(--radius-full);
+  color: var(--ink);
+  font-size: var(--text-xs);
   white-space: nowrap;
 }
 
@@ -1852,8 +2102,19 @@ a.button--danger:visited {
   max-width: 46rem;
 }
 
+/* The invitation form on one quiet panel - the same panel an entry form's parts sit on. */
 .collab__invite {
-  max-width: 34rem;
+  max-width: 38rem;
+  padding: var(--space-5) var(--space-6) var(--space-6);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--raised) 55%, transparent);
+}
+
+@media (max-width: 640px) {
+  .collab__invite {
+    padding: var(--space-4);
+  }
 }
 
 .collab__rolehint {
@@ -1877,10 +2138,14 @@ a.button--danger:visited {
   overflow-wrap: anywhere;
 }
 
+/* People and pending invitations as one ruled panel each, like the Types list. */
 .collab__list {
   list-style: none;
   margin: 0;
   padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--raised) 60%, transparent);
 }
 
 .collab__row {
@@ -1888,14 +2153,39 @@ a.button--danger:visited {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3) var(--space-5);
-  padding: var(--space-4) 0;
+  gap: var(--space-3) var(--space-4);
+  padding: var(--space-4) var(--space-5);
   border-top: 1px solid var(--rule);
 }
 
 .collab__row:first-child {
   border-top: 0;
-  padding-top: 0;
+}
+
+/* A person's monogram: their first letter in the display face, in a ring. Decorative; the name beside it is the text. */
+.collab__mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--accent-rule);
+  border-radius: var(--radius-full);
+  background: var(--accent-wash);
+}
+
+.collab__mark::before {
+  content: attr(data-initial);
+  font-family: var(--display);
+  font-size: 1.0625rem;
+  line-height: 1;
+  color: var(--ink);
+}
+
+@media (max-width: 640px) {
+  .collab__row {
+    padding: var(--space-3) var(--space-4);
+  }
 }
 
 .collab__row--highlight {
@@ -1905,7 +2195,7 @@ a.button--danger:visited {
 }
 
 .collab__who {
-  flex: 1 1 14rem;
+  flex: 1 1 12rem;
   min-width: 0;
 }
 
@@ -1979,9 +2269,10 @@ a.button--danger:visited {
 .invitations {
   margin-top: var(--space-7);
   padding: var(--space-5) var(--space-6);
-  border: 1px solid var(--rule-strong);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--rule));
   border-radius: var(--radius-md);
-  background: var(--raised);
+  background: color-mix(in srgb, var(--accent) 5%, var(--raised));
+  box-shadow: var(--shadow-1);
 }
 
 .invitations__heading {
@@ -2018,8 +2309,9 @@ a.button--danger:visited {
 
 .invitations__name {
   margin: 0;
-  font-size: var(--text-body);
-  font-weight: 600;
+  font-family: var(--display);
+  font-size: var(--text-item);
+  font-weight: 400;
   overflow-wrap: anywhere;
 }
 
@@ -2234,6 +2526,79 @@ a.button--danger:visited {
   white-space: nowrap;
 }
 
+/* ---------- Atmosphere ----------
+
+   A page's artwork as its environment, not its decoration: the world's own card when its owner has given it one,
+   Lorex's citadel when not, laid behind the head of the screen and fading into the working surface - down, and in
+   from the reading edge - under a veil of the canvas itself, so a title over it reads as it would over plain canvas.
+   One element, out of the flow, never a target; the image is fetched once and cached. Its parent is the stacking
+   context (`isolation`), so it paints above the parent's ground and below everything in it. */
+
+.atmosphere {
+  --atmosphere-image: url('./assets/atmosphere-citadel.webp');
+
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: -1;
+  height: clamp(15rem, 30vw, 26rem);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.atmosphere::before,
+.atmosphere::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.atmosphere::before {
+  background: var(--atmosphere-image) 68% 38% / cover no-repeat;
+  opacity: var(--atmosphere-opacity);
+}
+
+/* The veil: the canvas over the picture, thin at the top right where the picture lives, whole at the foot and at the
+   start edge where the title and the work begin. */
+.atmosphere::after {
+  background:
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--atmosphere-veil) 20%, transparent) 0%,
+      color-mix(in srgb, var(--atmosphere-veil) 62%, transparent) 55%,
+      var(--atmosphere-veil) 100%
+    ),
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--atmosphere-veil) 92%, transparent) 0%,
+      color-mix(in srgb, var(--atmosphere-veil) 55%, transparent) 40%,
+      transparent 78%
+    );
+}
+
+/* A universe's front page takes it as its hero: taller, and the world showing through more. */
+.atmosphere[data-size='hero'] {
+  height: clamp(19rem, 40vw, 34rem);
+}
+
+.atmosphere[data-size='hero']::before {
+  opacity: calc(var(--atmosphere-opacity) * 1.35);
+}
+
+/* A narrow screen: a shorter band, the picture's centre rather than its edge. */
+@media (max-width: 640px) {
+  .atmosphere {
+    height: 13rem;
+  }
+
+  .atmosphere[data-size='hero'] {
+    height: 17rem;
+  }
+
+  .atmosphere::before {
+    background-position: 62% 40%;
+  }
+}
+
 /* ---------- Universe workspace ---------- */
 
 .workspace {
@@ -2307,6 +2672,25 @@ a.button--danger:visited {
   background: var(--paper);
 }
 
+/* The world itself at the head of its sections: its artwork in miniature (the owner's, when there is one), then its
+   name. */
+.sidebar__identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.sidebar__art {
+  flex: none;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  box-shadow: var(--shadow-1);
+}
+
 .sidebar__head {
   padding: 0 var(--space-2);
 }
@@ -2330,11 +2714,12 @@ a.button--danger:visited {
 }
 
 .sidebar__name {
+  min-width: 0;
+  margin: 0;
   font-family: var(--display);
   font-weight: 400;
-  font-size: 1.25rem;
-  line-height: 1.25;
-  margin: var(--space-2) 0 0;
+  font-size: 1.3rem;
+  line-height: 1.2;
   overflow-wrap: anywhere;
 }
 
@@ -2370,6 +2755,8 @@ a.button--danger:visited {
   flex-direction: column;
   gap: var(--space-3);
   margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--rule);
 }
 
 /* Upkeep - Trash, Publish, Settings - is not worldbuilding: a hairline and a little more space set it apart. */
@@ -2393,11 +2780,11 @@ a.button--danger:visited {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  min-height: 2.25rem;
-  padding: 0 var(--space-2);
+  min-height: 2.375rem;
+  padding: 0 var(--space-3);
   border-radius: var(--radius-sm);
   font-size: var(--text-ui);
-  color: var(--ink);
+  color: color-mix(in srgb, var(--ink) 86%, var(--muted));
   text-decoration: none;
   transition:
     background-color var(--duration-1) var(--ease),
@@ -2406,6 +2793,7 @@ a.button--danger:visited {
 
 .sidebar__link:hover {
   background: var(--hover-wash);
+  color: var(--ink);
 }
 
 .sidebar__link:active {
@@ -2414,6 +2802,8 @@ a.button--danger:visited {
 
 .sidebar__link[aria-current='page'] {
   background: var(--accent-wash);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--ink);
   font-weight: 500;
 }
 
@@ -2435,13 +2825,18 @@ a.button--danger:visited {
   color: var(--muted);
 }
 
-.sidebar__link:hover .sidebar__icon,
-.sidebar__link[aria-current='page'] .sidebar__icon {
+.sidebar__link:hover .sidebar__icon {
   color: var(--ink);
+}
+
+.sidebar__link[aria-current='page'] .sidebar__icon {
+  color: var(--accent);
 }
 
 /* The column the rail and the sidebar leave: the universe's search bar above, and the screen below. */
 .workspace__column {
+  position: relative;
+  isolation: isolate;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -2469,7 +2864,7 @@ a.button--danger:visited {
 
 .unisearch {
   position: relative;
-  max-width: 46rem;
+  max-width: 40rem;
 }
 
 .unisearch__icon {
@@ -2489,13 +2884,18 @@ a.button--danger:visited {
   padding: 0.5rem 0.9rem 0.5rem 2.5rem;
   border: 1px solid var(--border-control);
   border-radius: var(--radius-sm);
-  background: var(--raised);
+  background: color-mix(in srgb, var(--raised) 80%, transparent);
   color: var(--ink);
   font: inherit;
   font-size: var(--text-body);
   transition:
     border-color var(--duration-1) var(--ease),
+    background-color var(--duration-1) var(--ease),
     box-shadow var(--duration-1) var(--ease);
+}
+
+.unisearch__input:focus {
+  background: var(--raised);
 }
 
 .unisearch__input::placeholder {
@@ -2655,14 +3055,19 @@ a.button--danger:visited {
    each part, grouped as the sidebar groups them. Doorways are cards - things you open - and lie in
    a grid that adds columns as the width allows. */
 
+.overview .pageheader {
+  margin-bottom: var(--space-7);
+  padding-top: clamp(var(--space-4), 4vw, var(--space-8));
+}
+
 .overview .pageheader__title {
   font-size: var(--text-document);
-  line-height: 1.1;
+  line-height: 1.05;
 }
 
 .overview__description {
   max-width: 58ch;
-  font-size: var(--text-body);
+  font-size: 1.0625rem;
   line-height: 1.6;
   color: var(--ink);
 }
@@ -2671,35 +3076,78 @@ a.button--danger:visited {
   font-size: var(--text-sm);
 }
 
-.contents + .contents {
-  margin-top: var(--space-7);
+.contents + .contents,
+.contents + .contents__pair {
+  margin-top: var(--space-8);
 }
 
-.contents__heading {
-  margin: 0 0 var(--space-3);
-  font-size: var(--text-ui);
-  font-weight: 600;
-  color: var(--muted);
+/* Writing and Keeping side by side once there is room for both: two short groups, read as a pair. */
+.contents__pair {
+  display: grid;
+  gap: var(--space-8) var(--space-7);
+}
+
+@media (min-width: 1180px) {
+  .contents__pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.contents {
+  container-type: inline-size;
 }
 
 .contents__list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
   gap: var(--space-4);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+/* The world's parts as a small spread once there is room: three across, Lore - where most of a world lives - leading
+   at double width, so five doorways fill two rows instead of leaving one alone on a third. */
+@container (min-width: 46rem) {
+  .contents--world .contents__list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .contents--world .contents__list > li:first-child {
+    grid-column: span 2;
+  }
+
+  .contents--world .contents__list > li:first-child .doorway__name {
+    font-size: 1.75rem;
+  }
+}
+
+/* Between a phone and the spread, two across: Lore takes the whole first row, so the other four pair off beneath it. */
+@container (min-width: 29rem) and (max-width: 45.99rem) {
+  .contents--world .contents__list > li:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+.contents__pair > .contents {
+  margin-top: 0;
+}
+
+/* A doorway into a part of the world: a medallion with the part's icon, its name in the display face, what it holds,
+   and the way through at its foot. Raised and lit from above; under the pointer it rises and its edge warms. Keeping's
+   doorways (Canon, Types) are upkeep, so they lie flatter: no fill until pointed at. */
 .doorway {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--space-1) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   height: 100%;
-  padding: var(--space-4);
+  min-height: 10rem;
+  padding: var(--space-5);
   border: 1px solid var(--rule);
   border-radius: var(--radius-md);
-  background: var(--raised);
+  background:
+    linear-gradient(to bottom, color-mix(in srgb, var(--ink) 3%, transparent), transparent 60%),
+    color-mix(in srgb, var(--raised) 92%, transparent);
   box-shadow: var(--shadow-1);
   color: var(--ink);
   text-decoration: none;
@@ -2709,10 +3157,16 @@ a.button--danger:visited {
     transform var(--duration-2) var(--ease);
 }
 
+.contents--keeping .doorway {
+  background: transparent;
+  box-shadow: none;
+}
+
 .doorway:hover {
-  border-color: var(--rule-strong);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--rule-strong));
+  background-color: var(--raised);
   box-shadow: var(--shadow-2);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
 
 .doorway:active {
@@ -2720,24 +3174,99 @@ a.button--danger:visited {
   transform: none;
 }
 
+.doorway__medallion {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin-bottom: var(--space-2);
+  border: 1px solid var(--accent-rule);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--accent);
+}
+
 .doorway__icon {
-  grid-row: span 2;
   width: 1.25rem;
   height: 1.25rem;
-  margin-top: 0.15rem;
-  color: var(--muted);
 }
 
 .doorway__name {
   font-family: var(--display);
-  font-size: var(--text-item);
-  line-height: 1.25;
+  font-size: 1.3125rem;
+  line-height: 1.2;
 }
 
 .doorway__purpose {
+  max-width: 36ch;
   font-size: var(--text-ui);
-  line-height: 1.45;
+  line-height: 1.5;
   color: var(--muted);
+}
+
+.doorway__go {
+  align-self: flex-end;
+  margin-top: auto;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-full);
+  color: var(--muted);
+  transition:
+    border-color var(--duration-1) var(--ease),
+    color var(--duration-1) var(--ease);
+}
+
+.doorway__go svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.doorway:hover .doorway__go {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* A phone: each doorway one compact row - the medallion, the name over what it holds, the way through. */
+@media (max-width: 640px) {
+  .doorway {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'medal name go'
+      'medal purpose go';
+    align-items: center;
+    gap: var(--space-1) var(--space-4);
+    min-height: 0;
+    padding: var(--space-4);
+  }
+
+  .doorway__medallion {
+    grid-area: medal;
+    margin: 0;
+  }
+
+  .doorway__name {
+    grid-area: name;
+    align-self: end;
+  }
+
+  .doorway__purpose {
+    grid-area: purpose;
+    align-self: start;
+  }
+
+  .doorway__go {
+    grid-area: go;
+    align-self: center;
+    margin: 0;
+  }
+
+  .contents--world .contents__list > li:first-child .doorway__name {
+    font-size: 1.3125rem;
+  }
 }
 
 /* ---------- Settings ---------- */
@@ -2792,9 +3321,9 @@ a.button--danger:visited {
 
 .tabs__tab {
   flex: none;
-  min-height: var(--control-md);
+  min-height: 2.75rem;
   margin-bottom: -1px;
-  padding: 0 var(--space-3);
+  padding: 0 var(--space-4);
   border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
@@ -2812,9 +3341,9 @@ a.button--danger:visited {
 }
 
 .tabs__tab[aria-selected='true'] {
-  border-bottom-color: var(--ink);
+  border-bottom-color: var(--accent);
   color: var(--ink);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .tabs__tab:focus-visible {
@@ -3579,12 +4108,12 @@ a.button--danger:visited {
 /* What is inside the chosen category: smaller, inset on a faint well, so it reads as a level below the categories rather
    than as more of them. */
 .typeswitch__row--sub {
-  gap: 2px;
-  margin-top: var(--space-2);
-  padding: var(--space-1);
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+  padding: var(--space-2);
   border: 1px solid var(--rule);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--ink) 3%, transparent);
+  background: color-mix(in srgb, var(--raised) 70%, transparent);
 }
 
 .typeswitch__row--sub .typeswitch__link {
@@ -3640,6 +4169,20 @@ a.button--danger:visited {
   background: var(--accent-wash);
   color: var(--ink);
   box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+/* Inside a category the exact choice is a lit pill: the gold edge all round rather than a rule at its foot. */
+.typeswitch__row--sub .typeswitch__link[aria-current='page'] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+.typeswitch__link[aria-current] .typeswitch__icon {
+  color: var(--accent);
+}
+
+.typeswitch__link[aria-current] .typeswitch__count {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--ink);
 }
 
 /* The category a subtype choice sits in: named in ink and weight, with a neutral rule. */
@@ -3770,14 +4313,16 @@ a.button--danger:visited {
 
 .entitycard {
   display: grid;
-  grid-template-columns: 5.5rem minmax(0, 1fr);
+  grid-template-columns: 6rem minmax(0, 1fr);
   gap: var(--space-4);
   align-items: start;
   height: 100%;
   padding: var(--space-4);
   border: 1px solid var(--rule);
   border-radius: var(--radius-md);
-  background: var(--raised);
+  background:
+    linear-gradient(to bottom, color-mix(in srgb, var(--ink) 2.5%, transparent), transparent 55%),
+    var(--raised);
   box-shadow: var(--shadow-1);
   color: var(--ink);
   text-decoration: none;
@@ -3788,9 +4333,9 @@ a.button--danger:visited {
 }
 
 .entitycard:hover {
-  border-color: var(--rule-strong);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--rule-strong));
   box-shadow: var(--shadow-2);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
 
 .entitycard:active {
@@ -3851,7 +4396,7 @@ a.button--danger:visited {
   -webkit-line-clamp: 2;
   line-clamp: 2;
   font-family: var(--display);
-  font-size: var(--text-item);
+  font-size: 1.1875rem;
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
@@ -3951,8 +4496,14 @@ a.button--danger:visited {
 .tile--blank {
   display: grid;
   place-items: center;
-  border-color: transparent;
-  background: color-mix(in srgb, var(--type-accent, var(--muted)) 14%, var(--raised));
+  border-color: var(--rule);
+  background:
+    radial-gradient(
+      circle at 50% 38%,
+      color-mix(in srgb, var(--type-accent, var(--accent)) 14%, transparent),
+      transparent 70%
+    ),
+    color-mix(in srgb, var(--type-accent, var(--muted)) 14%, var(--raised));
 }
 
 .tile__icon {
@@ -3962,7 +4513,13 @@ a.button--danger:visited {
 }
 
 :root[data-theme='dark'] .tile--blank {
-  background: color-mix(in srgb, var(--type-accent, var(--muted)) 22%, var(--raised));
+  background:
+    radial-gradient(
+      circle at 50% 38%,
+      color-mix(in srgb, var(--type-accent, var(--accent)) 16%, transparent),
+      transparent 70%
+    ),
+    color-mix(in srgb, var(--type-accent, var(--muted)) 16%, var(--paper));
 }
 
 :root[data-theme='dark'] .typeswitch__link,
@@ -3992,7 +4549,7 @@ a.button--danger:visited {
 
 .skeletoncard {
   display: grid;
-  grid-template-columns: 5.5rem minmax(0, 1fr);
+  grid-template-columns: 6rem minmax(0, 1fr);
   gap: var(--space-4);
   padding: var(--space-4);
   border: 1px solid var(--rule);
@@ -4335,9 +4892,11 @@ a.button--danger:visited {
   font-family: var(--display);
   font-weight: 400;
   font-size: var(--text-document);
-  line-height: 1.1;
+  line-height: 1.05;
+  letter-spacing: var(--title-tracking);
   margin: var(--space-3) 0 0;
   overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 
 /* The name as a document title while the form is open: ruled, not boxed, in the name's own size. */
@@ -4455,16 +5014,23 @@ a.button--danger:visited {
   margin: 0;
 }
 
+/* The picture in a frame: a raised mount with a hairline edge, the picture inset in it. */
+.entry__media {
+  padding: var(--space-2);
+  border: 1px solid var(--rule);
+  border-radius: calc(var(--radius-md) + 2px);
+  background: var(--raised);
+  box-shadow: var(--shadow-2);
+}
+
 .entry__media img {
   display: block;
   width: auto;
   height: auto;
   max-width: 100%;
   max-height: min(36rem, 75vh);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: var(--paper);
-  box-shadow: var(--shadow-1);
 }
 
 .entry__layout[data-shape='landscape'] .entry__media img {
@@ -4474,8 +5040,8 @@ a.button--danger:visited {
 /* Over the picture's corner, on its own small plate so it reads on a light or a dark picture. */
 .entry__expand {
   position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
+  top: var(--space-4);
+  right: var(--space-4);
   background: color-mix(in srgb, var(--raised) 88%, transparent);
   color: var(--ink);
   box-shadow: var(--shadow-1);
@@ -4533,8 +5099,10 @@ a.button--danger:visited {
 
 .rail__meta {
   margin: 0;
-  font-size: var(--text-xs);
-  line-height: 1.5;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--rule);
+  font-size: var(--text-sm);
+  line-height: 1.6;
   color: var(--muted);
 }
 
@@ -4581,19 +5149,27 @@ a.button--danger:visited {
   margin-top: var(--space-7);
 }
 
+/* Each part of the form on one quiet panel - a hairline and the faintest lift, the fields boxed inside it - so the
+   parts read as groups without a panel inside a panel. */
 .entryform__section {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  padding-top: var(--space-6);
-  border-top: 1px solid var(--rule);
+  padding: var(--space-5) var(--space-6) var(--space-6);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--raised) 55%, transparent);
 }
 
 .entryform__heading {
   margin: 0;
-  font-size: var(--text-ui);
-  font-weight: 600;
   overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .entryform__section {
+    padding: var(--space-4);
+  }
 }
 
 .entryform__fields {
@@ -4614,7 +5190,7 @@ a.button--danger:visited {
 .entry__actions.actionbar {
   max-width: 46rem;
   margin-top: var(--space-7);
-  border: 1px solid var(--rule);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--rule));
   border-radius: var(--radius-md);
 }
 
@@ -4738,8 +5314,8 @@ html:has(.viewer[open]) {
 /* The square the cards will show, at a size worth judging a crop by. Sized in CSS, so nothing reflows as it loads. */
 .imagefield__preview {
   flex: none;
-  width: 5.5rem;
-  height: 5.5rem;
+  width: 8rem;
+  height: 8rem;
   object-fit: cover;
   border: 1px solid var(--rule);
   border-radius: var(--radius-md);
@@ -4754,16 +5330,24 @@ html:has(.viewer[open]) {
 
 .imagefield__row {
   display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
-}
-
-.imagefield__actions {
-  display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: 0.4rem;
+  gap: var(--space-4);
+}
+
+/* The picture's verbs as a column beside it, each the same width, Remove last. */
+.imagefield__actions {
+  display: flex;
+  flex: 0 1 13rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  min-width: 11rem;
+}
+
+.imagefield__actions .button {
+  align-self: stretch;
+  justify-content: flex-start;
 }
 
 /* The real input is replaced by its own label, which is the only way to style a file picker.
@@ -5009,8 +5593,9 @@ html:has(.viewer[open]) {
 /* Shared prose styling for the editor surface and the read-only article. */
 .editor__surface,
 .article__body {
-  font-size: 1.02rem;
-  line-height: 1.75;
+  font-family: var(--display);
+  font-size: 1.125rem;
+  line-height: 1.72;
   max-width: 62ch;
 }
 
@@ -5090,10 +5675,8 @@ html:has(.viewer[open]) {
 }
 
 .article__title {
+  flex: 1 1 12rem;
   margin: 0;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--muted);
 }
 
 /* Arriving at the article from a search result: the mark says where, as a scene's does, so the heading
@@ -5325,13 +5908,24 @@ html:has(.viewer[open]) {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.35rem;
-  border-bottom: 1px solid var(--border-control);
-  padding-bottom: 0.35rem;
+  gap: var(--space-1) var(--space-2);
+  min-height: var(--control-md);
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-sm);
+  background: var(--raised);
+  transition:
+    border-color var(--duration-1) var(--ease),
+    box-shadow var(--duration-1) var(--ease);
+}
+
+.tokens:hover:not(:focus-within) {
+  border-color: var(--ink);
 }
 
 .tokens:focus-within {
-  border-bottom-color: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 .token {
@@ -5339,8 +5933,10 @@ html:has(.viewer[open]) {
   align-items: center;
   gap: 0.3rem;
   border: 1px solid var(--rule-strong);
-  padding: 0.1rem 0.2rem 0.1rem 0.45rem;
-  font-size: 0.8rem;
+  border-radius: var(--radius-xs);
+  background: var(--accent-wash);
+  padding: 0.1rem 0.2rem 0.1rem 0.5rem;
+  font-size: var(--text-sm);
 }
 
 .token__remove {
@@ -5374,33 +5970,69 @@ html:has(.viewer[open]) {
 
 /* ---------- Types ---------- */
 
+/* The types as one ruled panel: a hairline between rows, a wash under the pointer. */
 .types__list {
+  --types-pad: var(--space-4);
+  --types-step: 1.75rem;
+
   list-style: none;
-  margin: 1.5rem 0 0;
+  margin: var(--space-6) 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--raised) 60%, transparent);
+  box-shadow: var(--shadow-1);
 }
 
 .types__row {
-  padding: var(--space-3) 0;
-  border-top: 1px solid var(--rule);
-}
-
-/* A nested type steps in under its parent - 1.25rem a level, no further than six levels however deep the tree goes, so a
-   deep branch never pushes a row off a phone - with a hairline marking the step. The order and the hairline say where it
-   hangs; a reader hears "inside" and the parent's path. */
-.types__row[data-depth]:not([data-depth='0']) {
   position: relative;
-  padding-inline-start: calc(var(--depth) * 1.25rem);
+  padding: var(--space-3) var(--types-pad);
+  border-top: 1px solid var(--rule);
+  transition: background-color var(--duration-1) var(--ease);
 }
 
-.types__row[data-depth]:not([data-depth='0'])::before {
+.types__row:first-child {
+  border-top: 0;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.types__row:last-child {
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.types__row:hover {
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+}
+
+/* A nested type steps in under its parent - one step a level, no further than six levels however deep the tree goes, so
+   a deep branch never pushes a row off a phone - hung from a rail with an elbow into its own medallion. The order and the
+   rail say where it hangs; a reader hears "inside" and the parent's path. */
+.types__row[data-depth]:not([data-depth='0']) {
+  padding-inline-start: calc(var(--types-pad) + var(--depth) * var(--types-step));
+  border-top-color: color-mix(in srgb, var(--rule) 55%, transparent);
+}
+
+.types__row[data-depth]:not([data-depth='0'])::before,
+.types__row[data-depth]:not([data-depth='0'])::after {
   content: '';
   position: absolute;
-  inset-block: var(--space-2);
-  inset-inline-start: calc(var(--depth) * 1.25rem - 0.625rem);
+  inset-inline-start: calc(
+    var(--types-pad) + var(--depth) * var(--types-step) - var(--types-step) * 0.55
+  );
+}
+
+/* The rail runs the full height of the row, so a run of siblings reads as one line down the branch. */
+.types__row[data-depth]:not([data-depth='0'])::before {
+  inset-block: 0;
   border-inline-start: 1px solid var(--rule-strong);
+}
+
+.types__row[data-depth]:not([data-depth='0'])::after {
+  top: calc(var(--space-3) + 1.125rem);
+  width: calc(var(--types-step) * 0.45);
+  border-top: 1px solid var(--rule-strong);
 }
 
 /* The grip a type is reordered by on a wide screen (Product refinement 027): first on the row, quiet until pointed at, and
@@ -5453,7 +6085,7 @@ html:has(.viewer[open]) {
 .types__row[data-carried='true'] {
   background: var(--accent-wash);
   outline: 1px dashed var(--accent);
-  outline-offset: -1px;
+  outline-offset: -2px;
 }
 
 .types__row[data-drop='before'] {
@@ -5546,13 +6178,33 @@ html:has(.viewer[open]) {
 
 /* A phone: a smaller step that stops after four levels, and a row's tools always on a line of their own, so a deep row
    wraps the same way a top-level one does instead of scattering its buttons. */
+/* A phone: the rows go edge to edge again, no panel round them, so a row's tools keep their one line. */
 @media (max-width: 640px) {
-  .types__row[data-depth]:not([data-depth='0']) {
-    padding-inline-start: calc(min(var(--depth), 4) * 0.75rem);
+  .types__list {
+    --types-pad: 0rem;
+    --types-step: 1rem;
+
+    border-inline: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
   }
 
-  .types__row[data-depth]:not([data-depth='0'])::before {
-    inset-inline-start: calc(min(var(--depth), 4) * 0.75rem - 0.375rem);
+  .types__row,
+  .types__row:first-child,
+  .types__row:last-child {
+    border-radius: 0;
+  }
+
+  .types__row[data-depth]:not([data-depth='0']) {
+    padding-inline-start: calc(var(--types-pad) + min(var(--depth), 4) * var(--types-step));
+  }
+
+  .types__row[data-depth]:not([data-depth='0'])::before,
+  .types__row[data-depth]:not([data-depth='0'])::after {
+    inset-inline-start: calc(
+      var(--types-pad) + min(var(--depth), 4) * var(--types-step) - var(--types-step) * 0.55
+    );
   }
 
   .types__actions {
@@ -5573,25 +6225,31 @@ html:has(.viewer[open]) {
   flex: 1 1 12rem;
   min-width: 0;
   font-family: var(--display);
-  font-size: var(--text-item);
+  font-size: 1.1875rem;
   overflow-wrap: anywhere;
 }
 
+/* The type's picture in a medallion, gold-ringed like a doorway's; a nested type's a step smaller. */
 .types__icon {
   display: inline-grid;
   place-items: center;
   flex: none;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  border: 1px solid var(--accent-rule);
+  background: color-mix(in srgb, var(--accent) 7%, var(--raised));
+  color: var(--accent);
+}
+
+.types__row[data-depth]:not([data-depth='0']) .types__icon {
   width: 2rem;
   height: 2rem;
-  border-radius: 50%;
-  border: 1px solid var(--rule);
-  background: var(--surface);
-  color: var(--ink);
 }
 
 .types__icon svg {
-  width: 1rem;
-  height: 1rem;
+  width: 1.0625rem;
+  height: 1.0625rem;
 }
 
 .types__actions {
@@ -5745,16 +6403,30 @@ html:has(.viewer[open]) {
   font-variant-numeric: tabular-nums;
 }
 
+/* What a type is for, under its name: aligned with the name, past the grip and the medallion. */
 .types__description {
-  margin: 0.35rem 0 0;
-  font-size: 0.875rem;
+  margin: var(--space-1) 0 0;
+  padding-inline-start: calc(2.25rem + var(--space-3));
+  font-size: var(--text-ui);
   color: var(--muted);
 }
 
+.types__head:has(.types__handle) ~ .types__description {
+  padding-inline-start: calc(2rem - var(--space-2) + var(--space-3) + 2.25rem + var(--space-3));
+}
+
+@media (max-width: 640px) {
+  .types__description,
+  .types__head:has(.types__handle) ~ .types__description {
+    padding-inline-start: 0;
+  }
+}
+
 .types__fields {
-  margin-top: 1rem;
-  padding: 1rem 1.1rem;
+  margin-top: var(--space-4);
+  padding: var(--space-4) var(--space-5);
   border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
   background: var(--paper);
 }
 
@@ -6502,7 +7174,7 @@ html:has(.viewer[open]) {
     border: 0;
   }
 
-  .sidebar__name,
+  .sidebar__identity,
   .sidebar__archived {
     display: none;
   }
@@ -6519,6 +7191,8 @@ html:has(.viewer[open]) {
     columns: 2;
     column-gap: var(--space-4);
     margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
   }
 
   .sidebar__group {
@@ -6902,6 +7576,17 @@ html:has(.viewer[open]) {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
+}
+
+/* A drawer's form in named parts (the type editor): each headed by the accent section rule, spaced rather than boxed. */
+.drawer__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.drawer__group > .sectionrule {
+  margin: 0;
 }
 
 .drawer__actions {
@@ -7530,15 +8215,15 @@ a.lorechip--pov:focus-visible .lorechip__name {
 .views {
   display: flex;
   flex-wrap: wrap;
-  gap: 0 var(--space-6);
+  gap: 0 var(--space-7);
 }
 
 .views__link {
   margin-bottom: -1px;
-  padding: 0.45rem 0.05rem;
+  padding: 0.6rem 0.1rem;
   border-bottom: 2px solid transparent;
   color: var(--muted);
-  font-size: var(--text-ui);
+  font-size: 0.9375rem;
   font-weight: 500;
   text-decoration: none;
   transition:
@@ -10487,6 +11172,7 @@ a.idearef__name {
   --border-control: #767a81;
   --primary-bg: var(--portal-ink);
   --primary-ink: #111214;
+  --accent-rule: color-mix(in srgb, var(--accent) 45%, transparent);
   --accent-wash: color-mix(in srgb, var(--accent) 16%, var(--portal-raised));
   --hover-wash: rgb(var(--portal-ink-rgb) / 0.08);
   --press-wash: rgb(var(--portal-ink-rgb) / 0.13);
