@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Browser, type Page } from '@playwright/test'
-import { makeTestPassword } from './support/account'
+import { expectedVersionLabel, makeTestPassword } from './support/account'
 import { png } from './support/png'
 
 /**
@@ -126,6 +126,47 @@ test.describe('Lorex’s home is /', () => {
     await context.close()
   })
 
+  test('signed out: the footer offers only real places, this year and the running version', async ({
+    browser,
+  }) => {
+    const { context, page } = await stranger(browser)
+    await page.goto('/')
+    const footer = page.getByTestId('portal-footer')
+    await expect(footer).toBeVisible()
+    expect(await footer.evaluate((node) => node.tagName)).toBe('FOOTER')
+
+    // The brand goes home; the one group of links goes somewhere real, each of them.
+    await expect(footer.getByRole('link', { name: 'Lorex – Home' })).toHaveAttribute('href', '/')
+    const product = footer.getByRole('navigation', { name: 'Product' })
+    await expect(product.getByRole('link')).toHaveText(['Explore', 'Create account', 'Log in'])
+    for (const [name, href] of [
+      ['Explore', '/explore'],
+      ['Create account', '/register'],
+      ['Log in', '/login'],
+    ]) {
+      await expect(product.getByRole('link', { name })).toHaveAttribute('href', href)
+    }
+
+    // Nothing Lorex does not have: no community, no legal pages, no icon links to anywhere else.
+    await expect(footer.getByRole('navigation')).toHaveCount(1)
+    await expect(footer.getByText(/community|privacy|terms|contact|support/i)).toHaveCount(0)
+    await expect(footer.locator('a[href^="http"], a[target="_blank"], svg')).toHaveCount(0)
+
+    // The year is the visitor's, and the version is the build's, written down nowhere else.
+    await expect(page.getByTestId('portal-footer-copyright')).toHaveText(
+      `© ${new Date().getFullYear()} LoreX`,
+    )
+    const version = page.getByTestId('portal-footer-version')
+    await expect(version).toHaveText(expectedVersionLabel())
+    await expect(version.locator('a')).toHaveCount(0)
+
+    // The home page's footer only: Explore keeps none.
+    await page.goto('/explore')
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Explore Worlds')
+    await expect(page.getByTestId('portal-footer')).toHaveCount(0)
+    await context.close()
+  })
+
   test('signed out: Start building opens registration, which then lands in the workspace; Explore worlds opens Explore', async ({
     browser,
   }) => {
@@ -173,10 +214,17 @@ test.describe('Lorex’s home is /', () => {
     await expect(page.getByTestId('landing-final-actions').getByRole('link')).toHaveText([
       'Open my workspace',
     ])
-    await expect(page.getByTestId('portal-footer').getByRole('link')).toHaveText([
+    await expect(page.getByTestId('portal-footer-links').getByRole('link')).toHaveText([
       'Explore',
       'My workspace',
     ])
+    // The version a signed-in visitor sees here is the one their account menu shows.
+    await expect(page.getByTestId('portal-footer-version')).toHaveText(expectedVersionLabel())
+    await page.getByTestId('account-menu-trigger').click()
+    await expect(page.getByTestId('account-menu-version')).toHaveText(
+      (await page.getByTestId('portal-footer-version').textContent())!,
+    )
+    await page.keyboard.press('Escape')
     await expect(page.getByText('Start building')).toHaveCount(0)
 
     await page.getByTestId('landing-primary').click()

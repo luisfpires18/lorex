@@ -508,7 +508,10 @@ published worlds are found.
 
 - **Bar.** Brand (to `/`), Explore, then Appearance, Log in and Create account - or My workspace and the account menu.
   No world search on `/`: `PublicLayout` leaves `PortalSearch` out there and nowhere else. A quiet footer on `/` only
-  (Explore, and Log in / Create account or My workspace).
+  (033): the wordmark (to `/`) and its one line; a Product group of Explore, then Create account and Log in, or My
+  workspace; under a hairline `© <this year> LoreX` and `LoreX v<package version>` (`lib/buildInfo`), neither a link.
+  No Community, Legal or Support group: Lorex has no such destination yet, and an empty heading or a made-up link would
+  be worse than none.
 - **Actions.** Signed out: *Start building* (`/register`) and *Explore worlds*; at the foot *Start building your
   universe* and *Log in*. Signed in: *Go to my workspace* (`/app`) and *Explore worlds*; at the foot *Open my
   workspace*. Nothing is drawn until the session is known, so neither set flashes before the other.

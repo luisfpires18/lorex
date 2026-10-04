@@ -8,6 +8,7 @@ import { ActionIcon } from './ActionIcon'
 import { ActionMenu } from './ActionMenu'
 import { Avatar } from './Avatar'
 import { ThemeSwitch } from './ThemeSwitch'
+import { VERSION_LABEL } from '../lib/buildInfo'
 
 /**
  * The account, everywhere: a circular avatar that opens onto who you are, your profile and the way
@@ -133,6 +134,11 @@ export function AccountMenu({
           <ActionIcon icon={LogOut} />
           {busy ? 'Signing out' : 'Sign out'}
         </button>
+
+        {/* Which Lorex is running, for anyone asked "what version are you on?". Read, never pressed. */}
+        <p className="accountmenu__version" data-testid="account-menu-version">
+          {VERSION_LABEL}
+        </p>
       </ActionMenu>
     </div>
   )

@@ -17,7 +17,8 @@
                                 on a frontend build that no longer matches the API
     - cross-origin requests
     - the web app manifest      the browser reads the installed app's start_url, scope and
-                                id from it; a kept copy freezes all three (see v4 below)
+                                id from it; a kept copy froze all three once (UI refinement
+                                014), and it is never cached again
 
   Those requests are not passed to respondWith at all, so the browser handles them exactly
   as it would with no worker installed. Nothing authenticated is ever written to a cache.
@@ -25,23 +26,27 @@
   Consequence, stated plainly: Lorex does not work offline. Opening it without a network
   fails the same way it does in a normal tab. That is the intended behaviour, not a gap.
 
-  Update policy: bump CACHE_VERSION. The new worker takes over immediately (skipWaiting
-  plus clients.claim) and every older cache is deleted on activate. Since navigations are
-  never cached, the next load already carries the new asset URLs, so no update prompt is
+  Update policy: none to follow by hand. The app registers this file as /sw.js?build=<id>,
+  the id being the build's own (src/lib/buildInfo.ts), and the cache is named after it. A new
+  build is a new script URL, so the browser installs a new worker; it takes over immediately
+  (skipWaiting plus clients.claim) and deletes every other Lorex cache on activate. Root files
+  that keep their names across builds - the icons, brand-mark.png - are therefore fetched
+  afresh once per build rather than pinned to the first one a browser saw. Since navigations
+  are never cached, the next load already carries the new asset URLs, so no update prompt is
   needed.
+
+  Registered without a build id - only a test does that, against the dev server - the cache
+  is lorex-static-unbuilt, which no production registration can be.
 */
 
-// v3: the app icons have now changed twice at the same filenames - new artwork, then the
-// paper tile dropped from the favicons - and root static files are cached by path. Without a
-// bump, an installed or merely long-lived browser keeps serving whichever version it saw
-// first. The policy itself is unchanged.
-// v4 (UI refinement 014): the manifest is no longer cached. v3's cache-first rule matched
-// `/manifest.webmanifest`, so a browser that ran Lorex before Task 011 kept answering every
-// install and every manifest update check with the old file - `start_url: /app` - and the
-// installed app kept opening the workspace, or Login when signed out, long after the file on
-// the server said `/explore`. The bump deletes that cache on activate.
-const CACHE_VERSION = 'v4'
-const STATIC_CACHE = `lorex-static-${CACHE_VERSION}`
+const CACHE_PREFIX = 'lorex-static-'
+// The same characters vite.config.ts allows, so a hand-made query cannot name some other cache.
+const BUILD =
+  new URL(self.location.href).searchParams
+    .get('build')
+    ?.replace(/[^A-Za-z0-9._-]/g, '')
+    .slice(0, 40) || 'unbuilt'
+const STATIC_CACHE = `${CACHE_PREFIX}${BUILD}`
 
 /** Build output, plus the handful of static files that live at the web root. */
 const STATIC_ROOT_FILE = /^\/[^/]+\.(?:svg|png|ico|woff2?|css)$/
@@ -63,7 +68,9 @@ self.addEventListener('activate', (event) => {
     (async () => {
       const names = await caches.keys()
       await Promise.all(
-        names.filter((name) => name !== STATIC_CACHE).map((name) => caches.delete(name)),
+        names
+          .filter((name) => name.startsWith(CACHE_PREFIX) && name !== STATIC_CACHE)
+          .map((name) => caches.delete(name)),
       )
       await self.clients.claim()
     })(),

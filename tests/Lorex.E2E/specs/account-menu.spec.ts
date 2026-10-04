@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { openAccountMenu } from './support/account'
+import { expectedVersionLabel, makeTestPassword, openAccountMenu } from './support/account'
 import { png } from './support/png'
 
 /**
@@ -16,7 +16,7 @@ import { png } from './support/png'
  * photo looks like is `profile.spec.ts`'s business.
  */
 
-const PASSWORD = 'Test-password-123!'
+const PASSWORD = makeTestPassword()
 
 function unique(prefix: string) {
   return `${prefix}${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`
@@ -97,6 +97,14 @@ test.describe('the account menu', () => {
     const panel = page.getByTestId('account-menu-panel')
     await expect(panel).toContainText(username)
     await expect(panel).toContainText(`${username}@example.test`)
+
+    // The running version, last and quiet: text to read, not a thing to press.
+    const version = page.getByTestId('account-menu-version')
+    await expect(version).toHaveText(expectedVersionLabel())
+    expect(await version.evaluate((node) => node.tagName)).toBe('P')
+    await expect(version.locator('a, button')).toHaveCount(0)
+    await expect(panel.getByRole('link', { name: expectedVersionLabel() })).toHaveCount(0)
+    await expect(panel.getByRole('button', { name: expectedVersionLabel() })).toHaveCount(0)
 
     await page.getByRole('button', { name: 'Sign out' }).click()
     await expect(page).toHaveURL('/login')
