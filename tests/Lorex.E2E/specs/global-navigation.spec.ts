@@ -10,7 +10,7 @@ import { openAccountMenu } from './support/account'
  */
 
 const PASSWORD = 'Test-password-123!'
-const BRAND = 'Lorex – Explore'
+const BRAND = 'Lorex – Home'
 
 function unique(prefix: string) {
   return `${prefix}${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`
@@ -93,7 +93,7 @@ test.describe('My workspace: one frame for the account-level screens', () => {
       await expect(page.getByRole('banner')).toHaveCount(1)
       await expect(workspaceNav(page)).toHaveCount(1)
       await expect(page.getByText('My workspace', { exact: true })).toBeVisible()
-      await expect(page.getByRole('link', { name: BRAND })).toHaveAttribute('href', '/explore')
+      await expect(page.getByRole('link', { name: BRAND })).toHaveAttribute('href', '/')
       await expect(page.getByTestId('home-explore')).toHaveText('Explore')
       await expect(page.getByTestId('account-menu-trigger')).toBeVisible()
 
@@ -156,7 +156,7 @@ test.describe('Explore: the public side, called one thing', () => {
   })
 })
 
-test.describe('The brand leads to Explore from every shell, and says so', () => {
+test.describe('The brand leads to Lorex’s home from every shell, and says so (031)', () => {
   test('portal, Universes, Profile and a universe', async ({ page }) => {
     await signUp(page)
     const w = await world(page)
@@ -166,7 +166,8 @@ test.describe('The brand leads to Explore from every shell, and says so', () => 
       const brand = page.getByRole('link', { name: BRAND })
       await expect(brand).toHaveCount(1)
       await brand.click()
-      await expect(page).toHaveURL('/explore')
+      await expect(page).toHaveURL('/')
+      await expect(page.getByTestId('landing')).toBeVisible()
     }
 
     await page.goto(`/app/universes/${w.id}/lore/${w.entryId}`)
@@ -178,7 +179,7 @@ test.describe('The brand leads to Explore from every shell, and says so', () => 
     expect(box.width).toBeGreaterThanOrEqual(40)
     expect(box.height).toBeGreaterThanOrEqual(40)
     await mark.click()
-    await expect(page).toHaveURL('/explore')
+    await expect(page).toHaveURL('/')
   })
 })
 

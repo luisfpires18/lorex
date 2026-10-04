@@ -448,7 +448,7 @@ async function logInOnPage(page: Page, username: string) {
 }
 
 test.describe('the portal is the front door', () => {
-  test('anyone reaches Explore and a public world directly, from the root, after a refresh and in a new session', async ({
+  test('anyone reaches Explore and a public world directly, from the home page, after a refresh and in a new session', async ({
     page,
     browser,
   }) => {
@@ -460,8 +460,10 @@ test.describe('the portal is the front door', () => {
       genres: [FANTASY],
     })
 
+    // From Lorex's home (031), Explore is one named link away.
     const { context, page: visitor } = await stranger(browser)
     await visitor.goto('/')
+    await visitor.getByTestId('portal-explore').click()
     await visitor.waitForURL('/explore')
     await expect(visitor.getByRole('heading', { level: 1 })).toHaveText('Explore Worlds')
     await visitor.reload()
@@ -586,8 +588,8 @@ test.describe('the portal is the front door', () => {
       await page.reload()
       await logInOnPage(page, username)
       // Never away from Lorex. A value that is only a same-origin path ('/\evil.example' is '/evil.example') may be
-      // followed to that path, which nothing holds, so it lands on the front door (014); everything else on /app.
-      await page.waitForURL((url) => url.pathname === '/app' || url.pathname === '/explore')
+      // followed to that path, which nothing holds, so it lands on Lorex's home (031); everything else on /app.
+      await page.waitForURL((url) => url.pathname === '/app' || url.pathname === '/')
       expect(new URL(page.url()).origin, from).toBe(origin)
       await page.getByTestId('account-menu-trigger').click()
       await page.getByRole('button', { name: 'Sign out' }).click()

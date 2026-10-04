@@ -65,8 +65,8 @@ async function fresh(browser: Browser) {
   return { context, page: await context.newPage() }
 }
 
-test.describe('Lorex leads to the portal', () => {
-  test('the brand goes to Explore from the workspace, its headers, the portal and sign-in, keeping the theme', async ({
+test.describe('Lorex leads home', () => {
+  test('the brand goes to Lorex’s home from the workspace, its headers, the portal and sign-in, keeping the theme', async ({
     page,
   }) => {
     await signUp(page)
@@ -75,17 +75,18 @@ test.describe('Lorex leads to the portal', () => {
     await page.evaluate(() => localStorage.setItem('lorex-theme', 'dark'))
     await page.goto(`/app/universes/${w.id}/lore`)
     await page.locator('.rail__mark').click()
-    await page.waitForURL('/explore')
+    await page.waitForURL('/')
     expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark')
 
     for (const from of ['/app', '/app/ideas', '/app/profile']) {
       await page.goto(from)
       await page.getByTestId('home-brand').click()
-      await page.waitForURL('/explore')
+      await page.waitForURL('/')
     }
 
+    await page.goto('/explore')
     await page.locator('.portal__brand').click()
-    await page.waitForURL('/explore')
+    await page.waitForURL('/')
 
     // My workspace is still the deliberate way in.
     await page.getByTestId('portal-workspace').click()
@@ -96,7 +97,7 @@ test.describe('Lorex leads to the portal', () => {
     await page.getByTestId('account-menu-signout').click()
     await page.waitForURL('/login')
     await page.getByTestId('auth-brand').click()
-    await page.waitForURL('/explore')
+    await page.waitForURL('/')
   })
 })
 
@@ -539,7 +540,7 @@ test.describe('Settings', () => {
 })
 
 test.describe('Lorex opens on the portal', () => {
-  test('signed out, the front door and any unknown address are Explore, never Login; a workspace link still asks', async ({
+  test('signed out, the front door and any unknown address are Lorex’s home, never Login; the installed app opens Explore; a workspace link still asks', async ({
     browser,
   }) => {
     const { context, page } = await fresh(browser)
@@ -550,9 +551,11 @@ test.describe('Lorex opens on the portal', () => {
     await page.goto(manifest.start_url)
     await expect(page).toHaveURL('/explore')
     await page.goto('/')
-    await expect(page).toHaveURL('/explore')
+    await expect(page).toHaveURL('/')
+    await expect(page.getByTestId('landing')).toBeVisible()
     await page.goto('/somewhere-nobody-links')
-    await expect(page).toHaveURL('/explore')
+    await expect(page).toHaveURL('/')
+    await expect(page.getByTestId('landing')).toBeVisible()
 
     // An explicit workspace address is a deep link, and follows the sign-in rules.
     await page.goto('/app/universes')
@@ -560,7 +563,7 @@ test.describe('Lorex opens on the portal', () => {
     await context.close()
   })
 
-  test('signed in, having used the workspace, the front door is still Explore, and deep links go where they say', async ({
+  test('signed in, having used the workspace, the front door is still the portal, and deep links go where they say', async ({
     page,
   }) => {
     await signUp(page)
@@ -579,9 +582,10 @@ test.describe('Lorex opens on the portal', () => {
     await expect(launch).toHaveURL('/explore')
     await expect(launch.getByTestId('portal-workspace')).toBeVisible()
     await launch.goto('/')
-    await expect(launch).toHaveURL('/explore')
+    await expect(launch).toHaveURL('/')
+    await expect(launch.getByTestId('landing-primary')).toHaveText('Go to my workspace')
     await launch.goto('/not-a-page')
-    await expect(launch).toHaveURL('/explore')
+    await expect(launch).toHaveURL('/')
 
     await launch.goto(`/worlds/${slug}`)
     await expect(launch.getByRole('heading', { level: 1 })).toHaveText(w.name)

@@ -62,10 +62,8 @@ public static partial class FrontendHosting
 
         app.Map("/api/{**path}", () => Results.NotFound());
 
-        // "/" is the portal's front door, as it is in the client: a crawler is sent there rather than shown an empty shell.
-        app.MapGet("/", () => Results.Redirect("/explore")).AllowAnonymous().ExcludeFromDescription();
-
-        // Paths that look like files ("nonfile" excludes them) stay 404s, as MapFallbackToFile left them.
+        // "/" is Lorex's home page (031), answered by the shell like every other page, with its own head. Paths that look
+        // like files ("nonfile" excludes them) stay 404s, as MapFallbackToFile left them.
         app.MapFallback("{*path:nonfile}", context => SeoEndpoints.RenderShellAsync(context, template)).AllowAnonymous();
         return app;
     }

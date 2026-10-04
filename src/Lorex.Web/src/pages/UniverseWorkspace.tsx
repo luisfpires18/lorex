@@ -185,11 +185,11 @@ export default function UniverseWorkspace() {
             puts the only saturated colour in the chrome directly above the universe's accent
             seal - which is the one thing in the rail that carries meaning. The mark is shown
             large on the auth plate and small in the paper bars instead. */}
-        {/* Lorex's mark leads to Explore, Lorex's front door, from everywhere (014), and its name says so. The
-            universes are "All universes", at the head of the sidebar and of the phone's Sections sheet; the account
-            menu at the rail's foot names Explore and My workspace too. The glyph stays small and its target does
-            not: a 40px square, the rail's own width less its margins. */}
-        <Link className="rail__mark" to="/explore" aria-label={BRAND_LINK_LABEL}>
+        {/* Lorex's mark leads to Lorex's home, from everywhere (031), and its name says so. The universes are "All
+            universes", at the head of the sidebar and of the phone's Sections sheet; the account menu at the rail's
+            foot names Explore and My workspace. The glyph stays small and its target does not: a 40px square, the
+            rail's own width less its margins. */}
+        <Link className="rail__mark" to="/" aria-label={BRAND_LINK_LABEL}>
           L
         </Link>
         <span className="rail__seal" aria-hidden="true" />

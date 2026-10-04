@@ -30,6 +30,7 @@ const FamilyTreePage = lazy(() => import('./pages/FamilyTreePage'))
 const IdeaPage = lazy(() => import('./pages/IdeaPage'))
 const IdeasPage = lazy(() => import('./pages/IdeasPage'))
 const InvitationPage = lazy(() => import('./pages/InvitationPage'))
+const LandingPage = lazy(() => import('./pages/LandingPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const LorePage = lazy(() => import('./pages/LorePage'))
 const MassCreatePage = lazy(() => import('./pages/MassCreatePage'))
@@ -104,8 +105,10 @@ function Root() {
         <RouteFocus />
         <Routes>
           {/* The public portal: outside both guards, so it answers signed in or out, and outside the
-              workspace, so none of its chrome is mounted. It reads only the anonymous API (ADR 0036). */}
+              workspace, so none of its chrome is mounted. It reads only the anonymous API (ADR 0036). `/` is
+              Lorex's home (031); Explore is where the published worlds are found. */}
           <Route element={<PublicLayout />}>
+            <Route path="/" element={asScreen('home', <LandingPage />)} />
             <Route path="/explore" element={asScreen('explore', <ExplorePage />)} />
             <Route path="/worlds/:slug" element={asScreen('world', <PublicWorldPage />)} />
             <Route
@@ -118,9 +121,6 @@ function Root() {
             />
             <Route path="/authors/:authorSlug" element={asScreen('author', <PublicAuthorPage />)} />
           </Route>
-
-          {/* The front door is the portal, signed in or not; the workspace is a choice made from it. */}
-          <Route path="/" element={<Navigate to="/explore" replace />} />
 
           {/* An invitation link: outside both guards, because signed out it must still say what it is - and only that -
               and offer a way in that comes back here (ADR 0041 amendment). */}
@@ -287,9 +287,9 @@ function Root() {
             </Route>
           </Route>
 
-          {/* An address nobody holds: inside the workspace, the universes; anywhere else, the front door (014). */}
+          {/* An address nobody holds: inside the workspace, the universes; anywhere else, Lorex's home (031). */}
           <Route path="/app/*" element={<Navigate to="/app" replace />} />
-          <Route path="*" element={<Navigate to="/explore" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </ProfileImageProvider>
     </AuthProvider>

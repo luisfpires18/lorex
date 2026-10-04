@@ -48,9 +48,18 @@ export interface ExploreQuery {
   author?: string
 }
 
-/** One page of public universes. Works signed in or out; sends nothing about the session. */
-export function listPublicUniverses(query: ExploreQuery, page: number, signal?: AbortSignal) {
+/**
+ * One page of public universes. Works signed in or out; sends nothing about the session. `pageSize` left out is the
+ * API's own (24); the home page asks for the few it shows.
+ */
+export function listPublicUniverses(
+  query: ExploreQuery,
+  page: number,
+  signal?: AbortSignal,
+  pageSize?: number,
+) {
   const params = new URLSearchParams({ page: String(page) })
+  if (pageSize) params.set('pageSize', String(pageSize))
   for (const [name, value] of Object.entries(query)) {
     if (value) params.set(name, value)
   }
@@ -182,4 +191,16 @@ export function getWorkspaceLink(
     `/api/universes/by-address/${encodeURIComponent(world)}${query ? `?${query}` : ''}`,
     { signal },
   )
+}
+
+/** Lorex in four numbers, for its home page (031): counts only, the same for everyone. */
+export interface PublicStats {
+  creators: number
+  universes: number
+  publishedWorlds: number
+  privateWorlds: number
+}
+
+export function getPublicStats(signal?: AbortSignal) {
+  return apiFetch<PublicStats>('/api/public/stats', { signal })
 }

@@ -11460,14 +11460,46 @@ a.idearef__name {
   }
 }
 
-/* A phone: the brand is the way to Explore, so the bar keeps room for the way in. */
+/* No search (Lorex's home, 031): the way in keeps to the bar's end on its own. */
+.portal__nav + .portal__session {
+  margin-left: auto;
+}
+
+/* A phone: the brand and the way in share the first row; Explore - no longer the brand's destination (031) - opens the
+   second, beside the search where a page has one. A grid rather than wrapping, so Explore never lands on the first row
+   beside the account just because a short session left it room. */
 @media (max-width: 40rem) {
-  .portal__nav {
-    display: none;
+  .portal__bar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'brand . session'
+      'nav search search';
+    /* No column gap: the empty middle track already parts the brand from the session, and a gap on each side of it
+       would cost the narrowest phone its Create account. Row two's own space is the search's margin. */
+    gap: var(--space-2) 0;
   }
 
-  .portal__bar {
-    gap: var(--space-3);
+  .portal__brand {
+    grid-area: brand;
+  }
+
+  .portal__session {
+    grid-area: session;
+    margin-left: var(--space-2);
+  }
+
+  .portal__nav {
+    grid-area: nav;
+  }
+
+  .portal-search {
+    grid-area: search;
+    margin-left: var(--space-3);
+  }
+
+  .portal__link {
+    min-height: var(--control-md);
   }
 
   .portal__bar .wordmark {
@@ -11479,23 +11511,28 @@ a.idearef__name {
   }
 }
 
-/* The narrowest phones: brand and the two ways in still share one row. */
+/* The narrowest phones: brand and the two ways in still share one row, with air between them - measured at 360px,
+   touch-sized controls included. */
 @media (max-width: 25rem) {
+  .portal__brand {
+    gap: 0.45rem;
+  }
+
   .portal__bar .brandmark {
-    width: 1.75rem;
-    height: 1.75rem;
+    width: 1.625rem;
+    height: 1.625rem;
   }
 
   .portal__bar .wordmark {
-    font-size: 1.1rem;
+    font-size: 1rem;
   }
 
   .portal__session {
-    gap: var(--space-2);
+    gap: 0.375rem;
   }
 
   .portal__pill {
-    padding: 0 0.75rem;
+    padding: 0 0.625rem;
     font-size: var(--text-sm);
   }
 }
@@ -13041,5 +13078,640 @@ a.idearef__name {
   .pauthor__head {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+/* ---------- Lorex's home (031) ----------
+
+   The portal's own page about Lorex itself, in the portal's look: night or parchment, the display serif for what is
+   said and the interface face for what is done, the one ink-blue accent, artwork as atmosphere. One of the owner's two
+   landing paintings is the hero, under a veil of the page's own ground; Lorex's live numbers sit on the hero's foot;
+   then the sections, each laid out its own way rather than as a stack of cards. Pills are the interactive shape,
+   as in the bar; the world cards keep the portal's radius. Nothing on the page moves by itself. */
+
+.landing {
+  --landing-width: 76rem;
+  --landing-space: clamp(4.5rem, 9vw, 8rem);
+
+  padding-bottom: var(--landing-space);
+}
+
+.landing-section,
+.landing-connect__inner,
+.landing-hero__inner,
+.portal__footer {
+  width: min(100% - 2 * var(--portal-gutter), var(--landing-width));
+  margin-inline: auto;
+}
+
+.landing-section {
+  padding-top: var(--landing-space);
+}
+
+/* -- The hero: the painting, its veil, and four things said. -- */
+
+.landing-hero {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  min-height: clamp(32rem, 74svh, 44rem);
+  overflow: hidden;
+  padding: clamp(3rem, 7vw, 5.5rem) 0 clamp(5rem, 9vw, 7.5rem);
+}
+
+.landing-hero__image {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Where the window is narrower than the painting, its left is cropped first, which keeps the citadel to the right of
+     the title from a laptop down to a tablet. */
+  object-position: 45% 42%;
+}
+
+/* The page's own ground over the painting: whole along the reading edge, thin where the citadel stands, and whole
+   again at the foot, where the numbers sit. */
+.landing-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(
+      to right,
+      rgb(var(--portal-shade-rgb) / 0.92) 0,
+      rgb(var(--portal-shade-rgb) / 0.7) 34%,
+      rgb(var(--portal-shade-rgb) / 0.12) 70%
+    ),
+    linear-gradient(
+      to top,
+      var(--portal-bg) 0,
+      rgb(var(--portal-shade-rgb) / 0.6) 22%,
+      rgb(var(--portal-shade-rgb) / 0) 52%
+    ),
+    linear-gradient(rgb(var(--portal-shade-rgb) / 0.32), rgb(var(--portal-shade-rgb) / 0) 30%);
+}
+
+.landing-hero__eyebrow {
+  margin: 0 0 var(--space-5);
+  color: rgb(var(--portal-ink-rgb) / 0.86);
+  font-family: var(--display);
+  font-size: 0.9375rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 12px rgb(var(--portal-glow-rgb) / 0.7);
+}
+
+.landing-hero__title {
+  margin: 0;
+  font-family: var(--display);
+  /* Sized so the longest sentence holds one line from a 360px phone up, and stops short of the citadel. */
+  font-size: clamp(2rem, 8.8vw, 4.25rem);
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: -0.018em;
+  text-wrap: balance;
+  text-shadow: 0 2px 24px rgb(var(--portal-glow-rgb) / 0.55);
+}
+
+/* Each sentence a line of its own: three short thoughts, read as three. */
+.landing-hero__title span {
+  display: block;
+}
+
+.landing-hero__turn {
+  color: rgb(var(--portal-ink-rgb) / 0.74);
+}
+
+.landing-hero__lede {
+  max-width: 34rem;
+  margin: var(--space-6) 0 0;
+  color: rgb(var(--portal-ink-rgb) / 0.9);
+  font-size: clamp(1.0625rem, 0.98rem + 0.35vw, 1.25rem);
+  line-height: 1.55;
+  text-wrap: pretty;
+  text-shadow: 0 1px 12px rgb(var(--portal-glow-rgb) / 0.7);
+}
+
+/* -- Actions: one filled pill, one outlined, the size of a decision rather than of the bar's links. -- */
+
+.landing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  min-height: 3rem;
+  margin-top: clamp(1.75rem, 3.5vw, 2.5rem);
+}
+
+.landing-actions--center {
+  justify-content: center;
+}
+
+.landing-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3rem;
+  padding: 0 1.5rem;
+  border: 1px solid var(--portal-line-strong);
+  border-radius: var(--radius-full);
+  background: rgb(var(--portal-shade-rgb) / 0.42);
+  color: var(--portal-ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  transition:
+    background-color var(--duration-2) var(--ease),
+    border-color var(--duration-2) var(--ease),
+    transform var(--duration-1) var(--ease);
+}
+
+.landing-button:hover {
+  border-color: rgb(var(--portal-ink-rgb) / 0.55);
+  background: rgb(var(--portal-ink-rgb) / 0.1);
+}
+
+.landing-button:active {
+  transform: translateY(1px);
+}
+
+.landing-button:focus-visible {
+  outline-offset: 3px;
+}
+
+.landing-button--primary {
+  border-color: var(--portal-ink);
+  background: var(--portal-ink);
+  color: var(--primary-ink);
+}
+
+.landing-button--primary:hover {
+  border-color: color-mix(in srgb, var(--portal-ink) 86%, var(--portal-bg));
+  background: color-mix(in srgb, var(--portal-ink) 86%, var(--portal-bg));
+}
+
+/* -- Lorex in numbers: four live counts on the hero's foot, read as type, not as a dashboard. -- */
+
+.landing-metrics {
+  position: relative;
+  width: min(100% - 2 * var(--portal-gutter), var(--landing-width));
+  margin: calc(-1 * clamp(2.5rem, 5vw, 4rem)) auto 0;
+}
+
+.landing-metrics__list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  border-block: 1px solid var(--portal-line);
+}
+
+.landing-metric {
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: clamp(1.25rem, 2.5vw, 2rem) clamp(1rem, 2.5vw, 2rem);
+}
+
+.landing-metric + .landing-metric {
+  border-left: 1px solid var(--portal-line);
+}
+
+.landing-metric:first-child {
+  padding-left: 0;
+}
+
+.landing-metric__value {
+  display: flex;
+  align-items: center;
+  min-height: 1.1em;
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(2.25rem, 1.6rem + 2.2vw, 3.5rem);
+  font-weight: 600;
+  font-variant-numeric: lining-nums tabular-nums;
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+  overflow-wrap: anywhere;
+}
+
+.landing-metric__label {
+  color: rgb(var(--portal-ink-rgb) / 0.78);
+  font-size: var(--text-ui);
+  letter-spacing: 0.01em;
+}
+
+/* Waiting: a quiet bar where the number will be, the row already its final height. */
+.landing-metric__wait {
+  display: block;
+  width: 2.5ch;
+  height: 0.62em;
+  border-radius: var(--radius-xs);
+  background: rgb(var(--portal-ink-rgb) / 0.08);
+}
+
+/* Two by two below a tablet: the rules become a cross, and the first column loses its inset. */
+@media (max-width: 48rem) {
+  .landing-metrics__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .landing-metric:nth-child(3) {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .landing-metric:nth-child(n + 3) {
+    border-top: 1px solid var(--portal-line);
+  }
+}
+
+/* -- Section type: one heading voice, one lede voice, for every section below. -- */
+
+.landing-heading {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(1.875rem, 1.3rem + 1.9vw, 2.875rem);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.012em;
+  text-wrap: balance;
+}
+
+.landing-heading--statement {
+  font-size: clamp(2.125rem, 1.4rem + 2.6vw, 3.5rem);
+}
+
+.landing-lede {
+  max-width: 36rem;
+  margin: var(--space-5) 0 0;
+  color: rgb(var(--portal-ink-rgb) / 0.8);
+  font-size: clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem);
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+/* -- Build and Write: a column of argument beside what it is about. -- */
+
+.landing-split {
+  display: grid;
+  gap: var(--space-8);
+}
+
+@media (min-width: 56rem) {
+  .landing-split {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    align-items: start;
+    gap: clamp(3rem, 7vw, 6.5rem);
+  }
+}
+
+.landing-facets {
+  margin: 0;
+}
+
+.landing-facet {
+  display: grid;
+  gap: var(--space-1) var(--space-6);
+  padding: var(--space-5) 0;
+}
+
+.landing-facet + .landing-facet {
+  border-top: 1px solid var(--portal-line);
+}
+
+.landing-facet:first-child {
+  padding-top: var(--space-2);
+}
+
+@media (min-width: 40rem) {
+  .landing-facet {
+    grid-template-columns: 15rem minmax(0, 1fr);
+    align-items: baseline;
+  }
+}
+
+.landing-facet dt {
+  font-family: var(--display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.landing-facet dd {
+  margin: 0;
+  color: rgb(var(--portal-ink-rgb) / 0.78);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+/* -- Connect: one band, a statement, and three things that follow from writing once. -- */
+
+.landing-connect {
+  margin-top: var(--landing-space);
+  padding: var(--landing-space) 0;
+  border-block: 1px solid var(--portal-line);
+  background: var(--portal-surface);
+  text-align: center;
+}
+
+.landing-connect .landing-lede,
+.landing-final .landing-lede {
+  margin-inline: auto;
+  text-wrap: balance;
+}
+
+.landing-links {
+  display: grid;
+  gap: var(--space-7);
+  margin: clamp(2.5rem, 5vw, 4rem) 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+@media (min-width: 56rem) {
+  .landing-links {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: clamp(2rem, 4vw, 3.5rem);
+  }
+}
+
+.landing-links li {
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--accent-rule);
+}
+
+.landing-links__cause {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 1.3125rem;
+  line-height: 1.3;
+}
+
+.landing-links__effect {
+  margin: var(--space-2) 0 0;
+  color: rgb(var(--portal-ink-rgb) / 0.78);
+  line-height: 1.55;
+}
+
+/* -- Write: who it is for, in a sentence rather than a list of logos. -- */
+
+.landing-media {
+  padding-left: clamp(1.25rem, 2.5vw, 2rem);
+  border-left: 1px solid var(--accent-rule);
+}
+
+.landing-media__list {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(1.5rem, 1.15rem + 1.2vw, 2.125rem);
+  line-height: 1.3;
+  text-wrap: pretty;
+}
+
+.landing-media__turn {
+  margin: var(--space-5) 0 0;
+  color: rgb(var(--portal-ink-rgb) / 0.78);
+  font-size: var(--text-item);
+}
+
+/* -- Explore: a few real worlds, and the way to the rest. -- */
+
+.landing-explore__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-5) var(--space-8);
+  margin-bottom: clamp(2rem, 4vw, 3rem);
+}
+
+.landing-more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-touch);
+  color: var(--portal-ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--accent-rule);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.35em;
+  white-space: nowrap;
+  transition: text-decoration-color var(--duration-2) var(--ease);
+}
+
+.landing-more:hover {
+  text-decoration-color: currentColor;
+}
+
+.landing-more svg {
+  flex: none;
+  color: var(--accent);
+}
+
+.landing-worlds {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(1rem, 1.6vw, 1.5rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* One column on a phone: two worlds say what Explore is; four would be a scroll of their own. */
+@media (max-width: 33.99rem) {
+  .landing-worlds > :nth-child(n + 3) {
+    display: none;
+  }
+}
+
+@media (min-width: 34rem) {
+  .landing-worlds {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 75rem) {
+  .landing-worlds {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.landing-quiet {
+  max-width: 36rem;
+  margin: 0;
+  color: rgb(var(--portal-ink-rgb) / 0.78);
+}
+
+/* -- Trust: three promises Lorex already keeps. -- */
+
+.landing-assurances {
+  display: grid;
+  gap: var(--space-7);
+  margin: clamp(2rem, 4vw, 3rem) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 48rem) {
+  .landing-assurances {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: clamp(1.5rem, 3.5vw, 3rem);
+  }
+}
+
+.landing-assurance {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: start;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+
+/* The workspace's doorway medallion, small: a ring of the accent around the mark. */
+.landing-assurance svg {
+  box-sizing: content-box;
+  padding: 0.625rem;
+  border-radius: 50%;
+  background: rgb(var(--portal-accent-rgb) / 0.1);
+  box-shadow: inset 0 0 0 1px rgb(var(--portal-accent-rgb) / 0.35);
+  color: var(--accent);
+}
+
+.landing-assurance h3 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.landing-assurance p {
+  grid-column: 1 / -1;
+  margin: var(--space-2) 0 0;
+  color: rgb(var(--portal-ink-rgb) / 0.78);
+  line-height: 1.55;
+}
+
+/* -- The last word: one way on. -- */
+
+.landing-final {
+  width: min(100% - 2 * var(--portal-gutter), 46rem);
+  margin: var(--landing-space) auto 0;
+  padding-top: var(--landing-space);
+  border-top: 1px solid var(--portal-line);
+  text-align: center;
+}
+
+/* -- The footer: where else there is to go, and nothing invented. -- */
+
+.portal__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4) var(--space-7);
+  padding: var(--space-7) 0 var(--space-8);
+  border-top: 1px solid var(--portal-line);
+  color: var(--portal-muted);
+  font-size: var(--text-ui);
+}
+
+.portal__footerbrand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+.portal__footerbrand .wordmark {
+  color: var(--portal-ink);
+  font-size: 1.25rem;
+}
+
+.portal__footerbrand .wordmark__x {
+  color: var(--accent);
+}
+
+.portal__footernav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-6);
+}
+
+.portal__footernav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-md);
+  color: rgb(var(--portal-ink-rgb) / 0.82);
+  text-decoration: none;
+}
+
+.portal__footernav a:hover {
+  color: var(--portal-ink);
+  text-decoration: underline;
+  text-underline-offset: 0.3em;
+}
+
+/* A tablet: the title reaches across the citadel, so the veil covers the whole painting a little. */
+@media (max-width: 56rem) {
+  .landing-hero::after {
+    background:
+      linear-gradient(rgb(var(--portal-shade-rgb) / 0.42), rgb(var(--portal-shade-rgb) / 0.42)),
+      linear-gradient(
+        to right,
+        rgb(var(--portal-shade-rgb) / 0.82) 0,
+        rgb(var(--portal-shade-rgb) / 0.2) 85%
+      ),
+      linear-gradient(to top, var(--portal-bg) 0, rgb(var(--portal-shade-rgb) / 0) 45%);
+  }
+}
+
+/* -- A phone: the hero gives its height to the words, and the picture comes sooner. -- */
+
+@media (max-width: 40rem) {
+  .landing-hero {
+    align-items: flex-start;
+    min-height: 0;
+    padding: var(--space-8) 0 4.5rem;
+  }
+
+  .landing-hero__image {
+    object-position: 82% 45%;
+  }
+
+  .landing-hero::after {
+    background:
+      linear-gradient(rgb(var(--portal-shade-rgb) / 0.62), rgb(var(--portal-shade-rgb) / 0.62)),
+      linear-gradient(to top, var(--portal-bg) 0, rgb(var(--portal-shade-rgb) / 0) 40%);
+  }
+
+  .landing-hero__eyebrow {
+    font-size: 0.8125rem;
+  }
+
+  .landing-actions .landing-button {
+    flex: 1 1 12rem;
+  }
+
+  .landing-metrics {
+    margin-top: -2rem;
+  }
+
+  .landing-explore__head {
+    display: block;
+  }
+
+  .landing-more {
+    margin-top: var(--space-3);
   }
 }

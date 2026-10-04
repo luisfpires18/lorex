@@ -29,7 +29,8 @@ story's is its public summary, never its premise; an author's is "Name, creator 
 invented. Pictures are the public derivatives the API already serves (card, entry thumbnail, a photo only if shown),
 else the static `icon-512.png`. Private, trashed, incomplete and missing addresses are one **404** with a generic
 `noindex` head that names nothing. Everything else - workspace, sign-in, profile, unknown paths - is `noindex,nofollow`
-with `X-Robots-Tag` to match. Every API response says `X-Robots-Tag: noindex`. `/` redirects to `/explore`.
+with `X-Robots-Tag` to match. Every API response says `X-Robots-Tag: noindex`. `/` redirected to `/explore` until 031
+(amendment below).
 
 **Explore has one canonical.** `/explore` is indexable; any search or filter state is `noindex,follow` with its canonical
 at `/explore`, so arbitrary combinations are never indexed but the worlds they link to are reachable.
@@ -59,3 +60,11 @@ rendering crawler can draw a page and a preview can fetch its picture) and disal
 - A metadata lookup that fails serves the generic head with a 200 rather than failing the shell; the app then reports its
   own load failure.
 - No schema change. No structured data (schema.org): the pages do not map cleanly enough to be worth a guess.
+
+## Amendment (2026-10-04, Product refinement 031) - Lorex's home is a page
+
+- `/` is no longer redirected to `/explore` by the server (`FrontendHosting`) or the client: it is the app shell like
+  any other page, with its own head from `PageMetadataResolver` - "Lorex — Build connected fictional universes", a fixed
+  description Lorex writes, canonical `/`, `index,follow` (a query string makes it `noindex,follow` with the same
+  canonical, as Explore's), Open Graph with the static icon. `/` is the sitemap's first address. `robots.txt` already
+  allowed it. No new metadata mechanism.

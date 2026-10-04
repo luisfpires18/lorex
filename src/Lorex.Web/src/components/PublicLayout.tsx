@@ -15,37 +15,46 @@ import { Wordmark } from './Wordmark'
  * applications: the session, the router and the build are shared, so a visitor may be signed in or not and the
  * bar says which way to go - Log in and Create account, or My workspace and their account.
  *
- * The portal is where Lorex starts, signed in or not. Logging in from it comes back to the same page (the page is
- * passed as router state, which `returnPath` checks); the workspace is entered only by choosing My workspace, and
- * signing out from here stays here.
+ * Lorex's home, `/`, is a page of this frame (031), and the brand leads there from everywhere. Explore is the bar's one
+ * named destination, on every width: on a phone it takes a row of its own under the brand and the way in, beside the
+ * search where there is one.
  *
- * What a visitor sees this side of Lorex called is Explore - its one destination, the brand's, and its landmark's name;
+ * What a visitor sees this side of Lorex called is Explore - its one named destination and its landmark's name;
  * "portal" is the architecture's word for it, not the screen's. My workspace is a plain link across, in the same tab:
  * no outward arrow, which would say it opened somewhere else.
  *
+ * Logging in from a portal page comes back to the same page (the page is passed as router state, which `returnPath`
+ * checks) - except from the home page, whose Log in and Create account mean "let me in", so they land in the workspace
+ * as any sign-in does. The workspace is otherwise entered only by choosing My workspace, and signing out from here
+ * stays here.
+ *
  * The portal follows Lorex's one theme (013), in its own look: `.portal` redefines the shared tokens for everything
  * inside it, dark or light, so buttons, notices and menus drawn here follow without a second set of components. The
- * bar is a solid band above every page, holding the brand, Explore, the search (see `PortalSearch`) and the way in.
- * The theme is chosen in the account menu; signed out, where there is no account menu, from Appearance beside Log in.
+ * bar is a solid band above every page, holding the brand, Explore, the search (see `PortalSearch`) and the way in. The
+ * search is a search of published worlds, so the home page leaves it out: there it would only be a large box asking a
+ * newcomer a question before the page has said what Lorex is. The theme is chosen in the account menu; signed out,
+ * where there is no account menu, from Appearance beside Log in.
  */
 export function PublicLayout() {
   const { user, isLoading } = useAuth()
   const location = useLocation()
+  const home = location.pathname === '/'
   const here = `${location.pathname}${location.search}`
+  const comeBack = home ? undefined : { from: here }
 
   return (
     <div className="portal">
       <header className="portal__bar">
-        <Link className="portal__brand" to="/explore" aria-label={BRAND_LINK_LABEL}>
+        <Link className="portal__brand" to="/" aria-label={BRAND_LINK_LABEL}>
           <BrandMark />
           <Wordmark />
         </Link>
         <nav className="portal__nav" aria-label="Explore">
-          <NavLink className="portal__link" to="/explore" end>
+          <NavLink className="portal__link" to="/explore" end data-testid="portal-explore">
             Explore
           </NavLink>
         </nav>
-        <PortalSearch />
+        {home ? null : <PortalSearch />}
         <div className="portal__session" data-testid="portal-session">
           {isLoading ? null : user ? (
             <>
@@ -72,7 +81,7 @@ export function PublicLayout() {
               <Link
                 className="portal__pill"
                 to="/login"
-                state={{ from: here }}
+                state={comeBack}
                 data-testid="portal-login"
               >
                 Log in
@@ -80,7 +89,7 @@ export function PublicLayout() {
               <Link
                 className="portal__pill portal__pill--primary"
                 to="/register"
-                state={{ from: here }}
+                state={comeBack}
                 data-testid="portal-join"
               >
                 Create account
@@ -93,6 +102,26 @@ export function PublicLayout() {
       <main className="portal__body" id={MAIN_CONTENT_ID} tabIndex={-1}>
         <Outlet />
       </main>
+
+      {home ? (
+        <footer className="portal__footer" data-testid="portal-footer">
+          <p className="portal__footerbrand">
+            <Wordmark />
+            <span>A workspace for fictional universes</span>
+          </p>
+          <nav className="portal__footernav" aria-label="Site">
+            <Link to="/explore">Explore</Link>
+            {isLoading ? null : user ? (
+              <Link to="/app">My workspace</Link>
+            ) : (
+              <>
+                <Link to="/login">Log in</Link>
+                <Link to="/register">Create account</Link>
+              </>
+            )}
+          </nav>
+        </footer>
+      ) : null}
     </div>
   )
 }

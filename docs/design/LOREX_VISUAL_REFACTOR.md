@@ -1395,7 +1395,7 @@ buttons with `aria-pressed`, a decorative icon beside each word.
   spaced and ruled like Settings', no cards.
 - **A universe's colour** is `[picker] [#rrggbb]` with "No colour"; the swatch palette (Lapis, Verdigris, Rust,
   Amethyst, Brass, Slate) is retired and its `.swatch` styles deleted. Colours chosen from it are ordinary values.
-- The brand links to `/explore` wherever it is drawn.
+- The brand links to `/explore` wherever it is drawn (to `/`, Lorex's home, since 031).
 
 ### 21.1 Follow-up: grouping, Chronology, the theme control
 

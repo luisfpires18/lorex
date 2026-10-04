@@ -17,8 +17,8 @@ function screenName(pathname: string) {
  * profile - and the one place it is drawn. A layout route, as `PublicLayout` is the portal's, so the three screens
  * cannot drift apart again the way three copies of one header did.
  *
- * The bar says which side of Lorex this is and what is on it. The brand leads to Explore, as everywhere (014). Then the
- * workspace by name, and its two places, Universes and Ideas, the one that is open marked as the current page - by a
+ * The bar says which side of Lorex this is and what is on it. The brand leads to Lorex's home, as everywhere (031).
+ * Then the workspace by name, and its two places, Universes and Ideas, the one that is open marked as the current page - by a
  * rule along the bar's foot as well as by ink, never by colour alone. Profile is not a tab: it is the account's, reached
  * from the account menu, and on it neither tab is current. Explore, the other side of Lorex, at the end beside the
  * account; on a phone it leaves the bar, because the account menu's "Go to" already holds it, and the workspace takes a
@@ -38,7 +38,7 @@ export function WorkspaceLayout() {
       <header className="workspacebar">
         <Link
           className="home__brand workspacebar__brand"
-          to="/explore"
+          to="/"
           aria-label={BRAND_LINK_LABEL}
           data-testid="home-brand"
         >
