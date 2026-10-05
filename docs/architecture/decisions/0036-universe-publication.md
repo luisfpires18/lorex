@@ -91,9 +91,9 @@ request (two queries) per owned card on the list.
 - **`UniverseSummary` and `UniverseDetail` carry `artwork`: `UniverseArtworkIdentity { assetId, cardId }` or null.**
   The two ids the owner-only card address is built from and nothing else - no key, URL, file name, frame, size or date.
   The full `UniverseArtworkRef` stays where it is managed: `PublicationState` and the artwork routes.
-- **Owner-only, decided by the server.** The list sets it only where `OwnerId` is the caller - the same test its role
-  makes - and the detail only when the role it resolved is Owner. Viewer, Reviewer and Editor get null, as they got no
-  artwork before (ADR 0041). The binary route is unchanged and still checks both ids against the row.
+- **Owner-only, decided in the query.** The artwork is left-joined on its key *and* `OwnerId` being the caller - the
+  same test that makes the role Owner - so for a shared universe the database returns no ids at all; nothing is read
+  and dropped afterwards. Viewer, Reviewer and Editor get null, as they got no artwork before (ADR 0041). The binary route is unchanged and still checks both ids against the row.
 - **Null is an answer.** For the owner it means the universe has no artwork, not "not asked yet": the shell's first ready
   render and a card's first render already draw the right thing.
 - **No extra query on the reads.** A left join on the artwork's key inside the list's page query (still a count and a

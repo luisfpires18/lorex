@@ -1,8 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
+using Lorex.Api.Data;
 using Lorex.Api.Features.Media;
 using Lorex.Api.Features.Publishing;
 using Lorex.Api.Features.Universes;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using static Lorex.Api.Tests.CollaborationTestClient;
 using static Lorex.Api.Tests.PlotTestClient;
 using static Lorex.Api.Tests.PublishingTestClient;
@@ -89,6 +92,30 @@ public sealed class UniverseArtworkIdentityTests(LorexApiFactory factory) : ICla
 
         Assert.Equal(HttpStatusCode.NotFound, (await outsider.GetAsync($"/api/universes/{universe.Id}")).StatusCode);
         Assert.DoesNotContain((await List(outsider)).Items, item => item.Id == universe.Id);
+    }
+
+    [Fact]
+    public async Task The_query_itself_returns_no_artwork_row_for_a_universe_the_caller_does_not_own()
+    {
+        var (owner, ownerId) = await Account(_factory, "ident-sql-owner");
+        var (_, editorId) = await Account(_factory, "ident-sql-editor");
+        var universe = await CreateUniverse(owner, "Ident sql");
+        await UploadedArtwork(owner, universe.Id, Png(320, 200));
+        await Join(_factory, universe.Id, editorId, UniverseRole.Editor);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<LorexDbContext>();
+        var one = db.Universes.AsNoTracking().Where(candidate => candidate.Id == universe.Id);
+
+        // What the list and the read are built on, run as they run it. The artwork row is materialized straight from the
+        // query's columns - nothing filters it afterwards - so a null here is the database returning no ids for a
+        // collaborator, not the application dropping them.
+        var asOwner = await UniverseEndpoints.WithOwnedArtwork(db, one, ownerId).SingleAsync();
+        var asEditor = await UniverseEndpoints.WithOwnedArtwork(db, one, editorId).SingleAsync();
+
+        Assert.NotNull(asOwner.Artwork);
+        Assert.Equal(universe.Id, asEditor.Universe.Id);
+        Assert.Null(asEditor.Artwork);
     }
 
     [Fact]
@@ -193,6 +220,17 @@ public sealed class UniverseArtworkIdentityTests(LorexApiFactory factory) : ICla
         Assert.Equal(12, manyPage.Items.Count(item => item.Artwork is not null));
         Assert.Equal(2, fewQueries);
         Assert.Equal(2, manyQueries);
+
+        // Shared artwork universes on the page add no query either, and carry no ids.
+        foreach (var shared in manyPage.Items.Take(5))
+        {
+            await Join(_factory, shared.Id, fewId, UniverseRole.Viewer);
+        }
+
+        var (sharedQueries, sharedPage) = await CountListAsync(few, fewId);
+        Assert.Equal(6, sharedPage.Items.Count);
+        Assert.Single(sharedPage.Items, item => item.Artwork is not null);
+        Assert.Equal(2, sharedQueries);
 
         // The read: the access check, then the universe with its artwork - no third query for the art.
         var universe = manyPage.Items[0].Id;
