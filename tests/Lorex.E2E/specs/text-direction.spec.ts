@@ -1112,11 +1112,11 @@ test.describe('authored prose direction', () => {
     await page.goto(`/app/universes/${universeId}/ideas`)
     const lede = page.locator('.ideas__lede')
     await expectIsolated(lede, name)
-    expect(await drawnOrder(lede, ['Possibilities', 'Wright', 'آكرون', 'never'])).toEqual([
-      'Possibilities',
+    expect(await drawnOrder(lede, ['Your', 'Wright', 'آكرون', 'nothing'])).toEqual([
+      'Your',
       'Wright',
       'آكرون',
-      'never',
+      'nothing',
     ])
   })
 

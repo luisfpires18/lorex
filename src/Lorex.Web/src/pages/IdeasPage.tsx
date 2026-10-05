@@ -4,7 +4,7 @@ import type { WorkspaceContext } from './UniverseWorkspace'
 
 /**
  * Ideas: every idea the account has at `/app/ideas`, or one universe's inside its workspace. One list either way
- * (`IdeasBrowser`) - not two idea systems.
+ * (`IdeasBrowser`) - not two idea systems. A story's ideas are the same list again, inside the story's page.
  */
 export default function IdeasPage({ inUniverse = false }: { inUniverse?: boolean }) {
   const context = useOutletContext<WorkspaceContext | undefined>()
@@ -13,11 +13,10 @@ export default function IdeasPage({ inUniverse = false }: { inUniverse?: boolean
   if (universe) {
     return (
       <IdeasBrowser
-        universe={{ id: universe.id, name: universe.name }}
-        basePath={`/app/universes/${universe.id}/ideas`}
+        scope={{ kind: 'universe', universe: { id: universe.id, name: universe.name } }}
       />
     )
   }
 
-  return <IdeasBrowser universe={null} basePath="/app/ideas" />
+  return <IdeasBrowser scope={{ kind: 'all' }} />
 }

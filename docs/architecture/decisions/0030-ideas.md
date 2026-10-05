@@ -197,3 +197,34 @@ a collaborator's idea point into a shared universe would widen what an idea can 
 
 Since refinement 030 the universe picker of an idea offers only universes the account owns, so a shared universe is never
 offered where it would be refused, and Ideas is not a section of a universe shared with the account.
+
+## Amendment - Ideas workspace: three scopes and quick capture (2026-10-05, refinement 037)
+
+Still **one** idea: account-owned (`OwnerId` the boundary), an optional universe, a title, a plain-text body, explicit
+references. All ideas, a universe's ideas and a story's ideas are three views of it, never three kinds. No `Idea.StoryId`,
+no new table, no migration; backup stays version **20**.
+
+- **All** (`/app/ideas`): every live idea of the account, in a universe or none. **Universe**
+  (`/app/universes/{u}/ideas`): `UniverseId == u`. **Story** (`/app/universes/{u}/stories/{s}/ideas`, a fourth view of
+  the story page beside Scenes, Plot and Manuscript): the universe's ideas with at least one explicit reference to the
+  story, to one of its scenes or arcs, or to a beat of one of its arcs. A direct story reference is not required. One
+  idea is one row however many of the story's parts it names; an idea naming two stories is in both. Only references
+  decide: never a title, a body or a name in either. A reference to a part since put in the Trash still counts.
+- `GET /api/ideas?universeId=&storyId=`: `storyId` without `universeId` is 400; a story that is not live in a universe
+  the caller owns is 404, alike for missing, binned, another universe's, another account's and a collaborator's. The
+  filter is one EXISTS per reference kind, applied before the count and the page, and composes with search (title and
+  body) and `deleted`. References survive a soft delete, so a story's Recently deleted works by the same rule and a
+  restore brings the idea back to the same story. Command count per page: all 2, universe 2, story 3, at 1, 12 or 50
+  matching ideas.
+- **Quick capture** on every live list: one line, Enter (never while an input method is composing), the ordinary
+  `POST /api/ideas` with the line as the title and an empty body. All: no universe, no references. Universe: the
+  universe. Story: the universe and one direct story reference, which is what places it in the story's list. A blank
+  line is refused before it is sent; the server stays the judge; a failure keeps the words; a second Enter while the
+  first is on its way is ignored.
+- The story's Ideas view is offered only with `keepIdeas` (the owner). A collaborator is offered no view and, by
+  address, sees "not available" and asks nothing. Ideas are not collaborative.
+- A story's idea opens in the one editor at `/app/universes/{u}/ideas/{id}`; Back returns to the story's list with its
+  search and page, which live in the address.
+
+Still deliberately unsupported: promotion or conversion to lore, a story or a scene; rich text, Markdown, checklists;
+images; diagrams or canvases; tags, folders, statuses, priorities; autosave; sharing; any classification by content.
