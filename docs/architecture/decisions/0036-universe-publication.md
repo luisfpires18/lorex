@@ -82,6 +82,32 @@ Public portal section in Settings; the public page does not yet know its viewer 
   authenticated owner-scoped route, never anonymously.
 - An archived universe stays public; archive is the owner's list, not visibility.
 
+## Amendment (2026-10-05, fix/universe-artwork-loading) - the artwork's card arrives with the universe
+
+Measured first: a card and the workspace used to paint the fallback, then ask `GET /api/universes/{id}/artwork` for
+the ids, then draw the picture - one round trip late even when the image was already in the browser's cache, and one
+request (two queries) per owned card on the list.
+
+- **`UniverseSummary` and `UniverseDetail` carry `artwork`: `UniverseArtworkIdentity { assetId, cardId }` or null.**
+  The two ids the owner-only card address is built from and nothing else - no key, URL, file name, frame, size or date.
+  The full `UniverseArtworkRef` stays where it is managed: `PublicationState` and the artwork routes.
+- **Owner-only, decided by the server.** The list sets it only where `OwnerId` is the caller - the same test its role
+  makes - and the detail only when the role it resolved is Owner. Viewer, Reviewer and Editor get null, as they got no
+  artwork before (ADR 0041). The binary route is unchanged and still checks both ids against the row.
+- **Null is an answer.** For the owner it means the universe has no artwork, not "not asked yet": the shell's first ready
+  render and a card's first render already draw the right thing.
+- **No extra query on the reads.** A left join on the artwork's key inside the list's page query (still a count and a
+  page) and the detail's read (still the access check and the read). Writes that answer with the universe - update,
+  archive, unarchive, restore - read the ids in one more query; create answers null. A restore answers the artwork it
+  has just stored under new ids.
+- **The address versions itself.** Replacing mints both ids, reframing a new card id, so the owner's
+  `private, max-age=31536000, immutable` card URL never names two pictures and needs no cache-busting.
+- `GET /api/universes/{id}/artwork` remains, for managing the artwork; browsing no longer calls it. Publish's own changes
+  replace the shell's ids directly. Public artwork routes are untouched.
+- **Deferred:** the list's `OwnerId OR membership EXISTS` filter scans `Universes` and sorts in a temporary B-tree
+  instead of using the owner index (a query-shape change, not an index); and the private card read's role query plus
+  row check could become one query without weakening `UniverseAccess`. Neither causes a visible delay today.
+
 ## Amendment (2026-09-28, Task 010) - entries and stories are published one by one, and the universe overrides them
 
 The same principle, one level down: nothing inside a universe is public because the universe is.
