@@ -121,6 +121,7 @@ public sealed class UniverseAccessMatrixTests(LorexApiFactory factory) : IClassF
             new("edit kind", Put, $"{u}/relationship-types/{w.Kind}", May.Edit, Json(new RelationshipTypeRequest("Bound to", null, true, null, null))),
             new("delete kind", Delete, $"{u}/relationship-types/{any}", May.Edit),
             new("family tree", Get, $"{u}/family-tree/{w.Entry}", May.Read),
+            new("family discovery", Get, $"{u}/family-tree/families", May.Read),
 
             new("timeline", Get, $"{u}/timeline", May.Read),
             new("moment", Get, $"{u}/timeline/{w.Moment}", May.Read),

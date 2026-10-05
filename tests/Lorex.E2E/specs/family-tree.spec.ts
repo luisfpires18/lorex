@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { makeTestPassword } from './support/account'
 
 /**
  * The Family Tree, end to end (ADR 0035). Each test registers its own account and builds its own universe, so
@@ -8,8 +9,6 @@ import { expect, test, type Page } from '@playwright/test'
  * "parent of" is invisible to the tree until someone gives it a family meaning on the Types screen, and every
  * relative on screen is derived from those links on each read - never stored.
  */
-const PASSWORD = 'Test-password-123!'
-
 /** Mirrors the API enums. */
 const Canon = { idea: 0, draft: 1, canon: 2 } as const
 const Family = { none: 0, biological: 1, adoptive: 2 } as const
@@ -26,11 +25,12 @@ function unique(prefix: string) {
 
 async function signUp(page: Page) {
   const username = unique('kinkeeper')
+  const password = makeTestPassword()
   await page.goto('/register')
   await page.getByLabel('Username').fill(username)
   await page.getByLabel('Email').fill(`${username}@example.test`)
-  await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
-  await page.getByLabel('Confirm password').fill(PASSWORD)
+  await page.getByLabel('Password', { exact: true }).fill(password)
+  await page.getByLabel('Confirm password').fill(password)
   await page.getByRole('button', { name: 'Create account' }).click()
   await page.waitForURL('/app')
   return username
@@ -185,12 +185,14 @@ test.describe('family tree', () => {
     const lia = await seedPerson(page, universeId, typeId, 'Lia')
     await seedLink(page, universeId, named, mara, lia)
 
-    // The section is in the universe's own navigation, and the tree is empty: the name said nothing.
+    // The section is in the universe's own navigation, and there is no family to find: the name said nothing. Someone
+    // can still be chosen while a family kind is missing.
     await page.goto(`/app/universes/${universeId}`)
     await page.getByTestId('workspace-family-tree').click()
     await page.waitForURL(/\/family-tree$/)
-    await expect(page.getByTestId('family-empty')).toBeVisible()
     await expect(page.getByTestId('family-no-kinds')).toBeVisible()
+    await expect(page.getByTestId('family-discovery')).toHaveCount(0)
+    await expect(page.getByLabel('Whose family?')).toBeVisible()
 
     await page.goto(treeUrl(universeId, lia))
     await expect(node(page, 'Lia')).toBeVisible()
