@@ -124,6 +124,7 @@ public sealed class UniverseAccessMatrixTests(LorexApiFactory factory) : IClassF
             new("family discovery", Get, $"{u}/family-tree/families", May.Read),
 
             new("timeline", Get, $"{u}/timeline", May.Read),
+            new("timeline items", Get, $"{u}/timeline/items", May.Read),
             new("moment", Get, $"{u}/timeline/{w.Moment}", May.Read),
             new("create moment", Post, $"{u}/timeline", May.Edit, Json(RuleValidationTestClient.Moment("Another flood", null))),
             new("edit moment", Put, $"{u}/timeline/{w.Moment}", May.Edit, Json(RuleValidationTestClient.Moment("The great flood", null))),

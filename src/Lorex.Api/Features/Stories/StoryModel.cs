@@ -21,8 +21,10 @@ public enum StoryStatus
 ///
 /// Lore is what is true about the world; a story is how an author chooses to tell something in it.
 /// A story may be a draft, hypothetical, nonlinear, alternate or unfinished, so nothing in one
-/// becomes a fact: no Canon finding, no timeline moment, no relationship and no change to any entry
-/// is ever produced from it. Its scenes reference lore by id and never keep a copy of it.
+/// becomes a fact: no Canon finding, no stored timeline moment, no relationship and no change to any entry
+/// is ever produced from it. A scene with a world date is shown on the universe's timeline, read from the
+/// scene each time and never stored there (ADR 0009 amendment, 038); being shown there makes it neither
+/// Canon nor lore. Its scenes reference lore by id and never keep a copy of it.
 ///
 /// Owned by the universe and deleted with it. Deleting a story moves it to the Trash with everything it
 /// holds; only deleting the universe removes it for good. See

@@ -27,6 +27,7 @@ public static class TimelineEndpoints
             .RequireAuthorization();
 
         group.MapGet("/", ListAsync).WithName("ListTimelineEntries");
+        group.MapGet("/items", TimelineFeed.ListAsync).WithName("ListTimelineItems");
         group.MapPost("/", CreateAsync).WithName("CreateTimelineEntry");
         group.MapGet("/{entryId:guid}", GetAsync).WithName("GetTimelineEntry");
         group.MapPut("/{entryId:guid}", UpdateAsync).WithName("UpdateTimelineEntry");
@@ -153,6 +154,11 @@ public static class TimelineEndpoints
             return Results.ValidationProblem(detailErrors);
         }
 
+        if (await ResolveStoriesAsync(db, universeId, request.StoryIds ?? [], [], cancellationToken) is not { } storyIds)
+        {
+            return StoriesRefused();
+        }
+
         var now = DateTime.UtcNow;
         var entry = new TimelineEntry
         {
@@ -173,6 +179,11 @@ public static class TimelineEndpoints
         foreach (var id in entityIds)
         {
             entry.EntityLinks.Add(new TimelineEntryLink { EntityId = id });
+        }
+
+        foreach (var id in storyIds)
+        {
+            entry.StoryLinks.Add(new TimelineEntryStory { StoryId = id });
         }
 
         db.TimelineEntries.Add(entry);
@@ -215,6 +226,7 @@ public static class TimelineEndpoints
     {
         var entry = await db.TimelineEntries
             .Include(candidate => candidate.EntityLinks)
+            .Include(candidate => candidate.StoryLinks)
             .Include(candidate => candidate.Validation)
             .FirstOrDefaultAsync(
                 candidate => candidate.Id == entryId && candidate.UniverseId == universeId,
@@ -248,6 +260,18 @@ public static class TimelineEndpoints
             return Results.ValidationProblem(detailErrors);
         }
 
+        // Left out, the stored stories stand, as the details do: a client that knows nothing of them cannot erase them.
+        List<Guid>? storyIds = null;
+        if (request.StoryIds is { } requestedStories)
+        {
+            var stored = entry.StoryLinks.Select(link => link.StoryId).ToHashSet();
+            storyIds = await ResolveStoriesAsync(db, universeId, requestedStories, stored, cancellationToken);
+            if (storyIds is null)
+            {
+                return StoriesRefused();
+            }
+        }
+
         entry.Title = TimelineValidation.Normalize(request.Title)!;
         Apply(entry, request);
         entry.UpdatedAt = DateTime.UtcNow;
@@ -273,6 +297,21 @@ public static class TimelineEndpoints
         foreach (var id in entityIds.Where(id => !existing.Contains(id)))
         {
             entry.EntityLinks.Add(new TimelineEntryLink { TimelineEntryId = entry.Id, EntityId = id });
+        }
+
+        if (storyIds is not null)
+        {
+            var keep = storyIds.ToHashSet();
+            foreach (var link in entry.StoryLinks.Where(link => !keep.Contains(link.StoryId)).ToList())
+            {
+                entry.StoryLinks.Remove(link);
+            }
+
+            var linked = entry.StoryLinks.Select(link => link.StoryId).ToHashSet();
+            foreach (var id in storyIds.Where(id => !linked.Contains(id)))
+            {
+                entry.StoryLinks.Add(new TimelineEntryStory { TimelineEntryId = entry.Id, StoryId = id });
+            }
         }
 
         await db.SaveChangesAsync(cancellationToken);
@@ -374,6 +413,50 @@ public static class TimelineEndpoints
         return resolved.Count == requested.Count ? requested : null;
     }
 
+    /// <summary>
+    /// Re-resolves every requested story inside this universe, once each. Null when any id is not a story of this universe,
+    /// or names a story in the Trash that was not already linked - <paramref name="stored"/> - so an unrelated edit never
+    /// drops, or fails on, a link to a story that has since been put in the Trash. Another universe's story answers exactly
+    /// as one that does not exist.
+    /// </summary>
+    private static async Task<List<Guid>?> ResolveStoriesAsync(
+        LorexDbContext db,
+        Guid universeId,
+        IReadOnlyList<Guid> requested,
+        HashSet<Guid> stored,
+        CancellationToken cancellationToken)
+    {
+        var wanted = requested.Distinct().ToList();
+
+        if (wanted.Count == 0)
+        {
+            return wanted;
+        }
+
+        if (wanted.Count > TimelineLimits.MaxLinkedStories)
+        {
+            return null;
+        }
+
+        var found = await db.Stories.AsNoTracking()
+            .Where(story => story.UniverseId == universeId && wanted.Contains(story.Id))
+            .Select(story => new { story.Id, IsTrashed = story.DeletedAt != null })
+            .ToListAsync(cancellationToken);
+
+        return found.Count == wanted.Count && found.All(story => !story.IsTrashed || stored.Contains(story.Id))
+            ? wanted
+            : null;
+    }
+
+    private static IResult StoriesRefused() =>
+        Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["storyIds"] =
+            [
+                $"Choose up to {TimelineLimits.MaxLinkedStories} stories from this universe. A story in the Trash cannot be newly linked.",
+            ],
+        });
+
     // ---------- Reading ----------
 
     /// <summary>
@@ -425,7 +508,7 @@ public static class TimelineEndpoints
     /// The stored shape, flat. Precision is worked out afterwards in memory rather than
     /// pushed into SQL, so the query stays one statement and the DTO stays derived.
     /// </summary>
-    private sealed record Row(
+    internal sealed record Row(
         Guid Id,
         string Title,
         string? Description,
@@ -441,6 +524,7 @@ public static class TimelineEndpoints
         Guid? StartEraId,
         Guid? EndEraId,
         List<TimelineEntityLink> Entities,
+        List<TimelineStoryLink> Stories,
         DateTime CreatedAt,
         DateTime UpdatedAt,
         bool HasValidation,
@@ -452,7 +536,7 @@ public static class TimelineEndpoints
         string? ParticipantName,
         bool IsParticipantTrashed);
 
-    private static System.Linq.Expressions.Expression<Func<TimelineEntry, Row>> Projection() =>
+    internal static System.Linq.Expressions.Expression<Func<TimelineEntry, Row>> Projection() =>
         entry => new Row(
             entry.Id,
             entry.Title,
@@ -481,6 +565,11 @@ public static class TimelineEndpoints
                     link.Entity.CanonStatus,
                     link.Entity.DeletedAt != null))
                 .ToList(),
+            entry.StoryLinks
+                .OrderBy(link => link.Story!.Title)
+                .ThenBy(link => link.StoryId)
+                .Select(link => new TimelineStoryLink(link.StoryId, link.Story!.Title, link.Story.DeletedAt != null))
+                .ToList(),
             entry.CreatedAt,
             entry.UpdatedAt,
             entry.Validation != null,
@@ -492,7 +581,7 @@ public static class TimelineEndpoints
             entry.Validation.ParticipantEntity!.Name,
             entry.Validation.ParticipantEntity.DeletedAt != null);
 
-    private static TimelineEntryResponse Map(Row row) =>
+    internal static TimelineEntryResponse Map(Row row) =>
         new(
             row.Id,
             row.Title,
@@ -521,5 +610,6 @@ public static class TimelineEndpoints
                     row.ParticipantId is { } participant
                         ? new TimelineValidationParticipant(participant, row.ParticipantName!, row.IsParticipantTrashed)
                         : null)
-                : null);
+                : null,
+            row.Stories);
 }

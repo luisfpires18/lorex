@@ -184,8 +184,17 @@ public sealed record UniverseBackup(
     /// - not from the field's name, not from the entries it already links - so a version 19 reader would restore every limited
     /// field open to any type. A file at version 19 or earlier has no <c>targetEntityTypeId</c>; each link field reads as open
     /// to any type, and one that carries it was not written by Lorex and is refused.
+    ///
+    /// 21 - A timeline moment may be linked to the stories it matters to (ADR 0009 amendment, 038).
+    /// <see cref="BackupTimelineEntry.StoryIds"/> names stories of the same file, sorted, each once; the restore links the moment
+    /// to those stories' new ids. The moment stays one moment however many stories it names. Not ignorable: the links are the
+    /// author's statement of which stories a moment belongs to, which nothing derives again - so a version 20 reader would
+    /// restore every story's timeline empty of its moments. Scenes and birth and death years on the timeline are not in the
+    /// format as timeline items: they are read from the scenes and entries, which already travel. A file at version 20 or
+    /// earlier has no <c>storyIds</c>; each moment reads as linked to no story, and one that carries them was not written by
+    /// Lorex and is refused.
     /// </summary>
-    public const int CurrentVersion = 20;
+    public const int CurrentVersion = 21;
 
     public static UniverseBackup Of(UniverseBackupPayload payload, DateTime generatedAt) =>
         new(FormatName, CurrentVersion, generatedAt, payload);
@@ -557,7 +566,8 @@ public sealed record BackupRelationship(
 /// <paramref name="EraLabel"/> is the free-text label that reckoning allows.
 ///
 /// <paramref name="Validation"/> is the moment's structured details for world rule checks, or null for a moment with none (since
-/// version 13).
+/// version 13). <paramref name="StoryIds"/> are the stories of this file it is linked to (since version 21), null in an older
+/// file.
 /// </summary>
 public sealed record BackupTimelineEntry(
     Guid Id,
@@ -577,7 +587,8 @@ public sealed record BackupTimelineEntry(
     DateTime CreatedAt,
     DateTime UpdatedAt,
     IReadOnlyList<Guid> ParticipantEntityIds,
-    BackupTimelineValidation? Validation = null);
+    BackupTimelineValidation? Validation = null,
+    IReadOnlyList<Guid>? StoryIds = null);
 
 /// <summary>
 /// A moment's structured details for world rule checks (since version 13): an event kind and a method from this file's

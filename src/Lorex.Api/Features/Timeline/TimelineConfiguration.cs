@@ -11,6 +11,9 @@ public static class TimelineLimits
 
     /// <summary>Enough for a crowded scene, small enough that one request stays bounded.</summary>
     public const int MaxLinkedEntities = 100;
+
+    /// <summary>The stories one moment may be linked to. A handful in practice; bounded so one save stays small.</summary>
+    public const int MaxLinkedStories = 50;
 }
 
 public sealed class TimelineEntryConfiguration : IEntityTypeConfiguration<TimelineEntry>
@@ -83,5 +86,29 @@ public sealed class TimelineEntryLinkConfiguration : IEntityTypeConfiguration<Ti
 
         // Read from the entity side too: "every moment this character appears in".
         builder.HasIndex(link => link.EntityId);
+    }
+}
+
+public sealed class TimelineEntryStoryConfiguration : IEntityTypeConfiguration<TimelineEntryStory>
+{
+    public void Configure(EntityTypeBuilder<TimelineEntryStory> builder)
+    {
+        builder.ToTable("TimelineEntryStories");
+        builder.HasKey(link => new { link.TimelineEntryId, link.StoryId });
+
+        builder.HasOne(link => link.TimelineEntry)
+            .WithMany(entry => entry.StoryLinks)
+            .HasForeignKey(link => link.TimelineEntryId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // A story in the Trash is still a row, so the link stays and returns with it. Only a story deleted for good - with
+        // its universe, or from the Trash - takes the link, and never the moment.
+        builder.HasOne(link => link.Story)
+            .WithMany()
+            .HasForeignKey(link => link.StoryId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Read from the story side: "the moments that matter to this story".
+        builder.HasIndex(link => link.StoryId);
     }
 }

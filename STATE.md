@@ -50,8 +50,16 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
-- **Product refinement 037 - Ideas workspace** (`feat/ideas-workspace-expansion` off `dev` at `c60d534`; committed, not
-  merged, not pushed). No schema, migration or backup change (backup **20**). ADR 0030 amendment.
+- **Product refinement 038 - unified Timeline** (`feat/unified-timeline` off `dev` at `8916b36`; committed, not merged,
+  not pushed). One migration (`AddTimelineEntryStories`), backup **21**. ADR 0009, 0014, 0022, 0024 amendments.
+  - Timeline = one read view: moments (stored), live dated scenes and live entries' birth/death years (read live, never
+    copied). One world order (era, signed year, month, day), never narrative order. `GET .../timeline/items`: UNION ALL,
+    filtered and paged in SQL, 5-7 commands at any size, no manuscript read.
+  - Story timeline = `/timeline?story=`: its dated scenes + moments linked via `TimelineEntryStories`. Births/deaths are
+    universe-only. "View on timeline" on the story's facts line and ⋯ menu. Moment editor gains Stories.
+  - Not projected: Age, Gregorian Date fields (wait for a calendar model), plot arcs/beats, manuscripts.
+- **Product refinement 037 - Ideas workspace** (`feat/ideas-workspace-expansion` off `dev` at `c60d534`, merged into
+  `dev` at `8916b36`). No schema, migration or backup change (backup **20**). ADR 0030 amendment.
   - One account-owned idea, three views: All, a universe's, and a story's (`/stories/:storyId/ideas`, a fourth story
     view, owner only via `keepIdeas`). Story scope = explicit reference to the story or its scene, arc or beat; one row
     per idea; filtered in SQL before count and page (`GET /api/ideas?universeId=&storyId=`, 404 for any story not live in
@@ -59,8 +67,8 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - Quick capture on every live list: one line -> title, empty body, through the ordinary create; story capture adds one
     direct story reference. `IdeasBrowser` takes an `IdeasScope`; rows open in the universe's editor, Back returns.
   - Deferred: conversions (Idea -> Lore/Story/Scene), rich text, checklists, images, diagrams, tags, collaboration.
-- **Product correction 036 - entity-reference target types** (`fix/entity-reference-target-type` off `dev` at `2c7c8f1`;
-  committed, not merged, not pushed). One migration (`AddEntityReferenceTargetType`), backup **20**. ADR 0007 and 0014
+- **Product correction 036 - entity-reference target types** (`fix/entity-reference-target-type` off `dev` at
+  `2c7c8f1`, merged into `dev` at `c60d534`). One migration (`AddEntityReferenceTargetType`), backup **20**. ADR 0007 and 0014
   amendments.
   - A link field may be limited to one type: `EntityFieldDefinitions.TargetEntityTypeId` (nullable, keyed to the type,
     exact type only; null = "Any Lore type", an explicit choice). Existing link fields migrate open; nothing is inferred
@@ -1363,6 +1371,9 @@ tool has changed the picture.
   scene cards (it needs a flag the story read can give without reading prose). ADR 0024-0027, 0029.
 - **Lore article work deferred** - later, not gaps: plain text or Markdown, wiki links and backlinks, version diffs and
   pruning, restoring article text held in pre-ADR-0028 entry versions from the screen, autosave, word counts. ADR 0028.
+- **Unified Timeline deferred (038)** - not gaps: custom calendars and month names, a "show on timeline" option and wording
+  for custom (Gregorian) Date fields, dates on plot arcs, beats or manuscripts, births and deaths on a story's timeline (no
+  explicit relation yet; Story Bible later), a public timeline, the participant filter in the address.
 - **Ideas deferred** - not gaps: promoting an idea (AI proposals are Phase 5), statuses, tags, collections, rich text, wiki
   links, saved versions, cross-universe references, permanent delete, an account export for unassigned ideas. ADR 0030.
 - **Universe search deferred** - not gaps: **account-wide search is an unsettled owner decision**; unassigned ideas in any bar;

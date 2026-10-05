@@ -583,6 +583,17 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
             .Where(validation => validation.TimelineEntry!.UniverseId == universeId)
             .ToDictionaryAsync(validation => validation.TimelineEntryId, cancellationToken);
 
+        // Every link, a story in the Trash included: the story travels with its Trash marker and the link comes back with it.
+        var storyLinks = await db.TimelineEntryStories.AsNoTracking()
+            .Where(link => link.TimelineEntry!.UniverseId == universeId)
+            .ToListAsync(cancellationToken);
+
+        var storiesByEntry = storyLinks
+            .GroupBy(link => link.TimelineEntryId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<Guid>)[.. group.Select(link => link.StoryId).OrderBy(Key, StringComparer.Ordinal)]);
+
         var participantsByEntry = links
             .GroupBy(link => link.TimelineEntryId)
             .ToDictionary(
@@ -617,7 +628,8 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                     participantsByEntry.GetValueOrDefault(entry.Id, []),
                     details.TryGetValue(entry.Id, out var described)
                         ? new BackupTimelineValidation(described.EventKindTermId, described.MethodTermId, described.ParticipantEntityId)
-                        : null)),
+                        : null,
+                    storiesByEntry.GetValueOrDefault(entry.Id, []))),
         ];
     }
 

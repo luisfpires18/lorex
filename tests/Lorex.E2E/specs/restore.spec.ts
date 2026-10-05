@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { makeTestPassword } from './support/account'
 import { png } from './support/png'
 import { entryText } from './support/zip'
 
@@ -12,7 +13,6 @@ import { entryText } from './support/zip'
  * What a restore reconstructs in full, and every refusal it can make, is settled by the API tests. This builds one rich
  * world through the API and exports it for real, so the file uploaded is exactly the file Lorex writes.
  */
-const PASSWORD = 'Test-password-123!'
 
 function unique(prefix: string) {
   return `${prefix}${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`
@@ -23,8 +23,9 @@ async function signUp(page: Page) {
   await page.goto('/register')
   await page.getByLabel('Username').fill(username)
   await page.getByLabel('Email').fill(`${username}@example.test`)
-  await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
-  await page.getByLabel('Confirm password').fill(PASSWORD)
+  const password = makeTestPassword()
+  await page.getByLabel('Password', { exact: true }).fill(password)
+  await page.getByLabel('Confirm password').fill(password)
   await page.getByRole('button', { name: 'Create account' }).click()
   await page.waitForURL('/app')
 }
@@ -200,7 +201,7 @@ test.describe('restore a backup', () => {
     await expect(preview).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Ready to restore' })).toBeFocused()
     await expect(page.getByTestId('restore-universe-name')).toHaveText(source.name)
-    await expect(preview).toContainText('Version 20')
+    await expect(preview).toContainText('Version 21')
     await expect(preview).toContainText('1 world rule')
     await expect(preview).toContainText('1 entry')
     await expect(preview).toContainText('1 picture')
@@ -328,7 +329,7 @@ test.describe('restore a backup', () => {
         {
           name: 'future.json',
           mimeType: 'application/json',
-          buffer: Buffer.from(JSON.stringify({ ...document, formatVersion: 21 })),
+          buffer: Buffer.from(JSON.stringify({ ...document, formatVersion: 22 })),
         },
         /newer Lorex/,
       ],

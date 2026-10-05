@@ -258,7 +258,7 @@ internal static partial class BackupValidation
         }
 
         count += payload.Relationships.Count;
-        count += payload.TimelineEntries.Sum(entry => 1L + entry.ParticipantEntityIds.Count);
+        count += payload.TimelineEntries.Sum(entry => 1L + entry.ParticipantEntityIds.Count + (entry.StoryIds?.Count ?? 0));
 
         foreach (var story in payload.Stories!)
         {
@@ -1051,6 +1051,25 @@ internal static partial class BackupValidation
                 if (!participants.Add(participant))
                 {
                     Add(BackupIssueCodes.Duplicate, $"{what} names the same participant twice.");
+                }
+            }
+
+            if (entry.StoryIds is { } storyIds)
+            {
+                if (version < 21)
+                {
+                    Add(BackupIssueCodes.InvalidValue, $"{what} is linked to stories, which a backup this old cannot say. It was not written by Lorex.");
+                }
+
+                var linked = new HashSet<Guid>();
+                foreach (var story in storyIds)
+                {
+                    Reference(_stories.Contains(story), $"{what} is linked to a story the backup does not hold.");
+
+                    if (!linked.Add(story))
+                    {
+                        Add(BackupIssueCodes.Duplicate, $"{what} is linked to the same story twice.");
+                    }
                 }
             }
 

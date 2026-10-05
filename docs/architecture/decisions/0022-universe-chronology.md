@@ -129,3 +129,10 @@ The model did not.
 - **Unchanged:** ordering (period order, direction, year, month, day), year 1 with no year 0 inside a
   period, the gated chronology write, the in-use refusal, and dates written before any period stay
   kept and unguessed - now said in those words.
+
+## Amendment - birth and death years on the timeline (2026-10-05, refinement 038)
+
+A live entry's `BirthYear` and `DeathYear` values are shown on the timeline as "X is born." and "X dies.", at year precision,
+in their era, with the entry's Canon status - read from the entry, never stored (ADR 0009 amendment). A year in no era on a
+universe that names eras waits with the other undated-by-era items, as a moment does. `Age` and the Gregorian `Date` field
+are not shown.
