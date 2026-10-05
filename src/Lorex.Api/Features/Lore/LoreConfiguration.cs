@@ -66,6 +66,14 @@ public sealed class EntityFieldDefinitionConfiguration : IEntityTypeConfiguratio
             .HasForeignKey(field => field.EntityTypeId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // A type a reference field is restricted to is not deleted from under it: the type endpoint refuses first, with
+        // the reason. No action rather than restrict, so a whole universe still goes in one cascade - the field and the
+        // type it names leave together, and the key is checked once the statement is done.
+        builder.HasOne(field => field.TargetEntityType)
+            .WithMany()
+            .HasForeignKey(field => field.TargetEntityTypeId)
+            .OnDelete(DeleteBehavior.NoAction);
+
         builder.HasIndex(field => new { field.EntityTypeId, field.Name }).IsUnique();
 
         // One meaning per type at most. Filtered, because the ordinary case is a type with

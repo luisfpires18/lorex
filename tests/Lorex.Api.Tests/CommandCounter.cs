@@ -16,11 +16,19 @@ internal sealed class CommandCounter : IObserver<DiagnosticListener>, IObserver<
 {
     private readonly string[] _keys;
     private readonly List<IDisposable> _subscriptions = [];
+    private readonly Func<string, bool>? _sql;
     private int _count;
 
     public CommandCounter(IReadOnlyCollection<Guid> ids)
         : this([.. ids.Select(id => id.ToString())])
     {
+    }
+
+    /// <summary>Only commands whose text passes <paramref name="sql"/> - the reads of one table, say, and not the writes.</summary>
+    public CommandCounter(IReadOnlyCollection<Guid> ids, Func<string, bool> sql)
+        : this([.. ids.Select(id => id.ToString())])
+    {
+        _sql = sql;
     }
 
     /// <summary>Counts by any parameter text - an account id, say, which is not a <see cref="Guid"/> to Identity.</summary>
@@ -68,7 +76,7 @@ internal sealed class CommandCounter : IObserver<DiagnosticListener>, IObserver<
             .Any(parameter => parameter.Value?.ToString() is { } text
                 && _keys.Any(key => text.Contains(key, StringComparison.OrdinalIgnoreCase)));
 
-        if (carriesId)
+        if (carriesId && (_sql is null || _sql(executed.Command.CommandText)))
         {
             Interlocked.Increment(ref _count);
         }

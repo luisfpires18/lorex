@@ -121,6 +121,12 @@ export interface FieldInput {
 
   /** Null unless the author declares a meaning. Never guessed from the name - ADR 0011. */
   semantic: FieldSemanticValue | null
+
+  /**
+   * A link field's one allowed type, or null for any Lore type; null for every other kind. Required here, so an edit that
+   * only means to change something else sends the field's own limit back rather than clearing it.
+   */
+  targetEntityTypeId: string | null
 }
 
 export function addField(universeId: string, typeId: string, input: FieldInput) {

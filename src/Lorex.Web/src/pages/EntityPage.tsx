@@ -31,14 +31,7 @@ import { CanonBlockNotice } from '../components/CanonBlockNotice'
 import { ApiError } from '../lib/api'
 import { formatDate } from '../lib/dates'
 import { useLeaveGuard } from '../lib/leaveGuard'
-import {
-  createEntity,
-  deleteEntity,
-  getEntity,
-  listEntities,
-  listEntityTypes,
-  updateEntity,
-} from '../lore/api'
+import { createEntity, deleteEntity, getEntity, listEntityTypes, updateEntity } from '../lore/api'
 import {
   CANON_LABELS,
   CANON_ORDER,
@@ -46,7 +39,6 @@ import {
   FieldKind,
   type CanonStatusValue,
   type EntityDetail,
-  type EntitySummary,
   type EntityType,
   type FieldValueInput,
 } from '../lore/types'
@@ -131,7 +123,6 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
   const isNew = entityId === undefined
   const [types, setTypes] = useState<EntityType[]>([])
   const [typesRead, setTypesRead] = useState(false)
-  const [candidates, setCandidates] = useState<EntitySummary[]>([])
   const [detail, setDetail] = useState<EntityDetail | null>(null)
   const [editedDraft, setDraft] = useState<Draft | null>(null)
   const [isFormOpen, setIsEditing] = useState(isNew)
@@ -182,27 +173,19 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
   useEffect(() => {
     const controller = new AbortController()
 
-    Promise.all([
-      listEntityTypes(universe.id, controller.signal),
-      listEntities(
-        universe.id,
-        { search: '', entityTypeId: null, canonStatus: null, tag: null, page: 1 },
-        controller.signal,
-      ),
-    ])
-      .then(([loadedTypes, page]) => {
+    listEntityTypes(universe.id, controller.signal)
+      .then((loadedTypes) => {
         setTypes(loadedTypes)
         setTypesRead(true)
-        setCandidates(page.items.filter((item) => item.id !== entityId))
       })
       .catch(() => {
-        /* The page still works without the reference picker. */
+        /* The page still works without the types; a link field searches for itself. */
       })
 
     return () => {
       controller.abort()
     }
-  }, [universe.id, entityId])
+  }, [universe.id])
 
   useEffect(() => {
     if (isNew) return
@@ -799,8 +782,9 @@ export default function EntityPage({ view = 'article' }: { view?: EntryView }) {
                     <FieldInput
                       definition={definition}
                       value={draft.fields[definition.id] ?? emptyValue(definition)}
-                      candidates={candidates}
-                      retainedReference={retainedReference(detail, candidates, definition.id)}
+                      universeId={universe.id}
+                      excludeId={entityId}
+                      heldReference={heldReference(detail, definition.id)}
                       chronology={chronology}
                       onChange={(next) =>
                         setDraft((current) =>
@@ -1004,20 +988,15 @@ function pictureShape(image: { width: number; height: number }) {
 }
 
 /**
- * The reference a field already holds, when the picker's own list does not contain it.
+ * The entry a link field held when the entry was read, named for the picker that shows it.
  *
- * That happens for an entry in the Trash - the listing never offers one - and for an entry
- * past the first page the picker loaded. Either way the stored id has to stay in the select,
- * or saving any other field on this form would silently clear the reference.
+ * An entry in the Trash is never offered by a search, so it is named as being there. Either way the stored id stays the
+ * field's value until the author changes it, so saving any other field keeps the link.
  */
-function retainedReference(
-  detail: EntityDetail | null,
-  candidates: EntitySummary[],
-  fieldDefinitionId: string,
-) {
+function heldReference(detail: EntityDetail | null, fieldDefinitionId: string) {
   const held = detail?.fields.find((value) => value.fieldDefinitionId === fieldDefinitionId)
 
-  if (!held?.referencedEntityId || candidates.some((one) => one.id === held.referencedEntityId)) {
+  if (!held?.referencedEntityId) {
     return null
   }
 
@@ -1025,7 +1004,7 @@ function retainedReference(
 
   return {
     id: held.referencedEntityId,
-    label: held.referencedEntityIsTrashed ? `${name} (in Trash)` : name,
+    name: held.referencedEntityIsTrashed ? `${name} (in Trash)` : name,
   }
 }
 

@@ -570,6 +570,9 @@ internal sealed partial class UniverseRestore(
                     IsRequired = field.IsRequired,
                     DisplayOrder = field.DisplayOrder,
                     DefaultValue = field.DefaultValue,
+
+                    // The type it was limited to, as that type's restored id: validation proved it is a type of this file.
+                    TargetEntityTypeId = ids.Map(field.TargetEntityTypeId),
                 });
 
                 foreach (var option in field.Options)

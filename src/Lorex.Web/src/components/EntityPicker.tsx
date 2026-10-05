@@ -22,6 +22,7 @@ function useEntitySearch(
   isOpen: boolean,
   excludeIds: string[],
   familyTreeOnly = false,
+  entityTypeId: string | null = null,
 ) {
   const [results, setResults] = useState<EntitySummary[]>([])
   const [isSearching, setIsSearching] = useState(false)
@@ -44,7 +45,7 @@ function useEntitySearch(
         universeId,
         {
           search: query,
-          entityTypeId: null,
+          entityTypeId,
           canonStatus: null,
           tag: null,
           page: 1,
@@ -68,7 +69,7 @@ function useEntitySearch(
       clearTimeout(timer)
       controller.abort()
     }
-  }, [universeId, query, excludeKey, isOpen, familyTreeOnly])
+  }, [universeId, query, excludeKey, isOpen, familyTreeOnly, entityTypeId])
 
   return { results, isSearching, active, setActive }
 }
@@ -158,6 +159,11 @@ interface EntityPickerProps {
   excludeId?: string
   /** Only entries whose type is enabled for the Family Tree. */
   familyTreeOnly?: boolean
+  /**
+   * Only entries of exactly this type, searched for by the API rather than filtered here: a link field limited to one
+   * type. Null or left out offers every type.
+   */
+  entityTypeId?: string | null
   placeholder?: string
   error?: string
 }
@@ -170,6 +176,7 @@ export function EntityPicker({
   onChange,
   excludeId,
   familyTreeOnly = false,
+  entityTypeId = null,
   placeholder = 'Search this universe',
   error,
 }: EntityPickerProps) {
@@ -189,6 +196,7 @@ export function EntityPicker({
     isOpen,
     excludeId ? [excludeId] : [],
     familyTreeOnly,
+    entityTypeId,
   )
 
   useCloseOnOutside(wrapper, isOpen, () => setIsOpen(false))

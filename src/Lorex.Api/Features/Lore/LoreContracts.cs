@@ -71,6 +71,9 @@ public sealed record EntityTypeResponse(
 /// <paramref name="Semantic"/> is optional and normally null: a field means nothing to
 /// Lorex unless the author says it does. It is bound explicitly here, like every other
 /// member, so nothing can be overposted onto the definition.
+///
+/// <paramref name="TargetEntityTypeId"/> is the one type a link-to-an-entry field accepts, by id; null accepts any
+/// type. Only a link field may carry one.
 /// </summary>
 public sealed record FieldDefinitionRequest(
     string? Name,
@@ -79,7 +82,8 @@ public sealed record FieldDefinitionRequest(
     int? DisplayOrder,
     string? DefaultValue,
     IReadOnlyList<string>? Options,
-    EntityFieldSemantic? Semantic = null);
+    EntityFieldSemantic? Semantic = null,
+    Guid? TargetEntityTypeId = null);
 
 public sealed record FieldOptionResponse(Guid Id, string Value, int DisplayOrder);
 
@@ -91,7 +95,8 @@ public sealed record FieldDefinitionResponse(
     int DisplayOrder,
     string? DefaultValue,
     IReadOnlyList<FieldOptionResponse> Options,
-    EntityFieldSemantic? Semantic);
+    EntityFieldSemantic? Semantic,
+    Guid? TargetEntityTypeId = null);
 
 // ---------- Entities ----------
 

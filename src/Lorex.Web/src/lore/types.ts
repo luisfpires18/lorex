@@ -104,6 +104,11 @@ export interface FieldDefinition {
   defaultValue: string | null
   options: FieldOption[]
   semantic: FieldSemanticValue | null
+  /**
+   * For a link to an entity: the one type its entries must be of, exactly that type, by id. Null means any Lore type, an
+   * explicit choice. Always null for every other kind. Never worked out from a name.
+   */
+  targetEntityTypeId: string | null
 }
 
 export interface EntityType {

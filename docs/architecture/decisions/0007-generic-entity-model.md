@@ -164,3 +164,31 @@ No second endpoint; a listing without `field` is unchanged.
   chosen type cannot answer are taken out of the address with replace before anything is read; adding or removing one is a
   history entry and returns to page 1; another type starts with none; Clear filters clears them with search and status.
 - **Not here:** Date (it waits on each universe's own calendars), is empty / is not empty, OR, saved views, public Explore.
+
+## Amendment - a link field may be limited to one type (2026-10-05, Product correction 036)
+
+A Character's "Kingdom" field offered Runes, because a link field had no allowed type: the entry form listed the first page
+of every entry and the Lore filter's picker searched the whole universe. A target is now part of the field, by id.
+
+- **`EntityFieldDefinitions.TargetEntityTypeId`**, nullable, keyed to `EntityTypes` (no action on delete, so a universe still
+  goes in one cascade; the type endpoint refuses first). Set only on a link-to-an-entity field: the exact type its entries
+  must be of. Null means **any Lore type**, an explicit choice shown as such. Every other kind must send null, or the field
+  is refused. The same universe is checked by the endpoints, since the key cannot say it; another universe's type and no type
+  get the same answer.
+- **Exact type only.** Types nested inside the target are not included, and moving or renaming types changes nothing about
+  what a field accepts. Several allowed types or a whole branch would be a later, deliberate change.
+- **Never from a name.** A field called "Kingdom" is not limited to a type called "Kingdoms" unless its author says so; the
+  migration (`AddEntityReferenceTargetType`) leaves every existing link field open to any type and infers nothing.
+- **Narrowing waits for the data.** Limiting a field, from any type or from another type, is refused (409
+  `entity_field_target_conflict`) while any entry, one in the Trash included, links it to an entry of another type. Nothing
+  is cleared or rewritten. Widening to any type is always allowed.
+- **The API decides.** An entry's save resolves every link it carries in one read (id and type, this universe only) and
+  refuses one of the wrong type, a missing one or another universe's with the same words. A kept link to an entry in the
+  Trash still saves when it fits. A Lore filter on a limited field refuses an entry of another type (400) rather than
+  answering with nothing; its one batched read now also returns each entry's type.
+- **Deleting a type** a link field on another type is limited to is refused (409 `entity_type_targeted`), naming the first
+  such field. A type's own field that links to its own type goes with it.
+- **The picker** (`EntityPicker`) takes the allowed type and passes it to the ordinary Lore listing as `entityTypeId`, so the
+  database narrows the search. The entry form's link control is now that picker - it searches instead of listing a page - and
+  the 034 filter editor uses the same one. Types offers "Allowed type", "Any Lore type" first, then every type by its path.
+- Backup format 20 carries the target (ADR 0014 amendment).
