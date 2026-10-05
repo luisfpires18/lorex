@@ -54,12 +54,18 @@ public static class IdeaEndpoints
     /// ones most recently deleted first. <paramref name="universeId"/> narrows to one universe's ideas and
     /// <paramref name="unassigned"/> to those in none; asking for both is refused. <paramref name="search"/> matches the title
     /// or the body. A row carries the start of the body, never all of it.
+    ///
+    /// <paramref name="storyId"/> narrows a universe's ideas further, to those with an explicit reference to the story itself
+    /// or to one of its scenes, arcs or beats - a projection of the references, never a column on the idea, and never read
+    /// from a title or a body. It needs <paramref name="universeId"/>, and a story that is not live in one of the caller's
+    /// universes answers 404, exactly as a missing one does. One idea is one row however many of the story's parts it names.
     /// </summary>
     private static async Task<IResult> ListAsync(
         ClaimsPrincipal principal,
         LorexDbContext db,
         CancellationToken cancellationToken,
         [FromQuery] Guid? universeId = null,
+        [FromQuery] Guid? storyId = null,
         [FromQuery] bool unassigned = false,
         [FromQuery] bool deleted = false,
         [FromQuery] string? search = null,
@@ -76,8 +82,28 @@ public static class IdeaEndpoints
             });
         }
 
+        if (storyId is not null && universeId is null)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["storyId"] = ["Ask for a story's ideas together with its universe."],
+            });
+        }
+
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
+
+        // Owner-only, like the ideas themselves: a collaborator's role in the universe never opens this.
+        if (storyId is { } story
+            && !await db.Stories.AnyAsync(
+                candidate => candidate.Id == story
+                    && candidate.UniverseId == universeId
+                    && candidate.DeletedAt == null
+                    && candidate.Universe!.OwnerId == ownerId,
+                cancellationToken))
+        {
+            return Results.NotFound();
+        }
 
         var query = db.Ideas.AsNoTracking().Where(idea => idea.OwnerId == ownerId);
 
@@ -86,6 +112,18 @@ public static class IdeaEndpoints
         if (universeId is { } onlyUniverse)
         {
             query = query.Where(idea => idea.UniverseId == onlyUniverse);
+
+            // EXISTS per reference kind, so an idea naming the story, a scene and a beat of it is still one row, and the
+            // narrowing happens before the count and the page. A reference to a part since put in the Trash still counts:
+            // it is still on the idea, and still in this story.
+            if (storyId is { } onlyStory)
+            {
+                query = query.Where(idea =>
+                    idea.StoryReferences.Any(reference => reference.StoryId == onlyStory)
+                    || idea.SceneReferences.Any(reference => reference.Scene!.StoryId == onlyStory)
+                    || idea.PlotArcReferences.Any(reference => reference.PlotArc!.StoryId == onlyStory)
+                    || idea.PlotBeatReferences.Any(reference => reference.PlotBeat!.PlotArc!.StoryId == onlyStory));
+            }
         }
         else if (unassigned)
         {

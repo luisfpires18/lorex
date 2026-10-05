@@ -7897,7 +7897,7 @@ html:has(.viewer[open]) {
   color: var(--muted);
 }
 
-/* The views and the story's one menu, on the rule the current view underlines. The views never wrap: three fit a
+/* The views and the story's one menu, on the rule the current view underlines. The views never wrap: all four fit a
    360px phone, and the menu keeps to the end of the same line. */
 .story__bar {
   display: flex;
@@ -9889,6 +9889,58 @@ h2.trash__confirmtitle {
 
 .ideas__controls {
   margin-top: 2rem;
+}
+
+/* Inside a story the story's header is the page's; the view opens with one line of what it holds. */
+.ideas--story .ideas__intro {
+  margin-top: var(--space-5);
+}
+
+.ideas--story .ideas__lede {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+/* Capture: one line and its button, as wide as the filter below it, so the two share an edge. The status line keeps
+   its height only while it has something to say. */
+.ideacapture {
+  margin-top: 2rem;
+  max-width: 30rem;
+}
+
+.ideas--story .ideacapture {
+  margin-top: var(--space-5);
+}
+
+.ideacapture__row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.ideacapture__input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ideacapture__submit {
+  flex: none;
+  align-self: stretch;
+}
+
+.ideacapture__status {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.ideacapture__status:not(:empty) {
+  margin-top: var(--space-2);
+}
+
+.ideacapture + .ideas__controls {
+  margin-top: 1.5rem;
 }
 
 .ideas__show {

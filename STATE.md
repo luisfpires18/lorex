@@ -50,6 +50,15 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **Product refinement 037 - Ideas workspace** (`feat/ideas-workspace-expansion` off `dev` at `c60d534`; committed, not
+  merged, not pushed). No schema, migration or backup change (backup **20**). ADR 0030 amendment.
+  - One account-owned idea, three views: All, a universe's, and a story's (`/stories/:storyId/ideas`, a fourth story
+    view, owner only via `keepIdeas`). Story scope = explicit reference to the story or its scene, arc or beat; one row
+    per idea; filtered in SQL before count and page (`GET /api/ideas?universeId=&storyId=`, 404 for any story not live in
+    an owned universe). All 2, universe 2, story 3 commands at 1/12/50 ideas.
+  - Quick capture on every live list: one line -> title, empty body, through the ordinary create; story capture adds one
+    direct story reference. `IdeasBrowser` takes an `IdeasScope`; rows open in the universe's editor, Back returns.
+  - Deferred: conversions (Idea -> Lore/Story/Scene), rich text, checklists, images, diagrams, tags, collaboration.
 - **Product correction 036 - entity-reference target types** (`fix/entity-reference-target-type` off `dev` at `2c7c8f1`;
   committed, not merged, not pushed). One migration (`AddEntityReferenceTargetType`), backup **20**. ADR 0007 and 0014
   amendments.

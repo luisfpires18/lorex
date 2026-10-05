@@ -229,6 +229,10 @@ function Root() {
                 element={asSection('story', <StoryPage view="manuscript" />)}
               />
               <Route
+                path="stories/:storyId/ideas"
+                element={asSection('story', <StoryPage view="ideas" />)}
+              />
+              <Route
                 path="ideas"
                 element={asSection(
                   'ideas',

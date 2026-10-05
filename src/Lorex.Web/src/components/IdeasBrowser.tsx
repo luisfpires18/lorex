@@ -1,12 +1,29 @@
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react'
 import { Plus } from 'lucide-react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { EmptyState } from './EmptyState'
 import { ActionIcon } from './ActionIcon'
 import { PageHeader } from './PageHeader'
 import { Quoted } from './NameList'
-import { listAllUniverses, listIdeas, restoreIdea } from '../ideas/api'
-import type { IdeaPage, IdeaSummary } from '../ideas/types'
+import { createIdea, listAllUniverses, listIdeas, restoreIdea } from '../ideas/api'
+import {
+  IDEA_TITLE_MAX_LENGTH,
+  IdeaReferenceKind,
+  type IdeaInput,
+  type IdeaPage,
+  type IdeaSummary,
+  type IdeasScope,
+} from '../ideas/types'
+import { ApiError } from '../lib/api'
 import { formatDate, formatDateTime } from '../lib/dates'
 import type { UniverseSummary } from '../universes/types'
 
@@ -28,11 +45,19 @@ export interface IdeasListNotice {
 /** The value of the Show filter that means ideas in no universe. Never a universe id. */
 const UNASSIGNED = 'unassigned'
 
-interface IdeasBrowserProps {
-  /** The universe this list is inside, or null for every idea the account has. */
-  universe: { id: string; name: string } | null
-  /** Where this list lives; an idea opens at `${basePath}/${id}` and a new one at `${basePath}/new`. */
-  basePath: string
+/**
+ * What a capture creates from where it was typed: no universe from all ideas, the universe from a universe's, and the
+ * universe plus one reference to the story from a story's - which is what puts it in that story's list.
+ */
+function captureInput(scope: IdeasScope, title: string): IdeaInput {
+  return {
+    title,
+    body: '',
+    universeId: scope.kind === 'all' ? null : scope.universe.id,
+    references:
+      scope.kind === 'story' ? [{ kind: IdeaReferenceKind.Story, id: scope.story.id }] : [],
+    expectedUpdatedAt: null,
+  }
 }
 
 function referenceCountLabel(total: number) {
@@ -40,19 +65,27 @@ function referenceCountLabel(total: number) {
 }
 
 /**
- * A list of ideas: every idea the account has, or one universe's. Most recently updated first, so nothing has to be
- * organised. The filter is where the list is kept - in the address - so Back, Forward and a reload keep it.
+ * A list of ideas: every idea the account has, one universe's, or one story's (`IdeasScope`). Most recently updated
+ * first, so nothing has to be organised. The filter is where the list is kept - in the address - so Back, Forward and a
+ * reload keep it.
  *
  * Globally, the Show filter narrows to unassigned ideas or to one universe's, and each row says which in words: "No
- * universe", or the universe's name. Inside a universe the list is that universe's ideas. Either way, Recently deleted
- * lists the ideas deleted from the same place, with Restore.
+ * universe", or the universe's name. Inside a universe the list is that universe's ideas, and inside a story the
+ * universe's ideas that reference the story or something in it. Every way, Recently deleted lists the ideas deleted from
+ * the same place, with Restore, and the live list opens with a one-line capture. An idea always opens in the one editor,
+ * at its universe's address or the account's.
  */
-export function IdeasBrowser({ universe, basePath }: IdeasBrowserProps) {
+export function IdeasBrowser({ scope }: { scope: IdeasScope }) {
   const [params, setParams] = useSearchParams()
   const location = useLocation()
   const headingId = useId()
   const searchId = useId()
   const showId = useId()
+
+  const universe = scope.kind === 'all' ? null : scope.universe
+  const storyId = scope.kind === 'story' ? scope.story.id : null
+  // Where an idea opens, and a new one starts. A story's ideas open in their universe's editor: Back returns here.
+  const basePath = universe ? `/app/universes/${universe.id}/ideas` : '/app/ideas'
 
   const view = params.get('view') === 'deleted' ? 'deleted' : 'live'
   const show = universe ? universe.id : (params.get('show') ?? '')
@@ -132,6 +165,7 @@ export function IdeasBrowser({ universe, basePath }: IdeasBrowserProps) {
     listIdeas(
       {
         universeId: show !== '' && show !== UNASSIGNED ? show : null,
+        storyId,
         unassigned: show === UNASSIGNED,
         deleted: view === 'deleted',
         search,
@@ -148,7 +182,7 @@ export function IdeasBrowser({ universe, basePath }: IdeasBrowserProps) {
     return () => {
       controller.abort()
     }
-  }, [show, view, search, page, reads])
+  }, [show, storyId, view, search, page, reads])
 
   useEffect(() => {
     if (outcome) outcomeRef.current?.focus()
@@ -194,43 +228,72 @@ export function IdeasBrowser({ universe, basePath }: IdeasBrowserProps) {
     }
   }
 
+  /** A captured idea is the newest: shown at the top of the first page, which is read again. */
+  const captured = useCallback(() => {
+    setOutcome(null)
+    if (page !== 1) update({ page: null })
+    setReads((current) => current + 1)
+  }, [page, update])
+
   const result = state.kind === 'ready' ? state.page : null
   const isFiltered = search.trim() !== '' || (!universe && show !== '')
   const deleted = view === 'deleted'
 
+  const allLink = universe ? (
+    <p className="ideas__all">
+      <Link to="/app/ideas" data-testid="ideas-all">
+        All your ideas
+      </Link>
+    </p>
+  ) : null
+
   return (
-    <section className="ideas" aria-labelledby={headingId} data-testid="ideas">
-      <PageHeader
-        title="Ideas"
-        titleId={headingId}
-        lede={
-          <>
-            <p className="ideas__lede">
-              {universe ? (
-                <>
-                  Possibilities for <Quoted text={universe.name} />. An idea is never lore: nothing
-                  here changes the world.
-                </>
-              ) : (
-                'Possibilities, kept apart from your lore. An idea can belong to a universe, or to none.'
-              )}
-            </p>
-            {universe ? (
-              <p className="ideas__all">
-                <Link to="/app/ideas" data-testid="ideas-all">
-                  All your ideas
-                </Link>
+    <section
+      className={`ideas ideas--${scope.kind}`}
+      aria-labelledby={headingId}
+      data-testid="ideas"
+    >
+      {scope.kind === 'story' ? (
+        // Inside a story the story's own header is the page's: this is one of its views, named for a screen reader.
+        <div className="ideas__intro">
+          <h2 className="visually-hidden" id={headingId}>
+            Ideas
+          </h2>
+          <p className="ideas__lede">
+            Ideas linked to this story or to one of its scenes, arcs or beats. Only you can see
+            them.
+          </p>
+          {allLink}
+        </div>
+      ) : (
+        <PageHeader
+          title="Ideas"
+          titleId={headingId}
+          lede={
+            <>
+              <p className="ideas__lede">
+                {universe ? (
+                  <>
+                    Your ideas for <Quoted text={universe.name} />. Only you can see them, and
+                    nothing here changes the world.
+                  </>
+                ) : (
+                  'Every idea you have, in a universe or not. Only you can see them, and they stay out of your lore.'
+                )}
               </p>
-            ) : null}
-          </>
-        }
-        actions={
-          <Link className="button" to={`${basePath}/new`} data-testid="new-idea">
-            <ActionIcon icon={Plus} />
-            New idea
-          </Link>
-        }
-      />
+              {allLink}
+            </>
+          }
+          actions={
+            <Link className="button" to={`${basePath}/new`} data-testid="new-idea">
+              <ActionIcon icon={Plus} />
+              New idea
+            </Link>
+          }
+        />
+      )}
+
+      {deleted ? null : <QuickCapture scope={scope} onCaptured={captured} />}
 
       {created && !deleted ? (
         <div className="notice ideas__notice" data-testid="ideas-created-notice">
@@ -445,6 +508,12 @@ export function IdeasBrowser({ universe, basePath }: IdeasBrowserProps) {
             title="No ideas match."
             hint="Try other words, or show all ideas."
           />
+        ) : scope.kind === 'story' ? (
+          <EmptyState
+            testId="ideas-empty"
+            title="No ideas for this story yet."
+            hint="Capture one above. Ideas linked to any scene, arc or beat in it show up here too."
+          />
         ) : (
           <EmptyState
             testId="ideas-empty"
@@ -484,5 +553,117 @@ export function IdeasBrowser({ universe, basePath }: IdeasBrowserProps) {
         </nav>
       ) : null}
     </section>
+  )
+}
+
+/**
+ * One line, kept without leaving the list: the words become the title of a new idea with no body, placed by the list it
+ * was typed in (`captureInput`). Enter keeps it, except while an input method is still composing. Kept words are cleared
+ * and said so; refused ones stay in the box with the reason beside it. The full editor is one click away on the new row.
+ */
+function QuickCapture({ scope, onCaptured }: { scope: IdeasScope; onCaptured: () => void }) {
+  const inputId = useId()
+  const errorId = useId()
+  const [text, setText] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [said, setSaid] = useState('')
+  // A second Enter before the first answer is the same idea, not another one.
+  const inFlight = useRef(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (inFlight.current) return
+
+    // A new attempt: what was said about the last one no longer applies.
+    setSaid('')
+    const title = text.trim()
+    if (title === '') {
+      setError('Write a few words first.')
+      return
+    }
+
+    inFlight.current = true
+    setSaving(true)
+    setError(null)
+    try {
+      const idea = await createIdea(captureInput(scope, title))
+      setText('')
+      // Ready for the next thought, even when the button was what kept this one.
+      inputRef.current?.focus()
+      setSaid(`Captured “${idea.title}”.`)
+      onCaptured()
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError && caught.status === 400
+          ? caught.message
+          : 'The idea could not be saved. Your words are still here. Try again.',
+      )
+    } finally {
+      inFlight.current = false
+      setSaving(false)
+    }
+  }
+
+  function keyDown(event: KeyboardEvent<HTMLInputElement>) {
+    // Enter that confirms a composition (Japanese, Chinese, Korean input) is not Enter that submits.
+    if (event.key === 'Enter' && (event.nativeEvent.isComposing || event.keyCode === 229)) {
+      event.preventDefault()
+    }
+  }
+
+  return (
+    <form
+      className="ideacapture"
+      onSubmit={(event) => void submit(event)}
+      noValidate
+      data-testid="idea-capture"
+    >
+      <label className="field__label" htmlFor={inputId}>
+        Capture an idea
+      </label>
+      <div className="ideacapture__row">
+        <input
+          ref={inputRef}
+          id={inputId}
+          className="field__input ideacapture__input"
+          name="title"
+          type="text"
+          autoComplete="off"
+          enterKeyHint="done"
+          maxLength={IDEA_TITLE_MAX_LENGTH}
+          placeholder="One line is enough…"
+          value={text}
+          readOnly={saving}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          onChange={(event) => {
+            setText(event.target.value)
+            if (error) setError(null)
+          }}
+          onKeyDown={keyDown}
+          data-testid="idea-capture-input"
+        />
+        <button
+          className="button button--secondary ideacapture__submit"
+          type="submit"
+          disabled={saving}
+          data-testid="idea-capture-submit"
+        >
+          <ActionIcon icon={Plus} />
+          {saving ? 'Capturing…' : 'Capture'}
+        </button>
+      </div>
+      {error ? (
+        <p className="field__error" id={errorId} role="alert" data-testid="idea-capture-error">
+          {error}
+        </p>
+      ) : null}
+      {/* Always in the page, so what is said into it is announced. */}
+      <p className="ideacapture__status" role="status" data-testid="idea-capture-status">
+        {said}
+      </p>
+    </form>
   )
 }

@@ -21,6 +21,7 @@ export const IDEA_CHANGED = 'idea_changed'
 export function listIdeas(query: IdeaQuery, signal?: AbortSignal) {
   const params = new URLSearchParams({ page: String(query.page), pageSize: String(IDEA_PAGE_SIZE) })
   if (query.universeId) params.set('universeId', query.universeId)
+  if (query.universeId && query.storyId) params.set('storyId', query.storyId)
   if (query.unassigned) params.set('unassigned', 'true')
   if (query.deleted) params.set('deleted', 'true')
   if (query.search.trim()) params.set('search', query.search.trim())

@@ -92,9 +92,24 @@ export interface IdeaInput {
   expectedUpdatedAt: string | null
 }
 
-/** Which ideas a list shows. `universeId` and `unassigned` are never both set. */
+/**
+ * Where a list of ideas is opened: every idea the account has, one universe's, or one story's. The same ideas seen from
+ * three places, never three kinds of idea. A story's ideas are the universe's ideas with an explicit reference to the
+ * story or to a scene, arc or beat in it.
+ */
+export type IdeasScope =
+  | { kind: 'all' }
+  | { kind: 'universe'; universe: { id: string; name: string } }
+  | {
+      kind: 'story'
+      universe: { id: string; name: string }
+      story: { id: string }
+    }
+
+/** Which ideas a list shows. `universeId` and `unassigned` are never both set; `storyId` needs `universeId`. */
 export interface IdeaQuery {
   universeId: string | null
+  storyId?: string | null
   unassigned: boolean
   deleted: boolean
   search: string

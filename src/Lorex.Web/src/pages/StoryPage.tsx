@@ -15,6 +15,7 @@ import { ContentPublication } from '../components/ContentPublication'
 import { ChapterForm } from '../components/ChapterForm'
 import { ChapterSection } from '../components/ChapterSection'
 import { EmptyState } from '../components/EmptyState'
+import { IdeasBrowser } from '../components/IdeasBrowser'
 import { ManuscriptPanel } from '../components/ManuscriptPanel'
 import { PageHeader } from '../components/PageHeader'
 import { PlotPanel } from '../components/PlotPanel'
@@ -80,17 +81,15 @@ function listed(parts: string[]) {
     : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
 }
 
+type StoryViewName = 'scenes' | 'plot' | 'manuscript' | 'ideas'
+
 /**
- * A story's page, one per story. Moving between its three views keeps the page and everything read for it; moving to
+ * A story's page, one per story. Moving between its views keeps the page and everything read for it; moving to
  * another story - a search result in another story, say - starts a new page, so nothing on screen for one story (the
  * story itself while the next is read, a message, a pending focus) is ever shown under the other's address, and a link
  * that lands on a scene or a beat lands once the story it is in is on screen.
  */
-export default function StoryPage({
-  view = 'scenes',
-}: {
-  view?: 'scenes' | 'plot' | 'manuscript'
-}) {
+export default function StoryPage({ view = 'scenes' }: { view?: StoryViewName }) {
   const { storyId } = useParams<{ storyId: string }>()
   return <StoryView key={storyId} view={view} />
 }
@@ -98,13 +97,14 @@ export default function StoryPage({
 /**
  * One story, told in the order its author sets, and planned in the plot its author follows.
  *
- * The page has three views under one header: Scenes, at the story's own address, Plot, at `/plot`, and Manuscript, at
- * `/manuscript/:sceneId`. All three read the same story and the same plot, once, so moving between them costs nothing
- * and the header never changes. Neither read carries prose: the Manuscript view reads one scene's text when that scene
- * is opened.
+ * The page has four views under one header: Scenes, at the story's own address, Plot, at `/plot`, Manuscript, at
+ * `/manuscript/:sceneId`, and Ideas, at `/ideas`. All four read the same story and the same plot, once, so moving between
+ * them costs nothing and the header never changes. Neither read carries prose: the Manuscript view reads one scene's text
+ * when that scene is opened, and the Ideas view reads one page of the author's own ideas for the story. Ideas are the
+ * account's, never the universe's (ADR 0030), so the view is offered only to a member who keeps ideas here - the owner.
  *
  * The header is deliberately short, because on a phone every line of it stands between the author and the work: the
- * title, one line of facts, the premise on Scenes alone - the story's home - and one bar holding the three views and the
+ * title, one line of facts, the premise on Scenes alone - the story's home - and one bar holding the views and the
  * story's own Edit and Delete. Each view then opens with its own tools, or with one empty state holding the one way to
  * begin.
  *
@@ -118,7 +118,7 @@ export default function StoryPage({
  * flashes back to a childhood is exactly as valid as one told straight through. The plot is a third order of
  * its own - arcs, and the beats in each - which follows neither.
  */
-function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
+function StoryView({ view }: { view: StoryViewName }) {
   const access = useUniverseAccess()
   const { universe, chronology } = useOutletContext<WorkspaceContext>()
   const { storyId, sceneId } = useParams<{ storyId: string; sceneId?: string }>()
@@ -657,6 +657,15 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
             >
               Manuscript
             </NavLink>
+            {access.keepIdeas ? (
+              <NavLink
+                to={`${storyPath}/ideas`}
+                className="views__link"
+                data-testid="story-view-ideas"
+              >
+                Ideas
+              </NavLink>
+            ) : null}
           </nav>
 
           {access.editContent ? (
@@ -698,7 +707,23 @@ function StoryView({ view }: { view: 'scenes' | 'plot' | 'manuscript' }) {
         </div>
       ) : null}
 
-      {view === 'plot' ? (
+      {view === 'ideas' ? (
+        access.keepIdeas ? (
+          <IdeasBrowser
+            scope={{
+              kind: 'story',
+              universe: { id: universe.id, name: universe.name },
+              story: { id: story.id },
+            }}
+          />
+        ) : (
+          <EmptyState
+            testId="role-unavailable"
+            title="This part of the universe is not available to you."
+            hint="Ideas are private to each account. The ideas in this universe belong to its owner."
+          />
+        )
+      ) : view === 'plot' ? (
         <PlotPanel
           universeId={universe.id}
           story={story}
