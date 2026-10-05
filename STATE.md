@@ -50,8 +50,18 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
-- **Product refinement 034 - Lore custom-field filters** (`feat/lore-custom-field-filters` off `dev` at `e4bbfcc`;
-  committed, not merged, not pushed). No schema, migration or backup change (backup **19**).
+- **Performance correction - universe artwork loading** (`fix/universe-artwork-loading` off `dev` at `01b2634`;
+  committed, not merged, not pushed). No schema, migration, index or backup change (backup **19**). ADR 0036 amendment.
+  - Measured cause: cards and the workspace asked `GET .../artwork` after rendering, so the fallback showed for a round
+    trip even with the image cached, and the list cost one request and two queries per owned card.
+  - `UniverseSummary`/`UniverseDetail` now carry `artwork` (`{ assetId, cardId }`, owner only, null = none), joined into
+    the existing queries: list still 2 commands at any size, detail still 2. Browsing never calls `GET .../artwork`;
+    `useUniverseArtwork` is gone and the shell holds the ids, which Publish replaces directly.
+  - Universes page: only typing in the search waits (150 ms); first load, paging, archive filter, retry and Back ask at once.
+  - Deferred: the list's owner-or-member filter scans `Universes` (query shape, not an index); the private card read's
+    role query and row check could be one query; R2 latency and HTTP/2 on DEV unmeasured.
+- **Product refinement 034 - Lore custom-field filters** (`feat/lore-custom-field-filters`, merged into `dev` at
+  `01b2634`). No schema, migration or backup change (backup **19**).
   - A type's entries narrowed by its own fields: text, number, yes or no, choose one, choose several, linked entry. ANDed,
     at most 10, in the address (`field=<id>:<op>:<value>`), filtered in the database before count and paging; a missing
     value never matches. Date deferred. ADR 0007 amendment.

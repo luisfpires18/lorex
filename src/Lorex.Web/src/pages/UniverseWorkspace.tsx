@@ -13,7 +13,7 @@ import { capabilitiesOf, ROLE_LABELS, UniverseAccessContext } from '../universes
 import { UniverseRole } from '../universes/types'
 import { useDocumentTitle } from '../lib/useDocumentTitle'
 import type { UniverseDetail } from '../universes/types'
-import { useUniverseArtwork } from '../universes/artwork'
+import { artworkUrl } from '../publishing/api'
 import type { UniverseArtworkRef } from '../publishing/types'
 import { EmptyState } from '../components/EmptyState'
 
@@ -116,12 +116,21 @@ export default function UniverseWorkspace() {
     setState((current) => (current.kind === 'ready' ? { ...current, chronology } : current))
   }, [])
 
-  // The world's own artwork as the atmosphere at the head of every screen - the owner's only (ADR 0041); anyone else,
-  // and a world without artwork, gets Lorex's.
-  const [artwork, setArtwork] = useUniverseArtwork(
-    id ?? '',
-    state.kind === 'ready' && state.universe.accessRole === UniverseRole.Owner,
-  )
+  // Publish hands up a changed artwork; only its two ids are the universe's to hold, and they replace the ones the
+  // universe arrived with, so the atmosphere follows without a reload.
+  const setArtwork = useCallback((next: UniverseArtworkRef | null) => {
+    setState((current) =>
+      current.kind === 'ready'
+        ? {
+            ...current,
+            universe: {
+              ...current.universe,
+              artwork: next ? { assetId: next.assetId, cardId: next.cardId } : null,
+            },
+          }
+        : current,
+    )
+  }, [])
 
   // The tab names the section and then the universe - "Lore | Hollowmere | Lorex" - from the shell, which knows both;
   // an entry or a story inside a section is still that section here, and nothing beneath sets a title of its own.
@@ -165,6 +174,11 @@ export default function UniverseWorkspace() {
 
   const { universe, chronology } = state
   const accent = universe.accentColor ?? undefined
+
+  // The world's own artwork as the atmosphere at the head of every screen, from the universe itself, so the first
+  // ready render already has it. The API sends it to the owner only (ADR 0041); anyone else, and a world without
+  // artwork, gets Lorex's.
+  const artwork = universe.artwork ? artworkUrl(universe.id, universe.artwork, 'card') : null
 
   // What this account may do here, for what is drawn: the API decides every request on its own (ADR 0041).
   const access = capabilitiesOf(universe.accessRole)

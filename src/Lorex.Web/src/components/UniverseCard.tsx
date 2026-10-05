@@ -2,22 +2,23 @@ import { Link } from 'react-router-dom'
 import { Clock } from 'lucide-react'
 import { formatDate } from '../lib/dates'
 import { ROLE_LABELS } from '../universes/access'
-import { useUniverseArtwork } from '../universes/artwork'
+import { artworkUrl } from '../publishing/api'
 import { UniverseRole, type UniverseSummary } from '../universes/types'
 
 /**
  * An entrance into a world: its artwork across the head of the card, a spine in the universe's own colour, the name
  * set in the display face, and nothing invented. No counts, no fake activity.
  *
- * The artwork is the owner's card cut, read only for a universe the account owns (a collaborator's role cannot read
- * it, ADR 0041). Without one - a world not yet given artwork, or one shared with you - the head is the world's own
- * colour as a dusk, with its initial set large and faint: plainly not a picture.
+ * The artwork is the owner's card cut, named by the ids the list row carries, so the picture is in the card's first
+ * render rather than asked for after it. The API sends them only for a universe the account owns (a collaborator's role
+ * cannot read the artwork, ADR 0041). Without one - a world not yet given artwork, or one shared with you - the head is
+ * the world's own colour as a dusk, with its initial set large and faint: plainly not a picture.
  *
  * A universe someone else owns says so quietly at its foot - "Shared · Editor" - in the meta line's own small muted type,
  * never beside the name. One the account owns carries no badge: owning is the ordinary case.
  */
 export function UniverseCard({ universe }: { universe: UniverseSummary }) {
-  const [artwork] = useUniverseArtwork(universe.id, universe.accessRole === UniverseRole.Owner)
+  const artwork = universe.artwork ? artworkUrl(universe.id, universe.artwork, 'card') : null
 
   return (
     <Link

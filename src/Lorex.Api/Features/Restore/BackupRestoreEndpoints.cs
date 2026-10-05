@@ -259,7 +259,10 @@ public static partial class BackupRestoreEndpoints
                     universe.UpdatedAt,
 
                     // A restored universe is the restoring account's alone: no membership is ever restored (ADR 0041).
-                    UniverseRole.Owner));
+                    UniverseRole.Owner,
+
+                    // A backup carries its artwork and the restore has just stored it, under new ids.
+                    await UniverseEndpoints.ArtworkIdentityAsync(db, universe.Id, cancellationToken)));
         }
         catch (BackupRejectedException rejected)
         {

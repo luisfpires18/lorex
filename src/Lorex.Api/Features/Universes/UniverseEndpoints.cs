@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Lorex.Api.Data;
 using Lorex.Api.Features.Ideas;
 using Lorex.Api.Features.Lore;
+using Lorex.Api.Features.Publishing;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -71,25 +72,30 @@ public static partial class UniverseEndpoints
         // negative offset.
         var skip = (int)Math.Min((long)(page - 1) * pageSize, int.MaxValue);
 
-        // Id breaks ties so paging stays stable when two universes share a timestamp.
-        var items = await query
-            .OrderByDescending(universe => universe.UpdatedAt)
-            .ThenBy(universe => universe.Id)
+        // Id breaks ties so paging stays stable when two universes share a timestamp. The artwork rides on the page
+        // query as a left join on its key - at most one row per universe, so paging is unchanged - joined only for the
+        // universes the caller owns, the same test the role makes, so a shared row's artwork is never read at all.
+        var items = await WithOwnedArtwork(db, query, userId)
+            .OrderByDescending(row => row.Universe.UpdatedAt)
+            .ThenBy(row => row.Universe.Id)
             .Skip(skip)
             .Take(pageSize)
-            .Select(universe => new UniverseSummary(
-                universe.Id,
-                universe.Name,
-                universe.Description,
-                universe.AccentColor,
-                universe.IsArchived,
-                universe.UpdatedAt,
-                universe.OwnerId == userId
+            .Select(row => new UniverseSummary(
+                row.Universe.Id,
+                row.Universe.Name,
+                row.Universe.Description,
+                row.Universe.AccentColor,
+                row.Universe.IsArchived,
+                row.Universe.UpdatedAt,
+                row.Universe.OwnerId == userId
                     ? UniverseRole.Owner
                     : db.UniverseMemberships
-                        .Where(membership => membership.UniverseId == universe.Id && membership.UserId == userId)
+                        .Where(membership => membership.UniverseId == row.Universe.Id && membership.UserId == userId)
                         .Select(membership => membership.Role)
-                        .First()))
+                        .First(),
+                row.Artwork != null
+                    ? new UniverseArtworkIdentity(row.Artwork.AssetId, row.Artwork.CardId)
+                    : null))
             .ToListAsync(cancellationToken);
 
         var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize);
@@ -104,22 +110,28 @@ public static partial class UniverseEndpoints
         CancellationToken cancellationToken)
     {
         // 404 for no access at all: someone else's universe must not be distinguishable from one that does not exist.
-        if (await UniverseAccess.RoleAsync(db, id, principal.RequireUserId(), cancellationToken) is not { } role)
+        var userId = principal.RequireUserId();
+
+        if (await UniverseAccess.RoleAsync(db, id, userId, cancellationToken) is not { } role)
         {
             return Results.NotFound();
         }
 
-        var universe = await db.Universes.AsNoTracking()
-            .Where(candidate => candidate.Id == id)
-            .Select(candidate => new UniverseDetail(
-                candidate.Id,
-                candidate.Name,
-                candidate.Description,
-                candidate.AccentColor,
-                candidate.IsArchived,
-                candidate.CreatedAt,
-                candidate.UpdatedAt,
-                role))
+        // The artwork in the same query as the rest, joined only when the caller owns the universe - the test that made
+        // the role Owner - so a collaborator's read never selects it (see UniverseArtworkIdentity).
+        var universe = await WithOwnedArtwork(db, db.Universes.AsNoTracking().Where(candidate => candidate.Id == id), userId)
+            .Select(row => new UniverseDetail(
+                row.Universe.Id,
+                row.Universe.Name,
+                row.Universe.Description,
+                row.Universe.AccentColor,
+                row.Universe.IsArchived,
+                row.Universe.CreatedAt,
+                row.Universe.UpdatedAt,
+                role,
+                row.Artwork != null
+                    ? new UniverseArtworkIdentity(row.Artwork.AssetId, row.Artwork.CardId)
+                    : null))
             .FirstOrDefaultAsync(cancellationToken);
 
         return universe is null ? Results.NotFound() : Results.Ok(universe);
@@ -175,7 +187,7 @@ public static partial class UniverseEndpoints
         // author's, and no read puts back one they removed.
         await EntityTypeDefaults.EnsureAsync(db, universe.Id, cancellationToken);
 
-        return Results.Created($"/api/universes/{universe.Id}", ToDetail(universe));
+        return Results.Created($"/api/universes/{universe.Id}", ToDetail(universe, artwork: null));
     }
 
     private static async Task<IResult> UpdateAsync(
@@ -227,7 +239,7 @@ public static partial class UniverseEndpoints
             return NameTakenProblem();
         }
 
-        return Results.Ok(ToDetail(universe));
+        return Results.Ok(ToDetail(universe, await ArtworkIdentityAsync(db, universe.Id, cancellationToken)));
     }
 
     private static Task<IResult> ArchiveAsync(
@@ -271,7 +283,7 @@ public static partial class UniverseEndpoints
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        return Results.Ok(ToDetail(universe));
+        return Results.Ok(ToDetail(universe, await ArtworkIdentityAsync(db, universe.Id, cancellationToken)));
     }
 
     private static async Task<IResult> DeleteAsync(
@@ -326,10 +338,52 @@ public static partial class UniverseEndpoints
             universe => universe.Id == id && universe.OwnerId == ownerId,
             cancellationToken);
 
-    /// <summary>Only ever answered to the owner: every route that returns it is the owner's.</summary>
-    private static UniverseDetail ToDetail(Universe universe) =>
+    /// <summary>
+    /// Only ever answered to the owner: every route that returns it is the owner's, so the artwork is always theirs to
+    /// see. A write answers with what the universe has now, or the client would draw it without its art.
+    /// </summary>
+    private static UniverseDetail ToDetail(Universe universe, UniverseArtworkIdentity? artwork) =>
         new(universe.Id, universe.Name, universe.Description, universe.AccentColor,
-            universe.IsArchived, universe.CreatedAt, universe.UpdatedAt, UniverseRole.Owner);
+            universe.IsArchived, universe.CreatedAt, universe.UpdatedAt, UniverseRole.Owner, artwork);
+
+    /// <summary>
+    /// Each universe beside its artwork row - only where <paramref name="callerId"/> owns the universe, null for every
+    /// other row and for a universe without artwork. The ownership test is part of the left join's own condition, so
+    /// the database never returns a shared universe's artwork ids to be dropped afterwards: the owner-only rule is the
+    /// query's, not the projection's (ADR 0041). Internal so a test can hold the query to that.
+    /// </summary>
+    internal static IQueryable<UniverseWithArtwork> WithOwnedArtwork(
+        LorexDbContext db,
+        IQueryable<Universe> universes,
+        string callerId) =>
+        from universe in universes
+        join artwork in db.UniverseArtworks
+            on new { Id = universe.Id, OwnerId = universe.OwnerId }
+            equals new { Id = artwork.UniverseId, OwnerId = callerId } into artworks
+        from artwork in artworks.DefaultIfEmpty()
+        select new UniverseWithArtwork { Universe = universe, Artwork = artwork };
+
+    // A class with initialisers rather than a positional record: EF Core follows member bindings into the later
+    // ordering and projection, not constructor arguments.
+    internal sealed class UniverseWithArtwork
+    {
+        public required Universe Universe { get; init; }
+
+        public UniverseArtwork? Artwork { get; init; }
+    }
+
+    /// <summary>
+    /// The current card of a universe's artwork, for the owner-only routes that answer with a universe they already
+    /// hold - a write, a restore - rather than read it afresh. One query.
+    /// </summary>
+    internal static Task<UniverseArtworkIdentity?> ArtworkIdentityAsync(
+        LorexDbContext db,
+        Guid universeId,
+        CancellationToken cancellationToken) =>
+        db.UniverseArtworks.AsNoTracking()
+            .Where(artwork => artwork.UniverseId == universeId)
+            .Select(artwork => new UniverseArtworkIdentity(artwork.AssetId, artwork.CardId))
+            .FirstOrDefaultAsync(cancellationToken);
 
     /// <summary>Also answered by a restore, which creates a universe under the same rule (ADR 0032).</summary>
     internal static IResult NameTakenProblem() =>

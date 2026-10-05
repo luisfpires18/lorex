@@ -18,6 +18,7 @@ export default function UniversesPage() {
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [search, setSearch] = useState('')
+  const [searched, setSearched] = useState('')
   const [includeArchived, setIncludeArchived] = useState(false)
   const [page, setPage] = useState(1)
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
@@ -33,34 +34,39 @@ export default function UniversesPage() {
     if (open) setIsCreating(false)
   }
 
+  // Only typing waits, so a search does not fire a request per keystroke. The search the list is asked for moves a
+  // moment after the box settles, and goes back to the first page with it - one request, as before.
   useEffect(() => {
-    const controller = new AbortController()
-    // Debounced so typing in the search box does not fire a request per keystroke.
+    if (search === searched) return
     const timer = setTimeout(() => {
-      listUniverses({ search, includeArchived, page }, controller.signal)
-        .then((result) => setState({ kind: 'ready', page: result }))
-        .catch((error: unknown) => {
-          if (controller.signal.aborted) return
-          setState({
-            kind: 'error',
-            message: error instanceof Error ? error.message : 'Could not load your universes.',
-          })
-        })
+      setSearched(search)
+      setPage(1)
     }, 150)
-
     return () => {
       clearTimeout(timer)
+    }
+  }, [search, searched])
+
+  // Everything else - the first load, a page, the archive filter, trying again, coming back - asks at once.
+  useEffect(() => {
+    const controller = new AbortController()
+    listUniverses({ search: searched, includeArchived, page }, controller.signal)
+      .then((result) => setState({ kind: 'ready', page: result }))
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return
+        setState({
+          kind: 'error',
+          message: error instanceof Error ? error.message : 'Could not load your universes.',
+        })
+      })
+
+    return () => {
       controller.abort()
     }
-  }, [search, includeArchived, page, reloadKey])
+  }, [searched, includeArchived, page, reloadKey])
 
   function changeFilter(next: boolean) {
     setIncludeArchived(next)
-    setPage(1)
-  }
-
-  function changeSearch(next: string) {
-    setSearch(next)
     setPage(1)
   }
 
@@ -137,7 +143,7 @@ export default function UniversesPage() {
               type="search"
               placeholder="Name of a world"
               value={search}
-              onChange={(event) => changeSearch(event.target.value)}
+              onChange={(event) => setSearch(event.target.value)}
             />
           </span>
         </div>

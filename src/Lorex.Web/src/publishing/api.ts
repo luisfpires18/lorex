@@ -1,6 +1,7 @@
 import { apiFetch } from '../lib/api'
 import type { ImageCrop } from '../lib/imageCrop'
 import { apiUpload, type UploadProgress } from '../lib/upload'
+import type { UniverseArtworkIdentity } from '../universes/types'
 import type {
   ContentKind,
   ContentPublicationState,
@@ -37,10 +38,12 @@ export function unpublishUniverse(universeId: string) {
 /**
  * Where the owner reads one of the artwork's two objects - public or not, and only with their session. The
  * public card has an address of its own, in the public API, which answers only while the universe is public.
+ *
+ * Only the ids are needed, so it takes the identity a universe carries as readily as the full artwork record.
  */
 export function artworkUrl(
   universeId: string,
-  artwork: UniverseArtworkRef,
+  artwork: UniverseArtworkIdentity,
   variant: 'original' | 'card',
 ) {
   return variant === 'original'
