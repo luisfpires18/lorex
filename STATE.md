@@ -50,8 +50,20 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
-- **Product refinement 035 - Family Tree discovery** (`feat/family-tree-discovery` off `dev` at `817d9a4`; committed,
-  not merged, not pushed). No schema, migration, table or backup change (backup **19**). ADR 0035 amendment.
+- **Product correction 036 - entity-reference target types** (`fix/entity-reference-target-type` off `dev` at `2c7c8f1`;
+  committed, not merged, not pushed). One migration (`AddEntityReferenceTargetType`), backup **20**. ADR 0007 and 0014
+  amendments.
+  - A link field may be limited to one type: `EntityFieldDefinitions.TargetEntityTypeId` (nullable, keyed to the type,
+    exact type only; null = "Any Lore type", an explicit choice). Existing link fields migrate open; nothing is inferred
+    from names.
+  - Held by the API: entry saves (one batched read of linked entries and their types), Lore filters (400 for another type),
+    narrowing a field that holds other types' links (409), deleting a targeted type (409), backup validation and restore
+    (target remapped to the restored type; v19 restores open).
+  - Types: "Allowed type" on add and on each link field. The entry form's link control is now the shared `EntityPicker`
+    (searches, restricted by `entityTypeId`), as is the 034 filter editor's.
+  - Testing policy from here: local focused + neighbouring E2E only; CI on `dev` runs the full Playwright suite.
+- **Product refinement 035 - Family Tree discovery** (`feat/family-tree-discovery`, merged into `dev` at `2c7c8f1`).
+  No schema, migration, table or backup change (backup **19**). ADR 0035 amendment.
   - The bare Family Tree opens on the families already recorded: connected groups of live entries joined by any
     family-meaning link (undirected), offered when a member's type is enabled, counted whole, opened at the enabled member
     with the most family neighbours. A projection only: no Family table, id or name.

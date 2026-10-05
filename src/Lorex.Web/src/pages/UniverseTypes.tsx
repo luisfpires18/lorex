@@ -33,6 +33,7 @@ import {
   reorderEntityType,
   updateEntityType,
   updateField,
+  type FieldInput,
 } from '../lore/api'
 import {
   FIELD_KIND_LABELS,
@@ -105,6 +106,8 @@ export default function UniverseTypes() {
   const [fieldRequired, setFieldRequired] = useState(false)
   const [fieldOptions, setFieldOptions] = useState('')
   const [fieldSemantic, setFieldSemantic] = useState<FieldSemanticValue | null>(null)
+  // A link field's allowed type: null is "Any Lore type", a real choice shown as one, never a blank that stands for it.
+  const [fieldTarget, setFieldTarget] = useState<string | null>(null)
   const [busyFieldId, setBusyFieldId] = useState<string | null>(null)
 
   const tree = useMemo(() => buildTypeTree(types ?? []), [types])
@@ -286,6 +289,12 @@ export default function UniverseTypes() {
     }
   }, [universe.id])
 
+  /** A link field's allowed type in words, from the types as they are now: a rename shows at once, nothing to repair. */
+  function targetLabel(targetEntityTypeId: string | null) {
+    const node = targetEntityTypeId ? tree.byId.get(targetEntityTypeId) : undefined
+    return node ? typePathLabel(node) : 'any Lore type'
+  }
+
   function report(error: unknown, fallback: string) {
     setMessage(error instanceof ApiError ? error.message : fallback)
   }
@@ -337,6 +346,19 @@ export default function UniverseTypes() {
       return
     }
 
+    // A link field on another type limited to this one: the same refusal the API gives, said before asking.
+    const targeting = (types ?? []).flatMap((owner) =>
+      owner.id === type.id
+        ? []
+        : owner.fields
+            .filter((field) => field.targetEntityTypeId === type.id)
+            .map((field) => ({ field: field.name, owner: owner.name })),
+    )
+    if (targeting.length > 0) {
+      setBlocked({ typeId: type.id, text: targetedDetail(type.name, targeting) })
+      return
+    }
+
     if (
       !window.confirm(`Delete the type “${type.name}”?\n\nNo entry uses it. This cannot be undone.`)
     ) {
@@ -384,11 +406,13 @@ export default function UniverseTypes() {
               .filter(Boolean)
           : null,
         semantic: fieldSemantic,
+        targetEntityTypeId: fieldKind === FieldKind.EntityReference ? fieldTarget : null,
       })
       setFieldName('')
       setFieldOptions('')
       setFieldRequired(false)
       setFieldSemantic(null)
+      setFieldTarget(null)
       await refresh()
     } catch (error: unknown) {
       report(error, 'That field could not be added.')
@@ -408,6 +432,33 @@ export default function UniverseTypes() {
     field: FieldDefinition,
     semantic: FieldSemanticValue | null,
   ) {
+    await changeField(typeId, field, { semantic }, 'That meaning could not be changed.')
+  }
+
+  /**
+   * Limits a link field to one type, or opens it to any. Narrowing is refused while an entry already links the field to an
+   * entry of another type; the refusal says so, and nothing is cleared to make it fit.
+   */
+  async function changeTarget(
+    typeId: string,
+    field: FieldDefinition,
+    targetEntityTypeId: string | null,
+  ) {
+    await changeField(
+      typeId,
+      field,
+      { targetEntityTypeId },
+      'That allowed type could not be changed.',
+    )
+  }
+
+  /** One part of a field changed, and everything else about it sent back exactly as it stands. */
+  async function changeField(
+    typeId: string,
+    field: FieldDefinition,
+    change: Partial<Pick<FieldInput, 'semantic' | 'targetEntityTypeId'>>,
+    fallback: string,
+  ) {
     setMessage(null)
     setBusyFieldId(field.id)
     try {
@@ -418,11 +469,13 @@ export default function UniverseTypes() {
         displayOrder: field.displayOrder,
         defaultValue: field.defaultValue,
         options: field.options.map((option) => option.value),
-        semantic,
+        semantic: field.semantic,
+        targetEntityTypeId: field.targetEntityTypeId,
+        ...change,
       })
       await refresh()
     } catch (error: unknown) {
-      report(error, 'That meaning could not be changed.')
+      report(error, fallback)
     } finally {
       setBusyFieldId(null)
     }
@@ -775,6 +828,38 @@ export default function UniverseTypes() {
                                 {field.isRequired ? (
                                   <span className="types__fieldkind">required</span>
                                 ) : null}
+                                {field.kind === FieldKind.EntityReference ? (
+                                  access.editContent ? (
+                                    <select
+                                      className="types__meaning"
+                                      aria-label={`Allowed type for ${field.name}`}
+                                      value={field.targetEntityTypeId ?? ''}
+                                      disabled={busyFieldId === field.id}
+                                      onChange={(event) =>
+                                        void changeTarget(
+                                          type.id,
+                                          field,
+                                          event.target.value || null,
+                                        )
+                                      }
+                                      data-testid={`field-target-${field.name}`}
+                                    >
+                                      <option value="">Any Lore type</option>
+                                      {tree.ordered.map((node) => (
+                                        <option key={node.type.id} value={node.type.id}>
+                                          {typePathLabel(node)}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <span
+                                      className="types__fieldkind"
+                                      data-testid={`field-target-${field.name}`}
+                                    >
+                                      Links to <bdi>{targetLabel(field.targetEntityTypeId)}</bdi>
+                                    </span>
+                                  )
+                                ) : null}
                                 {!access.editContent ? (
                                   field.semantic !== null && field.semantic !== undefined ? (
                                     <span className="types__fieldkind">
@@ -850,6 +935,8 @@ export default function UniverseTypes() {
                                       ? current
                                       : null,
                                   )
+                                  // An allowed type belongs to a link field alone: none is carried onto another kind.
+                                  if (kind !== FieldKind.EntityReference) setFieldTarget(null)
                                 }}
                               >
                                 {KIND_ORDER.map((kind) => (
@@ -868,6 +955,33 @@ export default function UniverseTypes() {
                                 value={fieldOptions}
                                 onChange={(event) => setFieldOptions(event.target.value)}
                               />
+                            ) : null}
+
+                            {fieldKind === FieldKind.EntityReference ? (
+                              <div className="field">
+                                <label className="field__label" htmlFor={`field-target-${type.id}`}>
+                                  Allowed type
+                                </label>
+                                <select
+                                  id={`field-target-${type.id}`}
+                                  className="field__input field__input--select"
+                                  value={fieldTarget ?? ''}
+                                  onChange={(event) => setFieldTarget(event.target.value || null)}
+                                  aria-describedby={`field-target-hint-${type.id}`}
+                                  data-testid={`new-field-target-${type.name}`}
+                                >
+                                  <option value="">Any Lore type</option>
+                                  {tree.ordered.map((node) => (
+                                    <option key={node.type.id} value={node.type.id}>
+                                      {typePathLabel(node)}
+                                    </option>
+                                  ))}
+                                </select>
+                                <p className="field__hint" id={`field-target-hint-${type.id}`}>
+                                  The field links only to entries of this type. Types nested inside
+                                  it are not included.
+                                </p>
+                              </div>
                             ) : null}
 
                             {semanticsFor(fieldKind).length > 0 ? (
@@ -960,6 +1074,21 @@ export default function UniverseTypes() {
       </TabPanel>
     </article>
   )
+}
+
+/**
+ * Why a type a link field is limited to cannot be deleted: the same sentence the API's refusal carries
+ * (`EntityTypeEndpoints.DeleteAsync`), naming the first field by its type's and its own name and counting the rest.
+ */
+function targetedDetail(name: string, targeting: { field: string; owner: string }[]) {
+  const ordered = [...targeting].sort((a, b) =>
+    a.owner === b.owner ? (a.field < b.field ? -1 : 1) : a.owner < b.owner ? -1 : 1,
+  )
+  const first = ordered[0]
+  const others = ordered.length - 1
+  const rest =
+    others === 0 ? '' : others === 1 ? ' and 1 other field' : ` and ${others} other fields`
+  return `${name} can't be deleted because the field "${first.field}" on ${first.owner}${rest} can only link to it. Change those fields to allow another type first.`
 }
 
 /**

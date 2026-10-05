@@ -136,6 +136,16 @@ public sealed class EntityFieldDefinition
     /// <summary>Default rendered into a new entity's form. Interpreted per <see cref="Kind"/>.</summary>
     public string? DefaultValue { get; set; }
 
+    /// <summary>
+    /// For an <see cref="EntityFieldKind.EntityReference"/> field, the one type its entries must be of - that exact type,
+    /// never its descendants - or null for any type, which is a choice and not a gap. Always null on any other kind.
+    /// Held by id alone and never worked out from a name, so renaming or moving the type changes nothing here. A type of
+    /// the same universe, which the key cannot say and the endpoints check.
+    /// </summary>
+    public Guid? TargetEntityTypeId { get; set; }
+
+    public EntityType? TargetEntityType { get; set; }
+
     public ICollection<EntityFieldOption> Options { get; set; } = [];
 
     public ICollection<EntityFieldValue> Values { get; set; } = [];

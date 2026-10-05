@@ -974,12 +974,26 @@ public static class EntityEndpoints
 
         var errors = new Dictionary<string, string[]>();
 
+        // Every entry a link field names, read once with its type, and only from this universe: what each field then accepts
+        // is decided from that, however many link fields the type has.
+        var wanted = definitions
+            .Where(definition => definition.Kind == EntityFieldKind.EntityReference)
+            .Select(definition => supplied.GetValueOrDefault(definition.Id)?.ReferencedEntityId)
+            .OfType<Guid>()
+            .Distinct()
+            .ToList();
+
+        var referenced = wanted.Count == 0
+            ? []
+            : await db.Entities.AsNoTracking()
+                .Where(candidate => candidate.UniverseId == universeId && wanted.Contains(candidate.Id))
+                .ToDictionaryAsync(candidate => candidate.Id, candidate => candidate.EntityTypeId, cancellationToken);
+
         foreach (var definition in definitions)
         {
             supplied.TryGetValue(definition.Id, out var input);
 
-            var rows = await BuildRowsAsync(
-                db, universeId, entity, definition, input, chronology, errors, cancellationToken);
+            var rows = BuildRows(entity, definition, input, chronology, referenced, errors);
 
             if (definition.IsRequired && rows.Count == 0)
             {
@@ -992,15 +1006,14 @@ public static class EntityEndpoints
         return errors.Count == 0 ? null : Results.ValidationProblem(errors);
     }
 
-    private static async Task<List<EntityFieldValue>> BuildRowsAsync(
-        LorexDbContext db,
-        Guid universeId,
+    /// <param name="referenced">This universe's entries the request links to, each with its type.</param>
+    private static List<EntityFieldValue> BuildRows(
         LoreEntity entity,
         EntityFieldDefinition definition,
         FieldValueInput? input,
         UniverseChronology chronology,
-        Dictionary<string, string[]> errors,
-        CancellationToken cancellationToken)
+        Dictionary<Guid, Guid> referenced,
+        Dictionary<string, string[]> errors)
     {
         var rows = new List<EntityFieldValue>();
 
@@ -1127,14 +1140,21 @@ public static class EntityEndpoints
                 // edit to this entry into a validation failure - or, worse, silently drop the
                 // reference. Discoverability is the picker's job: the entity listing never
                 // offers a trashed entry, so a *new* reference to one cannot be authored.
-                var referenceExists = await db.Entities.AnyAsync(
-                    candidate => candidate.Id == referenceId && candidate.UniverseId == universeId,
-                    cancellationToken);
-
-                if (!referenceExists)
+                //
+                // A field limited to one type accepts entries of exactly that type, checked here whatever the picker
+                // offered. A trashed entry still has its type, so a kept link is checked like any other. An entry of
+                // another universe gets the same answer as one of the wrong type, and says nothing about itself.
+                if (!referenced.TryGetValue(referenceId, out var referencedType))
                 {
-                    errors[definition.Id.ToString()] =
-                        [$"{definition.Name} must point at an entity in this universe."];
+                    errors[definition.Id.ToString()] = definition.TargetEntityTypeId is null
+                        ? [$"{definition.Name} must point at an entity in this universe."]
+                        : [WrongTarget(definition)];
+                    break;
+                }
+
+                if (definition.TargetEntityTypeId is { } target && referencedType != target)
+                {
+                    errors[definition.Id.ToString()] = [WrongTarget(definition)];
                     break;
                 }
 
@@ -1150,6 +1170,10 @@ public static class EntityEndpoints
 
         return rows;
     }
+
+    /// <summary>The one refusal for a link a limited field does not allow: wrong type, missing or not this universe's.</summary>
+    private static string WrongTarget(EntityFieldDefinition definition) =>
+        $"{definition.Name} can only link to an entry of the type it allows. Choose another entry.";
 
     /// <summary>
     /// What is wrong with the era a number arrived with, or null when nothing is.

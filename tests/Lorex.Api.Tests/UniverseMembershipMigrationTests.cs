@@ -72,7 +72,11 @@ public sealed class UniverseMembershipMigrationTests : IDisposable
             await db.GetService<IMigrator>().MigrateAsync(Before);
 
             Assert.Empty(await Strings(db, "SELECT name AS Value FROM sqlite_master WHERE name = 'UniverseMemberships'"));
-            Assert.Equal(indexes.Where(index => !index.EndsWith(" on UniverseMemberships", StringComparison.Ordinal) && !index.EndsWith(" on UniverseInvitations", StringComparison.Ordinal)), await Indexes(db));
+            Assert.Equal(
+                indexes.Where(index => !index.EndsWith(" on UniverseMemberships", StringComparison.Ordinal)
+                    && !index.EndsWith(" on UniverseInvitations", StringComparison.Ordinal)
+                    && LaterSchema.BeforeReferenceTargets(index)),
+                await Indexes(db));
             Assert.Equal(triggers, await Strings(db, "SELECT name AS Value FROM sqlite_master WHERE type = 'trigger' ORDER BY name"));
             content = await Content(db);
         }
@@ -124,8 +128,8 @@ public sealed class UniverseMembershipMigrationTests : IDisposable
             (await owner.PostAsJsonAsync("/api/auth/login", new LoginRequest("user-membermigrate", Password))).EnsureSuccessStatusCode();
             var detail = (await owner.GetFromJsonAsync<UniverseDetail>($"/api/universes/{universeId}"))!;
             Assert.Equal(UniverseRole.Owner, detail.AccessRole);
-            Assert.Equal(19, (await PlotTestClient.Backup(owner, universeId)).FormatVersion);
-            Assert.Equal(19, UniverseBackup.CurrentVersion);
+            Assert.Equal(20, (await PlotTestClient.Backup(owner, universeId)).FormatVersion);
+            Assert.Equal(20, UniverseBackup.CurrentVersion);
 
             var member = host.CreateHttpsClient();
             (await member.PostAsJsonAsync("/api/auth/login", new LoginRequest("user-membermigrate2", Password))).EnsureSuccessStatusCode();

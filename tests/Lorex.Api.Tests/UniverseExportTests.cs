@@ -399,7 +399,7 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
 
         // Authored configuration, added within version 4: no fact changes meaning without it. The file
         // is at its current version because of everything since (ADR 0024-0035), not because of these.
-        Assert.Equal(19, backup.FormatVersion);
+        Assert.Equal(20, backup.FormatVersion);
 
         var parent = backup.Payload.RelationshipTypes.Single(type => type.Name == "parent of");
         Assert.Equal(RelationshipAgeOrder.SourceOlder, parent.AgeOrder);
@@ -503,7 +503,7 @@ public sealed class UniverseExportTests(LorexApiFactory factory) : IClassFixture
 
         // Eras arrived in version 4; stories took the file to 5, chapters to 6, plot to 7 and prose to 8 without
         // changing how eras travel.
-        Assert.Equal(19, backup.FormatVersion);
+        Assert.Equal(20, backup.FormatVersion);
         Assert.Equal(
             [
                 new BackupChronologyEra(

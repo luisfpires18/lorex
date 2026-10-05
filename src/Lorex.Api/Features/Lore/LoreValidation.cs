@@ -67,6 +67,12 @@ public static partial class LoreValidation
             }
         }
 
+        // Refused rather than dropped: a type sent with a number field is a client saying something it should not.
+        if (request.TargetEntityTypeId is not null && request.Kind != EntityFieldKind.EntityReference)
+        {
+            errors["targetEntityTypeId"] = ["Only a field that links to an entry can be limited to a type."];
+        }
+
         return errors.Count == 0 ? null : errors;
     }
 

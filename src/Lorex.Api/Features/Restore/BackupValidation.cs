@@ -293,6 +293,7 @@ internal static partial class BackupValidation
         private readonly HashSet<Guid> _ids = [];
         private readonly Dictionary<Guid, BackupEntityType> _types = [];
         private readonly Dictionary<Guid, Guid> _fieldOwner = [];
+        private readonly Dictionary<Guid, (BackupFieldDefinition Field, string What)> _fieldTargets = [];
         private readonly HashSet<Guid> _options = [];
         private readonly HashSet<Guid> _tags = [];
         private readonly Dictionary<Guid, BackupEntity> _entities = [];
@@ -333,6 +334,7 @@ internal static partial class BackupValidation
             RegisterEras(eras);
             RegisterTypes(types);
             CheckTypeHierarchy(types);
+            CheckFieldTargets();
             RegisterTags(tags);
             RegisterEntities(entities);
             RegisterRelationshipTypes(relationshipTypes);
@@ -549,6 +551,29 @@ internal static partial class BackupValidation
             }
         }
 
+        /// <summary>
+        /// A link field's type limit (version 20), once every type is known: a type of this file, on a link field, in a file
+        /// new enough to say it. The restore maps it to that type's new id, so anything else would name nothing.
+        /// </summary>
+        private void CheckFieldTargets()
+        {
+            foreach (var (field, what) in _fieldTargets.Values)
+            {
+                if (version < 20)
+                {
+                    Add(BackupIssueCodes.InvalidValue, $"{what} is limited to one type, which a backup this old cannot say. It was not written by Lorex.");
+                }
+                else if (field.Kind != EntityFieldKind.EntityReference)
+                {
+                    Add(BackupIssueCodes.InvalidValue, $"{what} is limited to one type but does not link to an entry.");
+                }
+                else
+                {
+                    Reference(_types.ContainsKey(field.TargetEntityTypeId!.Value), $"{what} is limited to an entry type the backup does not hold.");
+                }
+            }
+        }
+
         private void RegisterTypes(IReadOnlyList<BackupEntityType> types)
         {
             var names = new HashSet<string>(StringComparer.Ordinal);
@@ -602,6 +627,11 @@ internal static partial class BackupValidation
 
                     Defined(field.Kind, $"{fieldWhat}'s kind");
                     Text(field.DefaultValue, LoreLimits.TextValueMaxLength, $"{fieldWhat}'s default value");
+
+                    if (field.TargetEntityTypeId is not null)
+                    {
+                        _fieldTargets[field.Id] = (field, fieldWhat);
+                    }
 
                     if (field.Semantic is { } semantic)
                     {
@@ -753,6 +783,14 @@ internal static partial class BackupValidation
                 if (value.ReferencedEntityId is { } referenced)
                 {
                     Reference(_entities.ContainsKey(referenced), $"{what} has a value pointing at an entry the backup does not hold.");
+
+                    // The limit holds in the file as it does in the app: a restore would otherwise write a link the field refuses.
+                    if (_fieldTargets.TryGetValue(value.FieldDefinitionId, out var limited)
+                        && _entities.TryGetValue(referenced, out var linked)
+                        && linked.EntityTypeId != limited.Field.TargetEntityTypeId)
+                    {
+                        Add(BackupIssueCodes.InvalidValue, $"{what} links its field {Quote(limited.Field.Name)} to an entry of a type that field does not allow.");
+                    }
                 }
 
                 if (value.EraId is { } era)

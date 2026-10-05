@@ -262,6 +262,7 @@ function FieldFilterEditor({
             universeId={universeId}
             value={entry}
             onChange={setEntry}
+            entityTypeId={field.targetEntityTypeId}
             placeholder="Search for an entry"
           />
         ) : (

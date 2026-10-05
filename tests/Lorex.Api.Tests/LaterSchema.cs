@@ -28,7 +28,18 @@ internal static class LaterSchema
         "IX_UniverseInvitations_UniverseId_NormalizedEmail",
     ];
 
+    /// <summary>A link field's allowed type (AddEntityReferenceTargetType, 2026-10-05, 036): its key's index.</summary>
+    private static readonly string[] ReferenceTargets =
+    [
+        "IX_EntityFieldDefinitions_TargetEntityTypeId",
+    ];
+
     /// <summary>Whether an index or trigger name (or "name on table") predates nested types - and so everything after them.</summary>
     public static bool BeforeNestedTypes(string name) =>
-        !NestedTypes.Concat(Memberships).Any(later => name == later || name.StartsWith($"{later} ", StringComparison.Ordinal));
+        !NestedTypes.Concat(Memberships).Concat(ReferenceTargets)
+            .Any(later => name == later || name.StartsWith($"{later} ", StringComparison.Ordinal));
+
+    /// <summary>Whether an index or trigger name predates the link field's allowed type.</summary>
+    public static bool BeforeReferenceTargets(string name) =>
+        !ReferenceTargets.Any(later => name == later || name.StartsWith($"{later} ", StringComparison.Ordinal));
 }

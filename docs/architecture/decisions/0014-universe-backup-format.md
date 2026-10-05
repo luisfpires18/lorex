@@ -396,3 +396,12 @@ Export is the owner's alone: the route asks `UniverseAccess` for `Backup`, so an
 not the world: no membership, collaborator id or name is ever written to an archive. The format stays at version 19.
 
 Invitations (refinement 030) are the same: account access metadata, never in an archive.
+
+## Amendment: version 20, a link field's allowed type (2026-10-05, Product correction 036)
+
+`BackupFieldDefinition.TargetEntityTypeId` names the type of the same file a link field is limited to, null for any type
+(ADR 0007 amendment). Not ignorable: the limit is what the author said the field means and nothing derives it again, so a
+version 19 reader would restore every limited field open to any type. A restore writes it as that type's restored id, never
+the old one. Validation refuses a target that is not a type of the file, one on a field that does not link, one in a file
+older than 20, and a value whose linked entry is not of its field's type. A version 19 or older file restores every link
+field open to any type, and nothing is inferred from names or values.

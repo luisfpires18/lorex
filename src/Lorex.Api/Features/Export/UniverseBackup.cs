@@ -177,8 +177,15 @@ public sealed record UniverseBackup(
     /// organised their lore and how Lore is browsed - choosing a type shows its whole branch - so a version 18 reader would
     /// restore every type flat and the organisation would be silently gone. A file at version 18 or earlier has no
     /// <c>parentId</c>; every type reads as a root in its stored order, and nothing is ever inferred from names.
+    ///
+    /// 20 - A field that links to an entry may be limited to one type (ADR 0007 amendment, 036).
+    /// <see cref="BackupFieldDefinition.TargetEntityTypeId"/> names a type of the same file, null for any type, and only a link
+    /// field may carry one. Not ignorable: the limit is the author's statement of what the field means, nothing derives it again
+    /// - not from the field's name, not from the entries it already links - so a version 19 reader would restore every limited
+    /// field open to any type. A file at version 19 or earlier has no <c>targetEntityTypeId</c>; each link field reads as open
+    /// to any type, and one that carries it was not written by Lorex and is refused.
     /// </summary>
-    public const int CurrentVersion = 19;
+    public const int CurrentVersion = 20;
 
     public static UniverseBackup Of(UniverseBackupPayload payload, DateTime generatedAt) =>
         new(FormatName, CurrentVersion, generatedAt, payload);
@@ -297,6 +304,7 @@ public sealed record BackupEntityType(
 /// <summary>
 /// One custom field, with its declared meaning. <c>Semantic</c> is authored (ADR 0011) and
 /// nothing infers it from a name, so losing it would silently disarm the chronology rules.
+/// <paramref name="TargetEntityTypeId"/> (version 20) is the type of this file a link field is limited to, or null for any.
 /// </summary>
 public sealed record BackupFieldDefinition(
     Guid Id,
@@ -306,7 +314,8 @@ public sealed record BackupFieldDefinition(
     bool IsRequired,
     int DisplayOrder,
     string? DefaultValue,
-    IReadOnlyList<BackupFieldOption> Options);
+    IReadOnlyList<BackupFieldOption> Options,
+    Guid? TargetEntityTypeId = null);
 
 public sealed record BackupFieldOption(Guid Id, string Value, int DisplayOrder);
 

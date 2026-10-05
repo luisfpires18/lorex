@@ -1,27 +1,24 @@
+import { useState } from 'react'
 import { namesEras } from '../chronology/format'
 import type { Chronology } from '../chronology/types'
-import {
-  FieldKind,
-  isYearMeaning,
-  type EntitySummary,
-  type FieldDefinition,
-  type FieldValueInput,
-} from '../lore/types'
+import { FieldKind, isYearMeaning, type FieldDefinition, type FieldValueInput } from '../lore/types'
+import { EntityPicker, type EntityChoice } from './EntityPicker'
 
 interface FieldInputProps {
   definition: FieldDefinition
   value: FieldValueInput
-  candidates: EntitySummary[]
+
+  /** The universe a link field searches. */
+  universeId: string
+
+  /** Never offered to a link field: the entry being edited. */
+  excludeId?: string
 
   /**
-   * The reference this field already holds, when it is not among `candidates` - because the
-   * entry it names is in the Trash, or simply beyond the first page the picker loaded.
-   *
-   * It is offered as a disabled option carrying the stored id, so the select shows what is
-   * really there and a save round-trips it. Without this the control would read "Not set" and
-   * saving an unrelated field would quietly destroy the reference.
+   * The entry this field held when the form opened, with its name - "(in Trash)" when it is there, since the listing never
+   * offers one. Shown as the choice until it is changed, so a save that touches another field keeps the link as it was.
    */
-  retainedReference?: { id: string; label: string } | null
+  heldReference?: EntityChoice | null
 
   /** How the universe keeps time, for a number that is a year in one of its date periods (eras). */
   chronology: Chronology
@@ -32,13 +29,17 @@ interface FieldInputProps {
 export function FieldInput({
   definition,
   value,
-  candidates,
-  retainedReference,
+  universeId,
+  excludeId,
+  heldReference,
   chronology,
   onChange,
 }: FieldInputProps) {
   const id = `field-${definition.id}`
   const label = definition.isRequired ? `${definition.name} (required)` : definition.name
+
+  // A link chosen in this form, kept for its name: the value itself is only an id.
+  const [chosen, setChosen] = useState<EntityChoice | null>(null)
 
   // A birth or death year on a universe with date periods is written in one of them, and so is any
   // number that already carries one - showing it keeps a save from quietly dropping it.
@@ -62,6 +63,33 @@ export function FieldInput({
       }
     />
   )
+
+  // A link is searched for rather than listed, and only among the entries the field allows: exactly its allowed type, or
+  // any type when it has none. The API decides what is offered and checks what is saved.
+  if (definition.kind === FieldKind.EntityReference) {
+    const held = value.referencedEntityId
+      ? chosen?.id === value.referencedEntityId
+        ? chosen
+        : heldReference?.id === value.referencedEntityId
+          ? heldReference
+          : { id: value.referencedEntityId, name: 'Unavailable' }
+      : null
+
+    return (
+      <EntityPicker
+        label={label}
+        universeId={universeId}
+        value={held}
+        onChange={(next) => {
+          setChosen(next)
+          patch({ referencedEntityId: next?.id ?? null })
+        }}
+        excludeId={excludeId}
+        entityTypeId={definition.targetEntityTypeId}
+        placeholder="Search for an entry"
+      />
+    )
+  }
 
   return (
     <div className="field">
@@ -175,27 +203,6 @@ export function FieldInput({
             )
           })}
         </div>
-      ) : null}
-
-      {definition.kind === FieldKind.EntityReference ? (
-        <select
-          id={id}
-          className="field__input field__input--select"
-          value={value.referencedEntityId ?? ''}
-          onChange={(event) => patch({ referencedEntityId: event.target.value || null })}
-        >
-          <option value="">Not set</option>
-          {retainedReference ? (
-            <option value={retainedReference.id} disabled>
-              {retainedReference.label}
-            </option>
-          ) : null}
-          {candidates.map((candidate) => (
-            <option key={candidate.id} value={candidate.id}>
-              {candidate.name}
-            </option>
-          ))}
-        </select>
       ) : null}
     </div>
   )

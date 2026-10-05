@@ -51,6 +51,12 @@ public static class EntityTypeEndpoints
 
     private static string Nested(int children) => children == 1 ? "1 nested type" : $"{children} nested types";
 
+    /// <summary>The marker on the 409 for deleting a type that a link field is limited to.</summary>
+    public const string TypeTargetedCode = "entity_type_targeted";
+
+    /// <summary>The marker on the 409 for limiting a link field to a type some of its links are not of.</summary>
+    public const string TargetConflictCode = "entity_field_target_conflict";
+
     /// <summary>The machine-readable marker on the refusal of a parent or a move that would put a type inside itself.</summary>
     public const string ParentCycleCode = "entity_type_parent_cycle";
 
@@ -531,6 +537,33 @@ public static class EntityTypeEndpoints
                 });
         }
 
+        // A link field on another type limited to this one would be left pointing at nothing. Named, so the author knows
+        // which field to change; one is enough to say what to do, and the count says how many. A field of this type that
+        // links to its own kind goes with it.
+        var targeting = await db.EntityFieldDefinitions.AsNoTracking()
+            .Where(field => field.TargetEntityTypeId == typeId && field.EntityTypeId != typeId)
+            .OrderBy(field => field.EntityType!.Name)
+            .ThenBy(field => field.Name)
+            .Select(field => new { field.Name, TypeName = field.EntityType!.Name })
+            .ToListAsync(cancellationToken);
+
+        if (targeting.Count > 0)
+        {
+            var first = targeting[0];
+            var others = targeting.Count - 1;
+            return Results.Problem(
+                title: "Type is in use",
+                detail: $"{entityType.Name} can't be deleted because the field \"{first.Name}\" on {first.TypeName}"
+                    + (others == 0 ? string.Empty : others == 1 ? " and 1 other field" : $" and {others} other fields")
+                    + " can only link to it. Change those fields to allow another type first.",
+                statusCode: StatusCodes.Status409Conflict,
+                extensions: new Dictionary<string, object?>
+                {
+                    ["code"] = TypeTargetedCode,
+                    ["fieldCount"] = targeting.Count,
+                });
+        }
+
         db.EntityTypes.Remove(entityType);
         await db.SaveChangesAsync(cancellationToken);
 
@@ -559,6 +592,11 @@ public static class EntityTypeEndpoints
         if (LoreValidation.ValidateField(request) is { } errors)
         {
             return Results.ValidationProblem(errors);
+        }
+
+        if (await UnknownTargetAsync(db, universeId, request.TargetEntityTypeId, cancellationToken))
+        {
+            return UnknownTarget();
         }
 
         var name = request.Name!.Trim();
@@ -590,6 +628,7 @@ public static class EntityTypeEndpoints
             IsRequired = request.IsRequired,
             DisplayOrder = order,
             DefaultValue = LoreValidation.Normalize(request.DefaultValue),
+            TargetEntityTypeId = request.TargetEntityTypeId,
         };
 
         AddOptions(definition, request.Options);
@@ -697,7 +736,32 @@ public static class EntityTypeEndpoints
             return SemanticTaken(request.Semantic!.Value);
         }
 
+        if (await UnknownTargetAsync(db, universeId, request.TargetEntityTypeId, cancellationToken))
+        {
+            return UnknownTarget();
+        }
+
+        // Narrowing a link field - from any type to one, or from one type to another - is refused while any entry links it
+        // to an entry of another type: nothing is cleared or rewritten behind the author's back. Entries in the Trash count,
+        // since their values come back with them. Widening to any type is always safe.
+        if (request.TargetEntityTypeId is { } target
+            && target != definition.TargetEntityTypeId
+            && await db.EntityFieldValues.AnyAsync(
+                value => value.FieldDefinitionId == fieldId
+                    && value.ReferencedEntityId != null
+                    && value.ReferencedEntity!.EntityTypeId != target,
+                cancellationToken))
+        {
+            return Results.Problem(
+                title: "Field is in use",
+                detail: "Some entries link this field to entries of another type. "
+                    + "Change those links first, then limit the field to this type.",
+                statusCode: StatusCodes.Status409Conflict,
+                extensions: new Dictionary<string, object?> { ["code"] = TargetConflictCode });
+        }
+
         definition.Name = name;
+        definition.TargetEntityTypeId = request.TargetEntityTypeId;
         definition.Kind = request.Kind;
 
         // Meaning is metadata about the field, not about what is stored in it, so it may be
@@ -894,7 +958,8 @@ public static class EntityTypeEndpoints
                             .OrderBy(option => option.DisplayOrder)
                             .Select(option => new FieldOptionResponse(option.Id, option.Value, option.DisplayOrder))
                             .ToList(),
-                        field.Semantic))
+                        field.Semantic,
+                        field.TargetEntityTypeId))
                     .ToList(),
                 type.FamilyTreeEligible,
                 type.ParentId))
@@ -940,5 +1005,23 @@ public static class EntityTypeEndpoints
         Results.ValidationProblem(new Dictionary<string, string[]>
         {
             ["name"] = ["This type already has a field with that name."],
+        });
+
+    /// <summary>
+    /// Whether a link field names a type that is not this universe's. One answer for a type that does not exist and one
+    /// that belongs to another universe, so neither can be told apart.
+    /// </summary>
+    private static async Task<bool> UnknownTargetAsync(
+        LorexDbContext db,
+        Guid universeId,
+        Guid? target,
+        CancellationToken cancellationToken) =>
+        target is { } typeId
+        && !await db.EntityTypes.AnyAsync(type => type.Id == typeId && type.UniverseId == universeId, cancellationToken);
+
+    private static IResult UnknownTarget() =>
+        Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["targetEntityTypeId"] = ["Choose a type from this universe, or any Lore type."],
         });
 }

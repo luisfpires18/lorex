@@ -95,11 +95,17 @@ public static class EntityFieldFilters
 
         var fields = await db.EntityFieldDefinitions.AsNoTracking()
             .Where(field => field.EntityTypeId == typeId && field.EntityType!.UniverseId == universeId)
-            .Select(field => new { field.Id, field.Kind, Options = field.Options.Select(option => option.Id).ToList() })
+            .Select(field => new
+            {
+                field.Id,
+                field.Kind,
+                field.TargetEntityTypeId,
+                Options = field.Options.Select(option => option.Id).ToList(),
+            })
             .ToDictionaryAsync(field => field.Id, cancellationToken);
 
         var errors = new Dictionary<string, string[]>();
-        var references = new Dictionary<int, Guid>();
+        var references = new Dictionary<int, (Guid EntityId, Guid? Target)>();
 
         for (var index = 0; index < raw.Length; index++)
         {
@@ -173,26 +179,33 @@ public static class EntityFieldFilters
                         break;
                     }
 
-                    references[index] = entityId;
+                    references[index] = (entityId, field.TargetEntityTypeId);
                     filters.Add(new(fieldId, field.Kind, op, Id: entityId));
                     break;
             }
         }
 
-        // One read for every referenced entry, and only this universe's count.
+        // One read for every referenced entry, with its type, and only this universe's count. A field limited to one type
+        // is compared only with an entry of that type: any other is a filter that cannot mean anything, so it is refused
+        // rather than answered with nothing - and an entry of another universe gets the same answer.
         if (references.Count > 0)
         {
-            var wanted = references.Values.Distinct().ToList();
+            var wanted = references.Values.Select(reference => reference.EntityId).Distinct().ToList();
             var known = await db.Entities.AsNoTracking()
                 .Where(entity => entity.UniverseId == universeId && wanted.Contains(entity.Id))
-                .Select(entity => entity.Id)
-                .ToListAsync(cancellationToken);
+                .ToDictionaryAsync(entity => entity.Id, entity => entity.EntityTypeId, cancellationToken);
 
-            foreach (var (index, entityId) in references)
+            foreach (var (index, (entityId, target)) in references)
             {
-                if (!known.Contains(entityId))
+                if (!known.TryGetValue(entityId, out var typeOf))
                 {
-                    errors[$"field[{index}]"] = ["Choose an entry of this universe."];
+                    errors[$"field[{index}]"] = [target is null
+                        ? "Choose an entry of this universe."
+                        : "Choose an entry of the type this field allows."];
+                }
+                else if (target is { } allowed && typeOf != allowed)
+                {
+                    errors[$"field[{index}]"] = ["Choose an entry of the type this field allows."];
                 }
             }
         }

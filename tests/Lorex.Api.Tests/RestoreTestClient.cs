@@ -479,6 +479,18 @@ internal static partial class RestoreTestClient
             }
         }
 
+        if (version < 20)
+        {
+            // A link field's allowed type arrived in version 20.
+            foreach (var type in payload["entityTypes"]!.AsArray())
+            {
+                foreach (var field in type!["fields"]!.AsArray())
+                {
+                    Drop(field, "targetEntityTypeId");
+                }
+            }
+        }
+
         if (version < 19)
         {
             // A type's parent arrived in version 19.

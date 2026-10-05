@@ -108,8 +108,17 @@ async function fillEntryFields(page: Page, input: EntryInput) {
   }
 
   for (const [label, target] of Object.entries(input.references ?? {})) {
-    await page.getByLabel(label).selectOption({ label: target })
+    await chooseEntry(page, label, target)
   }
+}
+
+/** A link field's picker: whatever it holds is changed, the entry is searched for by name and chosen. */
+async function chooseEntry(page: Page, label: string, name: string) {
+  const picker = page.locator('.picker').filter({ has: page.getByText(label, { exact: true }) })
+  const change = picker.getByTestId('picker-clear')
+  if (await change.isVisible()) await change.click()
+  await picker.getByTestId('picker-input').fill(name)
+  await picker.getByTestId(`picker-option-${name}`).click()
 }
 
 /**
@@ -421,7 +430,7 @@ test.describe('canon integrity', () => {
     // different conflict: the old one closes and a new one opens beside it.
     await page.goto(entryUrl(universeId, keep))
     await page.getByTestId('edit-entity').click()
-    await page.getByLabel('Warden').selectOption({ label: 'Brienne' })
+    await chooseEntry(page, 'Warden', 'Brienne')
     await page.getByTestId('save-entity').click()
     await expect(page.getByTestId('entry-fields')).toContainText('Brienne')
 
