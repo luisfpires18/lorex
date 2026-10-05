@@ -1,6 +1,7 @@
 using Lorex.Api.Features.Chronology;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.RuleValidation;
+using Lorex.Api.Features.Stories;
 using Lorex.Api.Features.Universes;
 
 namespace Lorex.Api.Features.Timeline;
@@ -106,6 +107,12 @@ public sealed class TimelineEntry
     public ICollection<TimelineEntryLink> EntityLinks { get; } = [];
 
     /// <summary>
+    /// The stories this moment matters to, chosen by the author. A relation, never a copy: the moment stays one moment however
+    /// many stories it is linked to, and a story's timeline is the universe's timeline narrowed to it.
+    /// </summary>
+    public ICollection<TimelineEntryStory> StoryLinks { get; } = [];
+
+    /// <summary>
     /// The optional structured details world rule checks read - event kind, method, participant - or null for an ordinary
     /// moment (ADR 0034). Separate from <see cref="EntityLinks"/>: an entry taking part is not the check's participant unless
     /// the author chose it there too.
@@ -126,4 +133,19 @@ public sealed class TimelineEntryLink
     public Guid EntityId { get; set; }
 
     public LoreEntity? Entity { get; set; }
+}
+
+/// <summary>
+/// One story one timeline moment matters to. A relational row per pair, as a participant is. Putting the story in the Trash
+/// keeps the row, so a restore brings the relevance back; only a story gone for good takes the row with it.
+/// </summary>
+public sealed class TimelineEntryStory
+{
+    public Guid TimelineEntryId { get; set; }
+
+    public TimelineEntry? TimelineEntry { get; set; }
+
+    public Guid StoryId { get; set; }
+
+    public Story? Story { get; set; }
 }

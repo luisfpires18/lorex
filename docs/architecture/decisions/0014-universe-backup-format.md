@@ -405,3 +405,12 @@ version 19 reader would restore every limited field open to any type. A restore 
 the old one. Validation refuses a target that is not a type of the file, one on a field that does not link, one in a file
 older than 20, and a value whose linked entry is not of its field's type. A version 19 or older file restores every link
 field open to any type, and nothing is inferred from names or values.
+
+## Amendment: version 21, a moment's stories (2026-10-05, refinement 038)
+
+`BackupTimelineEntry.StoryIds` names the stories of the same file a moment is linked to, sorted, each once (ADR 0009
+amendment). Not ignorable: the links are the author's statement of which stories a moment belongs to and nothing derives
+them, so a version 20 reader would restore every story's timeline without its moments. A restore writes each link to the
+restored story's id; the moment stays one moment. Validation refuses a link to a story the file does not hold, the same
+story twice, and any link in a file older than 21. A version 20 or older file restores every moment linked to no story.
+Scenes and birth and death years are never written as timeline items: they travel as scenes and entries already.

@@ -5,7 +5,7 @@ import {
   DatePrecision,
   type DatePrecisionValue,
   type TimelineDate,
-  type TimelineEntry,
+  type TimelineItem,
 } from './types'
 
 /**
@@ -76,7 +76,7 @@ export interface YearGroup {
   eraId: string | null
   /** The free-text label of the plain reckoning, when one was written. */
   eraLabel: string | null
-  entries: TimelineEntry[]
+  entries: TimelineItem[]
 }
 
 /** The moments placed in time, the ones dated in no era, and the ones not placed at all. */
@@ -87,8 +87,8 @@ export interface GroupedTimeline {
    * its eras. The API lists them after every placed moment, and they are shown apart for the same
    * reason - nothing says which era they meant.
    */
-  unreckoned: TimelineEntry[]
-  unplaced: TimelineEntry[]
+  unreckoned: TimelineItem[]
+  unplaced: TimelineItem[]
   /**
    * True when more than one free-text label is on the page of a universe that names no eras, so
    * the order cannot be trusted. Named eras are ordered by the API, so this never applies to them.
@@ -96,7 +96,7 @@ export interface GroupedTimeline {
   mixedEras: boolean
 }
 
-function groupKey(entry: TimelineEntry) {
+function groupKey(entry: TimelineItem) {
   return `${entry.date.startEraId ?? ''}|${entry.date.eraLabel ?? ''}|${entry.date.startYear}`
 }
 
@@ -106,10 +106,10 @@ function groupKey(entry: TimelineEntry) {
  * Runs are consecutive rather than gathered: the API decides the order, and pulling two
  * separated moments of year 3018 together would quietly rewrite it.
  */
-export function groupTimeline(entries: TimelineEntry[], chronology: Chronology): GroupedTimeline {
+export function groupTimeline(entries: TimelineItem[], chronology: Chronology): GroupedTimeline {
   const groups: YearGroup[] = []
-  const unreckoned: TimelineEntry[] = []
-  const unplaced: TimelineEntry[] = []
+  const unreckoned: TimelineItem[] = []
+  const unplaced: TimelineItem[] = []
   const labels = new Set<string | null>()
 
   for (const entry of entries) {

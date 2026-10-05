@@ -1,5 +1,10 @@
 import { apiFetch } from '../lib/api'
-import type { TimelineEntry, TimelineEntryInput, TimelineEntryPage, TimelineQuery } from './types'
+import type {
+  TimelineEntry,
+  TimelineEntryInput,
+  TimelineItemPage,
+  TimelineItemQuery,
+} from './types'
 
 /** Moments are tall, so a page holds fewer of them than the lore grid does. */
 export const TIMELINE_PAGE_SIZE = 12
@@ -8,9 +13,13 @@ function base(universeId: string) {
   return `/api/universes/${universeId}/timeline`
 }
 
-export function listTimelineEntries(
+/**
+ * One page of the unified timeline: moments, dated scenes and birth and death years, in one world order, filtered and
+ * counted together by the API. Nothing here pages one source and then another.
+ */
+export function listTimelineItems(
   universeId: string,
-  query: TimelineQuery,
+  query: TimelineItemQuery,
   signal?: AbortSignal,
 ) {
   const params = new URLSearchParams({
@@ -18,10 +27,13 @@ export function listTimelineEntries(
     pageSize: String(TIMELINE_PAGE_SIZE),
   })
 
+  if (query.source !== null) params.set('source', String(query.source))
+  if (query.storyId) params.set('storyId', query.storyId)
   if (query.canonStatus !== null) params.set('canonStatus', String(query.canonStatus))
   if (query.entityId) params.set('entityId', query.entityId)
+  if (query.search.trim()) params.set('search', query.search.trim())
 
-  return apiFetch<TimelineEntryPage>(`${base(universeId)}?${params}`, { signal })
+  return apiFetch<TimelineItemPage>(`${base(universeId)}/items?${params}`, { signal })
 }
 
 export function getTimelineEntry(universeId: string, entryId: string, signal?: AbortSignal) {

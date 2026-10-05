@@ -126,3 +126,11 @@ The deferred "Story search" is done, and the rule that no search hit comes from 
 search bar only (ADR 0031): a story's title and premise, and a scene's title, summary and notes, are searched there, over an
 index of their own kept in step by triggers. The Lore search still means lore and finds nothing a story holds. A story is
 still never Canon, a moment or a relationship, and nothing reads its words for meaning.
+
+## Amendment - scenes on the timeline (2026-10-05, refinement 038)
+
+"Nothing in a story becomes a timeline moment" still holds for what is stored: no scene ever creates or changes a
+`TimelineEntry`. But a live scene with a world date is now shown on the universe's timeline, read from the scene on every
+request (ADR 0009 amendment), with its story and chapter as context and no Canon status. Its date is still edited only on
+the scene, and its narrative order still never orders anything chronological. A moment may be linked to the stories it
+matters to; that link belongs to the moment.

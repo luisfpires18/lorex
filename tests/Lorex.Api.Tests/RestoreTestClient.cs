@@ -479,6 +479,15 @@ internal static partial class RestoreTestClient
             }
         }
 
+        if (version < 21)
+        {
+            // A moment's stories arrived in version 21.
+            foreach (var entry in payload["timelineEntries"]!.AsArray())
+            {
+                Drop(entry, "storyIds");
+            }
+        }
+
         if (version < 20)
         {
             // A link field's allowed type arrived in version 20.

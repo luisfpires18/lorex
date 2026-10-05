@@ -34,12 +34,23 @@ internal static class LaterSchema
         "IX_EntityFieldDefinitions_TargetEntityTypeId",
     ];
 
+    /// <summary>A moment's stories (AddTimelineEntryStories, 2026-10-05, 038): a table, its key's index and one index.</summary>
+    private static readonly string[] TimelineStories =
+    [
+        "sqlite_autoindex_TimelineEntryStories_1",
+        "IX_TimelineEntryStories_StoryId",
+    ];
+
     /// <summary>Whether an index or trigger name (or "name on table") predates nested types - and so everything after them.</summary>
     public static bool BeforeNestedTypes(string name) =>
-        !NestedTypes.Concat(Memberships).Concat(ReferenceTargets)
+        !NestedTypes.Concat(Memberships).Concat(ReferenceTargets).Concat(TimelineStories)
             .Any(later => name == later || name.StartsWith($"{later} ", StringComparison.Ordinal));
 
-    /// <summary>Whether an index or trigger name predates the link field's allowed type.</summary>
+    /// <summary>Whether an index or trigger name predates the link field's allowed type - and so everything after it.</summary>
     public static bool BeforeReferenceTargets(string name) =>
-        !ReferenceTargets.Any(later => name == later || name.StartsWith($"{later} ", StringComparison.Ordinal));
+        !ReferenceTargets.Concat(TimelineStories).Any(later => name == later || name.StartsWith($"{later} ", StringComparison.Ordinal));
+
+    /// <summary>Whether an index or trigger name predates a moment's stories.</summary>
+    public static bool BeforeTimelineStories(string name) =>
+        !TimelineStories.Any(later => name == later || name.StartsWith($"{later} ", StringComparison.Ordinal));
 }

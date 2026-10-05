@@ -671,6 +671,13 @@ internal sealed partial class UniverseRestore(
             {
                 db.TimelineEntryLinks.Add(new TimelineEntryLink { TimelineEntryId = entryId, EntityId = ids.Map(participant) });
             }
+
+            // To the restored stories, by their new ids: validation proved each is a story of this file. One moment, however
+            // many stories it names. A version 20 file has none.
+            foreach (var story in entry.StoryIds ?? [])
+            {
+                db.TimelineEntryStories.Add(new TimelineEntryStory { TimelineEntryId = entryId, StoryId = ids.Map(story) });
+            }
         }
     }
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useUniverseAccess } from '../universes/access'
-import { BookPlus, Pencil, Plus, Trash } from 'lucide-react'
+import { BookPlus, Hourglass, Pencil, Plus, Trash } from 'lucide-react'
 import {
   Link,
   NavLink,
@@ -275,6 +275,8 @@ function StoryView({ view }: { view: StoryViewName }) {
   const unchaptered = scenesIn(scenes, null)
   const sceneBeats = beatsByScene(arcs)
   const storyPath = `/app/universes/${universe.id}/stories/${story.id}`
+  // The universe's one timeline, narrowed to this story: its dated scenes and the moments linked to it.
+  const timelinePath = `/app/universes/${universe.id}/timeline?story=${story.id}`
 
   const targets: MoveTarget[] = hasChapters
     ? [
@@ -638,6 +640,9 @@ function StoryView({ view }: { view: StoryViewName }) {
                   onChange={(state) => setPublication({ storyId: story.id, state })}
                 />
               ) : null}
+              <Link className="story__timeline" to={timelinePath} data-testid="story-timeline">
+                View on timeline
+              </Link>
             </div>
           )
         }
@@ -668,33 +673,41 @@ function StoryView({ view }: { view: StoryViewName }) {
             ) : null}
           </nav>
 
-          {access.editContent ? (
-            <ActionMenu
-              className="story__menu"
-              label={`Story actions for ${story.title}`}
-              triggerTestId="story-actions"
-            >
-              <button
-                className="actionmenu__item"
-                type="button"
-                onClick={() => setIsEditingStory(true)}
-                data-testid="edit-story"
-              >
-                <ActionIcon icon={Pencil} />
-                Edit story
-              </button>
-              <hr className="actionmenu__divider" />
-              <button
-                className="actionmenu__item actionmenu__item--danger"
-                type="button"
-                onClick={() => void removeStory()}
-                data-testid="delete-story"
-              >
-                <ActionIcon icon={Trash} />
-                Delete story
-              </button>
-            </ActionMenu>
-          ) : null}
+          {/* Every view keeps a way to the story's world chronology here, the Manuscript view included, whose header has
+              no line of facts to hold it. */}
+          <ActionMenu
+            className="story__menu"
+            label={`Story actions for ${story.title}`}
+            triggerTestId="story-actions"
+          >
+            <Link className="actionmenu__item" to={timelinePath} data-testid="menu-story-timeline">
+              <ActionIcon icon={Hourglass} />
+              View on timeline
+            </Link>
+            {access.editContent ? (
+              <>
+                <button
+                  className="actionmenu__item"
+                  type="button"
+                  onClick={() => setIsEditingStory(true)}
+                  data-testid="edit-story"
+                >
+                  <ActionIcon icon={Pencil} />
+                  Edit story
+                </button>
+                <hr className="actionmenu__divider" />
+                <button
+                  className="actionmenu__item actionmenu__item--danger"
+                  type="button"
+                  onClick={() => void removeStory()}
+                  data-testid="delete-story"
+                >
+                  <ActionIcon icon={Trash} />
+                  Delete story
+                </button>
+              </>
+            ) : null}
+          </ActionMenu>
         </div>
       </PageHeader>
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { ChronologyPointFields, type ChronologyPointPart } from './ChronologyPointFields'
 import { EntityMultiPicker, EntityPicker, type EntityChoice } from './EntityPicker'
 import { CanonBlockNotice } from './CanonBlockNotice'
@@ -12,6 +12,8 @@ import { payloadKey, useDrawerGuard } from '../lib/drawerGuard'
 import { CANON_LABELS, CANON_ORDER, CanonStatus, type CanonStatusValue } from '../lore/types'
 import { ValidationTermKind } from '../ruleValidation/types'
 import { useValidationTerms } from '../ruleValidation/useValidationTerms'
+import { listStories } from '../stories/api'
+import type { StorySummary } from '../stories/types'
 import { createTimelineEntry, updateTimelineEntry } from '../timeline/api'
 import {
   DATE_KIND_HINTS,
@@ -20,6 +22,7 @@ import {
   DateKind,
   type DateKindValue,
   type TimelineEntry,
+  type TimelineStoryLink,
 } from '../timeline/types'
 
 /**
@@ -46,6 +49,8 @@ interface MomentDraft {
   eventKindId: string
   methodId: string
   participant: EntityChoice | null
+  /** The stories it is linked to. One in the Trash stays in the set, marked, so a save never drops it quietly. */
+  stories: TimelineStoryLink[]
 }
 
 /** The six chronology boxes, named so one handler can serve all of them. */
@@ -78,6 +83,7 @@ const EMPTY: MomentDraft = {
   eventKindId: '',
   methodId: '',
   participant: null,
+  stories: [],
 }
 
 function numberText(value: number | null) {
@@ -118,6 +124,7 @@ function draftFrom(entry: TimelineEntry): MomentDraft {
             : details.participant.name,
         }
       : null,
+    stories: entry.stories,
   }
 }
 
@@ -140,6 +147,8 @@ interface TimelineEntryFormProps {
   entry: TimelineEntry | null
   /** How this universe keeps time. With eras, every dated moment says which one it is in. */
   chronology: Chronology
+  /** The stories a new moment starts linked to: the story whose timeline it was started from. Ignored for an existing one. */
+  initialStories?: TimelineStoryLink[]
   onClose: () => void
   onSaved: () => void
 }
@@ -179,6 +188,8 @@ function inputOf(draft: MomentDraft, reckonsInEras: boolean) {
     startEraId: reckonsInEras && isDatedKind ? trimmed(draft.startEraId) : null,
     endEraId: reckonsInEras && isRangeKind ? trimmed(draft.endEraId) : null,
     entityIds: draft.entities.map((choice) => choice.id),
+    // Always sent whole, a story in the Trash included; an empty list unlinks every story.
+    storyIds: draft.stories.map((story) => story.storyId),
     // Always sent whole: all three empty removes the details.
     validation: {
       eventKindId: trimmed(draft.eventKindId),
@@ -192,13 +203,16 @@ export function TimelineEntryForm({
   universeId,
   entry,
   chronology,
+  initialStories = [],
   onClose,
   onSaved,
 }: TimelineEntryFormProps) {
   const dialog = useRef<HTMLDialogElement>(null)
   const title = useRef<HTMLInputElement>(null)
   // What the drawer opened on - the moment as stored, or the blank form - which the draft is measured against.
-  const [initial] = useState<MomentDraft>(() => (entry ? draftFrom(entry) : EMPTY))
+  const [initial] = useState<MomentDraft>(() =>
+    entry ? draftFrom(entry) : { ...EMPTY, stories: initialStories },
+  )
   const [draft, setDraft] = useState<MomentDraft>(initial)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
@@ -514,6 +528,13 @@ export function TimelineEntryForm({
             error={fieldErrors.entityids}
           />
 
+          <StoryLinks
+            universeId={universeId}
+            value={draft.stories}
+            onChange={(stories) => edit({ stories })}
+            error={fieldErrors.storyids}
+          />
+
           <details
             className="moment__details"
             open={detailsOpen}
@@ -611,5 +632,113 @@ export function TimelineEntryForm({
         </footer>
       </form>
     </dialog>
+  )
+}
+
+/**
+ * The stories a moment matters to: each linked one as a token with Remove, and a choice of the universe's other live stories to
+ * add. The story list is read once, when the drawer opens - a universe holds a handful of stories and the list is unpaged for
+ * that reason - and the linked ones are named from the moment itself, so showing them never waits on it. A story in the Trash
+ * stays linked and says so; it is never offered.
+ */
+function StoryLinks({
+  universeId,
+  value,
+  onChange,
+  error,
+}: {
+  universeId: string
+  value: TimelineStoryLink[]
+  onChange: (stories: TimelineStoryLink[]) => void
+  error?: string
+}) {
+  const selectId = useId()
+  const hintId = useId()
+  const errorId = useId()
+  const [stories, setStories] = useState<StorySummary[] | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    listStories(universeId, controller.signal)
+      .then(setStories)
+      .catch(() => {
+        if (!controller.signal.aborted) setFailed(true)
+      })
+    return () => {
+      controller.abort()
+    }
+  }, [universeId])
+
+  const linked = new Set(value.map((story) => story.storyId))
+  const offered = (stories ?? []).filter((story) => !linked.has(story.id))
+
+  return (
+    <div className="field storylinks" data-testid="moment-stories">
+      <label className="field__label" htmlFor={selectId}>
+        Stories
+      </label>
+      <p className="field__hint" id={hintId}>
+        Link this moment to the stories it matters to. It shows up on their timelines too.
+      </p>
+
+      {value.length > 0 ? (
+        <ul className="storylinks__list">
+          {value.map((story) => (
+            <li className="token" key={story.storyId} data-testid="moment-story">
+              <bdi>{story.title}</bdi>
+              {story.isTrashed ? <span className="token__note"> (in Trash)</span> : null}
+              <button
+                type="button"
+                className="token__remove"
+                aria-label={`Unlink ${story.title}`}
+                onClick={() => onChange(value.filter((one) => one.storyId !== story.storyId))}
+                data-testid={`moment-story-remove-${story.title}`}
+              >
+                &times;
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <select
+        id={selectId}
+        className="field__input field__input--select"
+        value=""
+        disabled={stories === null || offered.length === 0}
+        aria-describedby={error ? `${hintId} ${errorId}` : hintId}
+        aria-invalid={error ? true : undefined}
+        onChange={(event) => {
+          const story = offered.find((one) => one.id === event.target.value)
+          if (story)
+            onChange([...value, { storyId: story.id, title: story.title, isTrashed: false }])
+        }}
+        data-testid="moment-story-add"
+      >
+        <option value="">
+          {failed
+            ? 'Stories could not be read'
+            : stories === null
+              ? 'Reading stories…'
+              : offered.length === 0
+                ? stories.length === 0
+                  ? 'No stories yet'
+                  : 'Every story is linked'
+                : 'Link a story…'}
+        </option>
+        {offered.map((story) => (
+          <option key={story.id} value={story.id}>
+            {story.title}
+          </option>
+        ))}
+      </select>
+
+      {error ? (
+        <p className="field__error" id={errorId}>
+          {error}
+        </p>
+      ) : null}
+    </div>
   )
 }

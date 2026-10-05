@@ -71,6 +71,8 @@ public class LorexDbContext(DbContextOptions<LorexDbContext> options)
 
     public DbSet<TimelineEntryLink> TimelineEntryLinks => Set<TimelineEntryLink>();
 
+    public DbSet<TimelineEntryStory> TimelineEntryStories => Set<TimelineEntryStory>();
+
     public DbSet<CanonConflict> CanonConflicts => Set<CanonConflict>();
 
     public DbSet<CanonConflictSubject> CanonConflictSubjects => Set<CanonConflictSubject>();
