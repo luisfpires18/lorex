@@ -94,3 +94,27 @@ export const POSITION_LABELS: Record<FamilyPosition, { one: string; many: string
   children: { one: 'Child', many: 'Children' },
   grandchildren: { one: 'Grandchild', many: 'Grandchildren' },
 }
+
+/** A member named on a family's summary. */
+export interface FamilyDiscoveryMember {
+  entityId: string
+  name: string
+}
+
+/**
+ * A family as the universe's links make it: no id or name of its own, so it opens at `focusEntityId`, a member whose type
+ * is enabled for the Family Tree. `memberCount` is the whole group; `previewMembers` a few, the focal member first.
+ */
+export interface FamilyDiscoveryItem {
+  focusEntityId: string
+  memberCount: number
+  previewMembers: FamilyDiscoveryMember[]
+}
+
+export interface FamilyDiscoveryPage {
+  items: FamilyDiscoveryItem[]
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+}

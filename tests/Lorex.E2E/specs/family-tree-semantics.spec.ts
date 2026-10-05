@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { makeTestPassword } from './support/account'
 
 /**
  * Family Tree eligibility, family that defines no ancestry, and the Types screen's three tabs (ADR 0040). Each test
@@ -8,8 +9,6 @@ import { expect, test, type Page } from '@playwright/test'
  * entry already recorded in a family stays reachable whatever its type; and an "uncle of" is listed as the authored
  * link it is - it never puts anyone in the tree.
  */
-const PASSWORD = 'Test-password-123!'
-
 const Canon = { idea: 0, draft: 1, canon: 2 } as const
 const Family = { none: 0, biological: 1, adoptive: 2, other: 3 } as const
 
@@ -19,11 +18,12 @@ function unique(prefix: string) {
 
 async function signUp(page: Page) {
   const username = unique('kinwright')
+  const password = makeTestPassword()
   await page.goto('/register')
   await page.getByLabel('Username').fill(username)
   await page.getByLabel('Email').fill(`${username}@example.test`)
-  await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
-  await page.getByLabel('Confirm password').fill(PASSWORD)
+  await page.getByLabel('Password', { exact: true }).fill(password)
+  await page.getByLabel('Confirm password').fill(password)
   await page.getByRole('button', { name: 'Create account' }).click()
   await page.waitForURL('/app')
 }
@@ -176,7 +176,10 @@ test.describe('family tree semantics', () => {
     await page.goto(treeUrl(universeId, aragorn))
     await expect(page.getByTestId('family-type-not-enabled')).toHaveCount(0)
     await expect(node(page, 'Men')).toContainText('Biological parent')
+    // The family is found from Aragorn's side, and the character picker beside it does not offer Men either.
     await page.goto(treeUrl(universeId))
+    await expect(page.getByTestId('family-card')).toHaveText(['Aragorn, Men2 members'])
+    await page.getByTestId('family-find-character').click()
     await search(page, 'Men')
     await expect(page.locator('.picker__none')).toHaveText('Nothing here by that name.')
   })

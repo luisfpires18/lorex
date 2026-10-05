@@ -50,8 +50,19 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
-- **Performance correction - universe artwork loading** (`fix/universe-artwork-loading` off `dev` at `01b2634`;
-  committed, not merged, not pushed). No schema, migration, index or backup change (backup **19**). ADR 0036 amendment.
+- **Product refinement 035 - Family Tree discovery** (`feat/family-tree-discovery` off `dev` at `817d9a4`; committed,
+  not merged, not pushed). No schema, migration, table or backup change (backup **19**). ADR 0035 amendment.
+  - The bare Family Tree opens on the families already recorded: connected groups of live entries joined by any
+    family-meaning link (undirected), offered when a member's type is enabled, counted whole, opened at the enabled member
+    with the most family neighbours. A projection only: no Family table, id or name.
+  - `GET .../family-tree/families?q=&page=&pageSize=` (Read, 12 a page, at most 40): three queries at any size, grouping
+    and search in memory over every family link. `/family-tree?q=&page=`; "Browse families" on a tree; "Find a character"
+    keeps the eligible-only picker as the second way in. The two-generation tree is unchanged.
+  - Family Tree E2E specs moved to `makeTestPassword()`.
+  - Deferred: Quick Create of a missing relative, unlimited genealogy, family names, public family trees; a stored family
+    index if a universe's family links ever make the in-memory grouping slow.
+- **Performance correction - universe artwork loading** (`fix/universe-artwork-loading`, merged into `dev` at
+  `817d9a4`). No schema, migration, index or backup change (backup **19**). ADR 0036 amendment.
   - Measured cause: cards and the workspace asked `GET .../artwork` after rendering, so the fallback showed for a round
     trip even with the image cached, and the list cost one request and two queries per owned card.
   - `UniverseSummary`/`UniverseDetail` now carry `artwork` (`{ assetId, cardId }`, owner only, null = none), joined into

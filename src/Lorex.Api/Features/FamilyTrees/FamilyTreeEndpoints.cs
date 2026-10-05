@@ -4,6 +4,7 @@ using Lorex.Api.Data;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.Universes;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace Lorex.Api.Features.FamilyTrees;
@@ -31,7 +32,61 @@ public static class FamilyTreeEndpoints
             .WithName("GetFamilyTree")
             .RequireAuthorization();
 
+        endpoints.MapGet("/api/universes/{universeId:guid}/family-tree/families", ListFamiliesAsync)
+            .WithTags("Family tree")
+            .WithName("ListFamilies")
+            .RequireAuthorization();
+
         return endpoints;
+    }
+
+    /// <summary>
+    /// <c>GET .../family-tree/families?q=&amp;page=&amp;pageSize=</c>: the families the universe already holds, as summaries
+    /// (<see cref="FamilyDiscovery"/>). Read access, as every reader of the tree has.
+    ///
+    /// Three queries whatever the size of the universe or of a family: the access check, every live family link's two ends, and
+    /// the live entries they name - id, name and whether their type is enabled. The grouping, the search and the order are worked
+    /// out from those in memory, so every family link in the universe is inspected on each request, and only one page of
+    /// summaries is answered. No tree, article, field, picture or date is read.
+    /// </summary>
+    private static async Task<IResult> ListFamiliesAsync(
+        Guid universeId,
+        ClaimsPrincipal principal,
+        LorexDbContext db,
+        CancellationToken cancellationToken,
+        [FromQuery] string? q = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = FamilyDiscovery.DefaultPageSize)
+    {
+        if (await UniverseAccess.DenyAsync(db, universeId, principal, UniverseCapability.Read, cancellationToken) is { } denied)
+        {
+            return denied;
+        }
+
+        page = Math.Max(page, 1);
+        pageSize = Math.Clamp(pageSize, 1, FamilyDiscovery.MaxPageSize);
+
+        var edges = await LiveLinks(db, universeId)
+            .Select(relationship => new FamilyDiscovery.Edge(relationship.SourceEntityId, relationship.TargetEntityId))
+            .ToListAsync(cancellationToken);
+
+        var ids = edges.SelectMany(edge => new[] { edge.SourceEntityId, edge.TargetEntityId }).Distinct().ToList();
+
+        var members = ids.Count == 0
+            ? []
+            : await db.Entities.AsNoTracking()
+                .Where(entity => entity.UniverseId == universeId && entity.DeletedAt == null && ids.Contains(entity.Id))
+                .Select(entity => new FamilyDiscovery.Member(entity.Id, entity.Name, entity.EntityType!.FamilyTreeEligible))
+                .ToListAsync(cancellationToken);
+
+        var families = FamilyDiscovery.Families(edges, members, q);
+
+        // Widened before multiplying, as every page here is.
+        var skip = (int)Math.Min((long)(page - 1) * pageSize, int.MaxValue);
+        var totalPages = families.Count == 0 ? 0 : (int)Math.Ceiling(families.Count / (double)pageSize);
+
+        return Results.Ok(new FamilyDiscoveryPage(
+            [.. families.Skip(skip).Take(pageSize)], page, pageSize, families.Count, totalPages));
     }
 
     private static async Task<IResult> GetAsync(

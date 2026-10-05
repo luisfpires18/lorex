@@ -69,6 +69,29 @@ public sealed record FamilyTreeRelative(Guid EntityId, IReadOnlyList<IReadOnlyLi
 public sealed record FamilyTreeLoop(IReadOnlyList<Guid> EntityIds, IReadOnlyList<Guid> RelationshipIds);
 
 /// <summary>
+/// One page of the families a universe already holds (<see cref="FamilyDiscovery"/>): summaries to choose from, never trees.
+/// </summary>
+public sealed record FamilyDiscoveryPage(
+    IReadOnlyList<FamilyDiscoveryItem> Items,
+    int Page,
+    int PageSize,
+    int TotalCount,
+    int TotalPages);
+
+/// <summary>
+/// A family as a summary. It has no id or name of its own - it is a group of linked entries, not a record - so it is opened by
+/// <paramref name="FocusEntityId"/>, an eligible member, at that member's tree. <paramref name="MemberCount"/> is the whole
+/// group; <paramref name="PreviewMembers"/> a few of them, the focal member first.
+/// </summary>
+public sealed record FamilyDiscoveryItem(
+    Guid FocusEntityId,
+    int MemberCount,
+    IReadOnlyList<FamilyDiscoveryMember> PreviewMembers);
+
+/// <summary>A member named on a family's summary: enough to recognise and nothing more.</summary>
+public sealed record FamilyDiscoveryMember(Guid EntityId, string Name);
+
+/// <summary>
 /// One authored non-structural family link touching the focal entry, read from the focal entry's side the way a relation is
 /// everywhere else: <paramref name="Label"/> is the kind's name when the focal entry is the source, its inverse when it is the
 /// target, and the one name either way for a symmetric kind.

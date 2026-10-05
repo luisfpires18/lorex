@@ -187,3 +187,38 @@ Two statements above no longer hold, and are struck through where they stand rat
 
 Everything else in this decision - ids only, the stored direction, the bounded five-query read, circles reported and
 never resolved, the Trash, ownership, ordinary relationships and no second family table - is unchanged.
+
+## Amendment - discovery: the families already recorded (2026-10-05, Product refinement 035)
+
+The tree needed an entry the creator already knew. The bare Family Tree page now opens on the families the universe
+already holds, derived like everything else here and stored nowhere.
+
+- **A family is a projection, not a record.** One connected group of live entries joined by live relationships whose
+  kind has a family meaning other than None - biological parent, adoptive parent or non-structural family - read
+  without direction. A married couple with no children is a family; an "uncle of" joins two branches. Only the
+  configured meaning counts, never a name. The population is exactly the tree's (`LiveLinks`): the relationship, its
+  kind and both ends in this universe, both ends out of the Trash, every Canon status. No Family table, id, name or
+  membership row exists, and nothing is maintained beside the relationships.
+- **Offered when it can be opened, counted whole.** A family needs at least two distinct entries and at least one
+  member whose type is enabled for the Family Tree; the tree opens on such a member. Its size counts every member,
+  enabled or not. A group with no enabled member is not listed, though a deep link to one of its entries still works.
+- **Deterministic.** Union-find over the links, so a circle or a link written twice joins nothing new and a link to
+  oneself joins nobody. The tree opens on the enabled member with the most distinct family neighbours, then by name
+  (case aside, then exactly), then by id: usually someone central, recomputed on every request and never stored. A
+  summary names three members - that one first, then any the search matched, then the rest by name - and the size.
+  Families are listed by that member's name.
+- **`GET /api/universes/{id}/family-tree/families?q=&page=&pageSize=`**, Read capability, 12 a page, at most 40,
+  clamped like every page. `q` matches any member's name, case aside, before paging; a family matching through several
+  members is listed once, exact names before prefixes before contains. The answer is `{ items, page, pageSize,
+  totalCount, totalPages }`, each item `{ focusEntityId, memberCount, previewMembers[{ entityId, name }] }`: no tree,
+  link, path, picture or type.
+- **Three queries whatever the size:** the access check, every live family link's two ends, and the live entries they
+  name with their type's eligibility. Grouping, search and order run in memory, so each request inspects every family
+  link in the universe while answering one page. A materialized family index is not part of this.
+- **The tree is unchanged:** two generations each way, its own endpoint, read only for the family chosen.
+- **Pages:** `/family-tree?q=&page=` holds the search and page; only typing waits. A summary is a link to
+  `/family-tree/{focusEntityId}`; "Browse families" on that tree returns to the search it was opened from (carried in
+  history state, never in the tree's address). Choosing a character stays as the second way in, folded behind "Find a
+  character", and open from the start when no family exists yet.
+- **Deferred:** creating a missing relative from the tree (Quick Create), unlimited genealogy, family names, new family
+  meanings, and public family trees.

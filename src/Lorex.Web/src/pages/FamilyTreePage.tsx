@@ -1,9 +1,10 @@
 import { useEffect, useId, useMemo, useState } from 'react'
 import { useUniverseAccess } from '../universes/access'
-import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
-import { Plus } from 'lucide-react'
+import { Link, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import { ArrowLeft, Plus } from 'lucide-react'
 import { ActionIcon } from '../components/ActionIcon'
 import { EntityPicker, type EntityChoice } from '../components/EntityPicker'
+import { FamilyDiscovery, type FamiliesReturn } from '../components/FamilyDiscovery'
 import { FamilyKindDialog } from '../components/FamilyKindDialog'
 import { FamilyLinkForm } from '../components/FamilyLinkForm'
 import { FamilyTreeView } from '../components/FamilyTreeView'
@@ -40,12 +41,16 @@ type LoadState =
  * Since ADR 0040 the picker offers only entries of a type the author enabled for the Family Tree, and the focal
  * entry's other family - "uncle of", "married to" - is listed apart, as the authored links they are. An entry of
  * a type not enabled still opens here by its address, with a note that says so: nothing recorded is hidden.
+ *
+ * Without an entry in the address the page opens on the families already recorded (`FamilyDiscovery`, 035): a few
+ * names and a size each, opening the tree on one of them. "Browse families" on a tree goes back to that list.
  */
 export default function FamilyTreePage() {
   const access = useUniverseAccess()
   const { universe } = useOutletContext<WorkspaceContext>()
   const { entityId } = useParams<{ entityId: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const headingId = useId()
 
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
@@ -126,6 +131,9 @@ export default function FamilyTreePage() {
     [tree],
   )
   const isAdding = !!entityId && addingFor === entityId
+  // Only ever a query string this app put there; anything else is ignored rather than followed.
+  const carried = (location.state as Partial<FamiliesReturn> | null)?.familiesFrom
+  const familiesFrom = typeof carried === 'string' && carried.startsWith('?') ? carried : ''
   const typesPath = `/app/universes/${universe.id}/types`
   const relationKindsPath = `${typesPath}?tab=relations`
 
@@ -149,16 +157,29 @@ export default function FamilyTreePage() {
         lede="Parents, grandparents, siblings, children and grandchildren, worked out from the connections you have recorded. Only a relation kind you have given a family meaning counts."
       />
 
-      <div className="family__picker">
-        <EntityPicker
-          label={focal ? 'Family shown for' : 'Whose family?'}
-          universeId={universe.id}
-          value={focal ? { id: focal.entityId, name: focal.name } : null}
-          onChange={show}
-          familyTreeOnly
-          placeholder="Search this universe"
-        />
-      </div>
+      {entityId ? (
+        <>
+          {/* Back to the families: the search and page this tree was opened from, if it was. */}
+          <Link
+            className="family__browse"
+            to={`/app/universes/${universe.id}/family-tree${familiesFrom}`}
+            data-testid="family-browse"
+          >
+            <ArrowLeft className="family__browseicon" aria-hidden="true" focusable="false" />
+            Browse families
+          </Link>
+          <div className="family__picker">
+            <EntityPicker
+              label={focal ? 'Family shown for' : 'Whose family?'}
+              universeId={universe.id}
+              value={focal ? { id: focal.entityId, name: focal.name } : null}
+              onChange={show}
+              familyTreeOnly
+              placeholder="Search this universe"
+            />
+          </div>
+        </>
+      ) : null}
 
       {hasEligibleType === false ? (
         <p className="notice" data-testid="family-no-types">
@@ -200,17 +221,26 @@ export default function FamilyTreePage() {
         />
       ) : null}
 
-      {view.kind === 'idle' ? (
-        <EmptyState
-          testId="family-empty"
-          title="Choose an entry to see its family."
-          hint={
-            <>
-              Only entries of a type enabled for Family Tree are offered. Record a connection of a
-              kind that means “parent”, and the tree grows from it.
-            </>
-          }
-        />
+      {/* No entry in the address: the families already recorded, once there can be any - a type enabled for the tree
+          and a kind with a family meaning. Asked for alongside those checks rather than after them. */}
+      {view.kind === 'idle' &&
+      hasEligibleType !== false &&
+      !(kinds !== null && familyKinds.length === 0) ? (
+        <FamilyDiscovery universeId={universe.id} canEdit={access.editContent} onChoose={show} />
+      ) : null}
+
+      {/* No family kind yet means no family to discover: someone can still be opened, as before, while one is made. */}
+      {view.kind === 'idle' && hasEligibleType && kinds !== null && familyKinds.length === 0 ? (
+        <div className="family__picker">
+          <EntityPicker
+            label="Whose family?"
+            universeId={universe.id}
+            value={null}
+            onChange={show}
+            familyTreeOnly
+            placeholder="Search this universe"
+          />
+        </div>
       ) : null}
 
       {view.kind === 'loading' ? (
