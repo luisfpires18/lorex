@@ -96,7 +96,8 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
             await DismissedConflictsAsync(universeId, cancellationToken),
             await IdeasAsync(universe.Id, universe.OwnerId, cancellationToken),
             await WorldRulesAsync(universeId, cancellationToken),
-            await ValidationTermsAsync(universeId, cancellationToken));
+            await ValidationTermsAsync(universeId, cancellationToken),
+            await CalendarAsync(universeId, cancellationToken));
 
         // Read-only, so there is nothing to commit; this just closes the snapshot.
         await transaction.CommitAsync(cancellationToken);
@@ -161,6 +162,32 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                     era.Direction,
                     era.LabelPosition)),
         ];
+    }
+
+    /// <summary>The custom calendar with its months in order, or null on simple dates.</summary>
+    private async Task<BackupChronologyCalendar?> CalendarAsync(
+        Guid universeId,
+        CancellationToken cancellationToken)
+    {
+        var months = await db.ChronologyCalendarMonths.AsNoTracking()
+            .Where(month => month.Calendar!.UniverseId == universeId)
+            .ToListAsync(cancellationToken);
+
+        return months.Count == 0
+            ? null
+            : new BackupChronologyCalendar(
+                months[0].CalendarId,
+                [
+                    .. months
+                        .OrderBy(month => month.SortOrder)
+                        .ThenBy(month => Key(month.Id), StringComparer.Ordinal)
+                        .Select(month => new BackupChronologyCalendarMonth(
+                            month.Id,
+                            month.Name,
+                            month.Abbreviation,
+                            month.SortOrder,
+                            month.DayCount)),
+                ]);
     }
 
     // ---------- Types and fields ----------
@@ -629,7 +656,9 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                     details.TryGetValue(entry.Id, out var described)
                         ? new BackupTimelineValidation(described.EventKindTermId, described.MethodTermId, described.ParticipantEntityId)
                         : null,
-                    storiesByEntry.GetValueOrDefault(entry.Id, []))),
+                    storiesByEntry.GetValueOrDefault(entry.Id, []),
+                    entry.StartMonthId,
+                    entry.EndMonthId)),
         ];
     }
 
@@ -726,7 +755,7 @@ public sealed class UniverseBackupBuilder(LorexDbContext db)
                             scene.Notes,
                             scene.PovEntityId,
                             scene.Year is { } year
-                                ? new BackupChronologyValue(scene.EraId, year, scene.Month, scene.Day)
+                                ? new BackupChronologyValue(scene.EraId, year, scene.Month, scene.Day, scene.MonthId)
                                 : null,
                             linkedByScene.GetValueOrDefault(scene.Id, []),
                             manuscripts.TryGetValue(scene.Id, out var manuscript)

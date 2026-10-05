@@ -120,7 +120,7 @@ public sealed class ChapterMigrationTests : IDisposable
 
             // What each reference may do when the row it points at goes.
             Assert.Equal(
-                ["Chapters.ChapterId:NO ACTION", "ChronologyEras.EraId:NO ACTION", "Entities.PovEntityId:SET NULL", "Stories.StoryId:CASCADE"],
+                ["Chapters.ChapterId:NO ACTION", "ChronologyCalendarMonths.MonthId:NO ACTION", "ChronologyEras.EraId:NO ACTION", "Entities.PovEntityId:SET NULL", "Stories.StoryId:CASCADE"],
                 (await ForeignKeys(db, "Scenes")).Order(StringComparer.Ordinal));
             Assert.Equal(["Stories.StoryId:CASCADE"], await ForeignKeys(db, "Chapters"));
 

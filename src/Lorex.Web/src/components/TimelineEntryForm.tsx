@@ -5,7 +5,7 @@ import { CanonBlockNotice } from './CanonBlockNotice'
 import { ValidationTermSelect } from './ValidationTermSelect'
 import { blockingFindingsOf } from '../canon/blocked'
 import type { CanonBlockingFinding } from '../canon/types'
-import { namesEras } from '../chronology/format'
+import { hasCalendar, namesEras } from '../chronology/format'
 import type { Chronology } from '../chronology/types'
 import { ApiError } from '../lib/api'
 import { payloadKey, useDrawerGuard } from '../lib/drawerGuard'
@@ -99,10 +99,11 @@ function draftFrom(entry: TimelineEntry): MomentDraft {
     canonStatus: entry.canonStatus,
     dateKind: entry.date.kind,
     startYear: numberText(entry.date.startYear),
-    startMonth: numberText(entry.date.startMonth),
+    // A custom calendar's month is held by its id; a simple month by its number.
+    startMonth: entry.date.startMonthId ?? numberText(entry.date.startMonth),
     startDay: numberText(entry.date.startDay),
     endYear: numberText(entry.date.endYear),
-    endMonth: numberText(entry.date.endMonth),
+    endMonth: entry.date.endMonthId ?? numberText(entry.date.endMonth),
     endDay: numberText(entry.date.endDay),
     startEraId: entry.date.startEraId ?? '',
     endEraId: entry.date.endEraId ?? '',
@@ -167,8 +168,11 @@ interface TimelineEntryFormProps {
  * Validation details sit folded at the foot (ADR 0034): an ordinary moment never needs them, and nothing in them is filled in
  * from the title, the description or who took part.
  */
-/** The draft as the save sends it: a kind carries only its own date parts, and a universe with eras no free label. */
-function inputOf(draft: MomentDraft, reckonsInEras: boolean) {
+/**
+ * The draft as the save sends it: a kind carries only its own date parts, a universe with eras no free label, and a
+ * universe with a custom calendar its months by id rather than by number.
+ */
+function inputOf(draft: MomentDraft, reckonsInEras: boolean, custom: boolean) {
   const isDatedKind = draft.dateKind !== DateKind.Unknown
   const isRangeKind = draft.dateKind === DateKind.Range
 
@@ -178,10 +182,12 @@ function inputOf(draft: MomentDraft, reckonsInEras: boolean) {
     canonStatus: draft.canonStatus,
     dateKind: draft.dateKind,
     startYear: toNumber(draft.startYear),
-    startMonth: toNumber(draft.startMonth),
+    startMonth: custom ? null : toNumber(draft.startMonth),
+    startMonthId: custom ? trimmed(draft.startMonth) : null,
     startDay: toNumber(draft.startDay),
     endYear: toNumber(draft.endYear),
-    endMonth: toNumber(draft.endMonth),
+    endMonth: custom ? null : toNumber(draft.endMonth),
+    endMonthId: custom ? trimmed(draft.endMonth) : null,
     endDay: toNumber(draft.endDay),
     // A universe with eras has no free-text label; one without has no eras to send.
     eraLabel: reckonsInEras ? null : trimmed(draft.eraLabel),
@@ -227,9 +233,11 @@ export function TimelineEntryForm({
   } = useValidationTerms(universeId)
 
   const reckonsInEras = namesEras(chronology)
+  const custom = hasCalendar(chronology)
 
   const isDirty =
-    payloadKey(inputOf(draft, reckonsInEras)) !== payloadKey(inputOf(initial, reckonsInEras))
+    payloadKey(inputOf(draft, reckonsInEras, custom)) !==
+    payloadKey(inputOf(initial, reckonsInEras, custom))
   const { close, dialogProps } = useDrawerGuard(
     isDirty,
     entry
@@ -283,7 +291,7 @@ export function TimelineEntryForm({
     setBlocked(null)
     setIsSaving(true)
 
-    const input = inputOf(draft, reckonsInEras)
+    const input = inputOf(draft, reckonsInEras, custom)
 
     try {
       if (entry) {

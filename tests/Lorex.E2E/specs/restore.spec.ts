@@ -201,7 +201,7 @@ test.describe('restore a backup', () => {
     await expect(preview).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Ready to restore' })).toBeFocused()
     await expect(page.getByTestId('restore-universe-name')).toHaveText(source.name)
-    await expect(preview).toContainText('Version 21')
+    await expect(preview).toContainText('Version 22')
     await expect(preview).toContainText('1 world rule')
     await expect(preview).toContainText('1 entry')
     await expect(preview).toContainText('1 picture')
@@ -329,7 +329,7 @@ test.describe('restore a backup', () => {
         {
           name: 'future.json',
           mimeType: 'application/json',
-          buffer: Buffer.from(JSON.stringify({ ...document, formatVersion: 22 })),
+          buffer: Buffer.from(JSON.stringify({ ...document, formatVersion: 23 })),
         },
         /newer Lorex/,
       ],

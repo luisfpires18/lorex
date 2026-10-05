@@ -1,6 +1,7 @@
 import {
   EraLabelPosition,
   type Chronology,
+  type ChronologyCalendarMonth,
   type ChronologyEra,
   type EraLabelPositionValue,
   type EraWriting,
@@ -30,6 +31,19 @@ export function findEra(
 ): ChronologyEra | null {
   if (!eraId) return null
   return chronology.eras.find((era) => era.id === eraId) ?? null
+}
+
+/** True when the universe divides its years with a custom calendar rather than numeric months. */
+export function hasCalendar(chronology: Chronology) {
+  return chronology.calendar !== null && chronology.calendar !== undefined
+}
+
+export function findMonth(
+  chronology: Chronology,
+  monthId: string | null | undefined,
+): ChronologyCalendarMonth | null {
+  if (!monthId) return null
+  return chronology.calendar?.months.find((month) => month.id === monthId) ?? null
 }
 
 /** What is written beside a year: the short label, or the full name when there is none. */
@@ -74,6 +88,8 @@ export interface ChronologyPointParts {
   month: number | null
   day: number | null
   eraId: string | null
+  /** A custom calendar's month, in place of `month`. */
+  monthId?: string | null
 }
 
 function pad(value: number) {
@@ -81,13 +97,27 @@ function pad(value: number) {
 }
 
 /**
- * A point, largest part first: `3018`, `3018.09`, `BF 10.09.22`.
+ * A point. On simple dates, largest part first: `3018`, `3018.09`, `BF 10.09.22`. Month and day
+ * stay numeric there on purpose: naming month 9 "September" would invent a Gregorian fact the API
+ * never claimed.
  *
- * Month and day stay numeric on purpose. The calendar belongs to the author's world, so naming
- * month 9 "September" would invent a Gregorian fact the API never claimed. When month names
- * arrive they belong here, in the one formatter, and nowhere else.
+ * On a custom calendar the author named the months, so the date reads the way they wrote it: day
+ * and month name, then the year as this universe writes it - `17 Emberrise · TA 401`,
+ * `Emberrise · TA 401`. The month is found by id in the calendar read with the chronology, so a
+ * rename shows everywhere at once.
  */
-export function formatChronologyPoint(chronology: Chronology, point: ChronologyPointParts) {
+export function formatChronologyPoint(chronology: Chronology, point: ChronologyPointParts): string {
+  const custom = findMonth(chronology, point.monthId)
+  if (custom) {
+    const year = formatChronologyPoint(chronology, {
+      year: point.year,
+      month: null,
+      day: null,
+      eraId: point.eraId,
+    })
+    return `${point.day !== null ? `${point.day} ${custom.name}` : custom.name} · ${year}`
+  }
+
   let text = formatSignedYear(point.year)
   if (point.month !== null) {
     text += `.${pad(point.month)}`

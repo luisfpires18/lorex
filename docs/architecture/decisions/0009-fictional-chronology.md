@@ -94,3 +94,11 @@ entered once, where it belongs, and the timeline reads it from there.
 - **The page.** `/timeline` filters by story, source, status, participant and search, all in the address but the
   participant. A scene row opens the scene, its manuscript and, when a beat names it, the plot at that beat; a birth or death
   opens the entry; neither offers an edit. A story's ⋯ menu, on every view, and its facts line say "View on timeline".
+
+## Amendment - custom months on the timeline (2026-10-06, refinement 039)
+
+A moment's start and end may each name a custom calendar month by id (`StartMonthId`, `EndMonthId`; ADR 0022 amendment).
+The moment listing and the unified feed rank such a month by its calendar position plus one, joined in the same SQL
+statement, before paging and after filtering: no client re-sort, no query per row, still 5-7 commands a page at 1, 12 and 60
+items. Reordering the months reorders moments and scenes at once without touching either. A range is checked with the same
+comparer on save, and a calendar reorder that would turn any stored range around is refused.

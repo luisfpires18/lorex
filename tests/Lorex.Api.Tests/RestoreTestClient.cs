@@ -479,6 +479,25 @@ internal static partial class RestoreTestClient
             }
         }
 
+        if (version < 22)
+        {
+            // A custom calendar, and the month ids that name its months, arrived in version 22.
+            Drop(payload, "chronologyCalendar");
+
+            foreach (var entry in payload["timelineEntries"]!.AsArray())
+            {
+                Drop(entry, "startMonthId", "endMonthId");
+            }
+
+            foreach (var story in payload["stories"]?.AsArray() ?? [])
+            {
+                foreach (var scene in story!["scenes"]!.AsArray())
+                {
+                    Drop(scene!["chronology"], "monthId");
+                }
+            }
+        }
+
         if (version < 21)
         {
             // A moment's stories arrived in version 21.

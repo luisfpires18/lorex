@@ -17,6 +17,7 @@ export function sceneWhen(chronology: Chronology, value: ChronologyValue | null)
       month: value.month,
       day: value.day,
       eraId: value.eraId,
+      monthId: value.monthId,
     }),
     placed: isPlaced(chronology, value.eraId),
   }

@@ -12,6 +12,54 @@ public static class ChronologyLimits
 
     /// <summary>Generous for any reckoning a story needs, small enough to stay one screen of settings.</summary>
     public const int MaxEras = 20;
+
+    /// <summary>A protective bound on one calendar's months, not a statement about any world.</summary>
+    public const int MaxMonths = 100;
+
+    /// <summary>A protective bound on one month's length, not a statement about any world.</summary>
+    public const int MaxDaysInMonth = 1000;
+
+    /// <summary>What simple dates allow: the numeric month and day Lorex has always taken.</summary>
+    public const int SimpleMonths = 12;
+
+    public const int SimpleDays = 31;
+}
+
+public sealed class ChronologyCalendarConfiguration : IEntityTypeConfiguration<ChronologyCalendar>
+{
+    public void Configure(EntityTypeBuilder<ChronologyCalendar> builder)
+    {
+        builder.ToTable("ChronologyCalendars");
+        builder.HasKey(calendar => calendar.Id);
+
+        builder.HasOne(calendar => calendar.Universe)
+            .WithMany()
+            .HasForeignKey(calendar => calendar.UniverseId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // One calendar per universe in V1. Dropping this index is the whole schema change several calendars would need.
+        builder.HasIndex(calendar => calendar.UniverseId).IsUnique();
+    }
+}
+
+public sealed class ChronologyCalendarMonthConfiguration : IEntityTypeConfiguration<ChronologyCalendarMonth>
+{
+    public void Configure(EntityTypeBuilder<ChronologyCalendarMonth> builder)
+    {
+        builder.ToTable("ChronologyCalendarMonths");
+        builder.HasKey(month => month.Id);
+
+        builder.Property(month => month.Name).IsRequired().HasMaxLength(ChronologyLimits.NameMaxLength);
+        builder.Property(month => month.Abbreviation).HasMaxLength(ChronologyLimits.AbbreviationMaxLength);
+
+        builder.HasOne(month => month.Calendar)
+            .WithMany(calendar => calendar.Months)
+            .HasForeignKey(month => month.CalendarId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // One month per place, as for eras: the order is what a date's month ranks by.
+        builder.HasIndex(month => new { month.CalendarId, month.SortOrder }).IsUnique();
+    }
 }
 
 public sealed class ChronologyEraConfiguration : IEntityTypeConfiguration<ChronologyEra>

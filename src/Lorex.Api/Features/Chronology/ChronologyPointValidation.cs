@@ -19,10 +19,10 @@ public sealed record ChronologyPointKeys(string Year, string Month, string Day, 
 /// timeline entry's start and end, and a scene's position - so a year is refused in the same words
 /// wherever it is written.
 ///
-/// Deliberately not a calendar engine: month and day ranges are the ordinary ones, and no fictional
-/// calendar's own month lengths are enforced or invented. Where a year sits is the universe's
-/// reckoning to say (ADR 0022), and comparing two points is <see cref="ChronologyPoint"/>'s job and
-/// nothing here.
+/// Simple dates keep the ordinary ranges they always had: month 1 to 12, day 1 to 31. A universe with a custom calendar
+/// takes a month by id from that calendar and a day up to that month's own length, and nothing Earth-like is assumed.
+/// Where a year sits is the universe's reckoning to say (ADR 0022), and comparing two points is
+/// <see cref="ChronologyPoint"/>'s job and nothing here.
 /// </summary>
 public static class ChronologyPointValidation
 {
@@ -31,31 +31,65 @@ public static class ChronologyPointValidation
 
     /// <summary>
     /// Shape of the components on their own. Years are signed on purpose; only months and days are
-    /// bounded, and a day without a month is meaningless.
+    /// bounded, and a day without a month is meaningless. Errors about a custom month are keyed under the month, which is
+    /// one control whichever kind of month it is.
     /// </summary>
     public static void ValidateParts(
         int? year,
         int? month,
+        Guid? monthId,
         int? day,
         ChronologyPointKeys keys,
+        UniverseChronology chronology,
         Dictionary<string, string[]> errors)
     {
-        if (month is < 1 or > 12)
+        if (chronology.HasCalendar)
         {
-            errors[keys.Month] = ["A month runs from 1 to 12."];
+            if (month is not null)
+            {
+                errors[keys.Month] = ["This universe uses a custom calendar. Choose one of its months."];
+            }
+            else if (monthId is not null && chronology.Month(monthId) is null)
+            {
+                errors[keys.Month] = ["Choose one of this calendar's months."];
+            }
+
+            if (chronology.Month(monthId) is { } custom && day is { } chosen && (chosen < 1 || chosen > custom.DayCount))
+            {
+                errors[keys.Day] = [custom.DayCount == 1
+                    ? $"{custom.Name} has 1 day. The day can only be 1."
+                    : $"{custom.Name} has {custom.DayCount} days. Choose a day from 1 to {custom.DayCount}."];
+            }
+            else if (day is < 1)
+            {
+                errors[keys.Day] = ["A day starts at 1."];
+            }
+        }
+        else
+        {
+            if (monthId is not null)
+            {
+                errors[keys.Month] = ["This universe uses simple dates. Give the month as a number."];
+            }
+            else if (month is < 1 or > ChronologyLimits.SimpleMonths)
+            {
+                errors[keys.Month] = ["A month runs from 1 to 12."];
+            }
+
+            if (day is < 1 or > ChronologyLimits.SimpleDays)
+            {
+                errors[keys.Day] = ["A day runs from 1 to 31."];
+            }
         }
 
-        if (day is < 1 or > 31)
-        {
-            errors[keys.Day] = ["A day runs from 1 to 31."];
-        }
+        var hasMonth = month is not null || monthId is not null;
 
-        if (day is not null && month is null)
+        if (day is not null && !hasMonth)
         {
             errors[keys.Month] = ["Give the month as well when you give a day."];
         }
 
-        if (month is not null && year is null)
+        if (hasMonth && year is null)
         {
             errors[keys.Year] = ["Give the year as well when you give a month."];
         }
@@ -105,7 +139,7 @@ public static class ChronologyPointValidation
         UniverseChronology chronology,
         Dictionary<string, string[]> errors)
     {
-        ValidateParts(value.Year, value.Month, value.Day, keys, errors);
+        ValidateParts(value.Year, value.Month, value.MonthId, value.Day, keys, chronology, errors);
 
         if (value.Year is null)
         {

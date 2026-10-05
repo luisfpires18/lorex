@@ -48,6 +48,8 @@ namespace Lorex.Api.Features.Restore;
 /// <item>Versions 1-17: a type is enabled for the Family Tree only when it is the untouched starter Character, even when the file
 /// carries a value - the rule <c>AddEntityTypeFamilyTreeEligibility</c> applied to a live database, never a name alone (ADR 0040).
 /// A family meaning those versions could not hold is refused by validation, never read as a parent link.</item>
+/// <item>Versions 1-21: no custom calendar, even when the file carries one, so every date is a simple date with a numeric
+/// month. A month id in such a file names a calendar it does not have, and validation refuses it.</item>
 /// </list>
 ///
 /// One thing is normalized for every version: the live rows of each ordered collection are numbered
@@ -107,6 +109,7 @@ internal static class BackupNormalization
                 ? payload.WorldRules
                 : [.. payload.WorldRules.Select(rule => rule is null ? null! : rule with { Validation = null })],
         ValidationTerms = version >= 13 ? payload.ValidationTerms : null,
+        ChronologyCalendar = version >= 22 ? payload.ChronologyCalendar : null,
     };
 
     /// <summary>Constraints from version 4, a family meaning from version 14 - never taken from what a kind is called.</summary>
@@ -174,6 +177,9 @@ internal static class BackupNormalization
     public static UniverseBackupPayload Normalize(UniverseBackupPayload payload, int version) => payload with
     {
         ChronologyEras = Renumber(payload.ChronologyEras ?? [], _ => true, era => era.SortOrder, (era, order) => era with { SortOrder = order }),
+        ChronologyCalendar = payload.ChronologyCalendar is { } calendar
+            ? calendar with { Months = Renumber(calendar.Months, _ => true, month => month.SortOrder, (month, order) => month with { SortOrder = order }) }
+            : null,
         EntityTypes = version >= 4
             ? payload.EntityTypes
             : [.. payload.EntityTypes.Select(type => type with { Icon = LegacyIcon(type.Icon) })],

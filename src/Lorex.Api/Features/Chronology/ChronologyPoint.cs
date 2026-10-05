@@ -50,6 +50,13 @@ public readonly record struct ChronologyPoint(int EraRank, double Year, int Mont
     public static double SignedYear(ChronologyEraDirection direction, double year) =>
         direction == ChronologyEraDirection.Descending ? -year : year;
 
+    /// <summary>
+    /// A custom month's place in the year, from 1: its position in the calendar's current order. Simple month N and the
+    /// custom month at position N rank alike, so turning a calendar on or off never moves a date. The timeline's SQL writes
+    /// the same rule as <c>SortOrder + 1</c>; a test holds the two together.
+    /// </summary>
+    public static int MonthRank(ChronologyCalendarMonth month) => month.SortOrder + 1;
+
     /// <summary>Whether a year can be written inside an era: whole, and counted from 1.</summary>
     public static bool IsEraYear(double year) =>
         year >= FirstEraYear && year <= int.MaxValue && Math.Floor(year) == year;

@@ -5,7 +5,7 @@ import {
   type ChronologyPointPart,
 } from './ChronologyPointFields'
 import { EntityMultiPicker, EntityPicker, type EntityChoice } from './EntityPicker'
-import { namesEras } from '../chronology/format'
+import { hasCalendar, namesEras } from '../chronology/format'
 import type { Chronology, ChronologyValue } from '../chronology/types'
 import { ApiError } from '../lib/api'
 import { payloadKey, useDrawerGuard } from '../lib/drawerGuard'
@@ -65,7 +65,7 @@ function draftFrom(scene: Scene | null, chapterId: string | null): SceneDraft {
       ? {
           eraId: scene.chronology.eraId ?? '',
           year: numberText(scene.chronology.year),
-          month: numberText(scene.chronology.month),
+          month: scene.chronology.monthId ?? numberText(scene.chronology.month),
           day: numberText(scene.chronology.day),
         }
       : EMPTY_POINT,
@@ -86,26 +86,34 @@ function trimmed(value: string) {
   return text === '' ? null : text
 }
 
-/** Nothing typed at all is a scene not placed in time. Anything typed is sent as it stands. */
-function chronologyOf(point: ChronologyPointDraft, reckonsInEras: boolean): ChronologyValue | null {
+/**
+ * Nothing typed at all is a scene not placed in time. Anything typed is sent as it stands: a custom calendar's month by its
+ * id, a simple month by its number.
+ */
+function chronologyOf(
+  point: ChronologyPointDraft,
+  reckonsInEras: boolean,
+  custom: boolean,
+): ChronologyValue | null {
   if (Object.values(point).every((part) => part.trim() === '')) return null
 
   return {
     eraId: reckonsInEras ? trimmed(point.eraId) : null,
     year: toNumber(point.year),
-    month: toNumber(point.month),
+    month: custom ? null : toNumber(point.month),
     day: toNumber(point.day),
+    monthId: custom ? trimmed(point.month) : null,
   }
 }
 
 /** The draft as the save sends it: every reference as its id, nothing typed in the date as no date at all. */
-function inputOf(draft: SceneDraft, reckonsInEras: boolean) {
+function inputOf(draft: SceneDraft, reckonsInEras: boolean, custom: boolean) {
   return {
     title: draft.title.trim(),
     summary: trimmed(draft.summary),
     notes: trimmed(draft.notes),
     povEntityId: draft.pov?.id ?? null,
-    chronology: chronologyOf(draft.point, reckonsInEras),
+    chronology: chronologyOf(draft.point, reckonsInEras, custom),
     entityIds: draft.entities.map((choice) => choice.id),
     chapterId: draft.chapterId === '' ? null : draft.chapterId,
   }
@@ -155,13 +163,15 @@ export function SceneForm({
   const [isSaving, setIsSaving] = useState(false)
 
   const reckonsInEras = namesEras(chronology)
+  const custom = hasCalendar(chronology)
   const hasPoint = Object.values(draft.point).some((part) => part.trim() !== '')
 
   // A plain year written before the universe had date periods has no period to show in the picker.
   const unreckoned = reckonsInEras && scene?.chronology != null && scene.chronology.eraId === null
 
   const isDirty =
-    payloadKey(inputOf(draft, reckonsInEras)) !== payloadKey(inputOf(initial, reckonsInEras))
+    payloadKey(inputOf(draft, reckonsInEras, custom)) !==
+    payloadKey(inputOf(initial, reckonsInEras, custom))
   const { close, dialogProps } = useDrawerGuard(
     isDirty,
     scene
@@ -190,7 +200,7 @@ export function SceneForm({
     setFieldErrors({})
     setIsSaving(true)
 
-    const input = inputOf(draft, reckonsInEras)
+    const input = inputOf(draft, reckonsInEras, custom)
 
     try {
       const saved = scene

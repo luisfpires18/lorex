@@ -15,49 +15,92 @@ namespace Lorex.Api.Features.Chronology;
 public sealed class UniverseChronology
 {
     private readonly Dictionary<Guid, ChronologyEra> _byId;
+    private readonly Dictionary<Guid, ChronologyCalendarMonth> _monthsById;
 
-    private UniverseChronology(IReadOnlyList<ChronologyEra> eras)
+    private UniverseChronology(IReadOnlyList<ChronologyEra> eras, IReadOnlyList<ChronologyCalendarMonth>? months)
     {
         Eras = eras;
+        Months = months;
         _byId = eras.ToDictionary(era => era.Id);
+        _monthsById = months?.ToDictionary(month => month.Id) ?? [];
     }
 
-    /// <summary>The plain reckoning: no eras, signed years.</summary>
-    public static UniverseChronology Plain { get; } = new([]);
+    /// <summary>The plain reckoning: no eras, signed years, simple dates.</summary>
+    public static UniverseChronology Plain { get; } = new([], null);
 
     /// <summary>In order, earliest era first.</summary>
     public IReadOnlyList<ChronologyEra> Eras { get; }
 
+    /// <summary>
+    /// The custom calendar's months in order, earliest first, or null on simple dates. A calendar always has at least one
+    /// month, so null and empty never mean the same thing.
+    /// </summary>
+    public IReadOnlyList<ChronologyCalendarMonth>? Months { get; }
+
     /// <summary>True once the author has named at least one era.</summary>
     public bool NamesEras => Eras.Count > 0;
 
-    public static UniverseChronology Of(IEnumerable<ChronologyEra> eras) =>
-        new([.. eras.OrderBy(era => era.SortOrder).ThenBy(era => era.Id)]);
+    /// <summary>True when the universe divides its years with a custom calendar rather than simple numeric months.</summary>
+    public bool HasCalendar => Months is not null;
 
+    public static UniverseChronology Of(
+        IEnumerable<ChronologyEra> eras,
+        IEnumerable<ChronologyCalendarMonth>? months = null) =>
+        new(
+            [.. eras.OrderBy(era => era.SortOrder).ThenBy(era => era.Id)],
+            months is null ? null : [.. months.OrderBy(month => month.SortOrder).ThenBy(month => month.Id)]);
+
+    /// <summary>The eras and, when there is one, the calendar's months: two queries.</summary>
     public static async Task<UniverseChronology> LoadAsync(
         LorexDbContext db,
         Guid universeId,
-        CancellationToken cancellationToken) =>
-        Of(await db.ChronologyEras.AsNoTracking()
+        CancellationToken cancellationToken)
+    {
+        var eras = await db.ChronologyEras.AsNoTracking()
             .Where(era => era.UniverseId == universeId)
-            .ToListAsync(cancellationToken));
+            .ToListAsync(cancellationToken);
+
+        // A calendar is never saved without a month, so no months read means no calendar.
+        var months = await db.ChronologyCalendarMonths.AsNoTracking()
+            .Where(month => month.Calendar!.UniverseId == universeId)
+            .ToListAsync(cancellationToken);
+
+        return Of(eras, months.Count == 0 ? null : months);
+    }
 
     /// <summary>The era with this id in this universe, or null - including for an id from anywhere else.</summary>
     public ChronologyEra? Era(Guid? eraId) =>
         eraId is { } id && _byId.TryGetValue(id, out var era) ? era : null;
 
+    /// <summary>The calendar month with this id in this universe, or null - including for an id from anywhere else.</summary>
+    public ChronologyCalendarMonth? Month(Guid? monthId) =>
+        monthId is { } id && _monthsById.TryGetValue(id, out var month) ? month : null;
+
     /// <summary>
-    /// Where a stored year sits on this universe's line, or null when it cannot be placed.
+    /// Where a stored point sits on this universe's line, or null when it cannot be placed.
     ///
     /// A plain year places only on a universe with no eras. Once eras exist, a year without one
     /// - written before the author named them - is not on the line at all: reading it as a year
     /// in some era would be inventing which one.
+    ///
+    /// The month is the numeric one on simple dates, or the custom month's rank in the calendar's current order - resolved
+    /// here, by id, never by name or position stored on the date. A month id this calendar does not hold cannot be placed.
     /// </summary>
-    public ChronologyPoint? Point(Guid? eraId, double? year, int? month = null, int? day = null)
+    public ChronologyPoint? Point(Guid? eraId, double? year, int? month = null, int? day = null, Guid? monthId = null)
     {
         if (year is not { } value)
         {
             return null;
+        }
+
+        if (monthId is not null)
+        {
+            if (Month(monthId) is not { } custom)
+            {
+                return null;
+            }
+
+            month = ChronologyPoint.MonthRank(custom);
         }
 
         if (!NamesEras)

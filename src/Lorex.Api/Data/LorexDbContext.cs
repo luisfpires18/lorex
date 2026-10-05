@@ -81,6 +81,10 @@ public class LorexDbContext(DbContextOptions<LorexDbContext> options)
 
     public DbSet<ChronologyEra> ChronologyEras => Set<ChronologyEra>();
 
+    public DbSet<ChronologyCalendar> ChronologyCalendars => Set<ChronologyCalendar>();
+
+    public DbSet<ChronologyCalendarMonth> ChronologyCalendarMonths => Set<ChronologyCalendarMonth>();
+
     public DbSet<Story> Stories => Set<Story>();
 
     public DbSet<Chapter> Chapters => Set<Chapter>();

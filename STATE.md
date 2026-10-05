@@ -50,8 +50,23 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
-- **Product refinement 038 - unified Timeline** (`feat/unified-timeline` off `dev` at `8916b36`; committed, not merged,
-  not pushed). One migration (`AddTimelineEntryStories`), backup **21**. ADR 0009, 0014, 0022, 0024 amendments.
+- **Product refinement 039 - custom calendars** (`feat/custom-chronology-calendar` off `dev` at `ce4c416`; committed, not
+  merged, not pushed). One migration (`AddChronologyCalendars`), backup **22**. ADR 0022 (main), 0009, 0014, 0024 amendments.
+  - Simple dates stay the default (month 1-12, day 1-31, every existing universe untouched). Custom calendar = a
+    `ChronologyCalendars` row (one per universe in V1) with ordered months (name, short name, 1-1000 days, 1-100 months).
+    Eras and calendar are orthogonal. Dates name a month by id (`StartMonthId`/`EndMonthId`, `Scenes.MonthId`); rename and
+    reorder rewrite nothing. Order: `ChronologyPoint` month rank = position + 1, same rank in listing and feed SQL.
+  - `PUT`/`DELETE .../chronology/calendar`, beside the eras' save. On: simple month N -> Nth month, atomic, refused if any
+    date does not fit. Edit: whole list; removing a used month, shrinking below a used day, or a reorder that reverses a
+    range is refused. Off: back to position numbers, refused past 12 months / 31 days.
+  - UI: Chronology > Calendar (Simple dates / Custom calendar, month rows with Earlier/Later/Remove); month select and
+    month-bounded day in the moment and scene forms; dates read `17 Emberrise · TA 401`.
+  - Migration adds the scene/moment month columns natively (no `Scenes` rebuild, so its search triggers stay); rollback
+    rebuilds `Scenes` by hand and puts the triggers back.
+  - Deferred: several calendars, conversion, leap/intercalary days, weekdays, seasons, a chronology-aware Lore date field
+    (the Gregorian `Date` field is untouched), month-precision birth/death.
+- **Product refinement 038 - unified Timeline** (`feat/unified-timeline` off `dev` at `8916b36`, merged into `dev` at
+  `ce4c416`). One migration (`AddTimelineEntryStories`), backup **21**. ADR 0009, 0014, 0022, 0024 amendments.
   - Timeline = one read view: moments (stored), live dated scenes and live entries' birth/death years (read live, never
     copied). One world order (era, signed year, month, day), never narrative order. `GET .../timeline/items`: UNION ALL,
     filtered and paged in SQL, 5-7 commands at any size, no manuscript read.

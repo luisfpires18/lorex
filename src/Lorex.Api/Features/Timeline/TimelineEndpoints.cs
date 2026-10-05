@@ -374,9 +374,11 @@ public static class TimelineEndpoints
         entry.DateKind = request.DateKind;
         entry.StartYear = request.StartYear;
         entry.StartMonth = request.StartMonth;
+        entry.StartMonthId = request.StartMonthId;
         entry.StartDay = request.StartDay;
         entry.EndYear = request.EndYear;
         entry.EndMonth = request.EndMonth;
+        entry.EndMonthId = request.EndMonthId;
         entry.EndDay = request.EndDay;
         entry.StartEraId = request.StartEraId;
         entry.EndEraId = request.EndEraId;
@@ -465,7 +467,8 @@ public static class TimelineEndpoints
     /// The key is <see cref="ChronologyPoint"/>'s, written as a query: the start era's place in
     /// the order, then the start year signed by that era's direction, then month and day with
     /// an absent one counting as zero - so an entry known only to its year comes before any
-    /// dated moment inside it. A universe with no eras has no era to rank by and its years are
+    /// dated moment inside it. A custom month ranks by its calendar position plus one
+    /// (<see cref="ChronologyPoint.MonthRank"/>), joined live, so reordering the months reorders the dates in them. A universe with no eras has no era to rank by and its years are
     /// already signed, which is exactly the order the timeline has always had. A test holds this
     /// query and the comparer to the same answer.
     ///
@@ -485,7 +488,7 @@ public static class TimelineEndpoints
             .ThenBy(entry => entry.StartEraId != null && entry.StartEra!.Direction == ChronologyEraDirection.Descending
                 ? -entry.StartYear
                 : entry.StartYear)
-            .ThenBy(entry => entry.StartMonth ?? 0)
+            .ThenBy(entry => entry.StartMonthId != null ? entry.StartCalendarMonth!.SortOrder + 1 : entry.StartMonth ?? 0)
             .ThenBy(entry => entry.StartDay ?? 0)
             .ThenBy(entry => entry.Title)
             .ThenBy(entry => entry.Id);
@@ -534,7 +537,9 @@ public static class TimelineEndpoints
         string? MethodName,
         Guid? ParticipantId,
         string? ParticipantName,
-        bool IsParticipantTrashed);
+        bool IsParticipantTrashed,
+        Guid? StartMonthId,
+        Guid? EndMonthId);
 
     internal static System.Linq.Expressions.Expression<Func<TimelineEntry, Row>> Projection() =>
         entry => new Row(
@@ -579,7 +584,9 @@ public static class TimelineEndpoints
             entry.Validation.MethodTerm!.Name,
             entry.Validation.ParticipantEntityId,
             entry.Validation.ParticipantEntity!.Name,
-            entry.Validation.ParticipantEntity.DeletedAt != null);
+            entry.Validation.ParticipantEntity.DeletedAt != null,
+            entry.StartMonthId,
+            entry.EndMonthId);
 
     internal static TimelineEntryResponse Map(Row row) =>
         new(
@@ -596,10 +603,12 @@ public static class TimelineEndpoints
                 row.EndMonth,
                 row.EndDay,
                 row.EraLabel,
-                TimelineValidation.PrecisionOf(row.StartYear, row.StartMonth, row.StartDay),
-                TimelineValidation.PrecisionOf(row.EndYear, row.EndMonth, row.EndDay),
+                TimelineValidation.PrecisionOf(row.StartYear, row.StartMonth, row.StartDay, row.StartMonthId),
+                TimelineValidation.PrecisionOf(row.EndYear, row.EndMonth, row.EndDay, row.EndMonthId),
                 row.StartEraId,
-                row.EndEraId),
+                row.EndEraId,
+                row.StartMonthId,
+                row.EndMonthId),
             row.Entities,
             row.CreatedAt,
             row.UpdatedAt,

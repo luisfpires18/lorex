@@ -131,6 +131,8 @@ public sealed class UniverseAccessMatrixTests(LorexApiFactory factory) : IClassF
             new("delete moment", Delete, $"{u}/timeline/{w.Moment}", May.Edit),
             new("chronology", Get, $"{u}/chronology", May.Read),
             new("edit chronology", Put, $"{u}/chronology", May.Edit, Json(new ChronologyRequest([new ChronologyEraRequest(null, "Age of Ash", "AA", ChronologyEraDirection.Ascending, ChronologyLabelPosition.BeforeYear)]))),
+            new("save calendar", Put, $"{u}/chronology/calendar", May.Edit, Json(new ChronologyCalendarRequest([new ChronologyCalendarMonthRequest(null, "Frostwane", null, 42)]))),
+            new("remove calendar", Delete, $"{u}/chronology/calendar", May.Edit),
 
             // ---------- World rules, validation, Canon, search ----------
             new("world rules", Get, $"{u}/world-rules", May.Read),
