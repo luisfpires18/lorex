@@ -3,6 +3,7 @@ using Lorex.Api.Data;
 using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Export;
 using Lorex.Api.Features.Media;
+using Lorex.Api.Features.Storage;
 using Lorex.Api.Features.Universes;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -193,6 +194,7 @@ public static partial class BackupRestoreEndpoints
         IMediaObjectStore store,
         CanonIntegrityEvaluator evaluator,
         BackupRestoreStaging staging,
+        TimeProvider clock,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -235,8 +237,38 @@ public static partial class BackupRestoreEndpoints
                 // Again, on the bytes that are about to be written: nothing validated a moment ago is assumed.
                 var restorable = await BackupValidation.ValidateAsync(opened, cancellationToken);
 
-                universe = await new UniverseRestore(db, store, evaluator, logger)
-                    .RestoreAsync(restorable, opened, ownerId, name, cancellationToken);
+                // The restored universe is the restorer's, so its entries' pictures are their storage, held before
+                // a byte of them is stored and consumed by the commit that writes the universe (ADR 0042). The
+                // artwork is not a Lore picture and does not count.
+                var imageBytes = restorable.Images.Values.Sum(image => image.ByteSize);
+                StorageHold? hold = null;
+
+                if (imageBytes > 0)
+                {
+                    hold = await AccountStorage.ReserveAsync(db, clock, ownerId, imageBytes, cancellationToken);
+
+                    if (hold is null)
+                    {
+                        return NoRoom();
+                    }
+                }
+
+                try
+                {
+                    universe = await new UniverseRestore(db, store, evaluator, clock, logger)
+                        .RestoreAsync(restorable, opened, ownerId, name, hold, cancellationToken);
+                }
+                catch
+                {
+                    // Nothing was committed, so the room goes back. A restore that committed consumed it.
+                    await AccountStorage.ReleaseAsync(db, hold, logger);
+                    throw;
+                }
+            }
+            catch (StorageQuotaExceededException)
+            {
+                // The hold lapsed during a long restore and the room went meanwhile. Nothing was kept.
+                return NoRoom();
             }
             catch (FileNotFoundException)
             {
@@ -303,6 +335,17 @@ public static partial class BackupRestoreEndpoints
             staged.End();
         }
     }
+
+    /// <summary>
+    /// The restorer's own storage has no room for the backup's pictures. The upload stays waiting, as it does for a
+    /// taken name: room can be made and the restore tried again.
+    /// </summary>
+    private static IResult NoRoom() =>
+        Results.Problem(
+            title: "Not enough storage.",
+            detail: "There isn't room in your storage for this backup's pictures. Remove some images, then try again. The backup is still waiting.",
+            statusCode: StatusCodes.Status409Conflict,
+            extensions: new Dictionary<string, object?> { ["code"] = StorageQuota.ExceededCode });
 
     // ---------- Discard ----------
 

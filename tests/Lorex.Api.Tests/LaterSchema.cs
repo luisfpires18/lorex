@@ -53,21 +53,28 @@ internal static class LaterSchema
         "IX_TimelineEntries_StartMonthId",
     ];
 
+    /// <summary>Account storage (AddAccountStorageQuota, 2026-10-06, ADR 0042): the reservations table, its key's index and one index.</summary>
+    private static readonly string[] Storage =
+    [
+        "sqlite_autoindex_StorageReservations_1",
+        "IX_StorageReservations_UserId_ExpiresAt",
+    ];
+
     /// <summary>Whether an index or trigger name (or "name on table") predates nested types - and so everything after them.</summary>
     public static bool BeforeNestedTypes(string name) =>
-        !NestedTypes.Concat(Memberships).Concat(ReferenceTargets).Concat(TimelineStories).Concat(Calendars)
+        !NestedTypes.Concat(Memberships).Concat(ReferenceTargets).Concat(TimelineStories).Concat(Calendars).Concat(Storage)
             .Any(later => name == later || name.StartsWith($"{later} ", StringComparison.Ordinal));
 
     /// <summary>Whether an index or trigger name predates the link field's allowed type - and so everything after it.</summary>
     public static bool BeforeReferenceTargets(string name) =>
-        !ReferenceTargets.Concat(TimelineStories).Concat(Calendars).Any(later => name == later || name.StartsWith($"{later} ", StringComparison.Ordinal));
+        !ReferenceTargets.Concat(TimelineStories).Concat(Calendars).Concat(Storage).Any(later => name == later || name.StartsWith($"{later} ", StringComparison.Ordinal));
 
     /// <summary>Whether an index or trigger name predates a moment's stories - and so everything after it.</summary>
     public static bool BeforeTimelineStories(string name) =>
-        !TimelineStories.Concat(Calendars).Any(later => name == later || name.StartsWith($"{later} ", StringComparison.Ordinal));
+        !TimelineStories.Concat(Calendars).Concat(Storage).Any(later => name == later || name.StartsWith($"{later} ", StringComparison.Ordinal));
 
-    /// <summary>Whether an index or trigger name predates custom calendars.</summary>
+    /// <summary>Whether an index or trigger name predates custom calendars - and so everything after them.</summary>
     public static bool BeforeCalendars(string name) =>
-        !Calendars.Any(later => name == later || name.StartsWith($"{later} ", StringComparison.Ordinal));
+        !Calendars.Concat(Storage).Any(later => name == later || name.StartsWith($"{later} ", StringComparison.Ordinal));
 
 }

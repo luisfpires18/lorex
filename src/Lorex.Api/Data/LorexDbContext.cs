@@ -7,6 +7,7 @@ using Lorex.Api.Features.Profile;
 using Lorex.Api.Features.Publishing;
 using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.RuleValidation;
+using Lorex.Api.Features.Storage;
 using Lorex.Api.Features.Stories;
 using Lorex.Api.Features.Timeline;
 using Lorex.Api.Features.Universes;
@@ -78,6 +79,8 @@ public class LorexDbContext(DbContextOptions<LorexDbContext> options)
     public DbSet<CanonConflictSubject> CanonConflictSubjects => Set<CanonConflictSubject>();
 
     public DbSet<ProfileImage> ProfileImages => Set<ProfileImage>();
+
+    public DbSet<StorageReservation> StorageReservations => Set<StorageReservation>();
 
     public DbSet<ChronologyEra> ChronologyEras => Set<ChronologyEra>();
 

@@ -46,6 +46,7 @@ One ADR per durable decision. Rationale lives in the ADR, never here.
 | 0040 | A type may be enabled for the Family Tree, and a relation kind may mean family without ancestry (supersedes two statements of 0035) | [0040-family-tree-type-semantics.md](0040-family-tree-type-semantics.md) |
 
 | 0041 | A universe has one owner and may have collaborators, and one gate decides what each may do (supersedes 0006's access rule; amended 030: invitations by email and collaborator management) | [0041-universe-collaboration-access.md](0041-universe-collaboration-access.md) |
+| 0042 | An account has a storage allowance (1 GiB), counted from the originals of the Lore pictures in the universes it owns and held during uploads | [0042-account-storage-quota.md](0042-account-storage-quota.md) |
 
 All accepted. Next number: `0042`.
 
@@ -79,4 +80,4 @@ recall - a copy a visitor already has - and the slug a deleted world frees, and 
 reveals was once taken, in 0036, and the author address a second author of one name gets, in 0037, and the body a non-rendering crawler cannot see and
 the copies search engines keep after an unpublish, in 0038, and the unpublished chapter headings, the one-page story reader and
 the Trash restore that asks nothing for a story part, in 0039, and the Family Tree's own kind dialog that leaves Canon constraints to
-the Relation Kinds tab, and the relation editor that still links an entry of any type, in 0040.
+the Relation Kinds tab, and the relation editor that still links an entry of any type, in 0040, and the bucket objects no storage total counts and nothing reconciles, in 0042.

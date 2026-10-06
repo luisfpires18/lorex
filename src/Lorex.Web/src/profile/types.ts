@@ -17,3 +17,14 @@ export interface ProfileImageRef {
   uploadedAt: string
   crop: ImageCrop | null
 }
+
+/**
+ * The account's storage, in bytes (ADR 0042): the universes it owns, against its allowance. `usedBytes` is the total;
+ * `loreImagesBytes` is the one kind of file that makes it up today. Only ever the signed-in account's own.
+ */
+export interface AccountStorage {
+  usedBytes: number
+  quotaBytes: number
+  remainingBytes: number
+  loreImagesBytes: number
+}

@@ -8,6 +8,7 @@ using Lorex.Api.Features.WorldRules;
 using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.RuleValidation;
 using Lorex.Api.Features.Media;
+using Lorex.Api.Features.Storage;
 using Lorex.Api.Features.Publishing;
 using Lorex.Api.Features.Relationships;
 using Lorex.Api.Features.Stories;
@@ -207,6 +208,7 @@ internal sealed partial class UniverseRestore(
     LorexDbContext db,
     IMediaObjectStore store,
     CanonIntegrityEvaluator evaluator,
+    TimeProvider clock,
     ILogger logger)
 {
     public async Task<Universe> RestoreAsync(
@@ -214,6 +216,7 @@ internal sealed partial class UniverseRestore(
         OpenedBackup opened,
         string ownerId,
         string name,
+        StorageHold? hold,
         CancellationToken cancellationToken)
     {
         var ids = new RestoreIdentity(backup.Payload);
@@ -225,7 +228,7 @@ internal sealed partial class UniverseRestore(
         {
             var images = await StoreImagesAsync(backup, opened, ids, universeId, now, attempted, cancellationToken);
             var artwork = await StoreArtworkAsync(backup, opened, universeId, now, attempted, cancellationToken);
-            return await WriteAsync(backup.Payload, ids, universeId, ownerId, name, now, images, artwork, cancellationToken);
+            return await WriteAsync(backup.Payload, ids, universeId, ownerId, name, now, images, artwork, hold, cancellationToken);
         }
         catch
         {
@@ -448,9 +451,14 @@ internal sealed partial class UniverseRestore(
         DateTime now,
         Dictionary<Guid, EntityImage> images,
         UniverseArtwork? artwork,
+        StorageHold? hold,
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        // The pictures' room becomes stored bytes in this commit or not at all - and first, before any row of the new
+        // universe counts, so a hold that lapsed is checked against storage as it stands (ADR 0042).
+        await AccountStorage.ConsumeAsync(db, clock, hold, cancellationToken);
 
         if (await db.Universes.AnyAsync(universe => universe.OwnerId == ownerId && universe.Name == name, cancellationToken))
         {

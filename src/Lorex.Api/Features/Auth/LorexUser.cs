@@ -22,4 +22,11 @@ public sealed class LorexUser : IdentityUser
     /// the account has a public universe.
     /// </summary>
     public string? PublicAuthorSlug { get; set; }
+
+    /// <summary>
+    /// How many bytes of pictures the universes this account owns may hold (ADR 0042). Every account starts at
+    /// <see cref="Storage.StorageQuota.DefaultBytes"/>; there is no unlimited value and no route an account can change
+    /// its own with - only something trusted on the server, such as billing one day, may raise it.
+    /// </summary>
+    public long StorageQuotaBytes { get; set; } = Storage.StorageQuota.DefaultBytes;
 }

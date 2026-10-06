@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Lorex.Api.Data;
 using Lorex.Api.Features.Ideas;
 using Lorex.Api.Features.Lore;
+using Lorex.Api.Features.Media;
 using Lorex.Api.Features.Publishing;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -286,10 +287,23 @@ public static partial class UniverseEndpoints
         return Results.Ok(ToDetail(universe, await ArtworkIdentityAsync(db, universe.Id, cancellationToken)));
     }
 
+    /// <summary>
+    /// Deletes an archived universe and everything in it, then the pictures it held.
+    ///
+    /// The order is the one every picture follows (ADR 0019): the database is the thing that says what exists, so it
+    /// moves first and the objects follow. The exact keys of every entry picture and of the artwork are read from their
+    /// rows inside the delete's own transaction - the rows the cascade is about to remove, and nothing a write still in
+    /// flight has not committed - and swept only once the delete has committed. A failed delete leaves the universe and
+    /// every object it names whole. A sweep that fails after the commit is logged as litter: the universe stays deleted,
+    /// and its pictures stop counting against the owner's storage the moment their rows go (ADR 0042), whatever the
+    /// bucket still holds.
+    /// </summary>
     private static async Task<IResult> DeleteAsync(
         Guid id,
         ClaimsPrincipal principal,
         LorexDbContext db,
+        IMediaObjectStore store,
+        ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
         if (await UniverseAccess.DenyAsync(db, id, principal, UniverseCapability.ManageUniverse, cancellationToken) is { } denied)
@@ -322,9 +336,29 @@ public static partial class UniverseEndpoints
         // Same transaction, so no idea can be left pointing into a universe that is gone.
         await IdeaReferences.ReleaseUniverseAsync(db, universe.Id, cancellationToken);
 
+        // The stored keys, as written - never rebuilt from the naming convention - while the rows still exist.
+        var pictureKeys = (await db.EntityImages
+                .Where(image => image.Entity!.UniverseId == universe.Id)
+                .Select(image => new { image.OriginalKey, image.ThumbnailKey })
+                .ToListAsync(cancellationToken))
+            .SelectMany(image => new[] { image.OriginalKey, image.ThumbnailKey })
+            .ToArray();
+
+        var artworkKeys = (await db.UniverseArtworks
+                .Where(artwork => artwork.UniverseId == universe.Id)
+                .Select(artwork => new { artwork.OriginalKey, artwork.CardKey })
+                .ToListAsync(cancellationToken))
+            .SelectMany(artwork => new[] { artwork.OriginalKey, artwork.CardKey })
+            .ToArray();
+
         db.Universes.Remove(universe);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+
+        // Only past the commit, and never a reason to undo it: each helper logs a key that will not delete and moves on.
+        await Task.WhenAll(
+            EntityImageEndpoints.SweepAsync(store, loggerFactory.CreateLogger("Lorex.EntityImages"), pictureKeys),
+            UniverseArtworkEndpoints.SweepAsync(store, loggerFactory.CreateLogger(UniverseArtworkEndpoints.LoggerName), artworkKeys));
 
         return Results.NoContent();
     }

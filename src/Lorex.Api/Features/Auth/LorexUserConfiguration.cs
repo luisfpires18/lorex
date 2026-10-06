@@ -24,5 +24,9 @@ public sealed class LorexUserConfiguration : IEntityTypeConfiguration<LorexUser>
         builder.Property(user => user.PublicAuthorSlug)
             .HasMaxLength(Publishing.PublicationLimits.SlugMaxLength);
         builder.HasIndex(user => user.PublicAuthorSlug).IsUnique();
+
+        // The column's default is what every account that existed before storage quotas receives (ADR 0042). A new
+        // account gets the same from the property's own initializer.
+        builder.Property(user => user.StorageQuotaBytes).HasDefaultValue(Storage.StorageQuota.DefaultBytes);
     }
 }

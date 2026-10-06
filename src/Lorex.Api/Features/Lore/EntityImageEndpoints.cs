@@ -3,6 +3,7 @@ using System.Text.Json;
 using Lorex.Api.Data;
 using Lorex.Api.Features.CanonIntegrity;
 using Lorex.Api.Features.Media;
+using Lorex.Api.Features.Storage;
 using Lorex.Api.Features.Universes;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -114,6 +115,13 @@ public static partial class EntityImageEndpoints
     /// beside the file. It is optional - without one the thumbnail is the centred square - and it
     /// travels with the file, so a replacement is one request: nothing is uploaded until the
     /// author has confirmed how the new picture should be framed.
+    ///
+    /// <para><b>Storage.</b> The picture counts against the universe's owner, whoever uploads it,
+    /// and only by what it adds: the new original's size less the one it replaces (ADR 0042). An
+    /// upload that adds nothing - the same size, a smaller picture - needs no room and is never
+    /// refused for it, even past the allowance. One that adds bytes holds them before the bucket is
+    /// touched (<see cref="AccountStorage"/>), and the hold is consumed by the commit or given back
+    /// by every way this can fail.</para>
     /// </summary>
     private static async Task<IResult> UploadAsync(
         Guid universeId,
@@ -123,6 +131,7 @@ public static partial class EntityImageEndpoints
         ClaimsPrincipal principal,
         LorexDbContext db,
         IMediaObjectStore store,
+        TimeProvider clock,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -131,14 +140,16 @@ public static partial class EntityImageEndpoints
             return denied;
         }
 
-        // Trashed is not editable, exactly as the entity update path has it.
-        var exists = await db.Entities.AnyAsync(
-            candidate => candidate.Id == entityId
+        // Trashed is not editable, exactly as the entity update path has it. The same read names
+        // whose storage the picture will count against: the universe's owner, not the uploader.
+        var ownerId = await db.Entities
+            .Where(candidate => candidate.Id == entityId
                 && candidate.UniverseId == universeId
-                && candidate.DeletedAt == null,
-            cancellationToken);
+                && candidate.DeletedAt == null)
+            .Select(candidate => candidate.Universe!.OwnerId)
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (!exists)
+        if (ownerId is null)
         {
             return Results.NotFound();
         }
@@ -181,116 +192,225 @@ public static partial class EntityImageEndpoints
         var existing = await db.EntityImages
             .FirstOrDefaultAsync(image => image.EntityId == entityId, cancellationToken);
 
-        var supersededOriginal = existing?.OriginalKey;
-        var supersededThumbnail = existing?.ThumbnailKey;
+        var replacedAssetId = existing?.AssetId;
 
-        var assetId = Guid.NewGuid();
-        var thumbnailId = Guid.NewGuid();
-        var originalKey = EntityImageKeys.Original(universeId, entityId, assetId, prepared.Extension);
-        var thumbnailKey = EntityImageKeys.Thumbnail(universeId, entityId, assetId, thumbnailId);
+        // What the owner's storage grows by: the bytes the server received, never a size the
+        // browser claimed, less the original this one replaces. Only growth is held.
+        var growth = bytes.Length - (existing?.ByteSize ?? 0);
+        StorageHold? hold = null;
 
-        try
+        if (growth > 0)
         {
-            bytes.Position = 0;
-            using var thumbnail = new MemoryStream(prepared.Thumbnail, writable: false);
+            hold = await AccountStorage.ReserveAsync(db, clock, ownerId, growth, cancellationToken);
 
-            // Both at once. Neither depends on the other and nothing can read either until the
-            // association moves below, so waiting for the first before starting the second only
-            // ever bought a second round trip to the bucket - see MediaObjectWrites.
-            await MediaObjectWrites.PutAllAsync(
-                store,
-                cancellationToken,
-                new PendingMediaObject(originalKey, bytes, prepared.ContentType),
-                new PendingMediaObject(thumbnailKey, thumbnail, "image/webp"));
-        }
-        catch (MediaStorageUnavailableException exception)
-        {
-            // Nothing is configured, so nothing was written and there is nothing to sweep.
-            return Unavailable(exception);
-        }
-        catch (MediaStorageFailedException exception)
-        {
-            // The store refused one of the two, or stopped answering. The original may well
-            // have landed before the thumbnail did not; nothing points at either yet, so both
-            // come back out, and the entry keeps the picture it had.
-            LogStorageFailure(logger, "upload", entityId, exception);
-            await SweepAsync(store, logger, originalKey, thumbnailKey);
-            return Unavailable(exception);
-        }
-        catch (Exception)
-        {
-            // Nothing points at these yet, so removing them is safe and is the only thing that
-            // keeps a failed upload from leaving litter in the bucket.
-            await SweepAsync(store, logger, originalKey, thumbnailKey);
-            throw;
-        }
-
-        var now = DateTime.UtcNow;
-        var stored = existing ?? new EntityImage
-        {
-            EntityId = entityId,
-            OriginalKey = originalKey,
-            ThumbnailKey = thumbnailKey,
-            ContentType = prepared.ContentType,
-        };
-
-        stored.AssetId = assetId;
-        stored.ThumbnailId = thumbnailId;
-        stored.OriginalKey = originalKey;
-        stored.ThumbnailKey = thumbnailKey;
-        stored.ContentType = prepared.ContentType;
-        stored.FileName = TrimFileName(file.FileName);
-        stored.Width = prepared.Width;
-        stored.Height = prepared.Height;
-        stored.ByteSize = bytes.Length;
-        stored.UploadedAt = now;
-        SetCrop(stored, prepared.Crop);
-
-        try
-        {
-            // The association and the version that records it commit together or not at all.
-            // A history that had lost the moment the picture changed would be worse than one
-            // that never claimed to hold it - see ADR 0013 and ADR 0019.
-            await using var transaction = await JoinedTransaction.BeginAsync(db, cancellationToken);
-
-            if (existing is null)
+            if (hold is null)
             {
-                db.EntityImages.Add(stored);
+                return StorageQuota.Exceeded(isOwner: ownerId == principal.RequireUserId());
+            }
+        }
+
+        var committed = false;
+        try
+        {
+            var assetId = Guid.NewGuid();
+            var thumbnailId = Guid.NewGuid();
+            var originalKey = EntityImageKeys.Original(universeId, entityId, assetId, prepared.Extension);
+            var thumbnailKey = EntityImageKeys.Thumbnail(universeId, entityId, assetId, thumbnailId);
+
+            try
+            {
+                bytes.Position = 0;
+                using var thumbnail = new MemoryStream(prepared.Thumbnail, writable: false);
+
+                // Both at once. Neither depends on the other and nothing can read either until the
+                // association moves below, so waiting for the first before starting the second only
+                // ever bought a second round trip to the bucket - see MediaObjectWrites.
+                await MediaObjectWrites.PutAllAsync(
+                    store,
+                    cancellationToken,
+                    new PendingMediaObject(originalKey, bytes, prepared.ContentType),
+                    new PendingMediaObject(thumbnailKey, thumbnail, "image/webp"));
+            }
+            catch (MediaStorageUnavailableException exception)
+            {
+                // Nothing is configured, so nothing was written and there is nothing to sweep.
+                return Unavailable(exception);
+            }
+            catch (MediaStorageFailedException exception)
+            {
+                // The store refused one of the two, or stopped answering. The original may well
+                // have landed before the thumbnail did not; nothing points at either yet, so both
+                // come back out, and the entry keeps the picture it had.
+                LogStorageFailure(logger, "upload", entityId, exception);
+                await SweepAsync(store, logger, originalKey, thumbnailKey);
+                return Unavailable(exception);
+            }
+            catch (Exception)
+            {
+                // Nothing points at these yet, so removing them is safe and is the only thing that
+                // keeps a failed upload from leaving litter in the bucket.
+                await SweepAsync(store, logger, originalKey, thumbnailKey);
+                throw;
             }
 
-            // The entry's own UpdatedAt is left alone. It says when the lore was last authored,
-            // and the image carries its own timestamp - the same reasoning the Trash marker uses.
-            await db.SaveChangesAsync(cancellationToken);
+            var now = DateTime.UtcNow;
+            var stored = existing ?? new EntityImage
+            {
+                EntityId = entityId,
+                OriginalKey = originalKey,
+                ThumbnailKey = thumbnailKey,
+                ContentType = prepared.ContentType,
+            };
 
-            // No snapshot can see this, because a revision holds no image: the objects a past
-            // version pointed at are deleted when it is superseded, so a key kept in history
-            // would name nothing. The change is recorded rather than copied.
-            await EntityRevisions.CaptureAsync(
-                db,
-                entityId,
-                EntityRevisionKind.Edited,
-                restoredFromRevisionId: null,
-                cancellationToken,
-                also: EntityRevisionChange.Image);
+            string? supersededOriginal = null;
+            string? supersededThumbnail = null;
 
-            await transaction.CommitAsync(cancellationToken);
+            // Decided inside the transaction, acted on after it: the transaction does database work only, and
+            // every object-store call - this upload's own cleanup included - waits until it has been disposed
+            // and SQLite's writer lock is free again (ADR 0042).
+            var outcome = UploadOutcome.Committed;
+
+            try
+            {
+                // The association and the version that records it commit together or not at all.
+                // A history that had lost the moment the picture changed would be worse than one
+                // that never claimed to hold it - see ADR 0013 and ADR 0019.
+                await using (var transaction = await JoinedTransaction.BeginAsync(db, cancellationToken))
+                {
+                    // Read inside the transaction, which holds the writer lock, so nothing can move between
+                    // these checks and the save.
+                    //
+                    // The entry itself must still be live: a universe deleted, or an entry trashed or erased,
+                    // while the bytes were on their way leaves this upload nothing to attach to. The delete
+                    // swept only what had been committed; this upload's own objects are its own to remove.
+                    var current = await db.Entities.AnyAsync(
+                            candidate => candidate.Id == entityId
+                                && candidate.UniverseId == universeId
+                                && candidate.DeletedAt == null,
+                            cancellationToken)
+                        ? await db.EntityImages.AsNoTracking()
+                            .Where(image => image.EntityId == entityId)
+                            .Select(image => new CurrentImage(image.AssetId, image.OriginalKey, image.ThumbnailKey))
+                            .FirstOrDefaultAsync(cancellationToken)
+                            ?? CurrentImage.None
+                        : null;
+
+                    if (current is null)
+                    {
+                        outcome = UploadOutcome.EntryGone;
+                    }
+                    else if (current.AssetId != replacedAssetId)
+                    {
+                        // The picture this upload was measured against is no longer the entry's. Another
+                        // upload or a removal that landed meanwhile would make the growth held above
+                        // wrong, and its objects are the ones that would need sweeping - so it wins.
+                        outcome = UploadOutcome.PictureChanged;
+                    }
+                    else
+                    {
+                        // A reframe that landed meanwhile changed the thumbnail, not the picture: the one to
+                        // sweep is whichever the row names now.
+                        supersededOriginal = current.OriginalKey;
+                        supersededThumbnail = current.ThumbnailKey;
+
+                        // Before the picture is written, so a hold that lapsed is checked against storage
+                        // as it stands - see AccountStorage.ConsumeAsync.
+                        await AccountStorage.ConsumeAsync(db, clock, hold, cancellationToken);
+
+                        stored.AssetId = assetId;
+                        stored.ThumbnailId = thumbnailId;
+                        stored.OriginalKey = originalKey;
+                        stored.ThumbnailKey = thumbnailKey;
+                        stored.ContentType = prepared.ContentType;
+                        stored.FileName = TrimFileName(file.FileName);
+                        stored.Width = prepared.Width;
+                        stored.Height = prepared.Height;
+                        stored.ByteSize = bytes.Length;
+                        stored.UploadedAt = now;
+                        SetCrop(stored, prepared.Crop);
+
+                        if (existing is null)
+                        {
+                            db.EntityImages.Add(stored);
+                        }
+
+                        // The entry's own UpdatedAt is left alone. It says when the lore was last authored,
+                        // and the image carries its own timestamp - the same reasoning the Trash marker uses.
+                        await db.SaveChangesAsync(cancellationToken);
+
+                        // No snapshot can see this, because a revision holds no image: the objects a past
+                        // version pointed at are deleted when it is superseded, so a key kept in history
+                        // would name nothing. The change is recorded rather than copied.
+                        await EntityRevisions.CaptureAsync(
+                            db,
+                            entityId,
+                            EntityRevisionKind.Edited,
+                            restoredFromRevisionId: null,
+                            cancellationToken,
+                            also: EntityRevisionChange.Image);
+
+                        await transaction.CommitAsync(cancellationToken);
+                        committed = true;
+                    }
+                }
+            }
+
+            // The transaction is disposed - rolled back - before either handler runs, so these sweeps too
+            // happen with the writer lock released.
+            catch (StorageQuotaExceededException)
+            {
+                // The hold lapsed and the room went meanwhile. Nothing moved.
+                await SweepAsync(store, logger, originalKey, thumbnailKey);
+                return StorageQuota.Exceeded(isOwner: ownerId == principal.RequireUserId());
+            }
+            catch (Exception)
+            {
+                // The association never moved, so the old image is still the live one and the new
+                // objects are unreferenced. Take them back out.
+                await SweepAsync(store, logger, originalKey, thumbnailKey);
+                throw;
+            }
+
+            if (outcome != UploadOutcome.Committed)
+            {
+                // Lost a race. Nothing was written and nothing names these objects; the hold is given back
+                // in the finally below.
+                await SweepAsync(store, logger, originalKey, thumbnailKey);
+                return outcome == UploadOutcome.EntryGone ? Results.NotFound() : ReplacedMeanwhile();
+            }
+
+            // Past the commit. The new image is the entry's image whatever happens next, so a
+            // failure here is litter to be reported, never a reason to undo the write.
+            if (supersededOriginal is not null)
+            {
+                await SweepAsync(store, logger, supersededOriginal, supersededThumbnail!);
+            }
+
+            return Results.Ok(EntityImageRef.Of(stored));
         }
-        catch (Exception)
+        finally
         {
-            // The association never moved, so the old image is still the live one and the new
-            // objects are unreferenced. Take them back out.
-            await SweepAsync(store, logger, originalKey, thumbnailKey);
-            throw;
+            // Every way out that did not commit - a refusal, a store failure, a database failure, a
+            // cancelled request - gives the room back. The commit consumed it already.
+            if (!committed)
+            {
+                await AccountStorage.ReleaseAsync(db, hold, logger);
+            }
         }
+    }
 
-        // Past the commit. The new image is the entry's image whatever happens next, so a
-        // failure here is litter to be reported, never a reason to undo the write.
-        if (supersededOriginal is not null)
-        {
-            await SweepAsync(store, logger, supersededOriginal, supersededThumbnail!);
-        }
+    /// <summary>How an upload's commit ended: it landed, or it lost a race and keeps nothing.</summary>
+    private enum UploadOutcome
+    {
+        Committed,
+        EntryGone,
+        PictureChanged,
+    }
 
-        return Results.Ok(EntityImageRef.Of(stored));
+    /// <summary>The picture an entry has at the commit; <see cref="None"/> when it has none.</summary>
+    private sealed record CurrentImage(Guid? AssetId, string? OriginalKey, string? ThumbnailKey)
+    {
+        public static readonly CurrentImage None = new(null, null, null);
     }
 
     // ---------- Framing the thumbnail ----------
@@ -722,6 +842,14 @@ public static partial class EntityImageEndpoints
         Results.Problem(
             title: "The picture changed while it was being framed.",
             detail: "This entry's image was replaced or reframed somewhere else. Open it again to choose the framing.",
+            statusCode: StatusCodes.Status409Conflict,
+            extensions: new Dictionary<string, object?> { ["code"] = ImageChangedCode });
+
+    /// <summary>The entry's picture was replaced or removed while this upload was on its way. That one stands.</summary>
+    private static IResult ReplacedMeanwhile() =>
+        Results.Problem(
+            title: "The picture changed while this one was uploading.",
+            detail: "This entry's image was replaced or removed somewhere else, so this one was not kept. Open the entry again and choose the picture.",
             statusCode: StatusCodes.Status409Conflict,
             extensions: new Dictionary<string, object?> { ["code"] = ImageChangedCode });
 
