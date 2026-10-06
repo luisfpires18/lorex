@@ -129,7 +129,7 @@ public sealed class PlotMigrationTests : IDisposable
 
             // Nothing on a scene or a chapter points at the plot: no arc id on a chapter, no beat id on a scene.
             Assert.Equal(
-                ["Chapters.ChapterId:NO ACTION", "ChronologyEras.EraId:NO ACTION", "Entities.PovEntityId:SET NULL", "Stories.StoryId:CASCADE"],
+                ["Chapters.ChapterId:NO ACTION", "ChronologyCalendarMonths.MonthId:NO ACTION", "ChronologyEras.EraId:NO ACTION", "Entities.PovEntityId:SET NULL", "Stories.StoryId:CASCADE"],
                 (await ForeignKeys(db, "Scenes")).Order(StringComparer.Ordinal));
             Assert.Equal(["Stories.StoryId:CASCADE"], await ForeignKeys(db, "Chapters"));
 

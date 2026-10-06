@@ -46,8 +46,11 @@ public sealed record ChronologyEraResponse(
 /// means the record is not placed in time, which is ordinary. It is validated by
 /// <see cref="ChronologyPointValidation.ValidatePoint"/> and compared, where anything compares it,
 /// as a <see cref="ChronologyPoint"/>.
+///
+/// <paramref name="Month"/> is the numeric month on simple dates; <paramref name="MonthId"/> is the custom calendar's
+/// month on a universe that has one. Never both.
 /// </summary>
-public sealed record ChronologyValue(Guid? EraId, int? Year, int? Month, int? Day);
+public sealed record ChronologyValue(Guid? EraId, int? Year, int? Month, int? Day, Guid? MonthId = null);
 
 /// <summary>
 /// The reckoning, earliest era first.
@@ -60,4 +63,32 @@ public sealed record ChronologyValue(Guid? EraId, int? Year, int? Month, int? Da
 public sealed record ChronologyResponse(
     IReadOnlyList<ChronologyEraResponse> Eras,
     int UnplacedMomentCount,
-    int UnplacedYearCount);
+    int UnplacedYearCount,
+    ChronologyCalendarResponse? Calendar = null);
+
+/// <summary>
+/// A custom calendar, written whole: every month in the order of the year, earliest first. Saving it with no calendar yet
+/// turns custom dates on and converts every simple date (month N becomes the month at position N); saving it again renames,
+/// reorders, adds, removes and resizes months in one atomic change. A month with an id must be one of this calendar's; a
+/// month left out is removed.
+/// </summary>
+public sealed record ChronologyCalendarRequest(IReadOnlyList<ChronologyCalendarMonthRequest>? Months);
+
+public sealed record ChronologyCalendarMonthRequest(Guid? Id, string? Name, string? Abbreviation, int DayCount);
+
+/// <summary>The universe's custom calendar, or null on the chronology response for simple dates.</summary>
+public sealed record ChronologyCalendarResponse(Guid Id, IReadOnlyList<ChronologyCalendarMonthResponse> Months);
+
+/// <summary>
+/// One month, in order. <paramref name="UseCount"/> counts timeline moments that start or end in it and scenes dated in
+/// it, the Trash included - any keeps it from being removed. <paramref name="MaxDayUsed"/> is the latest day any of them
+/// uses, or null, so the month cannot be shortened below it.
+/// </summary>
+public sealed record ChronologyCalendarMonthResponse(
+    Guid Id,
+    string Name,
+    string? Abbreviation,
+    int SortOrder,
+    int DayCount,
+    int UseCount,
+    int? MaxDayUsed);

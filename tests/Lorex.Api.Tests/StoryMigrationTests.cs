@@ -99,9 +99,9 @@ public sealed class StoryMigrationTests : IDisposable
             Assert.Equal(0, await db.SceneEntityLinks.CountAsync());
 
             // What each reference is allowed to do when the row it points at goes. The chapter reference
-            // arrives with the later chapter migration, which this walk passes through on its way up.
+            // arrives with the later chapter migration, and the custom month's with calendars, both passed on the way up.
             Assert.Equal(
-                ["Chapters.ChapterId:NO ACTION", "ChronologyEras.EraId:NO ACTION", "Entities.PovEntityId:SET NULL", "Stories.StoryId:CASCADE"],
+                ["Chapters.ChapterId:NO ACTION", "ChronologyCalendarMonths.MonthId:NO ACTION", "ChronologyEras.EraId:NO ACTION", "Entities.PovEntityId:SET NULL", "Stories.StoryId:CASCADE"],
                 (await ForeignKeys(db, "Scenes")).Order(StringComparer.Ordinal));
             Assert.Equal(
                 ["Entities.EntityId:CASCADE", "Scenes.SceneId:CASCADE"],

@@ -20,6 +20,9 @@ namespace Lorex.Api.Features.Timeline;
 /// details: left out (null), a create links none and an update keeps what is stored, so a client that knows nothing of
 /// stories cannot erase them; a list, empty included, is the whole set. A story already linked and since put in the Trash
 /// may be sent back and stays linked; a story in the Trash cannot be newly linked.
+///
+/// <paramref name="StartMonthId"/> and <paramref name="EndMonthId"/> are the custom calendar's months, on a universe that has
+/// one, in place of <paramref name="StartMonth"/> and <paramref name="EndMonth"/>.
 /// </summary>
 public sealed record TimelineEntryRequest(
     string? Title,
@@ -37,13 +40,16 @@ public sealed record TimelineEntryRequest(
     Guid? StartEraId = null,
     Guid? EndEraId = null,
     TimelineValidationRequest? Validation = null,
-    IReadOnlyList<Guid>? StoryIds = null);
+    IReadOnlyList<Guid>? StoryIds = null,
+    Guid? StartMonthId = null,
+    Guid? EndMonthId = null);
 
 /// <summary>
 /// The chronology of one entry, already normalized. The components come back as numbers
 /// and the precision as an enum, so a client formats the date it wants without ever
 /// parsing a string back into parts. The eras come back as ids, formatted by the client
-/// from the universe's own chronology.
+/// from the universe's own chronology. A custom calendar's months come back as ids too, named by the client from the
+/// same chronology read.
 /// </summary>
 public sealed record TimelineDate(
     TimelineDateKind Kind,
@@ -57,7 +63,9 @@ public sealed record TimelineDate(
     TimelineDatePrecision StartPrecision,
     TimelineDatePrecision EndPrecision,
     Guid? StartEraId,
-    Guid? EndEraId);
+    Guid? EndEraId,
+    Guid? StartMonthId = null,
+    Guid? EndMonthId = null);
 
 /// <summary>
 /// One entity taking part, resolved enough to render without a second request.

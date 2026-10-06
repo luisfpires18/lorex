@@ -116,6 +116,12 @@ public sealed class SceneConfiguration : IEntityTypeConfiguration<Scene>
             .HasForeignKey(scene => scene.EraId)
             .OnDelete(DeleteBehavior.NoAction);
 
+        // A custom month, likewise: the calendar routes refuse removing one a scene is dated in, the Trash included.
+        builder.HasOne(scene => scene.CalendarMonth)
+            .WithMany()
+            .HasForeignKey(scene => scene.MonthId)
+            .OnDelete(DeleteBehavior.NoAction);
+
         // No action, deliberately not SET NULL. Emptying a chapter is the chapter route's work: it moves
         // the scenes to the end of Unchaptered and renumbers them first. A bare SET NULL would drop them
         // into Unchaptered carrying their old positions, colliding with the scenes already there. So a

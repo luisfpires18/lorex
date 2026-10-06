@@ -324,7 +324,13 @@ public sealed partial class EntityArticleMigrationTests : IDisposable
         var keys = new Dictionary<string, List<string>>();
         foreach (var table in Dependants)
         {
-            keys[table] = [.. (await ForeignKeys(db, table)).Order(StringComparer.Ordinal)];
+            // A scene's custom month (AddChronologyCalendars, 039) arrives after articles, so a rollback past it takes its key.
+            keys[table] =
+            [
+                .. (await ForeignKeys(db, table))
+                    .Where(key => !key.StartsWith("ChronologyCalendarMonths.", StringComparison.Ordinal))
+                    .Order(StringComparer.Ordinal),
+            ];
         }
 
         return keys;

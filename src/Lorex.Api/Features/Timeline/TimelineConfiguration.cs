@@ -49,6 +49,18 @@ public sealed class TimelineEntryConfiguration : IEntityTypeConfiguration<Timeli
             .HasForeignKey(entry => entry.EndEraId)
             .OnDelete(DeleteBehavior.NoAction);
 
+        // The same rule for a custom month: the calendar routes refuse removing a month a date is in, and this holds if a
+        // race gets past them. Checked at the end of the statement, so deleting a universe still cascades.
+        builder.HasOne(entry => entry.StartCalendarMonth)
+            .WithMany()
+            .HasForeignKey(entry => entry.StartMonthId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        builder.HasOne(entry => entry.EndCalendarMonth)
+            .WithMany()
+            .HasForeignKey(entry => entry.EndMonthId)
+            .OnDelete(DeleteBehavior.NoAction);
+
         // The chronological listing is the only read that matters here, so the index
         // carries the sort itself: unknown dates are pushed last by the query, and
         // everything else is already ordered by year, month and day inside one universe.

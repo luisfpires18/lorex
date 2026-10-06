@@ -351,9 +351,9 @@ public sealed class TypeManagementTests(LorexApiFactory factory) : IClassFixture
     public void The_backup_format_is_the_nested_types_version()
     {
         // A rename, an icon and the new icon keys are all values of columns a version 18 backup already carried; version 19
-        // added only a type's parent (nested types, Product refinement 022). Later versions added a link field's target (20)
-        // and a moment's stories (21), neither of them a type's.
-        Assert.Equal(21, UniverseBackup.CurrentVersion);
+        // added only a type's parent (nested types, Product refinement 022). Later versions added a link field's target (20),
+        // a moment's stories (21) and a custom calendar (22), none of them a type's.
+        Assert.Equal(22, UniverseBackup.CurrentVersion);
     }
 
     // ---------- Helpers ----------

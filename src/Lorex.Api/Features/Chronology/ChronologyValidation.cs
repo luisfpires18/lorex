@@ -79,6 +79,74 @@ public static class ChronologyValidation
         return errors.Count == 0 ? null : errors;
     }
 
+    /// <summary>
+    /// A calendar's shape: at least one month, each named uniquely ignoring case, lengths positive. The bounds are protective
+    /// only - nothing here expects twelve months or thirty-odd days.
+    /// </summary>
+    public static Dictionary<string, string[]>? ValidateCalendar(ChronologyCalendarRequest request)
+    {
+        var errors = new Dictionary<string, string[]>();
+
+        if (request.Months is not { Count: > 0 } months)
+        {
+            errors["months"] = ["A calendar needs at least one month."];
+            return errors;
+        }
+
+        if (months.Count > ChronologyLimits.MaxMonths)
+        {
+            errors["months"] = [$"A calendar can have at most {ChronologyLimits.MaxMonths} months."];
+            return errors;
+        }
+
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var ids = new HashSet<Guid>();
+
+        for (var index = 0; index < months.Count; index++)
+        {
+            var month = months[index];
+            var key = $"months[{index}]";
+
+            if (month is null)
+            {
+                errors[key] = ["Each month needs a name and a number of days."];
+                continue;
+            }
+
+            if (month.Id is { } id && !ids.Add(id))
+            {
+                errors[$"{key}.id"] = ["The same month is listed twice."];
+            }
+
+            var name = Normalize(month.Name);
+            if (name is null)
+            {
+                errors[$"{key}.name"] = ["Give the month a name."];
+            }
+            else if (name.Length > ChronologyLimits.NameMaxLength)
+            {
+                errors[$"{key}.name"] = [$"Keep a month's name under {ChronologyLimits.NameMaxLength} characters."];
+            }
+            else if (!names.Add(name))
+            {
+                errors[$"{key}.name"] = ["Another month already has this name."];
+            }
+
+            if (Normalize(month.Abbreviation) is { Length: > ChronologyLimits.AbbreviationMaxLength })
+            {
+                errors[$"{key}.abbreviation"] =
+                    [$"Keep a short name to {ChronologyLimits.AbbreviationMaxLength} characters or fewer."];
+            }
+
+            if (month.DayCount < 1 || month.DayCount > ChronologyLimits.MaxDaysInMonth)
+            {
+                errors[$"{key}.dayCount"] = [$"A month has from 1 to {ChronologyLimits.MaxDaysInMonth} days."];
+            }
+        }
+
+        return errors.Count == 0 ? null : errors;
+    }
+
     public static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

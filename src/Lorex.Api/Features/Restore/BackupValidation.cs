@@ -238,7 +238,7 @@ internal static partial class BackupValidation
 
     private static int CountRecords(UniverseBackupPayload payload)
     {
-        long count = 1 + payload.ChronologyEras!.Count + payload.Tags.Count + payload.RelationshipTypes.Count
+        long count = 1 + payload.ChronologyEras!.Count + (payload.ChronologyCalendar is { } calendar ? 1 + calendar.Months.Count : 0) + payload.Tags.Count + payload.RelationshipTypes.Count
             + payload.DismissedConflicts.Count;
 
         foreach (var type in payload.EntityTypes)
@@ -298,6 +298,8 @@ internal static partial class BackupValidation
         private readonly HashSet<Guid> _tags = [];
         private readonly Dictionary<Guid, BackupEntity> _entities = [];
         private readonly HashSet<Guid> _eras = [];
+        private readonly Dictionary<Guid, int> _monthDays = [];
+        private bool _hasCalendar;
         private readonly HashSet<Guid> _relationshipTypes = [];
         private readonly HashSet<Guid> _stories = [];
         private readonly Dictionary<Guid, Guid> _sceneStory = [];
@@ -332,6 +334,7 @@ internal static partial class BackupValidation
             // Everything that can be referenced is listed first, so a reference checked below can
             // point anywhere in the file regardless of order.
             RegisterEras(eras);
+            RegisterCalendar(payload.ChronologyCalendar);
             RegisterTypes(types);
             CheckTypeHierarchy(types);
             CheckFieldTargets();
@@ -509,6 +512,62 @@ internal static partial class BackupValidation
                 if (!places.Add(era.SortOrder))
                 {
                     Add(BackupIssueCodes.InvalidOrder, $"{what} claims the same place in the order as another date period.");
+                }
+            }
+        }
+
+        // ---------- Calendar ----------
+
+        /// <summary>
+        /// The custom calendar (version 22): at least one month, each with its own id, a unique name ignoring case, a length
+        /// within the bound and its own place. Its months are what custom dates are checked against.
+        /// </summary>
+        private void RegisterCalendar(BackupChronologyCalendar? calendar)
+        {
+            if (calendar is null)
+            {
+                return;
+            }
+
+            _hasCalendar = true;
+            Register(calendar.Id, "The calendar");
+
+            var months = Required(calendar.Months, "the calendar's months");
+            if (months.Count is 0 or > ChronologyLimits.MaxMonths)
+            {
+                Add(BackupIssueCodes.InvalidValue, $"The calendar has {months.Count} months. A calendar has from 1 to {ChronologyLimits.MaxMonths}.");
+            }
+
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var places = new HashSet<int>();
+
+            foreach (var month in months)
+            {
+                if (month is null)
+                {
+                    Missing("a month of the calendar");
+                    continue;
+                }
+
+                var what = $"The month {Quote(month.Name)}";
+                Register(month.Id, what);
+                _monthDays[month.Id] = month.DayCount;
+
+                if (Text(month.Name, ChronologyLimits.NameMaxLength, $"{what}'s name", required: true) && !names.Add(month.Name.Trim()))
+                {
+                    Add(BackupIssueCodes.Duplicate, $"{what} has the same name as another month.");
+                }
+
+                Text(month.Abbreviation, ChronologyLimits.AbbreviationMaxLength, $"{what}'s short name");
+
+                if (month.DayCount < 1 || month.DayCount > ChronologyLimits.MaxDaysInMonth)
+                {
+                    Add(BackupIssueCodes.InvalidValue, $"{what} has {month.DayCount} days. A month has from 1 to {ChronologyLimits.MaxDaysInMonth}.");
+                }
+
+                if (!places.Add(month.SortOrder))
+                {
+                    Add(BackupIssueCodes.InvalidOrder, $"{what} claims the same place in the year as another month.");
                 }
             }
         }
@@ -1040,8 +1099,8 @@ internal static partial class BackupValidation
             Text(entry.EraLabel, TimelineLimits.EraLabelMaxLength, $"{what}'s year label");
             Defined(entry.CanonStatus, $"{what}'s Canon status");
             Defined(entry.DateKind, $"{what}'s kind of date");
-            Point(entry.StartEraId, entry.StartYear, entry.StartMonth, entry.StartDay, $"{what}'s start");
-            Point(entry.EndEraId, entry.EndYear, entry.EndMonth, entry.EndDay, $"{what}'s end");
+            Point(entry.StartEraId, entry.StartYear, entry.StartMonth, entry.StartMonthId, entry.StartDay, $"{what}'s start");
+            Point(entry.EndEraId, entry.EndYear, entry.EndMonth, entry.EndMonthId, entry.EndDay, $"{what}'s end");
 
             var participants = new HashSet<Guid>();
             foreach (var participant in Required(entry.ParticipantEntityIds, $"{what}'s participants"))
@@ -1201,7 +1260,7 @@ internal static partial class BackupValidation
 
                 if (scene.Chronology is { } chronology)
                 {
-                    Point(chronology.EraId, chronology.Year, chronology.Month, chronology.Day, $"{sceneWhat}'s date");
+                    Point(chronology.EraId, chronology.Year, chronology.Month, chronology.MonthId, chronology.Day, $"{sceneWhat}'s date");
                 }
 
                 var linked = new HashSet<Guid>();
@@ -1602,7 +1661,7 @@ internal static partial class BackupValidation
         }
 
         /// <summary>A stored date's shape: an era the file names, a year from 1 inside one, a month and a day in range.</summary>
-        private void Point(Guid? eraId, int? year, int? month, int? day, string what)
+        private void Point(Guid? eraId, int? year, int? month, Guid? monthId, int? day, string what)
         {
             if (eraId is { } era)
             {
@@ -1614,9 +1673,34 @@ internal static partial class BackupValidation
                 }
             }
 
-            if (month is < 1 or > 12 || day is < 1 or > 31)
+            if (monthId is { } custom)
             {
-                Add(BackupIssueCodes.InvalidValue, $"{what} has a month or a day out of range.");
+                // Before version 22 there is no calendar, so any month id names one the backup does not have.
+                if (!_monthDays.TryGetValue(custom, out var length))
+                {
+                    Reference(false, $"{what} is in a month the backup's calendar does not have.");
+                }
+                else if (day is < 1 || day > length)
+                {
+                    Add(BackupIssueCodes.InvalidValue, $"{what} has a day past the end of its month.");
+                }
+
+                if (month is not null)
+                {
+                    Add(BackupIssueCodes.InvalidValue, $"{what} names its month twice, by number and from the calendar.");
+                }
+            }
+            else
+            {
+                if (month is not null && _hasCalendar)
+                {
+                    Add(BackupIssueCodes.InvalidValue, $"{what} has a numeric month, but the universe uses a custom calendar.");
+                }
+
+                if (month is < 1 or > ChronologyLimits.SimpleMonths || day is < 1 or > ChronologyLimits.SimpleDays)
+                {
+                    Add(BackupIssueCodes.InvalidValue, $"{what} has a month or a day out of range.");
+                }
             }
         }
 

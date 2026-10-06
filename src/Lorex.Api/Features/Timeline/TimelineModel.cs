@@ -67,15 +67,27 @@ public sealed class TimelineEntry
     /// <summary>Signed: a fictional calendar may count down to its own year zero.</summary>
     public int? StartYear { get; set; }
 
-    /// <summary>1-12 when given. Optional: a year on its own is a valid claim.</summary>
+    /// <summary>1-12 when given, on simple dates only. Optional: a year on its own is a valid claim.</summary>
     public int? StartMonth { get; set; }
 
-    /// <summary>1-31 when given. Requires a month.</summary>
+    /// <summary>
+    /// The custom calendar's month, by id, on a universe that has one; null on simple dates, where <see cref="StartMonth"/>
+    /// says the month. Never both. An id, so renaming or reordering the month moves the date with it and rewrites nothing.
+    /// </summary>
+    public Guid? StartMonthId { get; set; }
+
+    public ChronologyCalendarMonth? StartCalendarMonth { get; set; }
+
+    /// <summary>1-31 on simple dates, 1 to the month's length on a custom calendar. Requires a month.</summary>
     public int? StartDay { get; set; }
 
     public int? EndYear { get; set; }
 
     public int? EndMonth { get; set; }
+
+    public Guid? EndMonthId { get; set; }
+
+    public ChronologyCalendarMonth? EndCalendarMonth { get; set; }
 
     public int? EndDay { get; set; }
 

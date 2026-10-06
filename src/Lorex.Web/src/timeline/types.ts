@@ -62,6 +62,9 @@ export interface TimelineDate {
   endPrecision: DatePrecisionValue
   startEraId: string | null
   endEraId: string | null
+  /** The custom calendar's months, by id, in place of the numeric months on a universe that has one. */
+  startMonthId?: string | null
+  endMonthId?: string | null
 }
 
 /** One entity taking part, resolved by the API so a moment renders in one request. */
@@ -121,6 +124,9 @@ export interface TimelineEntryInput {
   entityIds: string[]
   startEraId: string | null
   endEraId: string | null
+  /** A custom calendar's months, in place of the numeric months. */
+  startMonthId?: string | null
+  endMonthId?: string | null
 
   /** Left out, a save keeps the stored details; all three parts null removes them. */
   validation?: TimelineValidationInput

@@ -203,7 +203,13 @@ public sealed class Scene
     /// <summary>Null when the scene is not placed in time. Signed on the plain reckoning, from 1 in an era.</summary>
     public int? Year { get; set; }
 
+    /// <summary>The numeric month, on simple dates only.</summary>
     public int? Month { get; set; }
+
+    /// <summary>The custom calendar's month by id, on a universe that has one; never set beside <see cref="Month"/>.</summary>
+    public Guid? MonthId { get; set; }
+
+    public ChronologyCalendarMonth? CalendarMonth { get; set; }
 
     public int? Day { get; set; }
 

@@ -71,6 +71,16 @@ internal sealed class RestoreIdentity
             yield return era.Id;
         }
 
+        if (payload.ChronologyCalendar is { } calendar)
+        {
+            yield return calendar.Id;
+
+            foreach (var month in calendar.Months)
+            {
+                yield return month.Id;
+            }
+        }
+
         foreach (var type in payload.EntityTypes)
         {
             yield return type.Id;
@@ -540,6 +550,26 @@ internal sealed partial class UniverseRestore(
             });
         }
 
+        // The calendar and every month under new ids; each date below points at its month's new id.
+        if (payload.ChronologyCalendar is { } calendar)
+        {
+            var calendarId = ids.Map(calendar.Id);
+            db.ChronologyCalendars.Add(new ChronologyCalendar { Id = calendarId, UniverseId = universeId });
+
+            foreach (var month in calendar.Months)
+            {
+                db.ChronologyCalendarMonths.Add(new ChronologyCalendarMonth
+                {
+                    Id = ids.Map(month.Id),
+                    CalendarId = calendarId,
+                    Name = month.Name,
+                    Abbreviation = month.Abbreviation,
+                    SortOrder = month.SortOrder,
+                    DayCount = month.DayCount,
+                });
+            }
+        }
+
         foreach (var type in payload.EntityTypes)
         {
             db.EntityTypes.Add(new EntityType
@@ -656,9 +686,11 @@ internal sealed partial class UniverseRestore(
                 DateKind = entry.DateKind,
                 StartYear = entry.StartYear,
                 StartMonth = entry.StartMonth,
+                StartMonthId = ids.Map(entry.StartMonthId),
                 StartDay = entry.StartDay,
                 EndYear = entry.EndYear,
                 EndMonth = entry.EndMonth,
+                EndMonthId = ids.Map(entry.EndMonthId),
                 EndDay = entry.EndDay,
                 StartEraId = ids.Map(entry.StartEraId),
                 EndEraId = ids.Map(entry.EndEraId),
@@ -864,6 +896,7 @@ internal sealed partial class UniverseRestore(
                     EraId = ids.Map(scene.Chronology?.EraId),
                     Year = scene.Chronology?.Year,
                     Month = scene.Chronology?.Month,
+                    MonthId = ids.Map(scene.Chronology?.MonthId),
                     Day = scene.Chronology?.Day,
                     CreatedAt = scene.CreatedAt,
                     UpdatedAt = scene.UpdatedAt,

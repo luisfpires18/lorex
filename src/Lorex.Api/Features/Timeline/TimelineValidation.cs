@@ -3,9 +3,8 @@ using Lorex.Api.Features.Chronology;
 namespace Lorex.Api.Features.Timeline;
 
 /// <summary>
-/// Input checks for the timeline feature. Deliberately not a calendar engine: month and day
-/// ranges are the ordinary ones, and no fictional calendar's own rules about how long a month
-/// runs are enforced or invented here.
+/// Input checks for the timeline feature. Month and day are checked by the shared point rules: the ordinary ranges on
+/// simple dates, the calendar's own months and their lengths on a universe with a custom calendar.
 ///
 /// Where a year sits is the universe's reckoning to say. A universe with no eras takes plain
 /// signed years, as it always has; one that names its eras takes a year counted from 1 inside
@@ -56,7 +55,7 @@ public static class TimelineValidation
             return errors;
         }
 
-        ValidateComponents(request, errors);
+        ValidateComponents(request, chronology, errors);
         ValidateKind(request, errors);
         ValidateReckoning(request, chronology, errors);
 
@@ -75,12 +74,13 @@ public static class TimelineValidation
     /// </summary>
     private static void ValidateComponents(
         TimelineEntryRequest request,
+        UniverseChronology chronology,
         Dictionary<string, string[]> errors)
     {
         ChronologyPointValidation.ValidateParts(
-            request.StartYear, request.StartMonth, request.StartDay, StartKeys, errors);
+            request.StartYear, request.StartMonth, request.StartMonthId, request.StartDay, StartKeys, chronology, errors);
         ChronologyPointValidation.ValidateParts(
-            request.EndYear, request.EndMonth, request.EndDay, EndKeys, errors);
+            request.EndYear, request.EndMonth, request.EndMonthId, request.EndDay, EndKeys, chronology, errors);
     }
 
     /// <summary>Which components each kind is allowed, and required, to carry.</summary>
@@ -90,6 +90,7 @@ public static class TimelineValidation
     {
         var hasEnd = request.EndYear is not null
             || request.EndMonth is not null
+            || request.EndMonthId is not null
             || request.EndDay is not null
             || request.EndEraId is not null;
 
@@ -125,6 +126,7 @@ public static class TimelineValidation
             case TimelineDateKind.Unknown:
                 if (request.StartYear is not null
                     || request.StartMonth is not null
+                    || request.StartMonthId is not null
                     || request.StartDay is not null
                     || request.StartEraId is not null
                     || hasEnd)
@@ -190,8 +192,8 @@ public static class TimelineValidation
         if (isRange
             && !errors.ContainsKey("startYear") && !errors.ContainsKey("startEraId")
             && !errors.ContainsKey("endYear") && !errors.ContainsKey("endEraId")
-            && chronology.Point(request.StartEraId, request.StartYear, request.StartMonth, request.StartDay) is { } start
-            && chronology.Point(request.EndEraId, request.EndYear, request.EndMonth, request.EndDay) is { } end
+            && chronology.Point(request.StartEraId, request.StartYear, request.StartMonth, request.StartDay, request.StartMonthId) is { } start
+            && chronology.Point(request.EndEraId, request.EndYear, request.EndMonth, request.EndDay, request.EndMonthId) is { } end
             && end < start)
         {
             errors["endYear"] = ["The span cannot end before it starts."];
@@ -201,10 +203,10 @@ public static class TimelineValidation
     public static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    /// <summary>How far down a set of components actually goes.</summary>
-    public static TimelineDatePrecision PrecisionOf(int? year, int? month, int? day) =>
+    /// <summary>How far down a set of components actually goes. A custom month counts as a month.</summary>
+    public static TimelineDatePrecision PrecisionOf(int? year, int? month, int? day, Guid? monthId = null) =>
         year is null ? TimelineDatePrecision.None
-        : month is null ? TimelineDatePrecision.Year
+        : month is null && monthId is null ? TimelineDatePrecision.Year
         : day is null ? TimelineDatePrecision.Month
         : TimelineDatePrecision.Day;
 }

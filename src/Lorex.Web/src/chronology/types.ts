@@ -46,8 +46,40 @@ export interface ChronologyEra extends EraWriting {
 export interface ChronologyValue {
   eraId: string | null
   year: number | null
+  /** The numeric month, on simple dates only. */
   month: number | null
   day: number | null
+  /** The custom calendar's month, by id, on a universe that has one. Never set beside `month`. */
+  monthId?: string | null
+}
+
+/** One month of a custom calendar, in the order of the year. */
+export interface ChronologyCalendarMonth {
+  id: string
+  name: string
+  abbreviation: string | null
+  sortOrder: number
+  dayCount: number
+
+  /** Timeline moments and scenes dated in it, the Trash included. Any keeps it from being removed. */
+  useCount: number
+
+  /** The latest day any of them uses, so the month cannot be shortened below it. */
+  maxDayUsed: number | null
+}
+
+/** How a universe's year is divided, when its author chose a custom calendar. */
+export interface ChronologyCalendar {
+  id: string
+  months: ChronologyCalendarMonth[]
+}
+
+/** One month as the Calendar screen sends it. A null id is a new month; a missing one is removed. */
+export interface ChronologyCalendarMonthInput {
+  id: string | null
+  name: string
+  abbreviation: string | null
+  dayCount: number
 }
 
 /**
@@ -62,6 +94,9 @@ export interface Chronology {
 
   /** Declared birth and death years with no era, likewise. */
   unplacedYearCount: number
+
+  /** The custom calendar, or null for simple dates: a numeric month and day. */
+  calendar: ChronologyCalendar | null
 }
 
 /** One era as the Settings screen sends it. A null id is a new era; a missing one is removed. */
@@ -83,4 +118,5 @@ export const PLAIN_CHRONOLOGY: Chronology = {
   eras: [],
   unplacedMomentCount: 0,
   unplacedYearCount: 0,
+  calendar: null,
 }

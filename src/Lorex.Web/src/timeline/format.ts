@@ -19,10 +19,11 @@ function formatPoint(
   day: number | null,
   precision: DatePrecisionValue,
   eraId: string | null,
+  monthId: string | null | undefined,
 ) {
   if (year === null || precision === DatePrecision.None) return ''
 
-  const withMonth = precision !== DatePrecision.Year && month !== null
+  const withMonth = precision !== DatePrecision.Year && (month !== null || !!monthId)
   const withDay = withMonth && precision === DatePrecision.Day && day !== null
 
   return formatChronologyPoint(chronology, {
@@ -30,6 +31,7 @@ function formatPoint(
     month: withMonth ? month : null,
     day: withDay ? day : null,
     eraId,
+    monthId: withMonth ? monthId : null,
   })
 }
 
@@ -42,6 +44,7 @@ export function formatTimelineDate(date: TimelineDate, chronology: Chronology) {
     date.startDay,
     date.startPrecision,
     date.startEraId,
+    date.startMonthId,
   )
 
   switch (date.kind) {
@@ -57,6 +60,7 @@ export function formatTimelineDate(date: TimelineDate, chronology: Chronology) {
         date.endDay,
         date.endPrecision,
         date.endEraId,
+        date.endMonthId,
       )
       return end ? `${start} – ${end}` : start
     }

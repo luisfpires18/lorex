@@ -25,7 +25,7 @@ One ADR per durable decision. Rationale lives in the ADR, never here.
 | 0019 | An entry has one image, held in a private bucket and served by Lorex | [0019-entity-primary-image.md](0019-entity-primary-image.md) |
 | 0020 | An entity type's icon is a key from a closed, built-in set | [0020-entity-type-icon-keys.md](0020-entity-type-icon-keys.md) |
 | 0021 | An account's photo is its own user-level media, on the entry image's proven path | [0021-profile-photo.md](0021-profile-photo.md) |
-| 0022 | A universe keeps its own chronology: ordered eras, compared as structured points (amended 018: authors see "date periods", unbounded) | [0022-universe-chronology.md](0022-universe-chronology.md) |
+| 0022 | A universe keeps its own chronology: ordered eras, compared as structured points (amended 018: authors see "date periods", unbounded; 039: an optional custom calendar of months by id) | [0022-universe-chronology.md](0022-universe-chronology.md) |
 | 0023 | A relationship type may carry explicit Canon constraints, checked on the stored direction | [0023-relationship-canon-constraints.md](0023-relationship-canon-constraints.md) |
 | 0024 | A story is authored narrative that references lore, told in its own order | [0024-story-scene-foundation.md](0024-story-scene-foundation.md) |
 | 0025 | A chapter is optional structure; a scene's order is its place inside its chapter | [0025-story-chapters.md](0025-story-chapters.md) |

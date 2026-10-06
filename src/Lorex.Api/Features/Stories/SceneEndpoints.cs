@@ -517,6 +517,7 @@ public static class SceneEndpoints
         scene.EraId = point?.EraId;
         scene.Year = point?.Year;
         scene.Month = point?.Month;
+        scene.MonthId = point?.MonthId;
         scene.Day = point?.Day;
     }
 
@@ -603,6 +604,7 @@ public static class SceneEndpoints
         Guid? EraId,
         int? Year,
         int? Month,
+        Guid? MonthId,
         int? Day,
         List<Guid> EntityIds,
         DateTime CreatedAt,
@@ -657,6 +659,7 @@ public static class SceneEndpoints
                 scene.EraId,
                 scene.Year,
                 scene.Month,
+                scene.MonthId,
                 scene.Day,
                 scene.EntityLinks.Select(link => link.EntityId).ToList(),
                 scene.CreatedAt,
@@ -683,7 +686,7 @@ public static class SceneEndpoints
                 row.Summary,
                 row.Notes,
                 row.PovEntityId is { } pov ? references.GetValueOrDefault(pov) : null,
-                row.Year is null ? null : new ChronologyValue(row.EraId, row.Year, row.Month, row.Day),
+                row.Year is null ? null : new ChronologyValue(row.EraId, row.Year, row.Month, row.Day, row.MonthId),
                 StoryLoreReferences.Listed(row.EntityIds, references),
                 row.CreatedAt,
                 row.UpdatedAt,

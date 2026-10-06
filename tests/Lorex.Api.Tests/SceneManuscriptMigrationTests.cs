@@ -126,7 +126,7 @@ public sealed class SceneManuscriptMigrationTests : IDisposable
 
             // Nothing on a scene points at its prose, and no other table's delete actions moved.
             Assert.Equal(
-                ["Chapters.ChapterId:NO ACTION", "ChronologyEras.EraId:NO ACTION", "Entities.PovEntityId:SET NULL", "Stories.StoryId:CASCADE"],
+                ["Chapters.ChapterId:NO ACTION", "ChronologyCalendarMonths.MonthId:NO ACTION", "ChronologyEras.EraId:NO ACTION", "Entities.PovEntityId:SET NULL", "Stories.StoryId:CASCADE"],
                 (await ForeignKeys(db, "Scenes")).Order(StringComparer.Ordinal));
             Assert.Equal(
                 ["PlotBeats.PlotBeatId:CASCADE", "Scenes.SceneId:CASCADE"],

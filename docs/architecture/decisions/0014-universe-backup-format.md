@@ -414,3 +414,15 @@ them, so a version 20 reader would restore every story's timeline without its mo
 restored story's id; the moment stays one moment. Validation refuses a link to a story the file does not hold, the same
 story twice, and any link in a file older than 21. A version 20 or older file restores every moment linked to no story.
 Scenes and birth and death years are never written as timeline items: they travel as scenes and entries already.
+
+## Amendment: version 22, a custom calendar (2026-10-06, refinement 039)
+
+`UniverseBackupPayload.ChronologyCalendar` carries the universe's custom calendar (ADR 0022 amendment), or null for simple
+dates: its id and its months in order, each with id, name, short name, `sortOrder` and `dayCount`.
+`BackupTimelineEntry.StartMonthId`/`EndMonthId` and `BackupChronologyValue.MonthId` (a scene's date) name a month of it in
+place of a numeric month. Not ignorable: a version 21 reader would restore every custom date without its month. A restore
+gives the calendar and each month a new id and points every date at its month's new id; month order and lengths are kept.
+Validation refuses a month id the file's calendar does not hold (unknown, another universe's, or no calendar at all, which
+covers any month id in a file older than 22), a duplicate id, two months with one name or one place, a length outside 1 to
+1000, a day past its month's end, and a date naming its month both by number and by id. A version 21 or older file has no
+calendar; every date restores as the simple date it was. Nothing derived (a rank, a formatted date) is carried.

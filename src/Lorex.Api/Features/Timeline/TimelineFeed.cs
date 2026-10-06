@@ -19,7 +19,8 @@ namespace Lorex.Api.Features.Timeline;
 ///
 /// <b>World order, never narrative order.</b> Every item is ranked by the key the moment list already uses - three blocks
 /// (placed in time; dated before the universe named eras; unknown), then the era's place, the year signed by the era's
-/// direction, month and day with an absent one as zero - and only then by title, kind and id. A scene's place in its story,
+/// direction, month and day with an absent one as zero - and only then by title, kind and id. A custom month ranks by its
+/// place in the calendar, joined live per row in the same statement, so reordering the months reorders every source at once. A scene's place in its story,
 /// chapter or plot is never part of it, so a flashback sits where it happens.
 ///
 /// <b>One stream, then one page.</b> The three sources are one UNION ALL of the same flat columns, filtered, counted and
@@ -101,7 +102,7 @@ internal static class TimelineFeed
             .OrderBy(row => row.Block)
             .ThenBy(row => row.EraOrder)
             .ThenBy(row => row.SignedYear)
-            .ThenBy(row => row.StartMonth ?? 0)
+            .ThenBy(row => row.MonthRank)
             .ThenBy(row => row.StartDay ?? 0)
             .ThenBy(row => row.Title)
             .ThenBy(row => row.Kind)
@@ -170,10 +171,13 @@ internal static class TimelineFeed
                 : entry.StartYear,
             DateKind = (int)entry.DateKind,
             StartYear = entry.StartYear,
+            MonthRank = entry.StartMonthId != null ? entry.StartCalendarMonth!.SortOrder + 1 : entry.StartMonth ?? 0,
             StartMonth = entry.StartMonth,
+            StartMonthId = entry.StartMonthId,
             StartDay = entry.StartDay,
             EndYear = entry.EndYear,
             EndMonth = entry.EndMonth,
+            EndMonthId = entry.EndMonthId,
             EndDay = entry.EndDay,
             EraLabel = entry.EraLabel,
             StartEraId = entry.StartEraId,
@@ -228,10 +232,13 @@ internal static class TimelineFeed
                 : scene.Year,
             DateKind = (int)TimelineDateKind.Exact,
             StartYear = scene.Year,
+            MonthRank = scene.MonthId != null ? scene.CalendarMonth!.SortOrder + 1 : scene.Month ?? 0,
             StartMonth = scene.Month,
+            StartMonthId = scene.MonthId,
             StartDay = scene.Day,
             EndYear = null,
             EndMonth = null,
+            EndMonthId = null,
             EndDay = null,
             EraLabel = null,
             StartEraId = scene.EraId,
@@ -285,10 +292,13 @@ internal static class TimelineFeed
                 : (int)value.NumberValue!.Value,
             DateKind = (int)TimelineDateKind.Exact,
             StartYear = (int)value.NumberValue!.Value,
+            MonthRank = 0,
             StartMonth = null,
+            StartMonthId = null,
             StartDay = null,
             EndYear = null,
             EndMonth = null,
+            EndMonthId = null,
             EndDay = null,
             EraLabel = null,
             StartEraId = value.EraId,
@@ -379,10 +389,12 @@ internal static class TimelineFeed
                 row.EndMonth,
                 row.EndDay,
                 row.EraLabel,
-                TimelineValidation.PrecisionOf(row.StartYear, row.StartMonth, row.StartDay),
-                TimelineValidation.PrecisionOf(row.EndYear, row.EndMonth, row.EndDay),
+                TimelineValidation.PrecisionOf(row.StartYear, row.StartMonth, row.StartDay, row.StartMonthId),
+                TimelineValidation.PrecisionOf(row.EndYear, row.EndMonth, row.EndDay, row.EndMonthId),
                 row.StartEraId,
-                row.EndEraId);
+                row.EndEraId,
+                row.StartMonthId,
+                row.EndMonthId);
 
             var item = kind switch
             {
@@ -430,13 +442,20 @@ internal static class TimelineFeed
 
         public int? StartYear { get; set; }
 
+        /// <summary>The month's place in the year: the numeric month, or a custom month's position plus one, 0 for none.</summary>
+        public int MonthRank { get; set; }
+
         public int? StartMonth { get; set; }
+
+        public Guid? StartMonthId { get; set; }
 
         public int? StartDay { get; set; }
 
         public int? EndYear { get; set; }
 
         public int? EndMonth { get; set; }
+
+        public Guid? EndMonthId { get; set; }
 
         public int? EndDay { get; set; }
 

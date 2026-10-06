@@ -27,6 +27,7 @@ public static class ChronologyEndpoints
 
         group.MapGet("/", GetAsync).WithName("GetChronology");
         group.MapPut("/", UpdateAsync).WithName("UpdateChronology");
+        group.MapChronologyCalendarEndpoints();
 
         return endpoints;
     }
@@ -294,6 +295,23 @@ public static class ChronologyEndpoints
                         || value.FieldDefinition.Semantic == EntityFieldSemantic.DeathYear),
                 cancellationToken);
 
-        return new ChronologyResponse(eras, unplacedMoments, unplacedYears);
+        var months = await ChronologyCalendarEndpoints.MonthsAsync(db, universeId, cancellationToken);
+
+        var calendar = months.Count == 0
+            ? null
+            : new ChronologyCalendarResponse(
+                months[0].CalendarId,
+                [
+                    .. months.Select(month => new ChronologyCalendarMonthResponse(
+                        month.Id,
+                        month.Name,
+                        month.Abbreviation,
+                        month.SortOrder,
+                        month.DayCount,
+                        month.UseCount,
+                        month.MaxDayUsed)),
+                ]);
+
+        return new ChronologyResponse(eras, unplacedMoments, unplacedYears, calendar);
     }
 }

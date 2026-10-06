@@ -136,3 +136,43 @@ A live entry's `BirthYear` and `DeathYear` values are shown on the timeline as "
 in their era, with the entry's Canon status - read from the entry, never stored (ADR 0009 amendment). A year in no era on a
 universe that names eras waits with the other undated-by-era items, as a moment does. `Age` and the Gregorian `Date` field
 are not shown.
+
+## Amendment - custom calendars (2026-10-06, refinement 039)
+
+A universe may divide its years with its own months. Eras say which named stretch of history a year is counted in; the
+calendar says how any year is split into months and days. The two are orthogonal: one calendar applies across every era.
+
+- **Two modes, no mode column.** *Simple dates* (the default, and every existing universe): numeric month 1-12, day 1-31, as
+  before. *Custom calendar*: a `ChronologyCalendars` row exists for the universe. As with eras, the configuration is the mode.
+- **Model.** `ChronologyCalendar` (one per universe in V1 by a unique index on `UniverseId`; a real entity so several
+  calendars later is an added row, not a new model) owns ordered `ChronologyCalendarMonth`s: id, name (unique ignoring case,
+  60), optional short name (12), `SortOrder` (0-based, contiguous, unique per calendar), `DayCount` (1-1000, a protective
+  bound only). Any number of months from 1 to 100; nothing assumes 12 months, 30/31 days or 365 days.
+- **Stable month identity.** A custom date names its month by id: `TimelineEntries.StartMonthId`/`EndMonthId`,
+  `Scenes.MonthId`, each a no-action key, never set beside the numeric month. Rename rewords every date; reorder moves every
+  date with its month; neither rewrites a row.
+- **One ordering authority.** `UniverseChronology.Point(..., monthId)` resolves a month id through the loaded calendar to its
+  rank, `ChronologyPoint.MonthRank` = `SortOrder + 1`, and `ChronologyPoint` compares era rank, signed year, month rank, day as
+  before. The moment listing and the unified feed write the same rank in SQL (`StartMonthId != null ? month.SortOrder + 1 :
+  StartMonth ?? 0`, joined in the same statement); a test holds the feed's pages to the comparer across eras and a reorder.
+  Simple month N and the custom month at position N rank alike, so turning a calendar on or off never moves a date.
+- **Validation.** One shared point check: on a calendar, a month must be one of its months and a day runs 1 to that month's
+  length; on simple dates the old ranges and no month id. Partial dates unchanged (year; year + month; year + month + day;
+  never a month without a year or a day without a month). Errors about a custom month are keyed under the month.
+- **Routes.** `PUT .../chronology/calendar` (whole ordered month list) and `DELETE .../chronology/calendar`, beside the eras'
+  `PUT .../chronology`; neither write touches the other. `GET .../chronology` carries `calendar` (id, months with `useCount`
+  and `maxDayUsed`), one query for any number of months. Same capability as the eras (`EditContent`); not Canon-gated,
+  because every chronology rule compares years only.
+- **Turning it on** converts deterministically in one transaction: simple month N becomes the month at position N, the day
+  stays, the Trash included. Refused (409 `chronology_dates_incompatible`) when a used month has no Nth month or a day is
+  past that month's length. Nothing is truncated, moved or guessed.
+- **Editing** is one atomic save. Rename, short name, add and lengthen are free. Removing a month any date uses (409
+  `chronology_month_in_use`), shortening below a day in use (409 `chronology_month_too_short`), and a reorder that would make
+  any stored range end before it starts (409 `chronology_range_reversed`) are refused before anything is written.
+- **Turning it off** writes each month back as the number of its position, refused (409) while any used month is past 12 or
+  any day past 31.
+- **Display.** One formatter per layer: `17 Emberrise · TA 401`, `Emberrise · TA 401`, `TA 401`. Simple dates keep
+  `TA 401.03.17`.
+- **Not in V1:** several calendars, conversion between calendars or to Gregorian, leap rules, intercalary days, weekdays,
+  seasons. Birth and death years stay year precision. The Gregorian `Date` custom field is unrelated and untouched; a
+  chronology-aware Lore field is the natural follow-up, not a reinterpretation of it.

@@ -1,4 +1,5 @@
 import { useOutletContext } from 'react-router-dom'
+import { CalendarEditor } from '../components/CalendarEditor'
 import { ChronologyEditor } from '../components/ChronologyEditor'
 import { EmptyState } from '../components/EmptyState'
 import { PageHeader } from '../components/PageHeader'
@@ -21,11 +22,18 @@ export default function ChronologyPage() {
   return (
     <article className="chronologypage" data-testid="chronology-page">
       {access.editContent ? (
-        <ChronologyEditor
-          universeId={universe.id}
-          chronology={chronology}
-          onSaved={setChronology}
-        />
+        <>
+          <ChronologyEditor
+            universeId={universe.id}
+            chronology={chronology}
+            onSaved={setChronology}
+          />
+          <CalendarEditor
+            universeId={universe.id}
+            chronology={chronology}
+            onSaved={setChronology}
+          />
+        </>
       ) : (
         <ChronologyReading chronology={chronology} />
       )}
@@ -71,6 +79,30 @@ function ChronologyReading({ chronology }: { chronology: Chronology }) {
               )
             })}
           </ol>
+        )}
+      </section>
+      <section className="chronology calendar" aria-labelledby="calendar-reading-heading">
+        <h2 className="settings__heading" id="calendar-reading-heading">
+          Calendar
+        </h2>
+        {chronology.calendar ? (
+          <ol className="months months--reading" data-testid="months-reading">
+            {chronology.calendar.months.map((month, index) => (
+              <li className="month month--reading" key={month.id} data-testid="month-reading">
+                <span className="month__ordinal" aria-hidden="true">
+                  {index + 1}
+                </span>
+                <bdi className="month__readname">{month.name}</bdi>
+                <span className="month__use">
+                  {month.dayCount === 1 ? '1 day' : `${month.dayCount} days`}
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="settings__note" data-testid="calendar-note">
+            Simple dates: months 1 to 12, days 1 to 31.
+          </p>
         )}
       </section>
     </>

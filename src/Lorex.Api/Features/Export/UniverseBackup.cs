@@ -193,8 +193,16 @@ public sealed record UniverseBackup(
     /// format as timeline items: they are read from the scenes and entries, which already travel. A file at version 20 or
     /// earlier has no <c>storyIds</c>; each moment reads as linked to no story, and one that carries them was not written by
     /// Lorex and is refused.
+    ///
+    /// 22 - A universe may divide its years with a custom calendar (ADR 0022 amendment, 039).
+    /// <see cref="UniverseBackupPayload.ChronologyCalendar"/> carries its months in order - id, name, short name, place and
+    /// length - and <see cref="BackupTimelineEntry.StartMonthId"/>, <see cref="BackupTimelineEntry.EndMonthId"/> and
+    /// <see cref="BackupChronologyValue.MonthId"/> name a month of it in place of a numeric month. The restore gives the
+    /// calendar and every month new ids and points each date at its month's new id. Not ignorable: a version 21 reader would
+    /// restore every custom date without its month. A file at version 21 or earlier has no calendar and no month ids; every
+    /// date restores as the simple date it was, and one that carries them was not written by Lorex and is refused.
     /// </summary>
-    public const int CurrentVersion = 21;
+    public const int CurrentVersion = 22;
 
     public static UniverseBackup Of(UniverseBackupPayload payload, DateTime generatedAt) =>
         new(FormatName, CurrentVersion, generatedAt, payload);
@@ -220,6 +228,8 @@ public sealed record UniverseBackup(
 ///
 /// <paramref name="ValidationTerms"/> is the universe's event kinds and methods, event kinds first, each by name (since version
 /// 13). Empty means none; absent - null, in any earlier file - means the same thing.
+///
+/// <paramref name="ChronologyCalendar"/> is the universe's custom calendar (since version 22), or null for simple dates.
 /// </summary>
 public sealed record UniverseBackupPayload(
     BackupUniverse Universe,
@@ -234,7 +244,8 @@ public sealed record UniverseBackupPayload(
     IReadOnlyList<BackupDismissedConflict> DismissedConflicts,
     IReadOnlyList<BackupIdea>? Ideas,
     IReadOnlyList<BackupWorldRule>? WorldRules,
-    IReadOnlyList<BackupValidationTerm>? ValidationTerms = null);
+    IReadOnlyList<BackupValidationTerm>? ValidationTerms = null,
+    BackupChronologyCalendar? ChronologyCalendar = null);
 
 /// <summary>
 /// The universe itself. <c>OwnerId</c> is deliberately absent: it names an Identity row that
@@ -292,6 +303,20 @@ public sealed record BackupChronologyEra(
     int SortOrder,
     ChronologyEraDirection Direction,
     ChronologyLabelPosition LabelPosition);
+
+/// <summary>
+/// A custom calendar (since version 22): its months in the order of the year. Ids are preserved because dates name the
+/// months; nothing derived - a rank, a formatted date - is carried.
+/// </summary>
+public sealed record BackupChronologyCalendar(Guid Id, IReadOnlyList<BackupChronologyCalendarMonth> Months);
+
+/// <summary>One month: <paramref name="SortOrder"/> is its place in the year from 0, <paramref name="DayCount"/> its length.</summary>
+public sealed record BackupChronologyCalendarMonth(
+    Guid Id,
+    string Name,
+    string? Abbreviation,
+    int SortOrder,
+    int DayCount);
 
 /// <summary>
 /// <paramref name="FamilyTreeEligible"/> was added in version 18, <paramref name="ParentId"/> in version 19 (see
@@ -567,7 +592,8 @@ public sealed record BackupRelationship(
 ///
 /// <paramref name="Validation"/> is the moment's structured details for world rule checks, or null for a moment with none (since
 /// version 13). <paramref name="StoryIds"/> are the stories of this file it is linked to (since version 21), null in an older
-/// file.
+/// file. <paramref name="StartMonthId"/> and <paramref name="EndMonthId"/> are months of the file's custom calendar, in place
+/// of the numeric months (since version 22).
 /// </summary>
 public sealed record BackupTimelineEntry(
     Guid Id,
@@ -588,7 +614,9 @@ public sealed record BackupTimelineEntry(
     DateTime UpdatedAt,
     IReadOnlyList<Guid> ParticipantEntityIds,
     BackupTimelineValidation? Validation = null,
-    IReadOnlyList<Guid>? StoryIds = null);
+    IReadOnlyList<Guid>? StoryIds = null,
+    Guid? StartMonthId = null,
+    Guid? EndMonthId = null);
 
 /// <summary>
 /// A moment's structured details for world rule checks (since version 13): an event kind and a method from this file's
@@ -822,9 +850,10 @@ public sealed record BackupValidationTerm(
 
 /// <summary>
 /// A position on the universe's line: the era the year is counted in - null on the plain reckoning -
-/// and the numbers. Nothing formatted is carried; the eras in the same file say how to write it.
+/// and the numbers. Nothing formatted is carried; the eras in the same file say how to write it. <paramref name="MonthId"/>
+/// is a month of the file's custom calendar, in place of <paramref name="Month"/> (since version 22).
 /// </summary>
-public sealed record BackupChronologyValue(Guid? EraId, int Year, int? Month, int? Day);
+public sealed record BackupChronologyValue(Guid? EraId, int Year, int? Month, int? Day, Guid? MonthId = null);
 
 /// <summary>
 /// The one piece of Canon Integrity that is not rebuildable: the author's decision to live

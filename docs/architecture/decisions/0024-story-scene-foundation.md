@@ -134,3 +134,11 @@ still never Canon, a moment or a relationship, and nothing reads its words for m
 request (ADR 0009 amendment), with its story and chapter as context and no Canon status. Its date is still edited only on
 the scene, and its narrative order still never orders anything chronological. A moment may be linked to the stories it
 matters to; that link belongs to the moment.
+
+## Amendment - a scene's custom month (2026-10-06, refinement 039)
+
+On a universe with a custom calendar (ADR 0022 amendment) a scene's date names its month by id (`Scenes.MonthId`, no-action
+key, `ChronologyValue.MonthId`), validated by the same shared point check as a moment: a day runs to that month's length.
+There is no scene-only calendar logic. Turning the calendar on or off converts scenes in the Trash too, so a restored scene
+keeps a meaningful date. Scene chronology has no revision history (only manuscripts do), so nothing in a history snapshot
+holds a month id.
