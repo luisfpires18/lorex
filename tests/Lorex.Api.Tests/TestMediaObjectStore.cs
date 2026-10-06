@@ -36,6 +36,12 @@ public sealed class TestMediaObjectStore : IMediaObjectStore
     /// <summary>Returns an exception to throw instead of deleting the key, or null to delete it.</summary>
     public Func<string, Exception?>? FailDelete { get; set; }
 
+    /// <summary>
+    /// Awaited before an object is deleted. It is how a test holds a sweep open and looks at what else is true
+    /// meanwhile - that the database is free to write, say, because nothing sweeps while holding its lock.
+    /// </summary>
+    public Func<string, Task>? BeforeDelete { get; set; }
+
     public IReadOnlyCollection<string> Keys => [.. _objects.Keys];
 
     public bool Contains(string key) => _objects.ContainsKey(key);
@@ -82,15 +88,19 @@ public sealed class TestMediaObjectStore : IMediaObjectStore
             entry.Bytes.Length));
     }
 
-    public Task DeleteAsync(string key, CancellationToken cancellationToken)
+    public async Task DeleteAsync(string key, CancellationToken cancellationToken)
     {
         if (FailDelete?.Invoke(key) is { } failure)
         {
             throw failure;
         }
 
+        if (BeforeDelete is { } wait)
+        {
+            await wait(key);
+        }
+
         _objects.TryRemove(key, out _);
-        return Task.CompletedTask;
     }
 
     private sealed record Entry(byte[] Bytes, string ContentType);

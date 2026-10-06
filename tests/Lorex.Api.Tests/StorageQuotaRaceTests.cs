@@ -1,8 +1,10 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Lorex.Api.Data;
 using Lorex.Api.Features.Auth;
+using Lorex.Api.Features.Lore;
 using Lorex.Api.Features.Media;
 using Lorex.Api.Features.Storage;
 using Microsoft.AspNetCore.Hosting;
@@ -146,6 +148,82 @@ public sealed class StorageQuotaRaceTests : IDisposable
     }
 
     [Fact]
+    public async Task An_upload_that_lost_to_a_universe_delete_sweeps_only_after_letting_go_of_the_database()
+    {
+        Directory.CreateDirectory(_directory);
+        await using var host = new FileHost(DataSource);
+        var (client, userId) = await Register(host, "user-sqgone", "sqgone@example.test");
+        var u = (await PlotTestClient.CreateUniverse(client, "Gone world")).Id;
+        var entry = await PlotTestClient.CreateEntity(client, u, "Racing");
+        (await client.PostAsync($"/api/universes/{u}/archive", null)).EnsureSuccessStatusCode();
+
+        // The universe goes while the upload's bytes are in the bucket and nothing names them yet.
+        host.Media.BeforePut = async key =>
+        {
+            if (key.Contains(entry.ToString("D"), StringComparison.Ordinal) && key.Contains("original", StringComparison.Ordinal))
+            {
+                Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/universes/{u}")).StatusCode);
+            }
+        };
+
+        var writes = WriterProbe(host, userId, key => key.Contains(entry.ToString("D"), StringComparison.Ordinal));
+
+        var response = await Upload(client, u, entry);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        AssertSweptWithTheDatabaseFree(writes, expected: 2);
+        Assert.DoesNotContain(host.Media.Keys, key => key.Contains(entry.ToString("D"), StringComparison.Ordinal));
+
+        SqliteConnection.ClearAllPools();
+        await using var db = Context();
+        Assert.Equal(0, await db.EntityImages.CountAsync());
+        Assert.Equal(0, await db.StorageReservations.CountAsync());
+    }
+
+    [Fact]
+    public async Task An_upload_that_lost_to_a_changed_picture_sweeps_only_after_letting_go_of_the_database()
+    {
+        Directory.CreateDirectory(_directory);
+        await using var host = new FileHost(DataSource);
+        var (client, userId) = await Register(host, "user-sqchanged", "sqchanged@example.test");
+        var u = (await PlotTestClient.CreateUniverse(client, "Changed world")).Id;
+        var entry = await PlotTestClient.CreateEntity(client, u, "Contested");
+        Assert.Equal(HttpStatusCode.OK, (await Upload(client, u, entry, RestoreTestClient.Png(120, 90, seed: 8))).StatusCode);
+
+        string firstAsset;
+        await using (var db = Context())
+        {
+            firstAsset = (await db.EntityImages.SingleAsync()).AssetId.ToString("D");
+        }
+
+        // A larger replacement is on its way when the picture it was measured against is removed.
+        host.Media.BeforePut = async key =>
+        {
+            if (key.Contains(entry.ToString("D"), StringComparison.Ordinal)
+                && key.Contains("original", StringComparison.Ordinal)
+                && !key.Contains(firstAsset, StringComparison.Ordinal))
+            {
+                Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/universes/{u}/entities/{entry}/image")).StatusCode);
+            }
+        };
+
+        var writes = WriterProbe(host, userId, key => key.Contains(entry.ToString("D"), StringComparison.Ordinal)
+            && !key.Contains(firstAsset, StringComparison.Ordinal));
+
+        var response = await Upload(client, u, entry);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Contains(EntityImageEndpoints.ImageChangedCode, await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        AssertSweptWithTheDatabaseFree(writes, expected: 2);
+        Assert.DoesNotContain(host.Media.Keys, key => key.Contains(entry.ToString("D"), StringComparison.Ordinal));
+
+        SqliteConnection.ClearAllPools();
+        await using var check = Context();
+        Assert.Equal(0, await check.EntityImages.CountAsync());
+        Assert.Equal(0, await check.StorageReservations.CountAsync());
+    }
+
+    [Fact]
     public async Task Every_account_from_before_the_migration_gets_the_default_allowance()
     {
         Directory.CreateDirectory(_directory);
@@ -195,6 +273,44 @@ public sealed class StorageQuotaRaceTests : IDisposable
 
     // ---------- Helpers ----------
 
+    /// <summary>
+    /// Holds each sweep of a key <paramref name="watched"/> picks just long enough to write to the database from a
+    /// connection of its own, one that gives up after a second rather than waiting out a held writer lock. Every write
+    /// that lands proves the sweep began with no write transaction open anywhere; one that times out is recorded as
+    /// the failure it is.
+    /// </summary>
+    private ConcurrentQueue<Exception?> WriterProbe(FileHost host, string userId, Func<string, bool> watched)
+    {
+        var writes = new ConcurrentQueue<Exception?>();
+        host.Media.BeforeDelete = async key =>
+        {
+            if (!watched(key))
+            {
+                return;
+            }
+
+            try
+            {
+                await using var other = new LorexDbContext(new DbContextOptionsBuilder<LorexDbContext>()
+                    .UseSqlite($"Data Source={DataSource};Default Timeout=1;Pooling=False").Options);
+                await other.Users.Where(user => user.Id == userId)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(user => user.StorageQuotaBytes, StorageQuota.DefaultBytes));
+                writes.Enqueue(null);
+            }
+            catch (Exception exception)
+            {
+                writes.Enqueue(exception);
+            }
+        };
+        return writes;
+    }
+
+    private static void AssertSweptWithTheDatabaseFree(ConcurrentQueue<Exception?> writes, int expected)
+    {
+        Assert.Equal(expected, writes.Count);
+        Assert.All(writes, failure => Assert.Null(failure));
+    }
+
     private static async Task<(HttpClient Client, string UserId)> Register(FileHost host, string username, string email)
     {
         var client = host.CreateHttpsClient();
@@ -203,10 +319,10 @@ public sealed class StorageQuotaRaceTests : IDisposable
         return (client, (await response.Content.ReadFromJsonAsync<AuthUserResponse>())!.Id);
     }
 
-    private static async Task<HttpResponseMessage> Upload(HttpClient client, Guid universeId, Guid entityId)
+    private static async Task<HttpResponseMessage> Upload(HttpClient client, Guid universeId, Guid entityId, byte[]? bytes = null)
     {
         using var form = new MultipartFormDataContent();
-        var file = new ByteArrayContent(Picture);
+        var file = new ByteArrayContent(bytes ?? Picture);
         file.Headers.ContentType = new MediaTypeHeaderValue("image/png");
         form.Add(file, "file", "picture.png");
         return await client.PutAsync($"/api/universes/{universeId}/entities/{entityId}/image", form);

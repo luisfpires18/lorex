@@ -64,7 +64,8 @@ transaction, under the writer lock, and refused if the room has gone - so a slow
 more than the allowance.
 
 **A replacement that raced another change loses.** The upload's commit re-reads the entry's picture and moves only if it
-is still the one the growth was measured against; otherwise it answers 409 `image_changed` and sweeps its own objects.
+is still the one the growth was measured against; otherwise it answers 409 `image_changed` and, once its transaction has
+been rolled back, sweeps its own objects.
 The superseded objects swept after the commit are the ones the row named at the commit, so a reframe that landed
 meanwhile no longer leaves its thumbnail behind.
 
@@ -107,6 +108,12 @@ whole. Once committed the universe is gone whatever the sweep does: a key that w
 it never counts against the owner, whose usage fell with the rows. Artwork is swept here and still never counts.
 
 Each write path cleans up only what it wrote. An upload whose bytes were in the bucket while its universe was deleted
-finds at its commit that the entry is no longer live, sweeps its own objects, gives back its hold and answers 404; the
+finds at its commit that the entry is no longer live, lets the transaction go, then sweeps its own objects, gives back
+its hold and answers 404; the
 delete never looks for objects nobody has committed. The same check makes an upload whose entry was trashed meanwhile a
 404 rather than a picture on a trashed entry.
+
+**No object-store call while a write transaction is open.** Every transaction an upload opens does database work only and
+decides an outcome; every put, get and sweep - its own cleanup after losing a race or a lapsed hold included - runs only
+once that transaction has been disposed, so a slow or failing bucket never holds SQLite's single writer lock. A real-file
+test pauses each such sweep and proves another connection can write meanwhile.
