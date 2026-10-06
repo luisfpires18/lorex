@@ -164,3 +164,9 @@ caller's role), whatever the request says; the address and first publication dat
 restored story is private, so nothing in it is read publicly whatever its parts still select. Chapters and world rules
 have no public surface; a plot beat has no selection of its own and is read as part of its arc, like a beat an Editor
 creates. The owner's restore is unchanged: the selection comes back, or "Restore as private" takes it back at once.
+
+## Amendment: storage belongs to the owner (2026-10-06, ADR 0042)
+
+A picture an Editor uploads, replaces or removes changes the owner's storage, never the Editor's. Permission to upload is
+still `EditContent`; the allowance is a separate check on the owner's account. A collaborator refused for room is told
+only that the universe has none - never the owner's usage or allowance.

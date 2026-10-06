@@ -50,6 +50,19 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   next numbered phase resumes only when the owner says so.
 - **Design refactor 001-007 done and merged** (007 at `cc798c1`, merged into `dev` at `a87b7da`; Deploy DEV #47 green).
   The contract is now an as-built reference. See Design refactor below.
+- **Product refinement 040 - account storage quotas** (`claude/dreamy-dirac-u8i6eh` off `dev` at `9c42bbe`; committed and
+  pushed, not merged). One migration (`AddAccountStorageQuota`), backup stays **22**. ADR 0042 (new); 0019, 0032, 0041 amendments.
+  - `LorexUser.StorageQuotaBytes`, 1 GiB for every account (column default for existing, initializer for new); never
+    unlimited, no route changes it. Usage = `SUM(EntityImages.ByteSize)` over universes the account owns, Trash included;
+    thumbnails, artwork, profile photos and orphaned objects never count. Editor uploads count against the owner.
+  - Upload judged by growth (new original - old). Growth <= 0 always allowed, even over the allowance; growth > 0 needs
+    stored + held + growth <= allowance, else 409 `storage_quota_exceeded` (owner and collaborator wording, no numbers).
+  - `StorageReservations` holds growth in one short IMMEDIATE transaction before the bucket; consumed in the commit;
+    released on every failure; lapses after 15 min and a lapsed hold is re-checked at the commit. Restore holds its
+    entry pictures the same way. Upload commit now refuses (409 `image_changed`) if the picture changed meanwhile.
+  - `GET /api/profile/storage` (one query at any size); Profile > Storage: "X used of Y", meter, full state in words.
+  - Deferred: billing, plans, admin allowance route, per-universe quotas, other media, thumbnail charging, bucket
+    reconciliation of orphaned objects.
 - **Product refinement 039 - custom calendars** (`feat/custom-chronology-calendar` off `dev` at `ce4c416`; committed, not
   merged, not pushed). One migration (`AddChronologyCalendars`), backup **22**. ADR 0022 (main), 0009, 0014, 0024 amendments.
   - Simple dates stay the default (month 1-12, day 1-31, every existing universe untouched). Custom calendar = a

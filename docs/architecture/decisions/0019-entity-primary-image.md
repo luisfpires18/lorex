@@ -311,3 +311,12 @@ honest answer to "why does saving a photo feel slow" is that it is moving a few 
 over a home connection to a shared-core App Service - so the wait is also *reported* now, rather
 than hidden behind one word. Nothing here weakens the format gate, the server-cut thumbnail, the
 preserved original, the private bucket or the ordering.
+
+## Amendment: account storage (2026-10-06, ADR 0042)
+
+`ByteSize` - the original as received, unchanged in meaning - is what an account's storage counts, for the universe's
+owner; the thumbnail never counts. An upload that adds bytes holds them (`StorageReservations`) before the pair is written
+and consumes the hold in the commit; a full owner's upload is refused with 409 `storage_quota_exceeded` before the bucket
+is touched. The commit now re-reads the entry's picture and moves only if it is still the one the upload replaced (409
+`image_changed` otherwise), and the superseded pair it sweeps is the one the row named at the commit. Reframe, read and
+remove are untouched by the allowance.

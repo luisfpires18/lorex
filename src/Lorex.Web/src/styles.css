@@ -11564,6 +11564,28 @@ a.idearef__name {
   height: 3.25rem;
 }
 
+/* Storage on the Profile (ADR 0042): the amount in words, then the shared progress bar as a meter. Full is said in
+   a sentence; the bar's ink turns to the danger colour only as a second signal, never the only one. */
+.storage__amount {
+  margin: 0 0 var(--space-2);
+  font-size: 0.925rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.storage__meter[data-state='full'] .progressbar__fill {
+  background: var(--danger);
+}
+
+.storage__full {
+  margin: var(--space-3) 0 0;
+  font-size: 0.875rem;
+  color: var(--danger);
+}
+
+.storage .settings__note {
+  margin-top: var(--space-3);
+}
+
 /* The public name on the Profile screen: a form of its own under the circle. */
 .profile__public {
   margin-top: var(--space-7);

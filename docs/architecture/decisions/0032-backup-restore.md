@@ -271,3 +271,9 @@ earlier restore flat.
 
 A restored universe belongs to the restoring account alone, whoever exported it and whoever could reach the original. A
 restore never creates a membership and the archive holds none to restore; its answer carries `accessRole` Owner.
+
+## Amendment: storage (2026-10-06, ADR 0042)
+
+The entry pictures a restore writes are the restorer's storage. Their total is held before any is stored and consumed by
+the transaction that writes the universe; without room the restore answers 409 `storage_quota_exceeded`, keeps nothing and
+leaves the upload waiting. Artwork does not count. No allowance or hold is in a backup.

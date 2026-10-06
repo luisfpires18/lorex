@@ -162,9 +162,10 @@ public sealed class UniverseMembershipMigrationTests : IDisposable
         var rows = new List<string>();
         foreach (var table in tables)
         {
-            // A scene's custom month (AddChronologyCalendars, 039) arrives after memberships, so a rollback past it takes it.
+            // A scene's custom month (AddChronologyCalendars, 039) and an account's storage allowance (AddAccountStorageQuota,
+            // ADR 0042) arrive after memberships, so a rollback past them takes them.
             var columns = (await Strings(db, $"SELECT name AS Value FROM pragma_table_info('{table}') ORDER BY cid"))
-                .Where(column => column != "MonthId");
+                .Where(column => column is not "MonthId" and not "StorageQuotaBytes");
             var select = string.Join(" || '|' || ", columns.Select(column => $"COALESCE(CAST(\"{column}\" AS TEXT), '~')"));
             rows.AddRange(await Strings(db, $"SELECT '{table}:' || {select} AS Value FROM \"{table}\" ORDER BY 1"));
         }

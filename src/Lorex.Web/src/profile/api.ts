@@ -1,7 +1,7 @@
 import { apiFetch } from '../lib/api'
 import type { ImageCrop } from '../lib/imageCrop'
 import { apiUpload, type UploadProgress } from '../lib/upload'
-import type { ProfileImageRef } from './types'
+import type { AccountStorage, ProfileImageRef } from './types'
 
 const BASE = '/api/profile/image'
 
@@ -89,4 +89,9 @@ export async function setPublicName(publicDisplayName: string | null) {
       body: JSON.stringify({ publicDisplayName }),
     })
   ).publicDisplayName
+}
+
+/** How much of its storage the account is using - the universes it owns, never one it only collaborates on. */
+export function getAccountStorage(signal?: AbortSignal) {
+  return apiFetch<AccountStorage>('/api/profile/storage', { signal })
 }
