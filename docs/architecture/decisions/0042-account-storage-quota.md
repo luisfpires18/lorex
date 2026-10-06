@@ -11,8 +11,8 @@ future billing system can raise without changing what it means.
 The audit found: `EntityImage.ByteSize` already holds the size of the original as the server received it; an image row
 cascades with its entry and its universe, survives the Trash untouched, and is removed explicitly by Remove image and by
 permanent deletion; thumbnails are derived and regenerated (on upload, reframe and restore); a replacement writes the new
-pair before the database moves and sweeps the old pair only after the commit; a universe delete removes the rows and
-leaves the objects in the bucket. Universe restore (ADR 0032) also writes entry pictures - every one in the backup, into a
+pair before the database moves and sweeps the old pair only after the commit; a universe delete removed the rows and
+left the objects in the bucket (corrected below). Universe restore (ADR 0032) also writes entry pictures - every one in the backup, into a
 new universe the restorer owns - so it is a second way to add stored bytes. Storage I/O never runs inside a database
 transaction, and every transaction Microsoft.Data.Sqlite begins is `IMMEDIATE`.
 
@@ -81,12 +81,32 @@ Backup format stays 22.
 ## Consequences
 
 - The Profile shows "X used of Y" and a meter, and says so in words when full. No plans, no prices, no upgrade.
-- An upload that adds bytes runs five more small commands than before (the room check, the lapsed-hold cleanup, the hold,
-  the re-read of the current picture, consuming the hold) in two short transactions; one that adds nothing runs one more
-  (the re-read). Reading storage is one command at 0, 1 or 50 pictures.
+- An upload that adds bytes runs six more small commands than before (the room check, the lapsed-hold cleanup, the hold,
+  the entry-still-live check and the re-read of the current picture at the commit, consuming the hold) in two short
+  transactions; one that adds nothing runs two more (the two commit checks). Reading storage is one command at 0, 1 or
+  50 pictures.
 - An allowance below what an account stores is allowed and changes nothing already stored.
-- Objects a failed sweep, a universe delete or a crash leaves in the bucket are not counted and not reconciled. Finding
-  them is an operations job, not the author's bill.
+- Objects a failed sweep or a crash leaves in the bucket are not counted and not reconciled. Finding them is an
+  operations job, not the author's bill.
 - Not done: billing, plans, add-ons, an admin route to change an allowance, per-universe quotas, sharing an allowance,
   counting thumbnails or other media, a generic file system. The next stored category adds one subquery to
   `AccountStorage` and one field to the response.
+
+## Amendment: deleting a universe sweeps its pictures (2026-10-06, review correction)
+
+Permanent deletion of a universe removed its `EntityImages` and `UniverseArtworks` rows by cascade and never touched the
+bucket, so an owner could fill their allowance, delete the universe, get the room back and repeat, leaving every object
+behind for Lorex to pay for. Usage freeing at once was right; never attempting the cleanup was not.
+
+The delete now follows the order every picture follows. Inside its transaction, after the owner and archived checks, it
+reads the exact stored keys - each entry picture's `OriginalKey` and `ThumbnailKey`, the Trash included, and the
+artwork's `OriginalKey` and `CardKey` - never rebuilding them from the naming convention. It commits, and only then sweeps
+those keys through the existing `MediaObjectWrites.SweepAsync` helpers (entry pictures and artwork each with their own
+orphan log). Nothing is deleted from the bucket before the commit, so a failed delete leaves the universe and its objects
+whole. Once committed the universe is gone whatever the sweep does: a key that will not delete is logged as litter, and
+it never counts against the owner, whose usage fell with the rows. Artwork is swept here and still never counts.
+
+Each write path cleans up only what it wrote. An upload whose bytes were in the bucket while its universe was deleted
+finds at its commit that the entry is no longer live, sweeps its own objects, gives back its hold and answers 404; the
+delete never looks for objects nobody has committed. The same check makes an upload whose entry was trashed meanwhile a
+404 rather than a picture on a trashed entry.

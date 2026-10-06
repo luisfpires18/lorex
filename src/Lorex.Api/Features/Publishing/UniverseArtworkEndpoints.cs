@@ -31,7 +31,7 @@ public static partial class UniverseArtworkEndpoints
 
     public const string RequiredWhilePublicCode = "artwork_required_while_public";
 
-    private const string LoggerName = "Lorex.UniverseArtwork";
+    internal const string LoggerName = "Lorex.UniverseArtwork";
 
     private const long RequestBodyCeiling = ImagePreparation.MaxUploadBytes * 2;
 
@@ -510,7 +510,8 @@ public static partial class UniverseArtworkEndpoints
         return Results.Stream(stored.Content, cardId is null ? artwork.ContentType : "image/webp", enableRangeProcessing: false);
     }
 
-    private static Task SweepAsync(IMediaObjectStore store, ILogger logger, params string[] keys) =>
+    /// <summary>Deletes artwork objects nothing points at any more, together. See MediaObjectWrites.</summary>
+    internal static Task SweepAsync(IMediaObjectStore store, ILogger logger, params string[] keys) =>
         MediaObjectWrites.SweepAsync(store, logger, LogOrphanedObject, keys);
 
     [LoggerMessage(

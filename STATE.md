@@ -60,6 +60,9 @@ Operational state only. Architecture: `docs/architecture/decisions/README.md`. P
   - `StorageReservations` holds growth in one short IMMEDIATE transaction before the bucket; consumed in the commit;
     released on every failure; lapses after 15 min and a lapsed hold is re-checked at the commit. Restore holds its
     entry pictures the same way. Upload commit now refuses (409 `image_changed`) if the picture changed meanwhile.
+  - Review correction: permanent universe delete reads its pictures' and artwork's stored keys in the delete transaction
+    and sweeps them after the commit (it never swept before: a quota bypass). Sweep failure = logged litter, usage stays
+    freed. An upload whose entry or universe went meanwhile answers 404 and sweeps its own objects.
   - `GET /api/profile/storage` (one query at any size); Profile > Storage: "X used of Y", meter, full state in words.
   - Deferred: billing, plans, admin allowance route, per-universe quotas, other media, thumbnail charging, bucket
     reconciliation of orphaned objects.

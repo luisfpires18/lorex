@@ -277,6 +277,19 @@ public static partial class EntityImageEndpoints
                 // and its objects are the ones that would need sweeping - so it wins, and this one
                 // answers 409 and takes its own objects back out. Read inside the transaction, which
                 // holds the writer lock, so nothing can move between this check and the save.
+                // The entry itself must still be live: a universe deleted, or an entry trashed or erased, while the
+                // bytes were on their way leaves this upload nothing to attach to. Its own objects come back out and
+                // its hold is given back below; the delete swept only what had been committed.
+                if (!await db.Entities.AnyAsync(
+                        candidate => candidate.Id == entityId
+                            && candidate.UniverseId == universeId
+                            && candidate.DeletedAt == null,
+                        cancellationToken))
+                {
+                    await SweepAsync(store, logger, originalKey, thumbnailKey);
+                    return Results.NotFound();
+                }
+
                 var current = await db.EntityImages.AsNoTracking()
                     .Where(image => image.EntityId == entityId)
                     .Select(image => new { image.AssetId, image.OriginalKey, image.ThumbnailKey })

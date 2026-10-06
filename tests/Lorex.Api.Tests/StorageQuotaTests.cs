@@ -488,6 +488,160 @@ public sealed class StorageQuotaTests(LorexApiFactory factory) : IClassFixture<L
         Assert.Equal(0, (await Storage(client)).UsedBytes);
     }
 
+    // ---------- Deleting a universe ----------
+
+    [Fact]
+    public async Task Deleting_a_universe_sweeps_its_pictures_and_artwork_and_frees_their_space()
+    {
+        var (client, _) = await PublishingTestClient.Account(_factory, "sq-delete");
+        var (stranger, _) = await PublishingTestClient.Account(_factory, "sq-delete-stranger");
+        var gone = (await PublishingTestClient.CreateUniverse(client, "Deleted world")).Id;
+        var kept = (await PublishingTestClient.CreateUniverse(client, "Kept world")).Id;
+        var theirs = (await PublishingTestClient.CreateUniverse(stranger, "Their world")).Id;
+
+        var first = await PlotTestClient.CreateEntity(client, gone, "First");
+        var second = await PlotTestClient.CreateEntity(client, gone, "Second");
+        var binned = await PlotTestClient.CreateEntity(client, gone, "Binned");
+        await Uploaded(client, gone, first, Small);
+        await Uploaded(client, gone, second, Medium);
+        await Uploaded(client, gone, binned, Large);
+        await CollaborationTestClient.Ok(client.DeleteAsync($"/api/universes/{gone}/entities/{binned}"));
+        await PublishingTestClient.UploadedArtwork(client, gone, RestoreTestClient.Png(1600, 1000, seed: 4));
+
+        var stays = await Uploaded(client, kept, await PlotTestClient.CreateEntity(client, kept, "Stays"), Medium);
+        await PublishingTestClient.UploadedArtwork(client, kept, RestoreTestClient.Png(1600, 1000, seed: 5));
+        await Uploaded(stranger, theirs, await PlotTestClient.CreateEntity(stranger, theirs, "Theirs"), Small);
+
+        var doomed = await StoredKeys(gone);
+        var unrelated = (await StoredKeys(kept)).Concat(await StoredKeys(theirs)).ToList();
+        Assert.Equal(8, doomed.Count);
+        Assert.All(doomed.Concat(unrelated), key => Assert.True(_factory.Media.Contains(key), key));
+        Assert.Equal(Small.Length + Medium.Length + Large.Length + stays.ByteSize, (await Storage(client)).UsedBytes);
+
+        await CollaborationTestClient.Ok(client.PostAsync($"/api/universes/{gone}/archive", null));
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/universes/{gone}")).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/universes/{gone}")).StatusCode);
+        Assert.False(await HasImage(first));
+        Assert.False(await HasImage(second));
+        Assert.False(await HasImage(binned));
+        Assert.Empty(await StoredKeys(gone));
+        Assert.Equal(stays.ByteSize, (await Storage(client)).UsedBytes);
+
+        Assert.All(doomed, key => Assert.False(_factory.Media.Contains(key), key));
+        Assert.All(unrelated, key => Assert.True(_factory.Media.Contains(key), key));
+    }
+
+    [Fact]
+    public async Task Space_freed_by_deleting_a_universe_can_be_used_again_and_its_objects_are_gone()
+    {
+        var (client, userId) = await PublishingTestClient.Account(_factory, "sq-reuse");
+        var old = (await PublishingTestClient.CreateUniverse(client, "Old world")).Id;
+        await Uploaded(client, old, await PlotTestClient.CreateEntity(client, old, "A"), Medium);
+        await Uploaded(client, old, await PlotTestClient.CreateEntity(client, old, "B"), Large);
+        await SetQuota(userId, Medium.Length + Large.Length);
+
+        var replacement = (await PublishingTestClient.CreateUniverse(client, "New world")).Id;
+        var entry = await PlotTestClient.CreateEntity(client, replacement, "C");
+        await AssertNoRoom(await Upload(client, replacement, entry, Large), owner: true);
+
+        var oldKeys = await StoredKeys(old);
+        await CollaborationTestClient.Ok(client.PostAsync($"/api/universes/{old}/archive", null));
+        await CollaborationTestClient.Ok(client.DeleteAsync($"/api/universes/{old}"));
+
+        Assert.Equal(0, (await Storage(client)).UsedBytes);
+        Assert.All(oldKeys, key => Assert.False(_factory.Media.Contains(key), key));
+        Assert.DoesNotContain(_factory.Media.Keys, key => key.Contains(old.ToString("D"), StringComparison.Ordinal));
+
+        Assert.Equal(Large.Length, (await Uploaded(client, replacement, entry, Large)).ByteSize);
+        Assert.Equal(Large.Length, (await Storage(client)).UsedBytes);
+    }
+
+    [Fact]
+    public async Task A_sweep_that_fails_after_the_delete_leaves_the_universe_deleted_and_the_space_free()
+    {
+        var (client, _) = await PublishingTestClient.Account(_factory, "sq-sweepfail");
+        var gone = (await PublishingTestClient.CreateUniverse(client, "Litter world")).Id;
+        var kept = (await PublishingTestClient.CreateUniverse(client, "Clean world")).Id;
+        var entry = await PlotTestClient.CreateEntity(client, gone, "Litter");
+        await Uploaded(client, gone, entry, Medium);
+        await PublishingTestClient.UploadedArtwork(client, gone, RestoreTestClient.Png(1600, 1000, seed: 6));
+        var stays = await Uploaded(client, kept, await PlotTestClient.CreateEntity(client, kept, "Clean"), Small);
+        var doomed = await StoredKeys(gone);
+        var unrelated = await StoredKeys(kept);
+        await CollaborationTestClient.Ok(client.PostAsync($"/api/universes/{gone}/archive", null));
+
+        _factory.Media.FailDelete = key => key.Contains(gone.ToString("D"), StringComparison.Ordinal)
+            ? new Lorex.Api.Features.Media.MediaStorageFailedException("Image storage could not complete the request.", new InvalidOperationException("synthetic"))
+            : null;
+        HttpResponseMessage deleted;
+        try
+        {
+            deleted = await client.DeleteAsync($"/api/universes/{gone}");
+        }
+        finally
+        {
+            _factory.Media.FailDelete = null;
+        }
+
+        // The delete stands: the bucket failing afterwards is litter, logged, never a reason to bring the universe back.
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/universes/{gone}")).StatusCode);
+        Assert.False(await HasImage(entry));
+        Assert.Empty(await StoredKeys(gone));
+
+        // And it is not the author's: nothing names it, so nothing counts it.
+        Assert.Equal(stays.ByteSize, (await Storage(client)).UsedBytes);
+        Assert.All(doomed, key => Assert.True(_factory.Media.Contains(key), key));
+        Assert.All(unrelated, key => Assert.True(_factory.Media.Contains(key), key));
+
+        foreach (var key in doomed)
+        {
+            _factory.Media.Evict(key);
+        }
+    }
+
+    [Fact]
+    public async Task An_upload_racing_its_universes_deletion_attaches_nothing_and_cleans_up_after_itself()
+    {
+        var (client, userId) = await PublishingTestClient.Account(_factory, "sq-deleterace");
+        var u = (await PublishingTestClient.CreateUniverse(client, "Vanishing world")).Id;
+        var committed = await PlotTestClient.CreateEntity(client, u, "Committed");
+        var racing = await PlotTestClient.CreateEntity(client, u, "Racing");
+        await Uploaded(client, u, committed, Small);
+        var committedKeys = await StoredKeys(u);
+        await CollaborationTestClient.Ok(client.PostAsync($"/api/universes/{u}/archive", null));
+
+        // The universe is deleted while the racing upload's bytes are in the bucket and nothing names them yet.
+        HttpStatusCode deletion = default;
+        _factory.Media.BeforePut = async key =>
+        {
+            if (key.Contains(racing.ToString("D"), StringComparison.Ordinal) && key.Contains("original", StringComparison.Ordinal))
+            {
+                deletion = (await client.DeleteAsync($"/api/universes/{u}")).StatusCode;
+            }
+        };
+        HttpResponseMessage late;
+        try
+        {
+            late = await Upload(client, u, racing, Medium);
+        }
+        finally
+        {
+            _factory.Media.BeforePut = null;
+        }
+
+        Assert.Equal(HttpStatusCode.NoContent, deletion);
+        Assert.Equal(HttpStatusCode.NotFound, late.StatusCode);
+        Assert.False(await HasImage(racing));
+        Assert.Empty(await Holds(userId));
+        Assert.Equal(0, (await Storage(client)).UsedBytes);
+
+        // The delete swept what had been committed; the upload swept what it had written itself.
+        Assert.All(committedKeys, key => Assert.False(_factory.Media.Contains(key), key));
+        Assert.DoesNotContain(_factory.Media.Keys, key => key.Contains(u.ToString("D"), StringComparison.Ordinal));
+    }
+
     // ---------- Restore ----------
 
     [Fact]
@@ -668,6 +822,22 @@ public sealed class StorageQuotaTests(LorexApiFactory factory) : IClassFixture<L
             ExpiresAt = expiresAt,
         });
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>Every object key a universe's rows name: its entries' pictures, Trash included, and its artwork.</summary>
+    private async Task<List<string>> StoredKeys(Guid universeId)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<LorexDbContext>();
+        var pictures = await db.EntityImages.AsNoTracking()
+            .Where(image => image.Entity!.UniverseId == universeId)
+            .Select(image => new[] { image.OriginalKey, image.ThumbnailKey })
+            .ToListAsync();
+        var artwork = await db.UniverseArtworks.AsNoTracking()
+            .Where(row => row.UniverseId == universeId)
+            .Select(row => new[] { row.OriginalKey, row.CardKey })
+            .ToListAsync();
+        return [.. pictures.Concat(artwork).SelectMany(keys => keys)];
     }
 
     private async Task<bool> HasImage(Guid entityId)
